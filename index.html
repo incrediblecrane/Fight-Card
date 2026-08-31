@@ -1,0 +1,832 @@
+<!doctype html><html><head><!-- frame-runtime --><base href="/_f/1788127620-d3b0/"><script>window.__FRAME_PREAMBLE={"v":1,"capabilities":{"artifact":"artifact.D_F1mx8d.js","assets":"assets.8Gk803W0.js","comments":"comments.GLuHR3zP.js","db":"db.h-3sndFg.js","downloads":"downloads.C3GSvEDP.js","embed":"embed.CxGAyc-v.js","mcp":"mcp.Bvma3qD7.js","network":"network.B5UA9Su4.js","notifications":"notifications.ssU4jy7G.js","permissions":"permissions.BNySkLV5.js","room":"room.BMMoe2BY.js","sample":"sample.BW2Uysoh.js","self":"artifact.D_F1mx8d.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.DSB5x63f.js","comments":"_comments.BoakUwmM.js","translate":"_translate.5HCW4BJh.js"}</script><script>(function(){"use strict";var te=["light","dark","system"],re=/^[A-Za-z0-9_-]{1,64}$/,$=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,ne=new Set(["class","hidden","value","checked","style","title","alt","placeholder","lang","dir","role","tabindex","disabled","readonly","contenteditable","open","colspan","rowspan"]);function oe(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||ne.has(t)}var Be="http://www.w3.org/1999/xhtml",se="http://www.w3.org/2000/svg",ae=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),ie=new Set(["script","style"]);function ce(e){const t=e.localName.toLowerCase();return e.namespaceURI==="http://www.w3.org/1999/xhtml"?!ae.has(t):e.namespaceURI===se?!ie.has(t):!1}function M(e,t){return e===t||(e===160||e===32)&&(t===160||t===32)}function le(e,t){const r=e.length,n=t.length;let s=0;for(;s<r&&s<n&&M(e.charCodeAt(s),t.charCodeAt(s));)s++;let o=0;for(;o<r-s&&o<n-s&&M(e.charCodeAt(r-1-o),t.charCodeAt(n-1-o));)o++;return{p:s,s:o}}function ue(e,t){const r=e.firstChild;if(e.childNodes.length!==1||r===null||r.nodeType!==Node.TEXT_NODE){e.textContent=t;return}const n=r.data,s=n.length,o=t.length,{p:i,s:c}=le(n,t);i===s&&c===0&&s===o||r.replaceData(i,s-i-c,t.slice(i,o-c));const h=r.data,p=e.ownerDocument.getSelection?.()??null,w=p!==null&&p.rangeCount>0&&(p.anchorNode===r||p.focusNode===r)?{anchor:p.anchorNode,anchorOffset:p.anchorOffset,focus:p.focusNode,focusOffset:p.focusOffset}:null;let m=-1,g=-1;for(let f=0;f<h.length&&f<t.length;f++){const v=h.charCodeAt(f),b=t.charCodeAt(f);v!==b&&M(v,b)&&(m<0&&(m=f),g=f)}const a=m>=0;if(a&&r.replaceData(m,g-m+1,t.slice(m,g+1)),a&&w!==null&&w.anchor!==null&&w.focus!==null)try{p.setBaseAndExtent(w.anchor,w.anchorOffset,w.focus,w.focusOffset)}catch{}}var fe=new Set(["html","head","body","frameset"]);function de(e){return e.namespaceURI==="http://www.w3.org/1999/xhtml"&&fe.has(e.localName)}function pe(e){if(e===null||typeof e!="object")return!1;const t=e;if(typeof t.target!="string"||!re.test(t.target)||t.text!==void 0&&typeof t.text!="string")return!1;if(t.attrsSet!==void 0){if(t.attrsSet===null||typeof t.attrsSet!="object")return!1;for(const[r,n]of Object.entries(t.attrsSet))if(!$.test(r)||typeof n!="string")return!1}if(t.attrsRemoved!==void 0){if(!Array.isArray(t.attrsRemoved))return!1;for(const r of t.attrsRemoved)if(typeof r!="string"||!$.test(r))return!1}return!0}function me(e,t){if(e===null||typeof e!="object")return!1;const{seq:r,elements:n}=e;if(typeof r!="number"||!Number.isSafeInteger(r)||!Array.isArray(n)||n.length===0||n.length>64)return!1;for(let s=0;s<n.length;s++)if(!t(n[s]))return!1;return!0}function he(e){return e===null||typeof e!="object"?!1:me(e.__frame_patch,pe)}function _e(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function ve(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function ye(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const r=t.theme;return typeof r=="string"&&te.includes(r)}var A=/^[\w.-]+\.js$/;function we(e,t,r){return r?"inert":typeof t=="string"&&A.test(t)?e?[t]:"inert":e?"inert":"framed"}function ge(){return{post(e,t){parent.postMessage(e,t)},on(e){const t=r=>{r.source===parent&&e(r.data,r.origin,r.isTrusted)};return addEventListener("message",t),()=>removeEventListener("message",t)}}}function be(){return{post:()=>{},on:()=>()=>{}}}var j="__frame_scroll",Ee=150,Ae=310,Se=160,Te=3e4;function ke(){let e=0,t=!1,r=!1,n=!1,s=0,o=null;const i=l=>{try{sessionStorage.setItem(j,JSON.stringify({y:l}))}catch{}},c=()=>{if(clearTimeout(e),o===null)return;const l=o;o=null,i(l)},h=()=>{if(t){t=!1;return}r=!0,o=scrollY,clearTimeout(e),e=setTimeout(c,Ee)};try{addEventListener("scroll",h,{passive:!0}),addEventListener("pagehide",c)}catch{}const p=()=>{let l;try{l=sessionStorage.getItem(j)}catch{return null}if(l===null)return null;let _;try{_=JSON.parse(l)}catch{_=null}const d=_?.y;if(!(typeof d=="number"&&Number.isFinite(d)&&d>=0)){try{sessionStorage.removeItem(j)}catch{}return null}return d};let w=!1;const m=l=>{try{const _=scrollY;scrollTo({top:l,left:0,behavior:"instant"}),s=l,n=!0,clearTimeout(e),o=null,i(l);const d=scrollY;d!==_&&(t=!0),d!==l&&!w&&(w=!0,addEventListener("load",()=>{try{if(scrollY===d){const T=p();m(T!==null?T:s)}}catch{}},{once:!0}))}catch{}},g=()=>{try{return!!location.hash}catch{return!0}};let a=!1;const f=()=>{try{if(a||innerWidth>Ae||innerHeight>Se)return;a=!0;const l=Date.now(),_=()=>{try{removeEventListener("resize",_)}catch{}if(Date.now()-l>Te||r||g())return;const d=p();m(d!==null?d:s)};addEventListener("resize",_)}catch{}};let v=!1,b=!1;return{restore(){if(v||(v=!0,g()))return;const l=p();l!==null&&(m(l),f())},promoted(){if(b||(b=!0,g()))return;const l=p();l!==null?(m(l),f()):n&&m(s)}}}function Re(e,t,r,n){let s=null;try{s=window.trustedTypes?.createPolicy("frame-runtime",{createScriptURL:h=>h})??null}catch{}const o=window.Worker,i=o?.prototype,c=Object.freeze({Worker:o,workerOn:i?.addEventListener,workerPost:i?.postMessage,workerTerminate:i?.terminate,fetch:window.fetch.bind(window),preventDefault:Event.prototype.preventDefault,policy:s,origins:t});r(e).then(h=>h?.bootTopLevel?h.bootTopLevel(c,n):n.settle()).catch(()=>n.settle())}var De="modulepreload",Ie=function(e){return"/"+e},Ue={},Le=function(t,r,n){let s=Promise.resolve();function o(i){const c=new Event("vite:preloadError",{cancelable:!0});if(c.payload=i,window.dispatchEvent(c),!c.defaultPrevented)throw i}return s.then(i=>{for(const c of i||[])c.status==="rejected"&&o(c.reason);return t().catch(o)})},Oe=window===top,q=Object.getOwnPropertyDescriptor(window,"claude"),k=we(Oe,window.__FRAME_PREAMBLE?.topLevel,q?.writable===!1),N=typeof k=="object"&&k[0],y=N?be():ge();(function(){const e=Object.defineProperty,t=globalThis,r=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let n=0;for(let s=0;s<r.length;s++){const o=r[s];try{e(t,o,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[o]}catch{}try{e(t,o,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[o]=="function"&&n++}if(n&&k==="framed")try{y.post({__frame_rtc_lockdown_failed:n},"*")}catch{}})();var Pe=1e4,Y=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function X(e){for(const t of Y)if(t.endsWith(":*"))try{const r=new URL(e);if(`${r.protocol}//${r.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var R=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),B=window.__FRAME_PREAMBLE?.transforms,D=window.__FRAME_PREAMBLE?.comments,I=window.__FRAME_PREAMBLE?.translate;function S(e){return Le(()=>import("/_runtime/"+e),void 0)}function G(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:x,hooks:O,pipe:()=>({wrap:(r,n)=>(...s)=>{try{return n(...s)}catch(o){return Promise.reject(o)}}})}}var L=null,E=null;function V(e,t,r){try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var U=!1,O={editBefore:null,edit:null};function Ce(e,t,r=!1){const n=[];let s;if(r)try{O.editBefore?.(e)}catch{}for(const o of e.elements){const i=document.querySelector(`[data-id="${o.target}"]`);if(!i){s=o.target;break}if([...Object.keys(o.attrsSet??{}),...o.attrsRemoved??[]].some(c=>!oe(c))){s=o.target;break}if(o.text!==void 0&&(!ce(i)||de(i))){s=o.target;break}for(const[c,h]of Object.entries(o.attrsSet??{}))if(!J(i,c)){try{i.setAttribute(c,h)}catch{}Z(i,c,h)}for(const c of o.attrsRemoved??[])J(i,c)||(i.removeAttribute(c),Z(i,c,null));typeof o.text=="string"&&ue(i,o.text),n.push(o.target)}if(r)try{O.edit?.(e.seq,n,s)}catch{}if(s!==void 0){y.post({__frame_patch_miss:{seq:e.seq}},t);return}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function Z(e,t,r){if(!(e instanceof HTMLInputElement))return;const n=t.toLowerCase();n==="checked"?e.checked=r!==null:n==="value"&&e.type!=="file"&&(e.value=r??"")}function J(e,t){const r=t.toLowerCase(),n=e;return r==="data-id"||(r==="value"||r==="checked")&&(n.__artifactSecret===!0||/^(password|hidden|file)$/.test(n.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${n.autocomplete??""}`))}function Q(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,U=!0):U&&(delete t.dataset.theme,t.style.colorScheme="",U=!1)}var P=new Map;function Me(){let e;const t={u:new Promise(r=>{e=r}),r:r=>{t.done=!0,e(r)},done:!1,nulled:!1};return t}function F(){for(const e of P.values())e.done||(e.nulled=!0,e.r(null))}var je=Object.freeze(Object.assign(Object.create(null),{call:Function.prototype.call,apply:Function.prototype.apply,bind:Function.prototype.bind})),x=(e,t)=>{const r=P.get(e);if(!r||r.done){r?.nulled&&E&&y.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:e}},E);return}const n=typeof t=="function"?Object.setPrototypeOf(t,je):Object.assign(Object.create(null),t);typeof n.then=="function"&&delete n.then,r.r(Object.freeze(n))};function ee(){const e=q?.value??{};V(window,"claude",e);for(const t of Object.keys(R)){if(e[t]!==void 0){V(e,t,e[t]);continue}P.set(t,Me())}if(e.use===void 0){const t=r=>{if(typeof r!="string"||!Object.hasOwn(R,r))return Promise.resolve(null);const n=P.get(r);return n?n.u:Promise.resolve(e[r]??null)};try{Object.defineProperty(e,"use",{value:t,writable:!0,configurable:!0,enumerable:!1})}catch{}}}if(k==="framed"){const e=B&&A.test(B)?S(B).catch(()=>{}):Promise.resolve(void 0),t=a=>{if(a.type==="auxclick"&&a.button!==1)return;const f=a.target,v=f&&f.closest?f.closest("a[href],area[href]"):null;if(!v)return;const b=v.getAttribute("href");if(!b)return;let l;try{l=new URL(b,document.baseURI)}catch{return}if((l.protocol==="http:"||l.protocol==="https:")&&l.origin!==location.origin){a.preventDefault();const _=(v.getAttribute("target")??"").toLowerCase(),d=a.type==="auxclick"||a.metaKey||a.ctrlKey||a.shiftKey||a.altKey||!["","_self","_top","_parent"].includes(_);y.post({__frame_nav:!0,url:l.href,newTab:d},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const r={},n=a=>{a.isTrusted&&(r.pointer=!0)},s=a=>{a.isTrusted&&(r.click=!0)};addEventListener("pointermove",n,{capture:!0,passive:!0}),addEventListener("click",s,{capture:!0,passive:!0}),e.then(a=>{a?.wireNav&&(a.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",n,!0),removeEventListener("click",s,!0),a.wireEngagement?.(r))});let o=null;try{o=ke()}catch{}ee();let i=null,c=null,h=0;const p=y.on((a,f)=>{X(f)&&_e(a)&&(i=a.__frame_init,E=f,p(),clearTimeout(h),c?.())});y.post({__frame_connect:!0},"*");const w=new Promise(a=>{c=a,h=setTimeout(()=>{p(),a()},Pe)}),m=document.readyState==="loading"?new Promise(a=>document.addEventListener("DOMContentLoaded",()=>a(),{once:!0})):Promise.resolve();m.then(()=>{try{o?.restore()}catch{}});const g={cb:null};y.on((a,f)=>{if(X(f)&&ve(a)){try{o?.promoted()}catch{}g.cb?.()}}),w.then(async()=>{if(!i||!E){F();return}Q(i.theme);const a=E;let f=!1,v=!1;y.on((u,z,C)=>{if(z!==a)return;ye(u)&&Q(u.__frame_theme.theme),he(u)&&Ce(u.__frame_patch,a,C);const H=u?.__fc_mode;H&&typeof H=="object"&&!f&&D&&A.test(D)&&(f=!0,S(D).then(K=>K.install?.(a,H.on===!0)).catch(()=>{}));const W=u?.__ft_cmd;W&&typeof W=="object"&&!v&&I&&A.test(I)&&(v=!0,S(I).then(K=>K.install?.(a,W)).catch(()=>{}))});const b=Object.keys(i.capabilities??{}).filter(u=>Object.hasOwn(R,u)).map(u=>[u,R[u]]).filter(u=>typeof u[1]=="string"&&A.test(u[1])),l=await Promise.allSettled(b.map(([,u])=>S(u))),_=await e,d=E;if(_?.buildBoot||y.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},d),_?.buildBoot)try{L=_.buildBoot(i,_.TRANSFORMS??{},{shellOrigin:d,mount:x,hooks:O},u=>y.post({__frame_cap_telemetry:u},d))}catch{y.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},d),L=G(i,d)}else L=G(i,d);const T=u=>y.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:u}},d),Ne=L;l.forEach((u,z)=>{const C=b[z][0];if(u.status!=="fulfilled"){T(C);return}try{u.value?.install?.(Ne)}catch{T(C)}}),F(),await m,y.post({__frame_ready:!0},E),e.then(u=>u?.installSizeReporter?.(d,g))})}else N&&(ee(),Re(N,Y,S,{settle:F,mount:x}))})();</script><!-- /frame-runtime --><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fight Card</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"><style>*{box-sizing:border-box;}:root{  --bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;  --text:#18181C;--text-soft:#55555F;--text-faint:#8A8A93;  --accent:#E8500F;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;}@media (prefers-color-scheme: dark){  :root:not([data-theme=light]){    --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;    --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;    --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;  }}:root[data-theme=dark]{  --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;  --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;  --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}.wrap{max-width:680px;margin:0 auto;padding:18px 16px 90px;}.hud{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;}.hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}.brand{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:0.02em;font-size:1.5rem;text-transform:uppercase;margin:0;}.brand span{color:var(--accent);}.date{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);text-align:right;line-height:1.5;}.lvl-row{display:flex;align-items:center;gap:10px;margin-top:14px;}.lvl-badge{font-family:'Anton',sans-serif;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:4px 10px;font-size:1rem;letter-spacing:0.02em;white-space:nowrap;}.xp-track{flex:1;height:8px;border-radius:5px;background:var(--surface-raised);border:1px solid var(--line);overflow:hidden;}.xp-fill{height:100%;background:var(--accent);border-radius:5px 0 0 5px;}.xp-num{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--text-faint);white-space:nowrap;font-variant-numeric:tabular-nums;}.streaks{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;}.streak{font-family:'IBM Plex Mono',monospace;}.streak .n{font-size:1.4rem;font-weight:600;font-variant-numeric:tabular-nums;}.streak .l{font-size:0.66rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.08em;display:block;}.week{display:flex;gap:6px;margin-top:14px;}.dot{width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--text-faint);}.dot.touched{border-color:var(--accent);color:var(--text);}.dot.clean{background:var(--good);border-color:var(--good);color:#fff;}.dot.flagged{background:var(--warn);border-color:var(--warn);color:#1a1a1a;}.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}.tab{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 14px;border-radius:8px;cursor:pointer;}.tab.active{background:var(--text);color:var(--bg);border-color:var(--text);}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}@media (max-width:420px){.grid{grid-template-columns:1fr;}}.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;}.card h3{font-family:'Anton',sans-serif;font-weight:400;font-size:1.05rem;letter-spacing:0.01em;text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;}.card .sub{font-size:0.78rem;color:var(--text-faint);margin:-6px 0 12px;}.linklike{background:none;border:none;color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:0.72rem;cursor:pointer;padding:0;margin-top:10px;display:block;}.stepper{display:flex;align-items:center;gap:12px;}.stepper button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1.2rem;cursor:pointer;}.stepper button.big{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}.stepper .count{font-family:'IBM Plex Mono',monospace;font-size:1.6rem;font-weight:600;min-width:2.2ch;text-align:center;font-variant-numeric:tabular-nums;}.dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;}.dots .cup{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line);}.dots .cup.on{background:var(--accent);border-color:var(--accent);}.pillgrid{display:flex;flex-wrap:wrap;gap:8px;}.pill{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:8px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text-soft);cursor:pointer;}.pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.note{font-size:0.78rem;color:var(--text-faint);margin-top:10px;}.sectiontitle{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.1rem;letter-spacing:0.01em;margin:26px 0 10px;}.sectiontitle:first-child{margin-top:0;}.libitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}.libitem .row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}.libitem h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.98rem;margin:0 0 4px;}.libitem .tag{font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);}.libitem p{font-size:0.86rem;color:var(--text-soft);margin:6px 0 0;white-space:pre-wrap;}.libitem ul{margin:8px 0 0;padding-left:1.1em;font-size:0.86rem;color:var(--text-soft);}.libitem li{margin:2px 0;}.libitem .x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1rem;padding:2px 6px;}.recipe-controls{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}.recipe-controls select{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}.inplan{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-soft);cursor:pointer;}.addform{background:var(--surface-raised);border:1px dashed var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;}.addform input,.addform select,.addform textarea{width:100%;font-family:'Work Sans',sans-serif;font-size:0.9rem;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);margin-top:8px;}.addform textarea{min-height:60px;resize:vertical;}.addform button{margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 16px;cursor:pointer;}.weekbox{background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;}.weekbox .empty{color:var(--text-faint);font-size:0.86rem;}.weekrow{display:flex;justify-content:space-between;font-size:0.86rem;padding:4px 0;border-bottom:1px solid var(--line);}.weekrow:last-child{border-bottom:none;}.weekrow .d{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:0.72rem;text-transform:uppercase;min-width:3.2em;}.shop{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:0.9rem;}.shop:last-child{border-bottom:none;}.shop .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);flex-shrink:0;}.shop.checked{color:var(--text-faint);text-decoration:line-through;}.shop.checked .box{background:var(--good);border-color:var(--good);}.clearbtn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;margin-top:10px;}.banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}.resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}.resume-banner .btns{display:flex;gap:8px;flex-shrink:0;}.resume-banner button.go{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:8px 12px;cursor:pointer;}.resume-banner button.x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1rem;}.wcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}.wcard .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}.wcard h4{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}.wcard .meta{font-size:0.78rem;color:var(--text-faint);}.wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;}.story{max-width:420px;margin:0 auto;}.story-bar{display:flex;gap:4px;margin-bottom:12px;}.story-bar i{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;position:relative;}.story-bar i b{display:block;height:100%;background:var(--accent);width:0%;}.story-bar i.done b{width:100%;}.story-bar i.now b{width:100%;}.story-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}.story-head button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap;}.story-title{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:0.95rem;color:var(--text-faint);margin:0;}.slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y;}.fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;}.fig-wrap svg{width:130px;height:170px;}.fig-wrap svg line,.fig-wrap svg circle{transition:all .7s cubic-bezier(.4,0,.2,1);}@media (prefers-reduced-motion:reduce){.fig-wrap svg line,.fig-wrap svg circle{transition:none;}}.slide h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1.15rem;margin:0 0 2px;text-align:center;}.slide .cat{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;text-align:center;display:block;margin-bottom:8px;}.slide .target{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--text-faint);text-align:center;}.slide .cue{font-size:0.85rem;color:var(--text-soft);text-align:center;margin:8px 0 14px;}.setchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;justify-content:center;}.setchip{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:var(--surface-raised);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-variant-numeric:tabular-nums;}.logrow{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}.logrow input{width:76px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}.logrow button{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;background:var(--good);color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;}.logrow .undo{background:none;color:var(--text-faint);border:1px solid var(--line);}.storynav{display:flex;gap:10px;margin-top:16px;}.storynav button{flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;text-transform:uppercase;border-radius:10px;padding:13px;cursor:pointer;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}.storynav button.next{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.storynav button.finish{background:var(--text);border-color:var(--text);color:var(--bg);}.storynav button.skip{background:none;color:var(--text-faint);border-style:dashed;flex:0.7;}.storynav button:disabled{opacity:0.35;cursor:default;}.addex-btn{display:block;width:100%;margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:none;border:1px dashed var(--line);color:var(--text-soft);border-radius:10px;padding:10px;cursor:pointer;}.discard-btn{display:block;width:100%;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;background:none;border:none;color:var(--text-faint);cursor:pointer;padding:6px;}.picker{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;}.picker input{width:100%;font-family:'Work Sans',sans-serif;font-size:0.92rem;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);margin-bottom:12px;}.pickgroup-title{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);padding:16px 4px 4px;}.pickrow{border-bottom:1px solid var(--line);}.pickrow:last-child{border-bottom:none;}.pickrow-head{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;gap:10px;}.pickrow-main{flex:1;cursor:pointer;}.pickrow-main .n{font-size:0.92rem;font-weight:600;}.pickrow-main .c{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--text-faint);text-transform:uppercase;}.pickrow-head button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;flex-shrink:0;}.pickrow-head button.added{background:var(--surface-raised);color:var(--text-faint);}.pickpreview{padding:0 4px 16px;}.preview-figs{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px;}.preview-figs .pf{width:72px;}.preview-figs .pf svg{width:100%;display:block;}.preview-figs .arrow{color:var(--text-faint);font-size:1.1rem;}.pickpreview .cue{font-size:0.8rem;color:var(--text-soft);text-align:center;margin:0;}.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:6px;}.stat-tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}.stat-tile .n{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums;}.stat-tile .l{font-size:0.7rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.exrow{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;}.exrow .top{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:10px;}.exrow .top h4{font-size:0.94rem;margin:0;font-family:'Work Sans',sans-serif;font-weight:700;}.exrow .top .last{font-size:0.74rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;white-space:nowrap;}.exdetail{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;overflow-x:auto;}.exdetail table{width:100%;border-collapse:collapse;font-size:0.8rem;}.exdetail td,.exdetail th{padding:4px 6px 4px 0;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;}.exdetail th{color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;}.bartrack{background:var(--surface-raised);border-radius:3px;overflow:hidden;width:60px;height:6px;}.bar{height:6px;background:var(--accent);border-radius:3px;}.recent-log{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;font-size:0.86rem;display:flex;justify-content:space-between;gap:10px;}.recent-log .d{color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:0.74rem;white-space:nowrap;}@media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}</style></head><body><div id="app"></div><script>(function App(DATA){
+
+var CSS = "\
+*{box-sizing:border-box;}\
+:root{\
+  --bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;\
+  --text:#18181C;--text-soft:#55555F;--text-faint:#8A8A93;\
+  --accent:#E8500F;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;\
+}\
+@media (prefers-color-scheme: dark){\
+  :root:not([data-theme=light]){\
+    --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;\
+    --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;\
+    --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;\
+  }\
+}\
+:root[data-theme=dark]{\
+  --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;\
+  --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;\
+  --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;\
+}\
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}\
+.wrap{max-width:680px;margin:0 auto;padding:18px 16px 90px;}\
+.hud{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;}\
+.hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}\
+.brand{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:0.02em;font-size:1.5rem;text-transform:uppercase;margin:0;}\
+.brand span{color:var(--accent);}\
+.date{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);text-align:right;line-height:1.5;}\
+.lvl-row{display:flex;align-items:center;gap:10px;margin-top:14px;}\
+.lvl-badge{font-family:'Anton',sans-serif;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:4px 10px;font-size:1rem;letter-spacing:0.02em;white-space:nowrap;}\
+.xp-track{flex:1;height:8px;border-radius:5px;background:var(--surface-raised);border:1px solid var(--line);overflow:hidden;}\
+.xp-fill{height:100%;background:var(--accent);border-radius:5px 0 0 5px;}\
+.xp-num{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--text-faint);white-space:nowrap;font-variant-numeric:tabular-nums;}\
+.streaks{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;}\
+.streak{font-family:'IBM Plex Mono',monospace;}\
+.streak .n{font-size:1.4rem;font-weight:600;font-variant-numeric:tabular-nums;}\
+.streak .l{font-size:0.66rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.08em;display:block;}\
+.week{display:flex;gap:6px;margin-top:14px;}\
+.dot{width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--text-faint);}\
+.dot.touched{border-color:var(--accent);color:var(--text);}\
+.dot.clean{background:var(--good);border-color:var(--good);color:#fff;}\
+.dot.flagged{background:var(--warn);border-color:var(--warn);color:#1a1a1a;}\
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}\
+.tab{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 14px;border-radius:8px;cursor:pointer;}\
+.tab.active{background:var(--text);color:var(--bg);border-color:var(--text);}\
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}\
+@media (max-width:420px){.grid{grid-template-columns:1fr;}}\
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;}\
+.card h3{font-family:'Anton',sans-serif;font-weight:400;font-size:1.05rem;letter-spacing:0.01em;text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;}\
+.card .sub{font-size:0.78rem;color:var(--text-faint);margin:-6px 0 12px;}\
+.linklike{background:none;border:none;color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:0.72rem;cursor:pointer;padding:0;margin-top:10px;display:block;}\
+.stepper{display:flex;align-items:center;gap:12px;}\
+.stepper button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1.2rem;cursor:pointer;}\
+.stepper button.big{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}\
+.stepper .count{font-family:'IBM Plex Mono',monospace;font-size:1.6rem;font-weight:600;min-width:2.2ch;text-align:center;font-variant-numeric:tabular-nums;}\
+.dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;}\
+.dots .cup{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line);}\
+.dots .cup.on{background:var(--accent);border-color:var(--accent);}\
+.pillgrid{display:flex;flex-wrap:wrap;gap:8px;}\
+.pill{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:8px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text-soft);cursor:pointer;}\
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}\
+.note{font-size:0.78rem;color:var(--text-faint);margin-top:10px;}\
+.sectiontitle{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.1rem;letter-spacing:0.01em;margin:26px 0 10px;}\
+.sectiontitle:first-child{margin-top:0;}\
+.libitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}\
+.libitem .row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}\
+.libitem h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.98rem;margin:0 0 4px;}\
+.libitem .tag{font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);}\
+.libitem p{font-size:0.86rem;color:var(--text-soft);margin:6px 0 0;white-space:pre-wrap;}\
+.libitem ul{margin:8px 0 0;padding-left:1.1em;font-size:0.86rem;color:var(--text-soft);}\
+.libitem li{margin:2px 0;}\
+.libitem .x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1rem;padding:2px 6px;}\
+.recipe-controls{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}\
+.recipe-controls select{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.inplan{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-soft);cursor:pointer;}\
+.addform{background:var(--surface-raised);border:1px dashed var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;}\
+.addform input,.addform select,.addform textarea{width:100%;font-family:'Work Sans',sans-serif;font-size:0.9rem;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);margin-top:8px;}\
+.addform textarea{min-height:60px;resize:vertical;}\
+.addform button{margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 16px;cursor:pointer;}\
+.weekbox{background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;}\
+.weekbox .empty{color:var(--text-faint);font-size:0.86rem;}\
+.weekrow{display:flex;justify-content:space-between;font-size:0.86rem;padding:4px 0;border-bottom:1px solid var(--line);}\
+.weekrow:last-child{border-bottom:none;}\
+.weekrow .d{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:0.72rem;text-transform:uppercase;min-width:3.2em;}\
+.shop{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:0.9rem;}\
+.shop:last-child{border-bottom:none;}\
+.shop .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);flex-shrink:0;}\
+.shop.checked{color:var(--text-faint);text-decoration:line-through;}\
+.shop.checked .box{background:var(--good);border-color:var(--good);}\
+.clearbtn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;margin-top:10px;}\
+.banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}\
+.resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}\
+.resume-banner .btns{display:flex;gap:8px;flex-shrink:0;}\
+.resume-banner button.go{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:8px 12px;cursor:pointer;}\
+.resume-banner button.x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1rem;}\
+.wcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}\
+.wcard .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}\
+.wcard h4{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
+.wcard .meta{font-size:0.78rem;color:var(--text-faint);}\
+.wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;}\
+.story{max-width:420px;margin:0 auto;}\
+.story-bar{display:flex;gap:4px;margin-bottom:12px;}\
+.story-bar i{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;position:relative;}\
+.story-bar i b{display:block;height:100%;background:var(--accent);width:0%;}\
+.story-bar i.done b{width:100%;}\
+.story-bar i.now b{width:100%;}\
+.story-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}\
+.story-head button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap;}\
+.story-title{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:0.95rem;color:var(--text-faint);margin:0;}\
+.slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y;}\
+.fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;}\
+.fig-wrap svg{width:130px;height:170px;}\
+.fig-wrap svg line,.fig-wrap svg circle{transition:all .7s cubic-bezier(.4,0,.2,1);}\
+@media (prefers-reduced-motion:reduce){.fig-wrap svg line,.fig-wrap svg circle{transition:none;}}\
+.slide h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1.15rem;margin:0 0 2px;text-align:center;}\
+.slide .cat{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;text-align:center;display:block;margin-bottom:8px;}\
+.slide .target{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--text-faint);text-align:center;}\
+.slide .cue{font-size:0.85rem;color:var(--text-soft);text-align:center;margin:8px 0 14px;}\
+.setchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;justify-content:center;}\
+.setchip{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:var(--surface-raised);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-variant-numeric:tabular-nums;}\
+.logrow{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}\
+.logrow input{width:76px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}\
+.logrow button{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;background:var(--good);color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;}\
+.logrow .undo{background:none;color:var(--text-faint);border:1px solid var(--line);}\
+.storynav{display:flex;gap:10px;margin-top:16px;}\
+.storynav button{flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;text-transform:uppercase;border-radius:10px;padding:13px;cursor:pointer;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.storynav button.next{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}\
+.storynav button.finish{background:var(--text);border-color:var(--text);color:var(--bg);}\
+.storynav button.skip{background:none;color:var(--text-faint);border-style:dashed;flex:0.7;}\
+.storynav button:disabled{opacity:0.35;cursor:default;}\
+.addex-btn{display:block;width:100%;margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:none;border:1px dashed var(--line);color:var(--text-soft);border-radius:10px;padding:10px;cursor:pointer;}\
+.discard-btn{display:block;width:100%;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;background:none;border:none;color:var(--text-faint);cursor:pointer;padding:6px;}\
+.picker{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;}\
+.picker input{width:100%;font-family:'Work Sans',sans-serif;font-size:0.92rem;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);margin-bottom:12px;}\
+.pickgroup-title{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);padding:16px 4px 4px;}\
+.pickrow{border-bottom:1px solid var(--line);}\
+.pickrow:last-child{border-bottom:none;}\
+.pickrow-head{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;gap:10px;}\
+.pickrow-main{flex:1;cursor:pointer;}\
+.pickrow-main .n{font-size:0.92rem;font-weight:600;}\
+.pickrow-main .c{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--text-faint);text-transform:uppercase;}\
+.pickrow-head button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;flex-shrink:0;}\
+.pickrow-head button.added{background:var(--surface-raised);color:var(--text-faint);}\
+.pickpreview{padding:0 4px 16px;}\
+.preview-figs{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px;}\
+.preview-figs .pf{width:72px;}\
+.preview-figs .pf svg{width:100%;display:block;}\
+.preview-figs .arrow{color:var(--text-faint);font-size:1.1rem;}\
+.pickpreview .cue{font-size:0.8rem;color:var(--text-soft);text-align:center;margin:0;}\
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:6px;}\
+.stat-tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}\
+.stat-tile .n{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums;}\
+.stat-tile .l{font-size:0.7rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}\
+.exrow{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;}\
+.exrow .top{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:10px;}\
+.exrow .top h4{font-size:0.94rem;margin:0;font-family:'Work Sans',sans-serif;font-weight:700;}\
+.exrow .top .last{font-size:0.74rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;white-space:nowrap;}\
+.exdetail{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;overflow-x:auto;}\
+.exdetail table{width:100%;border-collapse:collapse;font-size:0.8rem;}\
+.exdetail td,.exdetail th{padding:4px 6px 4px 0;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;}\
+.exdetail th{color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;}\
+.bartrack{background:var(--surface-raised);border-radius:3px;overflow:hidden;width:60px;height:6px;}\
+.bar{height:6px;background:var(--accent);border-radius:3px;}\
+.recent-log{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;font-size:0.86rem;display:flex;justify-content:space-between;gap:10px;}\
+.recent-log .d{color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:0.74rem;white-space:nowrap;}\
+@media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}\
+";
+
+var WORKOUT_TYPES=["Boxing/MMA","Strength","Power/Speed","Flexibility","Conditioning"];
+var AREA_ORDER=["Legs & glutes","Push","Pull","Core & rotation","Grip & carries","Power & explosive","Conditioning & cardio","Mobility & flexibility","Boxing/MMA technique"];
+var DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun","Unassigned"];
+var XP_PER_CUP=2, XP_WORKOUT=15, XP_REST=6;
+
+/* ---------- pose engine: 0deg=up, clockwise. stylised single-side stick figure ---------- */
+function pt(x0,y0,len,deg){ var r=deg*Math.PI/180; return {x:x0+len*Math.sin(r), y:y0-len*Math.cos(r)}; }
+function segFor(pose){
+  var hip={x:55,y:88+(pose.hipY||0)};
+  var shoulder=pt(hip.x,hip.y,34,pose.torso);
+  var headC=pt(shoulder.x,shoulder.y,10,pose.torso);
+  var elbow=pt(shoulder.x,shoulder.y,20,pose.armR);
+  var hand=pt(elbow.x,elbow.y,18,pose.forearmR);
+  var knee=pt(hip.x,hip.y,28,pose.legR);
+  var ankle=pt(knee.x,knee.y,26,pose.shinR);
+  return {hip:hip,shoulder:shoulder,headC:headC,elbow:elbow,hand:hand,knee:knee,ankle:ankle};
+}
+var P={
+  STAND:{torso:2,armR:170,forearmR:170,legR:181,shinR:180,hipY:0},
+  SQUAT_UP:{torso:6,armR:150,forearmR:150,legR:183,shinR:181,hipY:0},
+  SQUAT_DOWN:{torso:26,armR:120,forearmR:120,legR:215,shinR:150,hipY:13},
+  HINGE_UP:{torso:4,armR:172,forearmR:172,legR:181,shinR:180,hipY:0},
+  HINGE_DOWN:{torso:72,armR:55,forearmR:55,legR:186,shinR:178,hipY:5},
+  PRESS_DOWN:{torso:2,armR:95,forearmR:15,legR:181,shinR:180,hipY:0},
+  PRESS_UP:{torso:2,armR:18,forearmR:8,legR:181,shinR:180,hipY:0},
+  ROW_OUT:{torso:35,armR:80,forearmR:80,legR:190,shinR:175,hipY:2},
+  ROW_IN:{torso:35,armR:150,forearmR:170,legR:190,shinR:175,hipY:2},
+  HANG:{torso:2,armR:8,forearmR:6,legR:181,shinR:180,hipY:10},
+  HANG_UP:{torso:2,armR:6,forearmR:4,legR:181,shinR:180,hipY:0},
+  PLANK_A:{torso:88,armR:40,forearmR:40,legR:100,shinR:95,hipY:8},
+  PLANK_B:{torso:88,armR:40,forearmR:40,legR:100,shinR:95,hipY:11},
+  JUMP_LOAD:{torso:20,armR:140,forearmR:140,legR:205,shinR:160,hipY:10},
+  JUMP_AIR:{torso:0,armR:20,forearmR:15,legR:200,shinR:220,hipY:-16},
+  LUNGE_A:{torso:15,armR:170,forearmR:170,legR:150,shinR:190,hipY:8},
+  LUNGE_B:{torso:15,armR:170,forearmR:170,legR:210,shinR:150,hipY:6},
+  TWIST_A:{torso:10,armR:70,forearmR:60,legR:181,shinR:180,hipY:0},
+  TWIST_B:{torso:10,armR:290,forearmR:280,legR:181,shinR:180,hipY:0},
+  REACH_FWD:{torso:45,armR:40,forearmR:40,legR:181,shinR:180,hipY:0},
+  REACH_UP:{torso:2,armR:15,forearmR:10,legR:181,shinR:180,hipY:0},
+  GUARD_A:{torso:8,armR:100,forearmR:20,legR:170,shinR:190,hipY:0},
+  GUARD_B:{torso:8,armR:80,forearmR:15,legR:170,shinR:190,hipY:-2},
+  KNEEL:{torso:8,armR:172,forearmR:172,legR:150,shinR:230,hipY:6},
+  SITROT_A:{torso:20,armR:340,forearmR:330,legR:150,shinR:150,hipY:20},
+  SITROT_B:{torso:20,armR:20,forearmR:30,legR:150,shinR:150,hipY:20},
+  CARRY:{torso:2,armR:178,forearmR:178,legR:170,shinR:190,hipY:0},
+  SWIM_A:{torso:90,armR:30,forearmR:20,legR:95,shinR:100,hipY:6},
+  SWIM_B:{torso:90,armR:170,forearmR:170,legR:100,shinR:90,hipY:8}
+};
+var PP={
+  SQUAT:[P.SQUAT_UP,P.SQUAT_DOWN], HINGE:[P.HINGE_UP,P.HINGE_DOWN], PRESS:[P.PRESS_DOWN,P.PRESS_UP],
+  ROW:[P.ROW_OUT,P.ROW_IN], HANG:[P.HANG,P.HANG_UP], PLANK:[P.PLANK_A,P.PLANK_B], JUMP:[P.JUMP_LOAD,P.JUMP_AIR],
+  LUNGE:[P.LUNGE_A,P.LUNGE_B], TWIST:[P.TWIST_A,P.TWIST_B], REACH:[P.REACH_FWD,P.REACH_UP],
+  GUARD:[P.GUARD_A,P.GUARD_B], KNEEL:[P.STAND,P.KNEEL], SITROT:[P.SITROT_A,P.SITROT_B], CARRY:[P.STAND,P.CARRY],
+  SWIM:[P.SWIM_A,P.SWIM_B]
+};
+
+/* ---------- exercise library ---------- */
+var EX=[
+{id:"sq_goblet",name:"Goblet squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"8-10",pose:"SQUAT",cue:"Hold one dumbbell or kettlebell vertically at your chest, feet shoulder-width. Squat until thighs pass parallel, drive up through your heels."},
+{id:"sq_back",name:"Back squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"6-8",pose:"SQUAT",cue:"Bar across your upper back, feet shoulder-width. Squat to at least parallel keeping your chest up, drive through the whole foot."},
+{id:"sq_front",name:"Front squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"6-8",pose:"SQUAT",cue:"Bar racked on your front shoulders, elbows high. Squat down keeping your torso upright, stand tall to finish."},
+{id:"sq_air",name:"Air squat",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"SQUAT",cue:"Bodyweight only, feet shoulder-width, squat to parallel or below, drive up through your heels."},
+{id:"sq_jump",name:"Jump squat",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"8",pose:"JUMP",cue:"Squat down then explode straight up, land soft with bent knees and reset before the next rep."},
+{id:"dl_rdl",name:"Romanian deadlift",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"8-10",pose:"HINGE",cue:"Slight knee bend, hinge at the hips keeping the weight close to your legs, lower until your hamstrings stretch, drive hips forward to stand."},
+{id:"dl_conv",name:"Conventional deadlift",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"5",pose:"HINGE",cue:"Bar over mid-foot, flat back, drive through the floor and stand tall, hips and shoulders rising together."},
+{id:"hipthrust",name:"Hip thrust",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"10",pose:"HINGE",cue:"Upper back on a bench, bar over your hips, drive through your heels to full hip extension, squeeze at the top."},
+{id:"splitsq_bulg",name:"Bulgarian split squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:3,reps:"8 each side",pose:"LUNGE",cue:"Rear foot up on a bench, front foot forward. Drop straight down through the front leg, drive back up."},
+{id:"lunge_walk",name:"Walking lunge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"10 each side",pose:"LUNGE",cue:"Step forward into a lunge, both knees near 90 degrees, drive up and step through to the next lunge."},
+{id:"press_push",name:"Push press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8",pose:"PRESS",cue:"Dumbbells at your shoulders, dip your knees slightly then drive up explosively, press overhead as your legs extend."},
+{id:"press_ohp",name:"Overhead press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"PRESS",cue:"Bar or dumbbells at shoulder height, press straight overhead without arching your lower back, lower under control."},
+{id:"press_bench",name:"Bench press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"PRESS",cue:"Bar over your chest, lower with control to your sternum, press back up keeping your feet planted."},
+{id:"press_incline",name:"Incline dumbbell press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"10",pose:"PRESS",cue:"On an incline bench, press dumbbells up and slightly together, lower under control to chest level."},
+{id:"row_bent",name:"Bent-over row",cat:"Strength",area:"Pull",type:"load",sets:4,reps:"8-10",pose:"ROW",cue:"Hinge forward with a flat back, pull the bar or dumbbells to your ribs, squeeze your shoulder blades together."},
+{id:"row_single",name:"Single-arm row",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10 each side",pose:"ROW",cue:"One hand and knee on a bench, pull the dumbbell to your hip keeping your torso still."},
+{id:"facepull",name:"Face pull",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"15",pose:"ROW",cue:"Cable or band at face height, pull toward your face with elbows high, squeeze your rear shoulders."},
+{id:"pulldown",name:"Lat pulldown",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10",pose:"ROW",cue:"Pull the bar down to your upper chest, lead with your elbows, control it back up."},
+{id:"pullup",name:"Pull-up",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"6-8",pose:"HANG",cue:"Hang from a bar, pull your chin over it leading with your chest, lower under control."},
+{id:"chinup",name:"Chin-up",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"6-8",pose:"HANG",cue:"Underhand grip, pull your chin over the bar, lower under full control."},
+{id:"invertedrow",name:"Inverted row",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"8-10",pose:"ROW",cue:"Under a bar or table, body straight, pull your chest up to the bar and lower slowly."},
+{id:"pushup",name:"Push-up",cat:"Strength",area:"Push",type:"reps",sets:3,reps:"12-15",pose:"PRESS",cue:"Hands under shoulders, body in a straight line, lower your chest to the floor and press back up."},
+{id:"dip",name:"Dip",cat:"Strength",area:"Push",type:"reps",sets:3,reps:"8-10",pose:"PRESS",cue:"On parallel bars, lower until your shoulders dip below your elbows, press back up."},
+{id:"curl_bicep",name:"Bicep curl",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"12",pose:"PRESS",cue:"Elbows pinned to your sides, curl the weight up without swinging, lower under control."},
+{id:"triceps_ext",name:"Triceps extension",cat:"Strength",area:"Push",type:"load",sets:3,reps:"12",pose:"PRESS",cue:"Weight overhead, lower behind your head by bending the elbows only, press back to straight."},
+{id:"kb_swing",name:"Kettlebell swing",cat:"Power",area:"Power & explosive",type:"load",sets:4,reps:"12",pose:"HINGE",cue:"Hinge at the hips, snap them forward to drive the bell to chest height, arms just along for the ride."},
+{id:"deadbug",name:"Dead bug",cat:"Strength",area:"Core & rotation",type:"time",sets:3,reps:"30s each side",pose:"PLANK",cue:"On your back, opposite arm and leg extend slowly while your lower back stays pressed to the floor."},
+{id:"plank",name:"Plank",cat:"Isometric",area:"Core & rotation",type:"time",sets:3,reps:"30-45s",pose:"PLANK",cue:"Forearms and toes, straight line from hips to shoulders, brace your core and hold."},
+{id:"sideplank",name:"Side plank",cat:"Isometric",area:"Core & rotation",type:"time",sets:2,reps:"30s each side",pose:"PLANK",cue:"On one forearm, body in a straight line, hips lifted and stacked, hold without sagging."},
+{id:"deadhang",name:"Dead hang",cat:"Isometric",area:"Grip & carries",type:"time",sets:4,reps:"20-40s",pose:"HANG",cue:"Full grip on a bar, shoulders relaxed, hang with straight arms and let your spine decompress."},
+{id:"wallsit",name:"Wall sit",cat:"Isometric",area:"Legs & glutes",type:"time",sets:3,reps:"30-45s",pose:"SQUAT",cue:"Back flat against a wall, knees at 90 degrees, hold the position without your knees caving in."},
+{id:"hollowhold",name:"Hollow hold",cat:"Isometric",area:"Core & rotation",type:"time",sets:3,reps:"20-30s",pose:"PLANK",cue:"On your back, lower back pressed down, lift shoulders and legs off the floor into a shallow curve, hold."},
+{id:"boxjump",name:"Box jump",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"5",pose:"JUMP",cue:"Explode up from a quarter-squat, land soft on the box with both feet, step back down rather than jumping off."},
+{id:"broadjump",name:"Broad jump",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"5",pose:"JUMP",cue:"Swing your arms and jump forward for distance, land soft with bent knees, reset fully before the next rep."},
+{id:"medballthrow",name:"Med ball rotational throw",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"6 each side",pose:"TWIST",cue:"Rotate your hips and throw the ball sideways into a wall with full torso rotation, like a punch."},
+{id:"medballslam",name:"Med ball slam",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"8",pose:"REACH",cue:"Raise the ball overhead then slam it down hard into the floor, catch the bounce and reset."},
+{id:"sprint",name:"Short sprint",cat:"Power",area:"Power & explosive",type:"time",sets:6,reps:"10-15s",pose:"CARRY",cue:"All-out effort for the time, then rest fully before the next rep. Quality over fatigue."},
+{id:"bagspeed",name:"Heavy-bag speed combo",cat:"Power",area:"Power & explosive",type:"time",sets:6,reps:"10-15s",pose:"GUARD",cue:"Fast, sharp combinations on the bag for the time, then rest fully before the next round."},
+{id:"farmerscarry",name:"Farmer's carry",cat:"Strength",area:"Grip & carries",type:"distance",sets:3,reps:"30-40m",pose:"CARRY",cue:"A heavy dumbbell or kettlebell in each hand, walk tall with your shoulders back for the distance."},
+{id:"suitcasecarry",name:"Suitcase carry",cat:"Strength",area:"Grip & carries",type:"distance",sets:3,reps:"20m each side",pose:"CARRY",cue:"One heavy weight in one hand, resist leaning, walk tall keeping your torso upright."},
+{id:"hipflexor",name:"Hip flexor stretch",cat:"Flexibility",area:"Mobility & flexibility",type:"time",sets:2,reps:"30-45s each side",pose:"KNEEL",cue:"Half-kneeling, back knee down, push your hips forward gently until you feel the front of the hip stretch."},
+{id:"nine0",name:"90/90 hip mobility",cat:"Flexibility",area:"Mobility & flexibility",type:"reps",sets:2,reps:"8-10 each side",pose:"SITROT",cue:"Sit with your front leg bent 90 degrees in front of you, back leg bent 90 degrees to the side, rotate between both sides."},
+{id:"thoracic",name:"Thoracic rotation",cat:"Flexibility",area:"Mobility & flexibility",type:"reps",sets:2,reps:"8-10 each side",pose:"TWIST",cue:"Lie on your side, knees bent, open your top arm across your body, follow it with your eyes."},
+{id:"shoulderdisloc",name:"Shoulder dislocate",cat:"Flexibility",area:"Mobility & flexibility",type:"reps",sets:2,reps:"10",pose:"REACH",cue:"Hold a band or stick wide, raise it overhead and behind you keeping your arms straight, then return."},
+{id:"couchstretch",name:"Couch stretch",cat:"Flexibility",area:"Mobility & flexibility",type:"time",sets:2,reps:"30-45s each side",pose:"KNEEL",cue:"Rear foot up behind you, front foot forward, sink your hips down and forward."},
+{id:"pigeon",name:"Pigeon / figure-4",cat:"Flexibility",area:"Mobility & flexibility",type:"time",sets:2,reps:"30-45s each side",pose:"SITROT",cue:"Front shin across your body, sink your hips toward the floor, lean forward gently."},
+{id:"hamstring",name:"Hamstring stretch",cat:"Flexibility",area:"Mobility & flexibility",type:"time",sets:2,reps:"30s each side",pose:"REACH",cue:"Leg extended, hinge forward from the hips keeping your back flat until you feel the stretch."},
+{id:"ankle_mob",name:"Ankle mobility (knee-to-wall)",cat:"Flexibility",area:"Mobility & flexibility",type:"reps",sets:2,reps:"10 each side",pose:"LUNGE",cue:"Drive your knee over your toes without your heel lifting, work on the range each side."},
+{id:"catcow",name:"Cat-cow",cat:"Flexibility",area:"Mobility & flexibility",type:"reps",sets:2,reps:"10",pose:"HINGE",cue:"On hands and knees, alternate arching and rounding your spine slowly with your breath."},
+{id:"childspose",name:"Child's pose",cat:"Flexibility",area:"Mobility & flexibility",type:"time",sets:2,reps:"30-45s",pose:"KNEEL",cue:"Knees wide, sit back toward your heels, arms extended forward, breathe and relax into it."},
+{id:"worldsgreatest",name:"World's greatest stretch",cat:"Flexibility",area:"Mobility & flexibility",type:"reps",sets:2,reps:"5 each side",pose:"LUNGE",cue:"From a deep lunge, rotate your torso and reach the same-side arm up toward the ceiling."},
+{id:"mtnclimb",name:"Mountain climbers",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"PLANK",cue:"Plank position, drive your knees toward your chest quickly, alternating, keeping your hips level."},
+{id:"battleropes",name:"Battle ropes",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"ROW",cue:"Alternate slamming the ropes hard and fast, stay low in your stance."},
+{id:"rowerg",name:"Rowing machine",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:4,reps:"250m",pose:"ROW",cue:"Legs, then back, then arms on the drive, reverse the order on the recovery, keep a steady strong pace."},
+{id:"skipping",name:"Skipping",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JUMP",cue:"Light on your feet, steady rhythm, small jumps rather than big bounces."},
+{id:"shadowbox",name:"Shadowboxing",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:6,reps:"2min",pose:"GUARD",cue:"Move and throw combinations at pace, keep your guard up between combos, work your footwork."},
+{id:"burpee",name:"Burpee",cat:"Conditioning",area:"Conditioning & cardio",type:"reps",sets:4,reps:"10",pose:"JUMP",cue:"Chest to the floor, jump your feet back in, jump up to finish. Keep it smooth rather than rushed."},
+{id:"technique",name:"Technique / drilling block",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:1,reps:"20-30 min",pose:"GUARD",cue:"Coach-led, or your own focus if training solo. Quality of movement over speed."},
+{id:"rounds",name:"Rounds (pad/drill/spar)",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"reps",sets:1,reps:"3-6 rounds",pose:"GUARD",cue:"Set intensity by the session's goal, technical or live, one minute rest between rounds."},
+{id:"jabcross",name:"Jab-cross combo drill",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:6,reps:"1min",pose:"GUARD",cue:"Sharp jab-cross combinations at pace, reset your guard between every combo."},
+{id:"kb_clean",name:"Kettlebell clean",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"8 each side",pose:"HINGE",cue:"Hike the bell back, drive your hips forward and pull it up close to your body, catching it softly at your shoulder."},
+{id:"kb_snatch",name:"Kettlebell snatch",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"6 each side",pose:"HINGE",cue:"One explosive hip drive takes the bell from between your legs straight overhead, punching your hand through at the top."},
+{id:"kb_press",name:"Kettlebell single-arm press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8 each side",pose:"PRESS",cue:"Bell racked at your shoulder, press straight overhead without leaning away from it, lower under control."},
+{id:"kb_tgu",name:"Turkish get-up",cat:"Strength",area:"Core & rotation",type:"reps",sets:2,reps:"3 each side",pose:"REACH",cue:"From lying down to standing, weight locked out overhead the whole way, moving slowly through each step. Start light, this one's about control, not load."},
+{id:"pistol",name:"Pistol squat",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"5 each side",pose:"SQUAT",cue:"One leg extended in front, squat down on the standing leg keeping your heel down. Hold a doorframe or rail for balance while you build this up."},
+{id:"glutebridge",name:"Glute bridge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"HINGE",cue:"On your back, knees bent, drive your hips up by squeezing your glutes, pause at the top, lower with control."},
+{id:"bearcrawl",name:"Bear crawl",cat:"Conditioning",area:"Core & rotation",type:"time",sets:3,reps:"30s",pose:"PLANK",cue:"Hands and feet on the floor, knees hovering just off it, crawl forward keeping your hips low and steady."},
+{id:"calfraise",name:"Calf raise",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"SQUAT",cue:"Rise up onto your toes as high as you can, pause, lower slowly until you feel a stretch."},
+{id:"swim_warmup",name:"Warm-up swim",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"200-400m",pose:"SWIM",cue:"Easy, relaxed pace to get your stroke and breathing settled before the main work."},
+{id:"swim_drill",name:"Technique drill",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"200m",pose:"SWIM",cue:"Catch-up drill: one arm stays extended forward until the other finishes its stroke. Or kick with a board, steady controlled kick from the hips, not the knees."},
+{id:"swim_main",name:"Main set intervals",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"4-8 x 50-100m",pose:"SWIM",cue:"A pace you can just about hold with even splits, resting 15-30s between reps. Push the effort here."},
+{id:"swim_cooldown",name:"Cool-down swim",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"100-200m",pose:"SWIM",cue:"Easy pace, long smooth strokes, controlled breathing, let your heart rate settle."},
+{id:"cardio_gym_warmup",name:"Machine warm-up",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"5min",pose:"CARRY",cue:"Bike, rower or treadmill at an easy, conversational effort to open your legs and lungs up."},
+{id:"cardio_gym_intervals",name:"Machine intervals",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:8,reps:"1min hard / 1min easy",pose:"JUMP",cue:"Push hard for the work period on whichever machine you like, recover fully on the easy period, repeat."},
+{id:"cardio_gym_steady",name:"Steady-state finisher",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"10-15min",pose:"CARRY",cue:"One steady pace you could hold a conversation at, no intervals, just time on the machine."},
+{id:"jumpingjack",name:"Jumping jacks",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JUMP",cue:"Feet and arms out together, back in together, steady rhythm, no equipment needed."},
+{id:"highknees",name:"High knees",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"30s",pose:"CARRY",cue:"Drive your knees up toward your chest quickly on the spot, stay light on your feet."},
+{id:"briskwalkjog",name:"Brisk walk or jog",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"10-15min",pose:"CARRY",cue:"Outside, a corridor, wherever you've got, steady pace you could just about hold a conversation at."},
+{id:"woodchopper",name:"Cable or band woodchopper",cat:"Power",area:"Core & rotation",type:"reps",sets:3,reps:"10 each side",pose:"TWIST",cue:"Rotate diagonally from high to low (or low to high) through your torso, arms follow, control the return, don't let momentum do the work."},
+{id:"russiantwist",name:"Russian twist",cat:"Strength",area:"Core & rotation",type:"reps",sets:3,reps:"16 each side",pose:"TWIST",cue:"Seated, leaning back slightly, feet up or down, rotate a weight or your hands side to side, keep the movement in your torso not your arms."},
+{id:"palloffpress",name:"Pallof press",cat:"Strength",area:"Core & rotation",type:"reps",sets:3,reps:"10 each side",pose:"PRESS",cue:"Band or cable at your chest, press straight out and resist it pulling you round, that resistance to rotation is the whole point."},
+{id:"hangingkneeraise",name:"Hanging knee raise",cat:"Strength",area:"Core & rotation",type:"reps",sets:3,reps:"10-12",pose:"HANG",cue:"Hang from a bar, raise your knees toward your chest without swinging, lower under control."},
+{id:"platepinch",name:"Plate pinch hold",cat:"Isometric",area:"Grip & carries",type:"time",sets:3,reps:"20-30s",pose:"HANG",cue:"Pinch two weight plates together smooth-side-out at your sides, hold without letting them slip."},
+{id:"kb_bottomsup",name:"Kettlebell bottoms-up carry",cat:"Strength",area:"Grip & carries",type:"distance",sets:2,reps:"15-20m each side",pose:"CARRY",cue:"Hold the kettlebell upside down by the handle, walk keeping it stable and vertical, don't let it tip over."}
+];
+function exDef(id){ for(var i=0;i<EX.length;i++){ if(EX[i].id===id) return EX[i]; } return null; }
+
+/* ---------- workouts reference exercise ids + this workout's own set/rep prescription ---------- */
+var WORKOUTS=[
+  {id:"w1",tag:"Strength",title:"Strength — functional full body",warmup:"5 min easy cardio, then leg swings, arm circles, hip openers.",cooldown:"5 min easy stretch.",
+    plan:[{ex:"sq_goblet",sets:4,reps:"8-10"},{ex:"dl_rdl",sets:4,reps:"8-10"},{ex:"press_push",sets:3,reps:"8"},{ex:"pullup",sets:3,reps:"8-10"},{ex:"farmerscarry",sets:3,reps:"30-40m"},{ex:"plank",sets:3,reps:"30-45s"}]},
+  {id:"w2",tag:"Power/Speed",title:"Power & speed",warmup:"Dynamic mobility, then 2-3 build-up shadowboxing rounds at rising intensity.",cooldown:"Easy walk and stretch.",
+    plan:[{ex:"boxjump",sets:4,reps:"5"},{ex:"medballthrow",sets:4,reps:"6 each side"},{ex:"kb_swing",sets:4,reps:"12"},{ex:"bagspeed",sets:6,reps:"10-15s"}]},
+  {id:"w3",tag:"Flexibility",title:"Flexibility & mobility",warmup:"5 min dynamic: leg swings, arm circles, walking lunge with a twist, hip circles.",cooldown:"5 min slow breathing.",
+    plan:[{ex:"hipflexor",sets:2,reps:"30-45s each side"},{ex:"nine0",sets:2,reps:"8-10 each side"},{ex:"thoracic",sets:2,reps:"8-10 each side"},{ex:"shoulderdisloc",sets:2,reps:"10"},{ex:"couchstretch",sets:2,reps:"30-45s each side"},{ex:"pigeon",sets:2,reps:"30-45s each side"},{ex:"ankle_mob",sets:2,reps:"10 each side"}]},
+  {id:"w4",tag:"Conditioning",title:"Conditioning circuit",warmup:"5 min easy.",cooldown:"Walk it down, stretch.",
+    plan:[{ex:"kb_swing",sets:4,reps:"40s"},{ex:"shadowbox",sets:4,reps:"40s"},{ex:"mtnclimb",sets:4,reps:"40s"},{ex:"burpee",sets:4,reps:"40s"},{ex:"rowerg",sets:4,reps:"250m"}]},
+  {id:"w5",tag:"Boxing/MMA",title:"Boxing/MMA technical",warmup:"10 min: skip, shadowbox, mobility.",cooldown:"Light stretch.",
+    plan:[{ex:"technique",sets:1,reps:"20-30 min"},{ex:"rounds",sets:1,reps:"3-6 rounds"}]},
+  {id:"w6",tag:"Strength",title:"Push",warmup:"5 min easy cardio, arm circles, band pull-aparts, a few light push-ups.",cooldown:"Chest and shoulder stretch, 5 min.",
+    plan:[{ex:"press_bench",sets:4,reps:"8"},{ex:"press_ohp",sets:3,reps:"8"},{ex:"press_incline",sets:3,reps:"10"},{ex:"dip",sets:3,reps:"8-10"},{ex:"triceps_ext",sets:3,reps:"12"}]},
+  {id:"w7",tag:"Strength",title:"Pull",warmup:"5 min easy cardio, band pull-aparts, dead hangs to open the shoulders.",cooldown:"Lat and bicep stretch, 5 min.",
+    plan:[{ex:"row_bent",sets:4,reps:"8-10"},{ex:"pullup",sets:3,reps:"6-8"},{ex:"pulldown",sets:3,reps:"10"},{ex:"facepull",sets:3,reps:"15"},{ex:"curl_bicep",sets:3,reps:"12"},{ex:"deadhang",sets:2,reps:"20-30s"}]},
+  {id:"w8",tag:"Strength",title:"Legs",warmup:"5 min easy cardio, leg swings, bodyweight squats, hip openers.",cooldown:"Quad, hamstring and hip flexor stretch, 5 min.",
+    plan:[{ex:"sq_back",sets:4,reps:"6-8"},{ex:"dl_rdl",sets:4,reps:"8-10"},{ex:"splitsq_bulg",sets:3,reps:"8 each side"},{ex:"hipthrust",sets:3,reps:"10"},{ex:"calfraise",sets:3,reps:"15"},{ex:"wallsit",sets:2,reps:"30-45s"}]},
+  {id:"w9",tag:"Strength",title:"Kettlebells",warmup:"5 min easy cardio, arm circles, a few light kettlebell swings to groove the hinge.",cooldown:"Shoulder and hip stretch, 5 min.",
+    plan:[{ex:"kb_swing",sets:4,reps:"15"},{ex:"kb_clean",sets:3,reps:"8 each side"},{ex:"kb_press",sets:3,reps:"8 each side"},{ex:"kb_snatch",sets:3,reps:"6 each side"},{ex:"kb_tgu",sets:2,reps:"3 each side"},{ex:"farmerscarry",sets:3,reps:"30-40m"}]},
+  {id:"w10",tag:"Strength",title:"Bodyweight",warmup:"5 min easy cardio, arm circles, bodyweight squats.",cooldown:"Full-body stretch, 5 min.",
+    plan:[{ex:"pushup",sets:3,reps:"12-15"},{ex:"pullup",sets:3,reps:"6-8"},{ex:"sq_air",sets:3,reps:"15"},{ex:"pistol",sets:3,reps:"5 each side"},{ex:"plank",sets:3,reps:"30-45s"},{ex:"burpee",sets:3,reps:"10"}]},
+  {id:"w11",tag:"Conditioning",title:"Swim",warmup:"5 min poolside mobility: shoulder circles, arm swings.",cooldown:"Stretch shoulders and lats poolside or after.",
+    plan:[{ex:"swim_warmup",sets:1,reps:"200-400m"},{ex:"swim_drill",sets:1,reps:"200m"},{ex:"swim_main",sets:1,reps:"4-8 x 50-100m"},{ex:"swim_cooldown",sets:1,reps:"100-200m"}]},
+  {id:"w12",tag:"Conditioning",title:"Cardio — gym",warmup:"2-3 min easy on whichever machine you're starting on.",cooldown:"2-3 min easy pace to bring your heart rate down, then stretch.",
+    plan:[{ex:"cardio_gym_warmup",sets:1,reps:"5min"},{ex:"cardio_gym_intervals",sets:8,reps:"1min hard / 1min easy"},{ex:"cardio_gym_steady",sets:1,reps:"10-15min"}]},
+  {id:"w13",tag:"Conditioning",title:"Cardio — anywhere",warmup:"2-3 min easy jog on the spot or a brisk walk, arm circles.",cooldown:"Walk it off, stretch your calves and hips.",
+    plan:[{ex:"jumpingjack",sets:4,reps:"40s"},{ex:"highknees",sets:4,reps:"30s"},{ex:"burpee",sets:4,reps:"10"},{ex:"mtnclimb",sets:4,reps:"40s"},{ex:"briskwalkjog",sets:1,reps:"10-15min"}]},
+  {id:"w14",tag:"Strength",title:"Core & rotation",warmup:"5 min easy cardio, cat-cow, a few bodyweight twists to warm up the spine.",cooldown:"Child's pose and a gentle spinal twist stretch, 5 min.",
+    plan:[{ex:"woodchopper",sets:3,reps:"10 each side"},{ex:"russiantwist",sets:3,reps:"16 each side"},{ex:"palloffpress",sets:3,reps:"10 each side"},{ex:"deadbug",sets:3,reps:"30s each side"},{ex:"hangingkneeraise",sets:3,reps:"10-12"},{ex:"plank",sets:3,reps:"30-45s"}]},
+  {id:"w15",tag:"Strength",title:"Grip & carries",warmup:"2-3 min easy arm swings and wrist circles to warm up your hands and forearms.",cooldown:"Shake out your hands and forearms, gentle wrist stretch.",
+    plan:[{ex:"deadhang",sets:4,reps:"20-40s"},{ex:"farmerscarry",sets:3,reps:"30-40m"},{ex:"suitcasecarry",sets:3,reps:"20m each side"},{ex:"platepinch",sets:3,reps:"20-30s"},{ex:"kb_bottomsup",sets:2,reps:"15-20m each side"}]},
+  {id:"w16",tag:"Flexibility",title:"Reset — 10 min",warmup:"None needed, ease into it.",cooldown:"Stay in child's pose or lie flat for a minute, breathe.",
+    plan:[{ex:"catcow",sets:2,reps:"10"},{ex:"worldsgreatest",sets:2,reps:"5 each side"},{ex:"childspose",sets:1,reps:"45-60s"},{ex:"hipflexor",sets:1,reps:"30s each side"}]}
+];
+
+function pad(n){return n<10?'0'+n:''+n;}
+function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function todayKey(){return dateKey(new Date());}
+function prettyDate(){var d=new Date();return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});}
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+var state=JSON.parse(JSON.stringify(DATA));
+if(!state.days) state.days={};
+if(!state.library) state.library=[];
+if(!state.recipes) state.recipes=[];
+if(!state.shoppingChecked) state.shoppingChecked=[];
+if(!state.workoutLogs) state.workoutLogs=[];
+if(state.activeSession===undefined) state.activeSession=null;
+if(!state.totalXp) state.totalXp=0;
+if(!state.waterTarget) state.waterTarget=8;
+var tab=state.uiTab||'today';
+var viewingSession=!!state.uiViewingSession;
+var expanded={};
+var slide=state.uiSlide||0;
+var addingExercise=false;
+var exSearch='';
+var poseFlip=false;
+var poseTimer=null;
+var saveTimer=null;
+var artifactApi=null;
+var saving=false;
+var touchX=null;
+
+function ensureDay(k){
+  if(!state.days[k]) state.days[k]={water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false};
+  return state.days[k];
+}
+function levelInfo(){ var span=150; var level=1+Math.floor(state.totalXp/span); var into=state.totalXp%span; return {level:level,into:into,span:span}; }
+function last7Keys(){ var out=[]; for(var i=6;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);out.push(dateKey(d));} return out; }
+function computeStreaks(){
+  var d=new Date(); var dayStreak=0, cleanStreak=0; var breakingDay=false, breakingClean=false;
+  for(var i=0;i<400;i++){
+    var k=dateKey(d); var entry=state.days[k];
+    if(!breakingDay){ if(entry && entry.touched) dayStreak++; else breakingDay=true; }
+    if(!breakingClean){ if(entry && entry.touched && entry.alcohol===0 && entry.smoking===0 && entry.weed===0) cleanStreak++; else breakingClean=true; }
+    if(breakingDay && breakingClean) break;
+    d.setDate(d.getDate()-1);
+  }
+  return {dayStreak:dayStreak,cleanStreak:cleanStreak};
+}
+function addXp(n){ state.totalXp+=n; if(state.totalXp<0) state.totalXp=0; }
+function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(persist,1000); }
+function persist(){
+  if(!window.claude || !window.claude.use){ render(); return; }
+  saving=true; render();
+  claude.use('artifact').then(function(ns){
+    artifactApi=ns;
+    if(!ns){ saving=false; render(); return; }
+    return ns.publish(fullDocument(state)).then(function(){ saving=false; }).catch(function(err){
+      saving=false;
+      if(err && err.code==='conflict'){ return; }
+      render();
+    });
+  });
+}
+function shoppingList(){
+  var seen={}, out=[];
+  state.recipes.forEach(function(r){
+    if(!r.inPlan) return;
+    (r.ingredients||[]).forEach(function(ing){ var key=ing.trim().toLowerCase(); if(!key||seen[key]) return; seen[key]=true; out.push(ing.trim()); });
+  });
+  out.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  return out;
+}
+function setLabel(type,v,w){
+  if(type==='load') return (w?w+'kg × '+v:v+' reps');
+  if(type==='time') return v+'s';
+  if(type==='distance') return v+'m';
+  return v+' reps';
+}
+
+function startWorkout(id){
+  var w=WORKOUTS.filter(function(x){return x.id===id;})[0];
+  if(!w) return;
+  if(!state.activeSession || state.activeSession.workoutId!==id){
+    state.activeSession={workoutId:id,startedAt:todayKey(),exIds:w.plan.map(function(p){return p.ex;}),targets:{},logs:{}};
+    w.plan.forEach(function(p){ state.activeSession.targets[p.ex]={sets:p.sets,reps:p.reps}; });
+  }
+  slide=0; addingExercise=false; viewingSession=true;
+}
+function logSet(exId,type){
+  var valInput=document.getElementById('log-v-'+exId);
+  if(!valInput) return;
+  var v=parseFloat(valInput.value);
+  if(isNaN(v)||v<=0) return;
+  var entry={v:v,w:null};
+  if(type==='load'){ var wInput=document.getElementById('log-w-'+exId); var wt=wInput?parseFloat(wInput.value):NaN; entry.w=isNaN(wt)?null:wt; }
+  if(!state.activeSession.logs[exId]) state.activeSession.logs[exId]=[];
+  state.activeSession.logs[exId].push(entry);
+}
+function undoSet(exId){ var arr=state.activeSession && state.activeSession.logs[exId]; if(arr&&arr.length) arr.pop(); }
+function finishWorkout(){
+  var sess=state.activeSession; if(!sess) return;
+  var w=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
+  var title=w?w.title:'Workout', tag=w?w.tag:'Strength';
+  state.workoutLogs.push({id:'wl'+Date.now(),workoutId:sess.workoutId,title:title,tag:tag,date:todayKey(),logs:sess.logs});
+  var today=ensureDay(todayKey());
+  if(!today.workout.done) addXp(XP_WORKOUT);
+  today.workout.done=true; today.workout.type=tag; today.rest=false; today.touched=true;
+  state.activeSession=null; viewingSession=false; tab='progress';
+}
+function addExToSession(exId){
+  if(!state.activeSession) return;
+  if(state.activeSession.exIds.indexOf(exId)>-1) return;
+  state.activeSession.exIds.push(exId);
+  var def=exDef(exId);
+  state.activeSession.targets[exId]={sets:def.sets,reps:def.reps};
+}
+function removeExFromSession(exId){
+  if(!state.activeSession) return;
+  state.activeSession.exIds=state.activeSession.exIds.filter(function(x){return x!==exId;});
+  delete state.activeSession.logs[exId];
+  if(slide>=state.activeSession.exIds.length) slide=Math.max(0,state.activeSession.exIds.length-1);
+}
+
+function figureSVG(poseKey,phase){
+  var pair=PP[poseKey]||PP.SQUAT;
+  var pose=pair[phase?1:0];
+  var s=segFor(pose);
+  return '<svg viewBox="0 -20 140 190">'+
+    '<line x1="'+s.hip.x+'" y1="'+s.hip.y+'" x2="'+s.shoulder.x+'" y2="'+s.shoulder.y+'" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>'+
+    '<line x1="'+s.shoulder.x+'" y1="'+s.shoulder.y+'" x2="'+s.elbow.x+'" y2="'+s.elbow.y+'" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>'+
+    '<line x1="'+s.elbow.x+'" y1="'+s.elbow.y+'" x2="'+s.hand.x+'" y2="'+s.hand.y+'" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>'+
+    '<line x1="'+s.hip.x+'" y1="'+s.hip.y+'" x2="'+s.knee.x+'" y2="'+s.knee.y+'" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>'+
+    '<line x1="'+s.knee.x+'" y1="'+s.knee.y+'" x2="'+s.ankle.x+'" y2="'+s.ankle.y+'" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>'+
+    '<circle cx="'+s.headC.x+'" cy="'+s.headC.y+'" r="10" fill="var(--text)"/>'+
+  '</svg>';
+}
+function startPoseLoop(){
+  stopPoseLoop();
+  poseTimer=setInterval(function(){
+    poseFlip=!poseFlip;
+    var w=document.getElementById('fig-live');
+    if(w){ var key=w.getAttribute('data-pose'); w.innerHTML=figureSVG(key,poseFlip); }
+  },900);
+}
+function stopPoseLoop(){ if(poseTimer){ clearInterval(poseTimer); poseTimer=null; } }
+
+function bodyContent(){
+  var t=ensureDay(todayKey());
+  var lvl=levelInfo();
+  var streaks=computeStreaks();
+  var week=last7Keys().map(function(k){
+    var e=state.days[k]; var cls='dot'; var dd=k.slice(8,10);
+    if(e && e.touched){ cls+=' touched'; if(e.alcohol===0&&e.smoking===0&&e.weed===0) cls+=' clean'; else cls+=' flagged'; }
+    return '<div class="'+cls+'" title="'+k+'">'+dd+'</div>';
+  }).join('');
+  var cupsRow=''; for(var i=0;i<Math.max(state.waterTarget,t.water);i++){ cupsRow+='<div class="cup'+(i<t.water?' on':'')+'"></div>'; }
+  var typePills=WORKOUT_TYPES.map(function(wt){
+    var on=t.workout.done && t.workout.type===wt;
+    return '<button class="pill'+(on?' on':'')+'" data-action="workout" data-type="'+wt+'">'+wt+'</button>';
+  }).join('')+'<button class="pill'+(t.rest?' on':'')+'" data-action="rest">Rest day</button>';
+
+  var todayView =
+    '<div class="grid">'+
+      '<div class="card"><h3>Water</h3><div class="sub">Target '+state.waterTarget+' cups a day</div>'+
+        '<div class="stepper"><button data-action="water" data-d="-1">-</button><span class="count">'+t.water+'</span><button class="big" data-action="water" data-d="1">+</button></div>'+
+        '<div class="dots">'+cupsRow+'</div></div>'+
+      '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+t.workout.type):(t.rest?'Recovery day':'Not logged yet'))+'</div>'+
+        '<div class="pillgrid">'+typePills+'</div>'+
+        '<button class="linklike" data-action="tab" data-tab="training">Or start a guided session &rarr;</button></div>'+
+      '<div class="card"><h3>Alcohol</h3><div class="sub">Units / drinks today</div>'+
+        '<div class="stepper"><button data-action="alcohol" data-d="-1">-</button><span class="count">'+t.alcohol+'</span><button data-action="alcohol" data-d="1">+</button></div></div>'+
+      '<div class="card"><h3>Smoking</h3><div class="sub">Cigarettes today</div>'+
+        '<div class="stepper"><button data-action="smoking" data-d="-1">-</button><span class="count">'+t.smoking+'</span><button data-action="smoking" data-d="1">+</button></div></div>'+
+      '<div class="card"><h3>Weed</h3><div class="sub">Sessions today</div>'+
+        '<div class="stepper"><button data-action="weed" data-d="-1">-</button><span class="count">'+t.weed+'</span><button data-action="weed" data-d="1">+</button></div></div>'+
+    '</div>'+
+    '<p class="note">Logging a number never costs you points. Clean streak just means the last touched days had zero across alcohol, smoking and weed &mdash; miss one and it resets quietly, no penalty beyond that.</p>';
+
+  var trainingItems=state.library.map(function(item){
+    return '<div class="libitem"><div class="row"><div><span class="tag">'+esc(item.tag)+'</span><h4>'+esc(item.title)+'</h4></div>'+
+      '<button class="x" data-action="dellib" data-id="'+item.id+'">&times;</button></div>'+(item.notes?'<p>'+esc(item.notes)+'</p>':'')+'</div>';
+  }).join('');
+
+  var resumeBanner='';
+  if(state.activeSession){
+    var aw=WORKOUTS.filter(function(x){return x.id===state.activeSession.workoutId;})[0];
+    var cnt=0; Object.keys(state.activeSession.logs).forEach(function(k){cnt+=state.activeSession.logs[k].length;});
+    resumeBanner='<div class="resume-banner"><span>In progress: <strong>'+(aw?esc(aw.title):'Workout')+'</strong> ('+cnt+' sets logged)</span>'+
+      '<span class="btns"><button class="go" data-action="resumesession">Resume</button><button class="x" data-action="discardsession" title="Discard">&times;</button></span></div>';
+  }
+  var workoutCards=WORKOUTS.map(function(w){
+    return '<div class="wcard"><div class="row"><div><h4>'+esc(w.title)+'</h4><div class="meta">'+w.plan.length+' exercises &middot; '+esc(w.tag)+'</div></div>'+
+      '<button class="start" data-action="startworkout" data-id="'+w.id+'">Start</button></div></div>';
+  }).join('');
+  var trainingView =
+    '<div class="sectiontitle">Overview</div>'+trainingItems+
+    '<div class="sectiontitle">Workouts</div>'+resumeBanner+workoutCards+
+    '<div class="addform"><strong style="font-family:Work Sans;font-size:0.86rem;">Add a note or adjustment</strong>'+
+      '<input id="lib-title" placeholder="Title" maxlength="80">'+
+      '<select id="lib-tag"><option>Note</option><option>Adjustment</option><option>Other</option></select>'+
+      '<textarea id="lib-notes" placeholder="Notes"></textarea>'+
+      '<button data-action="addlib">Add to training plan</button></div>';
+
+  var inPlan=state.recipes.filter(function(r){return r.inPlan;});
+  var byDay={};
+  inPlan.forEach(function(r){ var d=r.day||'Unassigned'; (byDay[d]=byDay[d]||[]).push(r.title); });
+  var weekRows=DAYS.filter(function(d){return byDay[d];}).map(function(d){ return '<div class="weekrow"><span class="d">'+d+'</span><span>'+esc(byDay[d].join(', '))+'</span></div>'; }).join('');
+  var listSL=shoppingList();
+  var shopRows=listSL.map(function(ing){
+    var checked=state.shoppingChecked.indexOf(ing)>-1;
+    return '<div class="shop'+(checked?' checked':'')+'" data-action="shopcheck" data-item="'+esc(ing)+'"><span class="box"></span>'+esc(ing)+'</div>';
+  }).join('');
+  var recipeItems=state.recipes.map(function(r){
+    var ingList=(r.ingredients||[]).map(function(i){return '<li>'+esc(i)+'</li>';}).join('');
+    var dayOptions=DAYS.map(function(d){return '<option'+(r.day===d?' selected':'')+'>'+d+'</option>';}).join('');
+    return '<div class="libitem"><div class="row"><div><span class="tag">'+esc(r.tag||'Recipe')+'</span><h4>'+esc(r.title)+'</h4></div>'+
+      '<button class="x" data-action="delrecipe" data-id="'+r.id+'">&times;</button></div>'+
+      (ingList?'<ul>'+ingList+'</ul>':'')+(r.instructions?'<p>'+esc(r.instructions)+'</p>':'')+
+      '<div class="recipe-controls"><label class="inplan"><input type="checkbox" data-action="inplan" data-id="'+r.id+'"'+(r.inPlan?' checked':'')+'> In this week&#39;s plan</label>'+
+      '<select data-action="recipeday" data-id="'+r.id+'">'+dayOptions+'</select></div></div>';
+  }).join('');
+  var mealsView =
+    '<div class="sectiontitle">This week</div><div class="weekbox">'+(weekRows||'<div class="empty">No recipes added to this week yet &mdash; tick &#39;in this week&#39;s plan&#39; on any recipe below.</div>')+'</div>'+
+    '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+(shopRows||'<div class="empty">Empty until a recipe is added to this week.</div>')+
+      (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear week &amp; shopping list</button>':'')+'</div>'+
+    '<div class="sectiontitle">Recipes</div>'+(recipeItems||'<p class="note" style="margin-top:0;">No recipes yet.</p>')+
+    '<div class="addform"><strong style="font-family:Work Sans;font-size:0.86rem;">Add a recipe</strong>'+
+      '<input id="rec-title" placeholder="Title" maxlength="80">'+
+      '<textarea id="rec-ing" placeholder="Ingredients, one per line"></textarea>'+
+      '<textarea id="rec-inst" placeholder="Method / notes"></textarea>'+
+      '<button data-action="addrecipe">Add recipe</button></div>';
+
+  var logs=state.workoutLogs;
+  var wk=last7Keys();
+  var thisWeekCount=logs.filter(function(l){return wk.indexOf(l.date)>-1;}).length;
+  var recent=logs.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);}).slice(0,6);
+  var recentHtml=recent.map(function(l){
+    var setCount=0; Object.keys(l.logs).forEach(function(k){setCount+=l.logs[k].length;});
+    return '<div class="recent-log"><span>'+esc(l.title)+'</span><span class="d">'+l.date+' &middot; '+setCount+' sets</span></div>';
+  }).join('') || '<p class="note" style="margin-top:0;">No sessions logged yet &mdash; start one from the Training tab.</p>';
+
+  var histo={};
+  logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){ if(!histo[exId]) histo[exId]=[]; l.logs[exId].forEach(function(s){ histo[exId].push({date:l.date,v:s.v,w:s.w}); }); }); });
+  var exIds=Object.keys(histo).sort(function(a,b){ var da=histo[a][histo[a].length-1].date, db=histo[b][histo[b].length-1].date; return da<db?1:(da>db?-1:0); });
+  var exList=exIds.map(function(exId){
+    var def=exDef(exId)||{name:exId,type:'reps'};
+    var hist=histo[exId].slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
+    var last=hist[0]; var isOpen=!!expanded[exId];
+    var maxV=Math.max.apply(null,hist.map(function(h){return def.type==='load'?(h.w||h.v):h.v;}));
+    var rows=hist.slice(0,15).map(function(h){
+      var barVal=def.type==='load'?(h.w||h.v):h.v; var pct=maxV?Math.round((barVal/maxV)*100):0;
+      return '<tr><td>'+h.date+'</td><td>'+setLabel(def.type,h.v,h.w)+'</td><td><div class="bartrack"><div class="bar" style="width:'+pct+'%"></div></div></td></tr>';
+    }).join('');
+    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+exId+'"><h4>'+esc(def.name)+'</h4><span class="last">'+setLabel(def.type,last.v,last.w)+' &middot; '+last.date+'</span></div>'+
+      (isOpen?('<div class="exdetail"><table><tr><th>Date</th><th>Set</th><th></th></tr>'+rows+'</table></div>'):'')+'</div>';
+  }).join('') || '<p class="note" style="margin-top:0;">Log a workout to start building exercise history.</p>';
+  var progressView =
+    '<div class="stat-row"><div class="stat-tile"><div class="n">'+logs.length+'</div><div class="l">sessions total</div></div>'+
+      '<div class="stat-tile"><div class="n">'+thisWeekCount+'</div><div class="l">this week</div></div>'+
+      '<div class="stat-tile"><div class="n">'+exIds.length+'</div><div class="l">exercises tracked</div></div></div>'+
+    '<div class="sectiontitle">Recent sessions</div>'+recentHtml+
+    '<div class="sectiontitle">Exercise history</div>'+exList;
+
+  var sessionHtml='';
+  if(viewingSession && state.activeSession){
+    var sess=state.activeSession;
+    var w2=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
+    var n=sess.exIds.length;
+    if(slide>=n) slide=Math.max(0,n-1);
+
+    if(addingExercise){
+      var already=sess.exIds;
+      var q=exSearch.toLowerCase();
+      var results=EX.filter(function(e){ return already.indexOf(e.id)===-1 && (e.name.toLowerCase().indexOf(q)>-1 || e.cat.toLowerCase().indexOf(q)>-1 || e.area.toLowerCase().indexOf(q)>-1); });
+      var grouped=AREA_ORDER.map(function(area){
+        var inArea=results.filter(function(e){return e.area===area;});
+        if(!inArea.length) return '';
+        var rowsHtml=inArea.map(function(e){
+          var isOpen=!!expanded[e.id];
+          return '<div class="pickrow">'+
+            '<div class="pickrow-head">'+
+              '<div class="pickrow-main" data-action="toggleex" data-id="'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
+              '<button data-action="addex" data-id="'+e.id+'">Add</button>'+
+            '</div>'+
+            (isOpen?('<div class="pickpreview"><div class="preview-figs"><div class="pf">'+figureSVG(e.pose,false)+'</div><span class="arrow">&rarr;</span><div class="pf">'+figureSVG(e.pose,true)+'</div></div><p class="cue">'+esc(e.cue)+'</p></div>'):'')+
+          '</div>';
+        }).join('');
+        return '<div class="pickgroup"><div class="pickgroup-title">'+esc(area)+'</div>'+rowsHtml+'</div>';
+      }).join('') || '<p class="note" style="margin-top:0;">No matches.</p>';
+      sessionHtml='<div class="story"><div class="story-head"><h2 class="story-title">Add an exercise</h2><button data-action="closepicker">Close</button></div>'+
+        '<div class="picker"><input id="ex-search" placeholder="Search by name, area or category (try &#39;grip&#39; or &#39;dead hang&#39;)" value="'+esc(exSearch)+'">'+grouped+'</div></div>';
+    } else if(n===0){
+      sessionHtml='<div class="story"><div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+'</h2><button data-action="cancelsession">Back</button></div>'+
+        '<div class="slide"><p class="note" style="margin-top:0;">No exercises in this session. Add one to get going.</p>'+
+        '<button class="addex-btn" data-action="openpicker">+ Add exercise</button></div></div>';
+    } else {
+      var exId=sess.exIds[slide];
+      var def2=exDef(exId);
+      var sets=sess.logs[exId]||[];
+      var tgt=sess.targets[exId]||{sets:def2.sets,reps:def2.reps};
+      var chips=sets.map(function(s){ return '<span class="setchip">'+setLabel(def2.type,s.v,s.w)+'</span>'; }).join('');
+      var weightInput=def2.type==='load'?('<input id="log-w-'+exId+'" type="number" inputmode="decimal" placeholder="kg">'):'';
+      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?'secs':def2.type==='distance'?'metres':'reps';
+      var totalLogged=0; Object.keys(sess.logs).forEach(function(k){totalLogged+=sess.logs[k].length;});
+      var bar=sess.exIds.map(function(id,i){ var has=(sess.logs[id]||[]).length>0; var cls=i===slide?'now':(has?'done':''); return '<i class="'+cls+'"><b></b></i>'; }).join('');
+      sessionHtml='<div class="story">'+
+        '<div class="story-bar">'+bar+'</div>'+
+        '<div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>'+
+        '<div class="slide" id="slide-card" data-pose="'+def2.pose+'">'+
+          '<div class="fig-wrap"><div id="fig-live" data-pose="'+def2.pose+'">'+figureSVG(def2.pose,poseFlip)+'</div></div>'+
+          '<span class="cat">'+esc(def2.cat)+'</span>'+
+          '<h4>'+esc(def2.name)+'</h4>'+
+          '<div class="target">Target: '+tgt.sets+' x '+esc(tgt.reps)+'</div>'+
+          '<div class="cue">'+esc(def2.cue)+'</div>'+
+          (chips?'<div class="setchips">'+chips+'</div>':'')+
+          '<div class="logrow">'+weightInput+
+            '<input id="log-v-'+exId+'" type="number" inputmode="decimal" placeholder="'+valPlaceholder+'">'+
+            '<button data-action="logset" data-ex="'+exId+'" data-type="'+def2.type+'">Log set</button>'+
+            (sets.length?'<button class="undo" data-action="undoset" data-ex="'+exId+'">Undo</button>':'')+
+          '</div>'+
+          '<div class="storynav">'+
+            '<button data-action="prevslide"'+(slide===0?' disabled':'')+'>&larr; Prev</button>'+
+            '<button class="skip" data-action="skipex" data-ex="'+exId+'">Skip</button>'+
+            (slide<n-1?'<button class="next" data-action="nextslide">Next &rarr;</button>':'<button class="finish" data-action="finishworkout">Finish ('+totalLogged+' set'+(totalLogged===1?'':'s')+')</button>')+
+          '</div>'+
+          '<button class="addex-btn" data-action="openpicker">+ Add exercise to this session</button>'+
+          '<button class="discard-btn" data-action="removeex" data-id="'+exId+'">Remove this exercise from today&#39;s session</button>'+
+        '</div>'+
+      '</div>';
+    }
+  }
+
+  var current;
+  if(viewingSession && state.activeSession){ current=sessionHtml; }
+  else if(tab==='training'){ current=trainingView; }
+  else if(tab==='meals'){ current=mealsView; }
+  else if(tab==='progress'){ current=progressView; }
+  else { current=todayView; }
+
+  var tabsBar=(viewingSession && state.activeSession)?'':
+    '<div class="tabs">'+
+      '<button class="tab'+(tab==='today'?' active':'')+'" data-action="tab" data-tab="today">Today</button>'+
+      '<button class="tab'+(tab==='training'?' active':'')+'" data-action="tab" data-tab="training">Training</button>'+
+      '<button class="tab'+(tab==='meals'?' active':'')+'" data-action="tab" data-tab="meals">Meals</button>'+
+      '<button class="tab'+(tab==='progress'?' active':'')+'" data-action="tab" data-tab="progress">Progress</button>'+
+    '</div>';
+
+  return '<div class="wrap">'+
+      (saving?'<div class="banner">saving&hellip;</div>':'')+
+      (window.claude && window.claude.use ? '' : '<div class="banner">Open this from your artifact link to sync across devices &mdash; changes here are local to this tab only.</div>')+
+      '<div class="hud"><div class="hud-top"><h1 class="brand">Fight <span>Card</span></h1><div class="date">'+prettyDate()+'</div></div>'+
+        '<div class="lvl-row"><div class="lvl-badge">LV '+lvl.level+'</div>'+
+          '<div class="xp-track"><div class="xp-fill" style="width:'+Math.round((lvl.into/lvl.span)*100)+'%"></div></div>'+
+          '<div class="xp-num">'+lvl.into+' / '+lvl.span+' xp</div></div>'+
+        '<div class="streaks"><div class="streak"><span class="n">'+streaks.dayStreak+'</span><span class="l">day streak</span></div>'+
+          '<div class="streak"><span class="n">'+streaks.cleanStreak+'</span><span class="l">clean streak</span></div>'+
+          '<div class="streak"><span class="n">'+state.totalXp+'</span><span class="l">total xp</span></div></div>'+
+        '<div class="week">'+week+'</div></div>'+
+      tabsBar+current+
+    '</div>';
+}
+
+function syncUi(){
+  state.uiTab=tab; state.uiViewingSession=viewingSession; state.uiSlide=slide;
+}
+
+function render(){
+  syncUi();
+  var app=document.getElementById('app');
+  if(app) app.innerHTML=bodyContent();
+  stopPoseLoop();
+  if(viewingSession && state.activeSession && !addingExercise && state.activeSession.exIds.length){ startPoseLoop(); }
+}
+
+function onClick(e){
+  var t=e.target.closest('[data-action]');
+  if(!t) return;
+  var action=t.getAttribute('data-action');
+  var today=ensureDay(todayKey());
+  var uiOnly=false;
+
+  if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
+  else if(action==='toggleex'){ var id0=t.getAttribute('data-id'); expanded[id0]=!expanded[id0]; uiOnly=true; }
+  else if(action==='cancelsession'){ viewingSession=false; addingExercise=false; uiOnly=true; }
+  else if(action==='resumesession'){ viewingSession=true; slide=0; uiOnly=true; }
+  else if(action==='startworkout'){ startWorkout(t.getAttribute('data-id')); }
+  else if(action==='discardsession'){ state.activeSession=null; viewingSession=false; addingExercise=false; }
+  else if(action==='finishworkout'){ finishWorkout(); }
+  else if(action==='logset'){ logSet(t.getAttribute('data-ex'), t.getAttribute('data-type')); }
+  else if(action==='undoset'){ undoSet(t.getAttribute('data-ex')); }
+  else if(action==='prevslide'){ if(slide>0) slide--; uiOnly=true; }
+  else if(action==='nextslide'){ if(state.activeSession && slide<state.activeSession.exIds.length-1) slide++; uiOnly=true; }
+  else if(action==='skipex'){
+    if(state.activeSession && slide<state.activeSession.exIds.length-1){ slide++; uiOnly=true; }
+    else if(state.activeSession){ finishWorkout(); }
+  }
+  else if(action==='openpicker'){ addingExercise=true; exSearch=''; uiOnly=true; }
+  else if(action==='closepicker'){ addingExercise=false; uiOnly=true; }
+  else if(action==='addex'){ addExToSession(t.getAttribute('data-id')); addingExercise=false; slide=state.activeSession.exIds.length-1; }
+  else if(action==='removeex'){ removeExFromSession(t.getAttribute('data-id')); }
+  else if(action==='water'){
+    var d=parseInt(t.getAttribute('data-d'),10); var prev=today.water;
+    today.water=Math.max(0,today.water+d); if(today.water>0) today.touched=true;
+    if(d>0 && prev<state.waterTarget) addXp(XP_PER_CUP);
+    if(d<0 && prev<=state.waterTarget && prev>0) addXp(-XP_PER_CUP);
+  }
+  else if(action==='workout'){
+    var wt=t.getAttribute('data-type');
+    if(today.workout.done && today.workout.type===wt){ today.workout.done=false; today.workout.type=null; addXp(-XP_WORKOUT); }
+    else { if(!today.workout.done) addXp(XP_WORKOUT); today.workout.done=true; today.workout.type=wt; today.rest=false; }
+    today.touched=true;
+  }
+  else if(action==='rest'){
+    if(today.rest){ today.rest=false; addXp(-XP_REST); }
+    else { today.rest=true; today.workout.done=false; today.workout.type=null; addXp(XP_REST); }
+    today.touched=true;
+  }
+  else if(action==='alcohol'||action==='smoking'||action==='weed'){
+    var dd=parseInt(t.getAttribute('data-d'),10); today[action]=Math.max(0,today[action]+dd); today.touched=true;
+  }
+  else if(action==='addlib'){
+    var titleEl=document.getElementById('lib-title'); var tagEl=document.getElementById('lib-tag'); var notesEl=document.getElementById('lib-notes');
+    var title=(titleEl.value||'').trim(); if(!title) return;
+    state.library.push({id:'l'+Date.now(),title:title,tag:tagEl.value,notes:(notesEl.value||'').trim()});
+  }
+  else if(action==='dellib'){ var libid=t.getAttribute('data-id'); state.library=state.library.filter(function(x){return x.id!==libid;}); }
+  else if(action==='addrecipe'){
+    var rt=document.getElementById('rec-title'); var ri=document.getElementById('rec-ing'); var rn=document.getElementById('rec-inst');
+    var title2=(rt.value||'').trim(); if(!title2) return;
+    var ings=(ri.value||'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
+    state.recipes.push({id:'r'+Date.now(),title:title2,tag:'Recipe',ingredients:ings,instructions:(rn.value||'').trim(),inPlan:false,day:'Unassigned'});
+  }
+  else if(action==='delrecipe'){ var rid=t.getAttribute('data-id'); state.recipes=state.recipes.filter(function(x){return x.id!==rid;}); }
+  else if(action==='shopcheck'){ var item=t.getAttribute('data-item'); var sidx=state.shoppingChecked.indexOf(item); if(sidx>-1) state.shoppingChecked.splice(sidx,1); else state.shoppingChecked.push(item); }
+  else if(action==='clearweek'){ state.recipes.forEach(function(r){ r.inPlan=false; r.day='Unassigned'; }); state.shoppingChecked=[]; }
+
+  render();
+  if(!uiOnly) scheduleSave();
+}
+
+function onChange(e){
+  var t=e.target.closest('[data-action]');
+  if(!t) return;
+  var action=t.getAttribute('data-action');
+  if(action==='inplan'){ var id=t.getAttribute('data-id'); var r=state.recipes.filter(function(x){return x.id===id;})[0]; if(r) r.inPlan=t.checked; }
+  else if(action==='recipeday'){ var id2=t.getAttribute('data-id'); var r2=state.recipes.filter(function(x){return x.id===id2;})[0]; if(r2) r2.day=t.value; }
+  render(); scheduleSave();
+}
+
+function onInput(e){
+  if(e.target && e.target.id==='ex-search'){ exSearch=e.target.value; render(); }
+}
+
+function onTouchStart(e){ if(e.target.closest('.slide')){ touchX=e.touches[0].clientX; } }
+function onTouchEnd(e){
+  if(touchX===null) return;
+  var dx=e.changedTouches[0].clientX-touchX; touchX=null;
+  if(Math.abs(dx)<50) return;
+  if(!state.activeSession) return;
+  var n=state.activeSession.exIds.length;
+  if(dx<0 && slide<n-1){ slide++; render(); }
+  else if(dx>0 && slide>0){ slide--; render(); }
+}
+
+function fullDocument(data){
+  return '<!doctype html><html><head><meta charset="utf-8">'+
+  '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+  '<title>Fight Card</title>'+
+  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">'+
+  '<style>'+CSS+'</style></head><body><div id="app"></div>'+
+  '<script>('+App.toString()+')('+JSON.stringify(data)+');<\/script>'+
+  '</body></html>';
+}
+
+function boot(){
+  var styleTag=document.createElement('style'); styleTag.textContent=CSS; document.head.appendChild(styleTag);
+  document.addEventListener('click',onClick);
+  document.addEventListener('change',onChange);
+  document.addEventListener('input',onInput);
+  document.addEventListener('touchstart',onTouchStart,{passive:true});
+  document.addEventListener('touchend',onTouchEnd,{passive:true});
+  render();
+  if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); }); }
+}
+boot();
+})({"waterTarget":8,"totalXp":31,"days":{"2026-08-29":{"water":0,"workout":{"done":false,"type":null},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":false},"2026-08-30":{"water":12,"workout":{"done":true,"type":"Strength"},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":true}},"shoppingChecked":[],"workoutLogs":[{"id":"wl1788070912139","workoutId":"w12","title":"Cardio — gym","tag":"Conditioning","date":"2026-08-30","logs":{"cardio_gym_warmup":[{"v":300,"w":null}],"cardio_gym_intervals":[{"v":900,"w":null}],"cardio_gym_steady":[{"v":120,"w":null}]}},{"id":"wl1788083112190","workoutId":"w6","title":"Push","tag":"Strength","date":"2026-08-30","logs":{"press_bench":[{"v":10,"w":40},{"v":8,"w":60},{"v":6,"w":70},{"v":10,"w":60}],"press_ohp":[{"v":10,"w":20},{"v":8,"w":30},{"v":8,"w":30}],"press_incline":[{"v":8,"w":24},{"v":10,"w":22},{"v":10,"w":22}],"dip":[{"v":8,"w":null},{"v":10,"w":null},{"v":9,"w":null}],"triceps_ext":[{"v":8,"w":27},{"v":12,"w":23},{"v":10,"w":23}],"deadhang":[{"v":60,"w":null},{"v":35,"w":null}]}}],"activeSession":null,"library":[{"id":"t1","title":"Weekly training template","tag":"Overview","notes":"Mon: Boxing/MMA technical + short mobility warm-up.\nTue: Strength — functional full-body.\nWed: Power & speed.\nThu: Boxing/MMA technical + a conditioning finisher.\nFri: Flexibility & mobility.\nSat: Conditioning.\nSun: Full rest.\nAdapt the days to your actual gym/class times. Keep 48h between sessions hitting the same movement pattern, don't stack strength and power on the same day early on, and start conservative in week one. Start any workout from the cards below, swipe through each exercise with an example and a place to log, and add extras from the full exercise list mid-session if you want."}],"recipes":[{"id":"r1","title":"Overnight oats, berries & peanut butter","tag":"Breakfast","ingredients":["Porridge oats (80g)","Milk or yoghurt (200ml)","Chia seeds (1 tbsp)","Mixed berries (handful)","Peanut butter (1 tbsp)","Honey (drizzle)"],"instructions":"Stir oats, milk and chia together, leave overnight in the fridge. Top with berries, peanut butter and honey before eating.","inPlan":false,"day":"Unassigned"},{"id":"r2","title":"Greek yoghurt, granola & banana","tag":"Breakfast","ingredients":["Greek yoghurt (200g)","Granola (40g)","Banana (1)","Honey (drizzle)"],"instructions":"Layer yoghurt, granola and sliced banana.","inPlan":false,"day":"Unassigned"},{"id":"r3","title":"Chicken, rice & veg tray bake","tag":"Lunch/Dinner","ingredients":["Chicken thighs (4)","Rice (mug, uncooked)","Broccoli (1 head)","Peppers (2)","Olive oil","Garlic (2 cloves)","Mixed herbs"],"instructions":"Roast chicken and chopped veg with oil, garlic and herbs at 200C for 30-35 min. Cook rice separately.","inPlan":false,"day":"Unassigned"},{"id":"r4","title":"Salmon, sweet potato & greens","tag":"Dinner","ingredients":["Salmon fillets (2)","Sweet potato (2)","Spinach or kale (large handful)","Lemon (1)","Olive oil"],"instructions":"Roast cubed sweet potato at 200C for 25 min, add salmon for the last 12-15 min. Wilt spinach, finish with lemon and oil.","inPlan":false,"day":"Unassigned"},{"id":"r5","title":"Mince chilli (beef or turkey)","tag":"Dinner","ingredients":["Mince, beef or turkey (500g)","Kidney beans (1 tin)","Chopped tomatoes (1 tin)","Onion (1)","Pepper (1)","Rice","Cumin, paprika, chilli powder"],"instructions":"Brown the mince and onion, add pepper, spices, tomatoes and beans, simmer 20 min. Serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r6","title":"Egg & veg scramble wrap","tag":"Lunch","ingredients":["Eggs (3)","Spinach (handful)","Mushrooms (4)","Wholemeal wrap (1)","Cheese, optional"],"instructions":"Scramble eggs with sauteed mushrooms and spinach, fold into a wrap.","inPlan":false,"day":"Unassigned"},{"id":"r7","title":"Post-training recovery shake","tag":"Snack","ingredients":["Milk or plant milk (300ml)","Banana (1)","Oats (30g)","Peanut butter (1 tbsp)","Protein powder, optional","Ice"],"instructions":"Blend everything.","inPlan":false,"day":"Unassigned"},{"id":"r8","title":"Scrambled eggs, avocado & toast","tag":"Breakfast","ingredients":["Eggs (3)","Avocado (1/2)","Wholemeal bread (2 slices)","Chilli flakes (pinch)","Butter or oil"],"instructions":"Scramble the eggs gently, toast the bread, mash avocado on top, pile the eggs on.","inPlan":false,"day":"Unassigned"},{"id":"r9","title":"Protein porridge, peanut butter & banana","tag":"Breakfast","ingredients":["Porridge oats (60g)","Milk (250ml)","Protein powder (1 scoop, optional)","Banana (1)","Peanut butter (1 tbsp)"],"instructions":"Cook oats with milk, stir in protein powder off the heat, top with banana and peanut butter.","inPlan":false,"day":"Unassigned"},{"id":"r10","title":"Breakfast burrito","tag":"Breakfast","ingredients":["Eggs (3)","Tinned black beans (100g)","Cheddar cheese, grated","Salsa","Large tortilla wrap (1)"],"instructions":"Scramble eggs, warm the beans, layer into the wrap with cheese and salsa, fold and go.","inPlan":false,"day":"Unassigned"},{"id":"r11","title":"Smoked salmon & cream cheese bagel","tag":"Breakfast","ingredients":["Bagel (1)","Cream cheese (2 tbsp)","Smoked salmon (60g)","Black pepper","Lemon wedge"],"instructions":"Toast the bagel, spread cream cheese, top with salmon, lemon and pepper.","inPlan":false,"day":"Unassigned"},{"id":"r12","title":"Cottage cheese, pineapple & nuts","tag":"Breakfast","ingredients":["Cottage cheese (200g)","Pineapple chunks (handful)","Mixed nuts (small handful)","Honey, optional"],"instructions":"Combine straight from the fridge.","inPlan":false,"day":"Unassigned"},{"id":"r13","title":"Breakfast hash","tag":"Breakfast","ingredients":["Potatoes (2, diced)","Turkey bacon or chorizo (80g)","Pepper (1)","Egg (1-2)","Oil"],"instructions":"Fry the potato until golden, add bacon/chorizo and pepper, finish with an egg on top.","inPlan":false,"day":"Unassigned"},{"id":"r14","title":"Tuna, sweetcorn & mayo jacket potato","tag":"Lunch","ingredients":["Baking potato (1)","Tinned tuna (1)","Sweetcorn (handful)","Mayonnaise (1 tbsp)","Spring onion, optional"],"instructions":"Bake or microwave the potato, mix tuna, sweetcorn and mayo, spoon over.","inPlan":false,"day":"Unassigned"},{"id":"r15","title":"Chicken Caesar-style wrap","tag":"Lunch","ingredients":["Cooked chicken breast (1, sliced)","Romaine lettuce","Parmesan, grated","Caesar dressing","Tortilla wrap"],"instructions":"Toss chicken, lettuce, parmesan and dressing, roll into the wrap.","inPlan":false,"day":"Unassigned"},{"id":"r16","title":"Falafel & hummus flatbread","tag":"Lunch","ingredients":["Falafel (4-6)","Hummus (2 tbsp)","Flatbread","Mixed salad leaves","Tomato"],"instructions":"Warm the falafel, spread hummus, layer with salad and falafel.","inPlan":false,"day":"Unassigned"},{"id":"r17","title":"Turkey club sandwich","tag":"Lunch","ingredients":["Turkey breast slices","Cheese","Bacon","Lettuce","Tomato","Bread (2-3 slices)","Mayo"],"instructions":"Layer everything between toasted bread.","inPlan":false,"day":"Unassigned"},{"id":"r18","title":"Burrito bowl","tag":"Lunch","ingredients":["Rice","Black beans (tin)","Cooked chicken or leftover mince","Salsa","Cheese","Sweetcorn","Lime"],"instructions":"Layer rice, beans, protein, salsa, cheese and lime in a bowl.","inPlan":false,"day":"Unassigned"},{"id":"r19","title":"Soba noodle & edamame salad","tag":"Lunch","ingredients":["Soba noodles","Edamame beans (handful)","Carrot, grated","Soy sauce","Sesame oil","Rice vinegar"],"instructions":"Cook and cool noodles, toss with edamame, carrot and dressing.","inPlan":false,"day":"Unassigned"},{"id":"r20","title":"Ham, cheese & spinach toastie","tag":"Lunch","ingredients":["Bread (2 slices)","Ham","Cheese","Spinach","Butter"],"instructions":"Layer and toast until golden.","inPlan":false,"day":"Unassigned"},{"id":"r21","title":"Quinoa, roast veg & feta salad","tag":"Lunch","ingredients":["Quinoa (80g)","Courgette, pepper, red onion","Feta cheese","Olive oil","Lemon"],"instructions":"Roast the veg, cook quinoa, combine with feta and a lemon-oil dressing.","inPlan":false,"day":"Unassigned"},{"id":"r22","title":"Prawn stir-fry noodles","tag":"Lunch","ingredients":["Prawns (150g)","Noodles","Mixed stir-fry veg","Soy sauce","Garlic","Ginger"],"instructions":"Stir-fry garlic, ginger, veg then prawns, toss through noodles with soy sauce.","inPlan":false,"day":"Unassigned"},{"id":"r23","title":"Chickpea & spinach curry","tag":"Lunch","ingredients":["Chickpeas (tin)","Spinach (large handful)","Chopped tomatoes (tin)","Onion","Curry powder or paste","Rice"],"instructions":"Fry onion and curry powder, add tomatoes and chickpeas, simmer, stir through spinach. Serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r24","title":"Spaghetti bolognese","tag":"Dinner","ingredients":["Beef mince (500g)","Chopped tomatoes (tin)","Onion","Garlic","Mixed herbs","Spaghetti"],"instructions":"Brown mince with onion and garlic, add tomatoes and herbs, simmer 25-30 min, serve over spaghetti.","inPlan":false,"day":"Unassigned"},{"id":"r25","title":"Chicken fajitas","tag":"Dinner","ingredients":["Chicken breast (2-3, sliced)","Peppers (2)","Onion (1)","Fajita seasoning","Tortilla wraps","Soured cream"],"instructions":"Fry chicken and veg with seasoning, serve with warm wraps and soured cream.","inPlan":false,"day":"Unassigned"},{"id":"r26","title":"Sausages, mash & greens","tag":"Dinner","ingredients":["Sausages (4-6)","Potatoes, for mash","Broccoli or cabbage","Gravy","Butter/milk for mash"],"instructions":"Grill sausages, boil and mash potatoes, steam the greens.","inPlan":false,"day":"Unassigned"},{"id":"r27","title":"Thai green chicken curry","tag":"Dinner","ingredients":["Chicken breast (2, sliced)","Thai green curry paste","Coconut milk (tin)","Mixed vegetables","Rice"],"instructions":"Fry the paste, add chicken and coconut milk, simmer 15 min with veg, serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r28","title":"Beef stir-fry with noodles","tag":"Dinner","ingredients":["Beef strips (300g)","Broccoli","Noodles","Soy sauce","Garlic","Ginger","Oyster sauce"],"instructions":"Stir-fry beef hot and fast, add garlic, ginger, broccoli, toss through noodles.","inPlan":false,"day":"Unassigned"},{"id":"r29","title":"Cottage pie","tag":"Dinner","ingredients":["Beef mince (500g)","Carrots","Onion","Beef stock","Worcestershire sauce","Potatoes, for mash topping"],"instructions":"Brown mince with onion and carrot, add stock and sauce, simmer, top with mash, bake at 200C for 20 min.","inPlan":false,"day":"Unassigned"},{"id":"r30","title":"Baked cod with new potatoes","tag":"Dinner","ingredients":["Cod fillets (2)","New potatoes","Green beans","Lemon","Olive oil","Dill or parsley"],"instructions":"Boil potatoes, bake cod at 200C for 12-15 min with lemon and oil, steam beans.","inPlan":false,"day":"Unassigned"},{"id":"r31","title":"Pork chops with roasted veg","tag":"Dinner","ingredients":["Pork chops (2)","Carrot, parsnip, potato","Olive oil","Rosemary"],"instructions":"Roast veg at 200C for 25 min, cook chops for the last 10-12 min, rest before serving.","inPlan":false,"day":"Unassigned"},{"id":"r32","title":"Bean & vegetable chilli (veggie)","tag":"Dinner","ingredients":["Mixed beans (2 tins)","Chopped tomatoes (tin)","Peppers","Onion","Cumin, paprika, chilli powder","Rice"],"instructions":"Fry onion and peppers, add spices, tomatoes and beans, simmer 20 min, serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r33","title":"One-pan chicken and rice","tag":"Dinner","ingredients":["Chicken thighs (4)","Rice","Peppers","Paprika","Chicken stock","Chopped tomatoes (tin)"],"instructions":"Brown chicken, add rice, paprika, stock and tomatoes, simmer covered 20-25 min.","inPlan":false,"day":"Unassigned"},{"id":"r34","title":"Rice cakes, peanut butter & banana","tag":"Snack","ingredients":["Rice cakes (2)","Peanut butter (1 tbsp)","Banana (1/2)"],"instructions":"Spread and top.","inPlan":false,"day":"Unassigned"},{"id":"r35","title":"Hard-boiled eggs & oatcakes","tag":"Snack","ingredients":["Eggs (2)","Oatcakes (3-4)","Salt and pepper"],"instructions":"Boil eggs 8-10 min, cool, peel, eat with oatcakes.","inPlan":false,"day":"Unassigned"},{"id":"r36","title":"Greek yoghurt, honey & seeds","tag":"Snack","ingredients":["Greek yoghurt (200g)","Honey (drizzle)","Mixed seeds (1 tbsp)"],"instructions":"Combine.","inPlan":false,"day":"Unassigned"},{"id":"r37","title":"Homemade trail mix","tag":"Snack","ingredients":["Mixed nuts","Dried fruit (raisins/apricots)","Dark chocolate chunks","Pumpkin seeds"],"instructions":"Mix in a jar in whatever ratio you like, portion it out rather than eating from the bag.","inPlan":false,"day":"Unassigned"}],"uiTab":"today","uiViewingSession":false,"uiSlide":5});</script></body></html>
