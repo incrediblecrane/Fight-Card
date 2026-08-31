@@ -109,7 +109,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .story-title{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:0.95rem;color:var(--text-faint);margin:0;}\
 .slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y;}\
 .fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;}\
-.fig-wrap svg{width:130px;height:170px;}\
+.fig-wrap svg{width:155px;height:172px;}\
 .fig-wrap svg line,.fig-wrap svg circle{transition:all .7s cubic-bezier(.4,0,.2,1);}\
 @media (prefers-reduced-motion:reduce){.fig-wrap svg line,.fig-wrap svg circle{transition:none;}}\
 .slide h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1.15rem;margin:0 0 2px;text-align:center;}\
@@ -122,6 +122,12 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .logrow input{width:76px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}\
 .logrow button{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;background:var(--good);color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;}\
 .logrow .undo{background:none;color:var(--text-faint);border:1px solid var(--line);}\
+.cardio-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;}\
+.cardio-select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.sauna-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}\
+.sauna-row input{width:64px;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}\
+.sauna-row select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.logbtn{display:block;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;}\
 .storynav{display:flex;gap:10px;margin-top:16px;}\
 .storynav button{flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;text-transform:uppercase;border-radius:10px;padding:13px;cursor:pointer;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
 .storynav button.next{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}\
@@ -143,7 +149,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .pickrow-head button.added{background:var(--surface-raised);color:var(--text-faint);}\
 .pickpreview{padding:0 4px 16px;}\
 .preview-figs{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px;}\
-.preview-figs .pf{width:72px;}\
+.preview-figs .pf{width:80px;}\
 .preview-figs .pf svg{width:100%;display:block;}\
 .preview-figs .arrow{color:var(--text-faint);font-size:1.1rem;}\
 .pickpreview .cue{font-size:0.8rem;color:var(--text-soft);text-align:center;margin:0;}\
@@ -168,8 +174,12 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 
 var WORKOUT_TYPES=["Boxing/MMA","Strength","Power/Speed","Flexibility","Conditioning"];
 var AREA_ORDER=["Legs & glutes","Push","Pull","Core & rotation","Grip & carries","Power & explosive","Conditioning & cardio","Mobility & flexibility","Boxing/MMA technique"];
+var MACHINES=["Treadmill","Bike","Rower","Elliptical","Ski erg","Stair climber"];
+var EFFORT_LEVELS=["Easy","Moderate","Hard","Very hard","Max effort"];
 var DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun","Unassigned"];
-var XP_PER_CUP=2, XP_WORKOUT=15, XP_REST=6;
+var XP_PER_WATER=2, XP_WORKOUT=15, XP_REST=6, XP_SAUNA=5;
+var WATER_STEP_L=0.25;
+function litres(units){ var l=Math.round(units*WATER_STEP_L*100)/100; return l+'L'; }
 
 /* ---------- pose engine: 0deg=up, clockwise. stylised single-side stick figure ---------- */
 function pt(x0,y0,len,deg){ var r=deg*Math.PI/180; return {x:x0+len*Math.sin(r), y:y0-len*Math.cos(r)}; }
@@ -212,15 +222,98 @@ var P={
   SITROT_B:{torso:20,armR:20,forearmR:30,legR:150,shinR:150,hipY:20},
   CARRY:{torso:2,armR:178,forearmR:178,legR:170,shinR:190,hipY:0},
   SWIM_A:{torso:90,armR:30,forearmR:20,legR:95,shinR:100,hipY:6},
-  SWIM_B:{torso:90,armR:170,forearmR:170,legR:100,shinR:90,hipY:8}
+  SWIM_B:{torso:90,armR:170,forearmR:170,legR:100,shinR:90,hipY:8},
+  BENCH_DOWN:{torso:88,armR:95,forearmR:15,legR:100,shinR:95,hipY:8},
+  BENCH_UP:{torso:88,armR:18,forearmR:8,legR:100,shinR:95,hipY:8},
+  PUSHUP_DOWN:{torso:88,armR:70,forearmR:130,legR:100,shinR:95,hipY:14},
+  PUSHUP_UP:{torso:88,armR:40,forearmR:40,legR:100,shinR:95,hipY:8},
+  CURL_DOWN:{torso:2,armR:178,forearmR:178,legR:181,shinR:180,hipY:0},
+  CURL_UP:{torso:2,armR:178,forearmR:10,legR:181,shinR:180,hipY:0},
+  DIP_UP:{torso:8,armR:175,forearmR:175,legR:170,shinR:230,hipY:0},
+  DIP_DOWN:{torso:12,armR:170,forearmR:130,legR:170,shinR:230,hipY:10},
+  HIPBRIDGE_DOWN:{torso:90,armR:90,forearmR:90,legR:120,shinR:60,hipY:16},
+  HIPBRIDGE_UP:{torso:90,armR:90,forearmR:90,legR:120,shinR:60,hipY:0},
+  PISTOL_UP:{torso:6,armR:100,forearmR:30,legR:183,shinR:181,hipY:0},
+  PISTOL_DOWN:{torso:30,armR:80,forearmR:20,legR:220,shinR:145,hipY:15},
+  WALLSIT_A:{torso:0,armR:170,forearmR:170,legR:183,shinR:130,hipY:14},
+  WALLSIT_B:{torso:0,armR:170,forearmR:170,legR:183,shinR:130,hipY:17},
+  CALFRAISE_DOWN:{torso:2,armR:170,forearmR:170,legR:181,shinR:180,hipY:0},
+  CALFRAISE_UP:{torso:2,armR:170,forearmR:170,legR:181,shinR:180,hipY:-8},
+  INVROW_OUT:{torso:80,armR:15,forearmR:15,legR:100,shinR:95,hipY:6},
+  INVROW_IN:{torso:80,armR:150,forearmR:170,legR:100,shinR:95,hipY:6},
+  DEADBUG_TABLE:{torso:92,armR:175,forearmR:175,legR:175,shinR:175,hipY:6},
+  DEADBUG_EXTEND:{torso:92,armR:100,forearmR:100,legR:100,shinR:100,hipY:6},
+  SIDEPLANK_A:{torso:88,armR:38,forearmR:38,legR:96,shinR:96,hipY:6},
+  SIDEPLANK_B:{torso:88,armR:38,forearmR:38,legR:96,shinR:96,hipY:9},
+  HOLLOW_A:{torso:70,armR:15,forearmR:15,legR:150,shinR:150,hipY:10},
+  HOLLOW_B:{torso:74,armR:12,forearmR:12,legR:154,shinR:154,hipY:9},
+  SPRINT_A:{torso:16,armR:70,forearmR:110,legR:50,shinR:140,hipY:-6},
+  SPRINT_B:{torso:16,armR:170,forearmR:150,legR:190,shinR:170,hipY:0},
+  HIGHKNEE_A:{torso:6,armR:60,forearmR:100,legR:30,shinR:140,hipY:-6},
+  HIGHKNEE_B:{torso:6,armR:170,forearmR:170,legR:181,shinR:180,hipY:0},
+  JJACK_IN:{torso:2,armR:175,forearmR:175,legR:181,shinR:180,hipY:0},
+  JJACK_OUT:{torso:2,armR:35,forearmR:35,legR:215,shinR:190,hipY:-6},
+  MACHINE_A:{torso:8,armR:150,forearmR:140,legR:210,shinR:150,hipY:0},
+  MACHINE_B:{torso:8,armR:100,forearmR:120,legR:140,shinR:190,hipY:0},
+  JAB_PUNCH:{torso:12,armR:15,forearmR:8,legR:170,shinR:190,hipY:0}
 };
 var PP={
   SQUAT:[P.SQUAT_UP,P.SQUAT_DOWN], HINGE:[P.HINGE_UP,P.HINGE_DOWN], PRESS:[P.PRESS_DOWN,P.PRESS_UP],
   ROW:[P.ROW_OUT,P.ROW_IN], HANG:[P.HANG,P.HANG_UP], PLANK:[P.PLANK_A,P.PLANK_B], JUMP:[P.JUMP_LOAD,P.JUMP_AIR],
   LUNGE:[P.LUNGE_A,P.LUNGE_B], TWIST:[P.TWIST_A,P.TWIST_B], REACH:[P.REACH_FWD,P.REACH_UP],
   GUARD:[P.GUARD_A,P.GUARD_B], KNEEL:[P.STAND,P.KNEEL], SITROT:[P.SITROT_A,P.SITROT_B], CARRY:[P.STAND,P.CARRY],
-  SWIM:[P.SWIM_A,P.SWIM_B]
+  SWIM:[P.SWIM_A,P.SWIM_B],
+  BENCH:[P.BENCH_DOWN,P.BENCH_UP], PUSHUP:[P.PUSHUP_DOWN,P.PUSHUP_UP], CURL:[P.CURL_DOWN,P.CURL_UP],
+  DIP:[P.DIP_UP,P.DIP_DOWN], HIPBRIDGE:[P.HIPBRIDGE_DOWN,P.HIPBRIDGE_UP], PISTOL:[P.PISTOL_UP,P.PISTOL_DOWN],
+  WALLSIT:[P.WALLSIT_A,P.WALLSIT_B], CALFRAISE:[P.CALFRAISE_DOWN,P.CALFRAISE_UP], INVROW:[P.INVROW_OUT,P.INVROW_IN],
+  DEADBUG:[P.DEADBUG_TABLE,P.DEADBUG_EXTEND], SIDEPLANK:[P.SIDEPLANK_A,P.SIDEPLANK_B], HOLLOW:[P.HOLLOW_A,P.HOLLOW_B],
+  SPRINT:[P.SPRINT_A,P.SPRINT_B], HIGHKNEE:[P.HIGHKNEE_A,P.HIGHKNEE_B], JJACK:[P.JJACK_IN,P.JJACK_OUT],
+  MACHINE:[P.MACHINE_A,P.MACHINE_B], JAB:[P.GUARD_A,P.JAB_PUNCH]
 };
+var EQUIP={
+  sq_goblet:'dumbbell', sq_back:'barbell', sq_front:'barbell', dl_rdl:'barbell', dl_conv:'barbell', hipthrust:'barbell',
+  splitsq_bulg:'dumbbell', press_push:'dumbbell', press_ohp:'barbell', press_bench:'barbell', press_incline:'dumbbell',
+  row_bent:'barbell', row_single:'dumbbell', facepull:'band', pulldown:'bar', pullup:'bar', chinup:'bar',
+  invertedrow:'bar', hangingkneeraise:'bar', deadhang:'bar', curl_bicep:'dumbbell', triceps_ext:'dumbbell',
+  kb_swing:'kettlebell', kb_clean:'kettlebell', kb_snatch:'kettlebell', kb_press:'kettlebell', kb_tgu:'kettlebell',
+  kb_bottomsup:'kettlebell', farmerscarry:'dumbbell', suitcasecarry:'dumbbell', platepinch:'dumbbell', dip:'dipbars',
+  wallsit:'wall', boxjump:'box', shoulderdisloc:'band', woodchopper:'band', palloffpress:'band', battleropes:'band',
+  russiantwist:'dumbbell'
+};
+function equipFor(id){ return EQUIP[id]||null; }
+function equipGlyph(kind,s){
+  if(!kind) return '';
+  if(kind==='barbell'){
+    return '<line x1="'+(s.hand.x-24)+'" y1="'+s.hand.y+'" x2="'+(s.hand.x+24)+'" y2="'+s.hand.y+'" stroke="var(--text-soft)" stroke-width="3"/>'+
+      '<circle cx="'+(s.hand.x-24)+'" cy="'+s.hand.y+'" r="6" fill="none" stroke="var(--text-soft)" stroke-width="2.5"/>'+
+      '<circle cx="'+(s.hand.x+24)+'" cy="'+s.hand.y+'" r="6" fill="none" stroke="var(--text-soft)" stroke-width="2.5"/>';
+  }
+  if(kind==='dumbbell'){
+    return '<line x1="'+(s.hand.x-8)+'" y1="'+s.hand.y+'" x2="'+(s.hand.x+8)+'" y2="'+s.hand.y+'" stroke="var(--text-soft)" stroke-width="3"/>'+
+      '<circle cx="'+(s.hand.x-8)+'" cy="'+s.hand.y+'" r="4" fill="var(--text-soft)"/>'+
+      '<circle cx="'+(s.hand.x+8)+'" cy="'+s.hand.y+'" r="4" fill="var(--text-soft)"/>';
+  }
+  if(kind==='kettlebell'){
+    return '<circle cx="'+s.hand.x+'" cy="'+(s.hand.y+10)+'" r="8" fill="none" stroke="var(--text-soft)" stroke-width="2.5"/>'+
+      '<path d="M'+(s.hand.x-4)+' '+(s.hand.y+3)+' Q'+s.hand.x+' '+(s.hand.y-6)+' '+(s.hand.x+4)+' '+(s.hand.y+3)+'" fill="none" stroke="var(--text-soft)" stroke-width="2.5"/>';
+  }
+  if(kind==='band'){
+    return '<path d="M'+s.hand.x+' '+s.hand.y+' q8 10 0 20 q-8 10 0 20" fill="none" stroke="var(--accent)" stroke-width="2" opacity="0.55"/>';
+  }
+  if(kind==='bar'){
+    return '<line x1="'+(s.hand.x-30)+'" y1="'+(s.hand.y-2)+'" x2="'+(s.hand.x+30)+'" y2="'+(s.hand.y-2)+'" stroke="var(--text-soft)" stroke-width="4" stroke-linecap="round"/>';
+  }
+  if(kind==='dipbars'){
+    return '<line x1="'+(s.hand.x-2)+'" y1="'+(s.hand.y-16)+'" x2="'+(s.hand.x-2)+'" y2="'+(s.hand.y+16)+'" stroke="var(--text-soft)" stroke-width="3" stroke-linecap="round"/>';
+  }
+  if(kind==='wall'){
+    return '<line x1="14" y1="-16" x2="14" y2="170" stroke="var(--text-soft)" stroke-width="3" opacity="0.6"/>';
+  }
+  if(kind==='box'){
+    return '<rect x="86" y="128" width="34" height="34" fill="none" stroke="var(--text-soft)" stroke-width="2.5"/>';
+  }
+  return '';
+}
 
 /* ---------- exercise library ---------- */
 var EX=[
@@ -231,36 +324,36 @@ var EX=[
 {id:"sq_jump",name:"Jump squat",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"8",pose:"JUMP",cue:"Squat down then explode straight up, land soft with bent knees and reset before the next rep."},
 {id:"dl_rdl",name:"Romanian deadlift",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"8-10",pose:"HINGE",cue:"Slight knee bend, hinge at the hips keeping the weight close to your legs, lower until your hamstrings stretch, drive hips forward to stand."},
 {id:"dl_conv",name:"Conventional deadlift",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"5",pose:"HINGE",cue:"Bar over mid-foot, flat back, drive through the floor and stand tall, hips and shoulders rising together."},
-{id:"hipthrust",name:"Hip thrust",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"10",pose:"HINGE",cue:"Upper back on a bench, bar over your hips, drive through your heels to full hip extension, squeeze at the top."},
+{id:"hipthrust",name:"Hip thrust",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"10",pose:"HIPBRIDGE",cue:"Upper back on a bench, bar over your hips, drive through your heels to full hip extension, squeeze at the top."},
 {id:"splitsq_bulg",name:"Bulgarian split squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:3,reps:"8 each side",pose:"LUNGE",cue:"Rear foot up on a bench, front foot forward. Drop straight down through the front leg, drive back up."},
 {id:"lunge_walk",name:"Walking lunge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"10 each side",pose:"LUNGE",cue:"Step forward into a lunge, both knees near 90 degrees, drive up and step through to the next lunge."},
 {id:"press_push",name:"Push press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8",pose:"PRESS",cue:"Dumbbells at your shoulders, dip your knees slightly then drive up explosively, press overhead as your legs extend."},
 {id:"press_ohp",name:"Overhead press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"PRESS",cue:"Bar or dumbbells at shoulder height, press straight overhead without arching your lower back, lower under control."},
-{id:"press_bench",name:"Bench press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"PRESS",cue:"Bar over your chest, lower with control to your sternum, press back up keeping your feet planted."},
-{id:"press_incline",name:"Incline dumbbell press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"10",pose:"PRESS",cue:"On an incline bench, press dumbbells up and slightly together, lower under control to chest level."},
+{id:"press_bench",name:"Bench press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"BENCH",cue:"Bar over your chest, lower with control to your sternum, press back up keeping your feet planted."},
+{id:"press_incline",name:"Incline dumbbell press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"10",pose:"BENCH",cue:"On an incline bench, press dumbbells up and slightly together, lower under control to chest level."},
 {id:"row_bent",name:"Bent-over row",cat:"Strength",area:"Pull",type:"load",sets:4,reps:"8-10",pose:"ROW",cue:"Hinge forward with a flat back, pull the bar or dumbbells to your ribs, squeeze your shoulder blades together."},
 {id:"row_single",name:"Single-arm row",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10 each side",pose:"ROW",cue:"One hand and knee on a bench, pull the dumbbell to your hip keeping your torso still."},
 {id:"facepull",name:"Face pull",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"15",pose:"ROW",cue:"Cable or band at face height, pull toward your face with elbows high, squeeze your rear shoulders."},
 {id:"pulldown",name:"Lat pulldown",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10",pose:"ROW",cue:"Pull the bar down to your upper chest, lead with your elbows, control it back up."},
 {id:"pullup",name:"Pull-up",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"6-8",pose:"HANG",cue:"Hang from a bar, pull your chin over it leading with your chest, lower under control."},
 {id:"chinup",name:"Chin-up",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"6-8",pose:"HANG",cue:"Underhand grip, pull your chin over the bar, lower under full control."},
-{id:"invertedrow",name:"Inverted row",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"8-10",pose:"ROW",cue:"Under a bar or table, body straight, pull your chest up to the bar and lower slowly."},
-{id:"pushup",name:"Push-up",cat:"Strength",area:"Push",type:"reps",sets:3,reps:"12-15",pose:"PRESS",cue:"Hands under shoulders, body in a straight line, lower your chest to the floor and press back up."},
-{id:"dip",name:"Dip",cat:"Strength",area:"Push",type:"reps",sets:3,reps:"8-10",pose:"PRESS",cue:"On parallel bars, lower until your shoulders dip below your elbows, press back up."},
-{id:"curl_bicep",name:"Bicep curl",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"12",pose:"PRESS",cue:"Elbows pinned to your sides, curl the weight up without swinging, lower under control."},
+{id:"invertedrow",name:"Inverted row",cat:"Strength",area:"Pull",type:"reps",sets:3,reps:"8-10",pose:"INVROW",cue:"Under a bar or table, body straight, pull your chest up to the bar and lower slowly."},
+{id:"pushup",name:"Push-up",cat:"Strength",area:"Push",type:"reps",sets:3,reps:"12-15",pose:"PUSHUP",cue:"Hands under shoulders, body in a straight line, lower your chest to the floor and press back up."},
+{id:"dip",name:"Dip",cat:"Strength",area:"Push",type:"reps",sets:3,reps:"8-10",pose:"DIP",cue:"On parallel bars, lower until your shoulders dip below your elbows, press back up."},
+{id:"curl_bicep",name:"Bicep curl",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"12",pose:"CURL",cue:"Elbows pinned to your sides, curl the weight up without swinging, lower under control."},
 {id:"triceps_ext",name:"Triceps extension",cat:"Strength",area:"Push",type:"load",sets:3,reps:"12",pose:"PRESS",cue:"Weight overhead, lower behind your head by bending the elbows only, press back to straight."},
 {id:"kb_swing",name:"Kettlebell swing",cat:"Power",area:"Power & explosive",type:"load",sets:4,reps:"12",pose:"HINGE",cue:"Hinge at the hips, snap them forward to drive the bell to chest height, arms just along for the ride."},
-{id:"deadbug",name:"Dead bug",cat:"Strength",area:"Core & rotation",type:"time",sets:3,reps:"30s each side",pose:"PLANK",cue:"On your back, opposite arm and leg extend slowly while your lower back stays pressed to the floor."},
+{id:"deadbug",name:"Dead bug",cat:"Strength",area:"Core & rotation",type:"time",sets:3,reps:"30s each side",pose:"DEADBUG",cue:"On your back, opposite arm and leg extend slowly while your lower back stays pressed to the floor."},
 {id:"plank",name:"Plank",cat:"Isometric",area:"Core & rotation",type:"time",sets:3,reps:"30-45s",pose:"PLANK",cue:"Forearms and toes, straight line from hips to shoulders, brace your core and hold."},
-{id:"sideplank",name:"Side plank",cat:"Isometric",area:"Core & rotation",type:"time",sets:2,reps:"30s each side",pose:"PLANK",cue:"On one forearm, body in a straight line, hips lifted and stacked, hold without sagging."},
+{id:"sideplank",name:"Side plank",cat:"Isometric",area:"Core & rotation",type:"time",sets:2,reps:"30s each side",pose:"SIDEPLANK",cue:"On one forearm, body in a straight line, hips lifted and stacked, hold without sagging."},
 {id:"deadhang",name:"Dead hang",cat:"Isometric",area:"Grip & carries",type:"time",sets:4,reps:"20-40s",pose:"HANG",cue:"Full grip on a bar, shoulders relaxed, hang with straight arms and let your spine decompress."},
-{id:"wallsit",name:"Wall sit",cat:"Isometric",area:"Legs & glutes",type:"time",sets:3,reps:"30-45s",pose:"SQUAT",cue:"Back flat against a wall, knees at 90 degrees, hold the position without your knees caving in."},
-{id:"hollowhold",name:"Hollow hold",cat:"Isometric",area:"Core & rotation",type:"time",sets:3,reps:"20-30s",pose:"PLANK",cue:"On your back, lower back pressed down, lift shoulders and legs off the floor into a shallow curve, hold."},
+{id:"wallsit",name:"Wall sit",cat:"Isometric",area:"Legs & glutes",type:"time",sets:3,reps:"30-45s",pose:"WALLSIT",cue:"Back flat against a wall, knees at 90 degrees, hold the position without your knees caving in."},
+{id:"hollowhold",name:"Hollow hold",cat:"Isometric",area:"Core & rotation",type:"time",sets:3,reps:"20-30s",pose:"HOLLOW",cue:"On your back, lower back pressed down, lift shoulders and legs off the floor into a shallow curve, hold."},
 {id:"boxjump",name:"Box jump",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"5",pose:"JUMP",cue:"Explode up from a quarter-squat, land soft on the box with both feet, step back down rather than jumping off."},
 {id:"broadjump",name:"Broad jump",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"5",pose:"JUMP",cue:"Swing your arms and jump forward for distance, land soft with bent knees, reset fully before the next rep."},
 {id:"medballthrow",name:"Med ball rotational throw",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"6 each side",pose:"TWIST",cue:"Rotate your hips and throw the ball sideways into a wall with full torso rotation, like a punch."},
 {id:"medballslam",name:"Med ball slam",cat:"Power",area:"Power & explosive",type:"reps",sets:4,reps:"8",pose:"REACH",cue:"Raise the ball overhead then slam it down hard into the floor, catch the bounce and reset."},
-{id:"sprint",name:"Short sprint",cat:"Power",area:"Power & explosive",type:"time",sets:6,reps:"10-15s",pose:"CARRY",cue:"All-out effort for the time, then rest fully before the next rep. Quality over fatigue."},
+{id:"sprint",name:"Short sprint",cat:"Power",area:"Power & explosive",type:"time",sets:6,reps:"10-15s",pose:"SPRINT",cue:"All-out effort for the time, then rest fully before the next rep. Quality over fatigue."},
 {id:"bagspeed",name:"Heavy-bag speed combo",cat:"Power",area:"Power & explosive",type:"time",sets:6,reps:"10-15s",pose:"GUARD",cue:"Fast, sharp combinations on the bag for the time, then rest fully before the next round."},
 {id:"farmerscarry",name:"Farmer's carry",cat:"Strength",area:"Grip & carries",type:"distance",sets:3,reps:"30-40m",pose:"CARRY",cue:"A heavy dumbbell or kettlebell in each hand, walk tall with your shoulders back for the distance."},
 {id:"suitcasecarry",name:"Suitcase carry",cat:"Strength",area:"Grip & carries",type:"distance",sets:3,reps:"20m each side",pose:"CARRY",cue:"One heavy weight in one hand, resist leaning, walk tall keeping your torso upright."},
@@ -283,24 +376,24 @@ var EX=[
 {id:"burpee",name:"Burpee",cat:"Conditioning",area:"Conditioning & cardio",type:"reps",sets:4,reps:"10",pose:"JUMP",cue:"Chest to the floor, jump your feet back in, jump up to finish. Keep it smooth rather than rushed."},
 {id:"technique",name:"Technique / drilling block",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:1,reps:"20-30 min",pose:"GUARD",cue:"Coach-led, or your own focus if training solo. Quality of movement over speed."},
 {id:"rounds",name:"Rounds (pad/drill/spar)",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"reps",sets:1,reps:"3-6 rounds",pose:"GUARD",cue:"Set intensity by the session's goal, technical or live, one minute rest between rounds."},
-{id:"jabcross",name:"Jab-cross combo drill",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:6,reps:"1min",pose:"GUARD",cue:"Sharp jab-cross combinations at pace, reset your guard between every combo."},
+{id:"jabcross",name:"Jab-cross combo drill",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:6,reps:"1min",pose:"JAB",cue:"Sharp jab-cross combinations at pace, reset your guard between every combo."},
 {id:"kb_clean",name:"Kettlebell clean",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"8 each side",pose:"HINGE",cue:"Hike the bell back, drive your hips forward and pull it up close to your body, catching it softly at your shoulder."},
 {id:"kb_snatch",name:"Kettlebell snatch",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"6 each side",pose:"HINGE",cue:"One explosive hip drive takes the bell from between your legs straight overhead, punching your hand through at the top."},
 {id:"kb_press",name:"Kettlebell single-arm press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8 each side",pose:"PRESS",cue:"Bell racked at your shoulder, press straight overhead without leaning away from it, lower under control."},
 {id:"kb_tgu",name:"Turkish get-up",cat:"Strength",area:"Core & rotation",type:"reps",sets:2,reps:"3 each side",pose:"REACH",cue:"From lying down to standing, weight locked out overhead the whole way, moving slowly through each step. Start light, this one's about control, not load."},
-{id:"pistol",name:"Pistol squat",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"5 each side",pose:"SQUAT",cue:"One leg extended in front, squat down on the standing leg keeping your heel down. Hold a doorframe or rail for balance while you build this up."},
-{id:"glutebridge",name:"Glute bridge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"HINGE",cue:"On your back, knees bent, drive your hips up by squeezing your glutes, pause at the top, lower with control."},
+{id:"pistol",name:"Pistol squat",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"5 each side",pose:"PISTOL",cue:"One leg extended in front, squat down on the standing leg keeping your heel down. Hold a doorframe or rail for balance while you build this up."},
+{id:"glutebridge",name:"Glute bridge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"HIPBRIDGE",cue:"On your back, knees bent, drive your hips up by squeezing your glutes, pause at the top, lower with control."},
 {id:"bearcrawl",name:"Bear crawl",cat:"Conditioning",area:"Core & rotation",type:"time",sets:3,reps:"30s",pose:"PLANK",cue:"Hands and feet on the floor, knees hovering just off it, crawl forward keeping your hips low and steady."},
-{id:"calfraise",name:"Calf raise",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"SQUAT",cue:"Rise up onto your toes as high as you can, pause, lower slowly until you feel a stretch."},
+{id:"calfraise",name:"Calf raise",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"CALFRAISE",cue:"Rise up onto your toes as high as you can, pause, lower slowly until you feel a stretch."},
 {id:"swim_warmup",name:"Warm-up swim",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"200-400m",pose:"SWIM",cue:"Easy, relaxed pace to get your stroke and breathing settled before the main work."},
 {id:"swim_drill",name:"Technique drill",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"200m",pose:"SWIM",cue:"Catch-up drill: one arm stays extended forward until the other finishes its stroke. Or kick with a board, steady controlled kick from the hips, not the knees."},
 {id:"swim_main",name:"Main set intervals",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"4-8 x 50-100m",pose:"SWIM",cue:"A pace you can just about hold with even splits, resting 15-30s between reps. Push the effort here."},
 {id:"swim_cooldown",name:"Cool-down swim",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:1,reps:"100-200m",pose:"SWIM",cue:"Easy pace, long smooth strokes, controlled breathing, let your heart rate settle."},
-{id:"cardio_gym_warmup",name:"Machine warm-up",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"5min",pose:"CARRY",cue:"Bike, rower or treadmill at an easy, conversational effort to open your legs and lungs up."},
-{id:"cardio_gym_intervals",name:"Machine intervals",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:8,reps:"1min hard / 1min easy",pose:"JUMP",cue:"Push hard for the work period on whichever machine you like, recover fully on the easy period, repeat."},
-{id:"cardio_gym_steady",name:"Steady-state finisher",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"10-15min",pose:"CARRY",cue:"One steady pace you could hold a conversation at, no intervals, just time on the machine."},
-{id:"jumpingjack",name:"Jumping jacks",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JUMP",cue:"Feet and arms out together, back in together, steady rhythm, no equipment needed."},
-{id:"highknees",name:"High knees",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"30s",pose:"CARRY",cue:"Drive your knees up toward your chest quickly on the spot, stay light on your feet."},
+{id:"cardio_gym_warmup",name:"Machine warm-up",cat:"Conditioning",area:"Conditioning & cardio",type:"cardio",sets:1,reps:"5min",pose:"MACHINE",cue:"Bike, rower or treadmill at an easy, conversational effort to open your legs and lungs up."},
+{id:"cardio_gym_intervals",name:"Machine intervals",cat:"Conditioning",area:"Conditioning & cardio",type:"cardio",interval:true,sets:8,reps:"1min hard / 1min easy",pose:"MACHINE",cue:"Push hard for the work period on whichever machine you like, recover fully on the easy period, repeat."},
+{id:"cardio_gym_steady",name:"Steady-state finisher",cat:"Conditioning",area:"Conditioning & cardio",type:"cardio",sets:1,reps:"10-15min",pose:"MACHINE",cue:"One steady pace you could hold a conversation at, no intervals, just time on the machine."},
+{id:"jumpingjack",name:"Jumping jacks",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JJACK",cue:"Feet and arms out together, back in together, steady rhythm, no equipment needed."},
+{id:"highknees",name:"High knees",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"30s",pose:"HIGHKNEE",cue:"Drive your knees up toward your chest quickly on the spot, stay light on your feet."},
 {id:"briskwalkjog",name:"Brisk walk or jog",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"10-15min",pose:"CARRY",cue:"Outside, a corridor, wherever you've got, steady pace you could just about hold a conversation at."},
 {id:"woodchopper",name:"Cable or band woodchopper",cat:"Power",area:"Core & rotation",type:"reps",sets:3,reps:"10 each side",pose:"TWIST",cue:"Rotate diagonally from high to low (or low to high) through your torso, arms follow, control the return, don't let momentum do the work."},
 {id:"russiantwist",name:"Russian twist",cat:"Strength",area:"Core & rotation",type:"reps",sets:3,reps:"16 each side",pose:"TWIST",cue:"Seated, leaning back slightly, feet up or down, rotate a weight or your hands side to side, keep the movement in your torso not your arms."},
@@ -359,6 +452,7 @@ if(!state.library) state.library=[];
 if(!state.recipes) state.recipes=[];
 if(!state.shoppingChecked) state.shoppingChecked=[];
 if(!state.workoutLogs) state.workoutLogs=[];
+if(!state.saunaSessions) state.saunaSessions=[];
 if(state.activeSession===undefined) state.activeSession=null;
 if(!state.totalXp) state.totalXp=0;
 if(!state.waterTarget) state.waterTarget=8;
@@ -382,7 +476,10 @@ function ensureDay(k){
 function levelInfo(){ var span=150; var level=1+Math.floor(state.totalXp/span); var into=state.totalXp%span; return {level:level,into:into,span:span}; }
 function last7Keys(){ var out=[]; for(var i=6;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);out.push(dateKey(d));} return out; }
 function computeStreaks(){
-  var d=new Date(); var dayStreak=0, cleanStreak=0; var breakingDay=false, breakingClean=false;
+  var d=new Date();
+  var todayEntry=state.days[dateKey(d)];
+  if(!todayEntry || !todayEntry.touched){ d.setDate(d.getDate()-1); }
+  var dayStreak=0, cleanStreak=0; var breakingDay=false, breakingClean=false;
   for(var i=0;i<400;i++){
     var k=dateKey(d); var entry=state.days[k];
     if(!breakingDay){ if(entry && entry.touched) dayStreak++; else breakingDay=true; }
@@ -416,11 +513,16 @@ function shoppingList(){
   out.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   return out;
 }
-function setLabel(type,v,w){
-  if(type==='load') return (w?w+'kg × '+v:v+' reps');
-  if(type==='time') return v+'s';
-  if(type==='distance') return v+'m';
-  return v+' reps';
+function setLabel(type,e){
+  if(type==='load') return (e.w?e.w+'kg × '+e.v:e.v+' reps');
+  if(type==='time') return e.v+'s';
+  if(type==='distance') return e.v+'m';
+  if(type==='cardio'){
+    var label=e.v+' min'+(e.machine?' · '+e.machine:'');
+    if(e.work||e.rest) label+=' · '+(e.work||'—')+'/'+(e.rest||'—');
+    return label;
+  }
+  return e.v+' reps';
 }
 
 function startWorkout(id){
@@ -439,6 +541,11 @@ function logSet(exId,type){
   if(isNaN(v)||v<=0) return;
   var entry={v:v,w:null};
   if(type==='load'){ var wInput=document.getElementById('log-w-'+exId); var wt=wInput?parseFloat(wInput.value):NaN; entry.w=isNaN(wt)?null:wt; }
+  if(type==='cardio'){
+    var mEl=document.getElementById('log-machine-'+exId); entry.machine=mEl?mEl.value:'';
+    var wkEl=document.getElementById('log-work-'+exId); if(wkEl) entry.work=wkEl.value;
+    var rEl=document.getElementById('log-rest-'+exId); if(rEl) entry.rest=rEl.value;
+  }
   if(!state.activeSession.logs[exId]) state.activeSession.logs[exId]=[];
   state.activeSession.logs[exId].push(entry);
 }
@@ -467,17 +574,24 @@ function removeExFromSession(exId){
   if(slide>=state.activeSession.exIds.length) slide=Math.max(0,state.activeSession.exIds.length-1);
 }
 
-function figureSVG(poseKey,phase){
+function figureSVG(poseKey,phase,equip){
   var pair=PP[poseKey]||PP.SQUAT;
   var pose=pair[phase?1:0];
   var s=segFor(pose);
-  return '<svg viewBox="0 -20 140 190">'+
-    '<line x1="'+s.hip.x+'" y1="'+s.hip.y+'" x2="'+s.shoulder.x+'" y2="'+s.shoulder.y+'" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>'+
-    '<line x1="'+s.shoulder.x+'" y1="'+s.shoulder.y+'" x2="'+s.elbow.x+'" y2="'+s.elbow.y+'" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>'+
-    '<line x1="'+s.elbow.x+'" y1="'+s.elbow.y+'" x2="'+s.hand.x+'" y2="'+s.hand.y+'" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>'+
-    '<line x1="'+s.hip.x+'" y1="'+s.hip.y+'" x2="'+s.knee.x+'" y2="'+s.knee.y+'" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>'+
-    '<line x1="'+s.knee.x+'" y1="'+s.knee.y+'" x2="'+s.ankle.x+'" y2="'+s.ankle.y+'" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>'+
-    '<circle cx="'+s.headC.x+'" cy="'+s.headC.y+'" r="10" fill="var(--text)"/>'+
+  var groundY=Math.max(s.hip.y,s.shoulder.y,s.ankle.y,s.knee.y)+14;
+  var gx1=Math.min(s.hip.x,s.shoulder.x,s.ankle.x,s.hand.x)-30, gx2=Math.max(s.hip.x,s.shoulder.x,s.ankle.x,s.hand.x)+40;
+  var joints=[s.shoulder,s.elbow,s.hip,s.knee,s.ankle];
+  var jointDots=joints.map(function(j){return '<circle cx="'+j.x+'" cy="'+j.y+'" r="3.2" fill="var(--text)"/>';}).join('');
+  return '<svg viewBox="-20 -20 180 200">'+
+    equipGlyph(equip,s)+
+    '<line x1="'+gx1+'" y1="'+groundY+'" x2="'+gx2+'" y2="'+groundY+'" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="1 5" stroke-linecap="round"/>'+
+    '<line x1="'+s.hip.x+'" y1="'+s.hip.y+'" x2="'+s.shoulder.x+'" y2="'+s.shoulder.y+'" stroke="var(--text)" stroke-width="7" stroke-linecap="round"/>'+
+    '<line x1="'+s.shoulder.x+'" y1="'+s.shoulder.y+'" x2="'+s.elbow.x+'" y2="'+s.elbow.y+'" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/>'+
+    '<line x1="'+s.elbow.x+'" y1="'+s.elbow.y+'" x2="'+s.hand.x+'" y2="'+s.hand.y+'" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/>'+
+    '<line x1="'+s.hip.x+'" y1="'+s.hip.y+'" x2="'+s.knee.x+'" y2="'+s.knee.y+'" stroke="var(--text)" stroke-width="7" stroke-linecap="round"/>'+
+    '<line x1="'+s.knee.x+'" y1="'+s.knee.y+'" x2="'+s.ankle.x+'" y2="'+s.ankle.y+'" stroke="var(--text)" stroke-width="7" stroke-linecap="round"/>'+
+    jointDots+
+    '<circle cx="'+s.headC.x+'" cy="'+s.headC.y+'" r="11" fill="var(--text)"/>'+
   '</svg>';
 }
 function startPoseLoop(){
@@ -485,13 +599,14 @@ function startPoseLoop(){
   poseTimer=setInterval(function(){
     poseFlip=!poseFlip;
     var w=document.getElementById('fig-live');
-    if(w){ var key=w.getAttribute('data-pose'); w.innerHTML=figureSVG(key,poseFlip); }
+    if(w){ var key=w.getAttribute('data-pose'); var eq=w.getAttribute('data-equip'); w.innerHTML=figureSVG(key,poseFlip,eq); }
   },900);
 }
 function stopPoseLoop(){ if(poseTimer){ clearInterval(poseTimer); poseTimer=null; } }
 
 function bodyContent(){
   var t=ensureDay(todayKey());
+  var todaySaunaCount=state.saunaSessions.filter(function(s){return s.date===todayKey();}).length;
   var lvl=levelInfo();
   var streaks=computeStreaks();
   var week=last7Keys().map(function(k){
@@ -507,8 +622,8 @@ function bodyContent(){
 
   var todayView =
     '<div class="grid">'+
-      '<div class="card"><h3>Water</h3><div class="sub">Target '+state.waterTarget+' cups a day</div>'+
-        '<div class="stepper"><button data-action="water" data-d="-1">-</button><span class="count">'+t.water+'</span><button class="big" data-action="water" data-d="1">+</button></div>'+
+      '<div class="card"><h3>Water</h3><div class="sub">Target '+litres(state.waterTarget)+' a day &middot; taps of '+litres(1)+'</div>'+
+        '<div class="stepper"><button data-action="water" data-d="-1">-</button><span class="count">'+litres(t.water)+'</span><button class="big" data-action="water" data-d="1">+</button></div>'+
         '<div class="dots">'+cupsRow+'</div></div>'+
       '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+t.workout.type):(t.rest?'Recovery day':'Not logged yet'))+'</div>'+
         '<div class="pillgrid">'+typePills+'</div>'+
@@ -519,6 +634,11 @@ function bodyContent(){
         '<div class="stepper"><button data-action="smoking" data-d="-1">-</button><span class="count">'+t.smoking+'</span><button data-action="smoking" data-d="1">+</button></div></div>'+
       '<div class="card"><h3>Weed</h3><div class="sub">Sessions today</div>'+
         '<div class="stepper"><button data-action="weed" data-d="-1">-</button><span class="count">'+t.weed+'</span><button data-action="weed" data-d="1">+</button></div></div>'+
+      '<div class="card"><h3>Sauna</h3><div class="sub">'+(todaySaunaCount?(todaySaunaCount+' session'+(todaySaunaCount===1?'':'s')+' today'):'Mins, temp &amp; bench position')+'</div>'+
+        '<div class="sauna-row"><input id="sauna-mins" type="number" inputmode="decimal" placeholder="mins">'+
+          '<input id="sauna-temp" type="number" inputmode="decimal" placeholder="&deg;C">'+
+          '<select id="sauna-pos"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
+        '<button class="logbtn" data-action="logsauna">Log sauna</button></div>'+
     '</div>'+
     '<p class="note">Logging a number never costs you points. Clean streak just means the last touched days had zero across alcohol, smoking and weed &mdash; miss one and it resets quietly, no penalty beyond that.</p>';
 
@@ -586,7 +706,7 @@ function bodyContent(){
   }).join('') || '<p class="note" style="margin-top:0;">No sessions logged yet &mdash; start one from the Training tab.</p>';
 
   var histo={};
-  logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){ if(!histo[exId]) histo[exId]=[]; l.logs[exId].forEach(function(s){ histo[exId].push({date:l.date,v:s.v,w:s.w}); }); }); });
+  logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){ if(!histo[exId]) histo[exId]=[]; l.logs[exId].forEach(function(s){ histo[exId].push({date:l.date,v:s.v,w:s.w,machine:s.machine,work:s.work,rest:s.rest}); }); }); });
   var exIds=Object.keys(histo).sort(function(a,b){ var da=histo[a][histo[a].length-1].date, db=histo[b][histo[b].length-1].date; return da<db?1:(da>db?-1:0); });
   var exList=exIds.map(function(exId){
     var def=exDef(exId)||{name:exId,type:'reps'};
@@ -595,17 +715,22 @@ function bodyContent(){
     var maxV=Math.max.apply(null,hist.map(function(h){return def.type==='load'?(h.w||h.v):h.v;}));
     var rows=hist.slice(0,15).map(function(h){
       var barVal=def.type==='load'?(h.w||h.v):h.v; var pct=maxV?Math.round((barVal/maxV)*100):0;
-      return '<tr><td>'+h.date+'</td><td>'+setLabel(def.type,h.v,h.w)+'</td><td><div class="bartrack"><div class="bar" style="width:'+pct+'%"></div></div></td></tr>';
+      return '<tr><td>'+h.date+'</td><td>'+setLabel(def.type,h)+'</td><td><div class="bartrack"><div class="bar" style="width:'+pct+'%"></div></div></td></tr>';
     }).join('');
-    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+exId+'"><h4>'+esc(def.name)+'</h4><span class="last">'+setLabel(def.type,last.v,last.w)+' &middot; '+last.date+'</span></div>'+
+    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+exId+'"><h4>'+esc(def.name)+'</h4><span class="last">'+setLabel(def.type,last)+' &middot; '+last.date+'</span></div>'+
       (isOpen?('<div class="exdetail"><table><tr><th>Date</th><th>Set</th><th></th></tr>'+rows+'</table></div>'):'')+'</div>';
   }).join('') || '<p class="note" style="margin-top:0;">Log a workout to start building exercise history.</p>';
+  var saunaLogs=state.saunaSessions.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);}).slice(0,6);
+  var saunaHtml=saunaLogs.map(function(s){
+    return '<div class="recent-log"><span>'+s.mins+' min &middot; '+(s.temp?s.temp+'&deg;C &middot; ':'')+esc(s.position)+'</span><span class="d">'+s.date+'</span></div>';
+  }).join('') || '<p class="note" style="margin-top:0;">No sauna sessions logged yet.</p>';
   var progressView =
     '<div class="stat-row"><div class="stat-tile"><div class="n">'+logs.length+'</div><div class="l">sessions total</div></div>'+
       '<div class="stat-tile"><div class="n">'+thisWeekCount+'</div><div class="l">this week</div></div>'+
       '<div class="stat-tile"><div class="n">'+exIds.length+'</div><div class="l">exercises tracked</div></div></div>'+
     '<div class="sectiontitle">Recent sessions</div>'+recentHtml+
-    '<div class="sectiontitle">Exercise history</div>'+exList;
+    '<div class="sectiontitle">Exercise history</div>'+exList+
+    '<div class="sectiontitle">Sauna sessions</div>'+saunaHtml;
 
   var sessionHtml='';
   if(viewingSession && state.activeSession){
@@ -628,7 +753,7 @@ function bodyContent(){
               '<div class="pickrow-main" data-action="toggleex" data-id="'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
               '<button data-action="addex" data-id="'+e.id+'">Add</button>'+
             '</div>'+
-            (isOpen?('<div class="pickpreview"><div class="preview-figs"><div class="pf">'+figureSVG(e.pose,false)+'</div><span class="arrow">&rarr;</span><div class="pf">'+figureSVG(e.pose,true)+'</div></div><p class="cue">'+esc(e.cue)+'</p></div>'):'')+
+            (isOpen?('<div class="pickpreview"><div class="preview-figs"><div class="pf">'+figureSVG(e.pose,false,equipFor(e.id))+'</div><span class="arrow">&rarr;</span><div class="pf">'+figureSVG(e.pose,true,equipFor(e.id))+'</div></div><p class="cue">'+esc(e.cue)+'</p></div>'):'')+
           '</div>';
         }).join('');
         return '<div class="pickgroup"><div class="pickgroup-title">'+esc(area)+'</div>'+rowsHtml+'</div>';
@@ -644,21 +769,28 @@ function bodyContent(){
       var def2=exDef(exId);
       var sets=sess.logs[exId]||[];
       var tgt=sess.targets[exId]||{sets:def2.sets,reps:def2.reps};
-      var chips=sets.map(function(s){ return '<span class="setchip">'+setLabel(def2.type,s.v,s.w)+'</span>'; }).join('');
+      var chips=sets.map(function(s){ return '<span class="setchip">'+setLabel(def2.type,s)+'</span>'; }).join('');
       var weightInput=def2.type==='load'?('<input id="log-w-'+exId+'" type="number" inputmode="decimal" placeholder="kg">'):'';
-      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?'secs':def2.type==='distance'?'metres':'reps';
+      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?'secs':def2.type==='distance'?'metres':def2.type==='cardio'?'mins':'reps';
+      var machineSelect=def2.type==='cardio'?('<select id="log-machine-'+exId+'" class="cardio-select"><option value="">Machine&hellip;</option>'+MACHINES.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('')+'</select>'):'';
+      var effortSelects=(def2.type==='cardio'&&def2.interval)?(
+        '<select id="log-work-'+exId+'" class="cardio-select"><option value="">Work effort&hellip;</option>'+EFFORT_LEVELS.map(function(l){return '<option value="'+l+'">'+l+'</option>';}).join('')+'</select>'+
+        '<select id="log-rest-'+exId+'" class="cardio-select"><option value="">Rest effort&hellip;</option>'+EFFORT_LEVELS.map(function(l){return '<option value="'+l+'">'+l+'</option>';}).join('')+'</select>'
+      ):'';
+      var cardioRow=(machineSelect||effortSelects)?('<div class="cardio-row">'+machineSelect+effortSelects+'</div>'):'';
       var totalLogged=0; Object.keys(sess.logs).forEach(function(k){totalLogged+=sess.logs[k].length;});
       var bar=sess.exIds.map(function(id,i){ var has=(sess.logs[id]||[]).length>0; var cls=i===slide?'now':(has?'done':''); return '<i class="'+cls+'"><b></b></i>'; }).join('');
       sessionHtml='<div class="story">'+
         '<div class="story-bar">'+bar+'</div>'+
         '<div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>'+
         '<div class="slide" id="slide-card" data-pose="'+def2.pose+'">'+
-          '<div class="fig-wrap"><div id="fig-live" data-pose="'+def2.pose+'">'+figureSVG(def2.pose,poseFlip)+'</div></div>'+
+          '<div class="fig-wrap"><div id="fig-live" data-pose="'+def2.pose+'" data-equip="'+(equipFor(def2.id)||'')+'">'+figureSVG(def2.pose,poseFlip,equipFor(def2.id))+'</div></div>'+
           '<span class="cat">'+esc(def2.cat)+'</span>'+
           '<h4>'+esc(def2.name)+'</h4>'+
           '<div class="target">Target: '+tgt.sets+' x '+esc(tgt.reps)+'</div>'+
           '<div class="cue">'+esc(def2.cue)+'</div>'+
           (chips?'<div class="setchips">'+chips+'</div>':'')+
+          cardioRow+
           '<div class="logrow">'+weightInput+
             '<input id="log-v-'+exId+'" type="number" inputmode="decimal" placeholder="'+valPlaceholder+'">'+
             '<button data-action="logset" data-ex="'+exId+'" data-type="'+def2.type+'">Log set</button>'+
@@ -747,8 +879,15 @@ function onClick(e){
   else if(action==='water'){
     var d=parseInt(t.getAttribute('data-d'),10); var prev=today.water;
     today.water=Math.max(0,today.water+d); if(today.water>0) today.touched=true;
-    if(d>0 && prev<state.waterTarget) addXp(XP_PER_CUP);
-    if(d<0 && prev<=state.waterTarget && prev>0) addXp(-XP_PER_CUP);
+    if(d>0 && prev<state.waterTarget) addXp(XP_PER_WATER);
+    if(d<0 && prev<=state.waterTarget && prev>0) addXp(-XP_PER_WATER);
+  }
+  else if(action==='logsauna'){
+    var minsEl=document.getElementById('sauna-mins'); var tempEl=document.getElementById('sauna-temp'); var posEl=document.getElementById('sauna-pos');
+    var mins=parseFloat(minsEl?minsEl.value:''); if(isNaN(mins)||mins<=0) return;
+    var temp=tempEl?parseFloat(tempEl.value):NaN;
+    state.saunaSessions.push({date:todayKey(),mins:mins,temp:isNaN(temp)?null:temp,position:posEl?posEl.value:'Top'});
+    today.touched=true; addXp(XP_SAUNA);
   }
   else if(action==='workout'){
     var wt=t.getAttribute('data-type');
@@ -829,4 +968,4 @@ function boot(){
   if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); }); }
 }
 boot();
-})({"waterTarget":8,"totalXp":31,"days":{"2026-08-29":{"water":0,"workout":{"done":false,"type":null},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":false},"2026-08-30":{"water":12,"workout":{"done":true,"type":"Strength"},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":true}},"shoppingChecked":[],"workoutLogs":[{"id":"wl1788070912139","workoutId":"w12","title":"Cardio — gym","tag":"Conditioning","date":"2026-08-30","logs":{"cardio_gym_warmup":[{"v":300,"w":null}],"cardio_gym_intervals":[{"v":900,"w":null}],"cardio_gym_steady":[{"v":120,"w":null}]}},{"id":"wl1788083112190","workoutId":"w6","title":"Push","tag":"Strength","date":"2026-08-30","logs":{"press_bench":[{"v":10,"w":40},{"v":8,"w":60},{"v":6,"w":70},{"v":10,"w":60}],"press_ohp":[{"v":10,"w":20},{"v":8,"w":30},{"v":8,"w":30}],"press_incline":[{"v":8,"w":24},{"v":10,"w":22},{"v":10,"w":22}],"dip":[{"v":8,"w":null},{"v":10,"w":null},{"v":9,"w":null}],"triceps_ext":[{"v":8,"w":27},{"v":12,"w":23},{"v":10,"w":23}],"deadhang":[{"v":60,"w":null},{"v":35,"w":null}]}}],"activeSession":null,"library":[{"id":"t1","title":"Weekly training template","tag":"Overview","notes":"Mon: Boxing/MMA technical + short mobility warm-up.\nTue: Strength — functional full-body.\nWed: Power & speed.\nThu: Boxing/MMA technical + a conditioning finisher.\nFri: Flexibility & mobility.\nSat: Conditioning.\nSun: Full rest.\nAdapt the days to your actual gym/class times. Keep 48h between sessions hitting the same movement pattern, don't stack strength and power on the same day early on, and start conservative in week one. Start any workout from the cards below, swipe through each exercise with an example and a place to log, and add extras from the full exercise list mid-session if you want."}],"recipes":[{"id":"r1","title":"Overnight oats, berries & peanut butter","tag":"Breakfast","ingredients":["Porridge oats (80g)","Milk or yoghurt (200ml)","Chia seeds (1 tbsp)","Mixed berries (handful)","Peanut butter (1 tbsp)","Honey (drizzle)"],"instructions":"Stir oats, milk and chia together, leave overnight in the fridge. Top with berries, peanut butter and honey before eating.","inPlan":false,"day":"Unassigned"},{"id":"r2","title":"Greek yoghurt, granola & banana","tag":"Breakfast","ingredients":["Greek yoghurt (200g)","Granola (40g)","Banana (1)","Honey (drizzle)"],"instructions":"Layer yoghurt, granola and sliced banana.","inPlan":false,"day":"Unassigned"},{"id":"r3","title":"Chicken, rice & veg tray bake","tag":"Lunch/Dinner","ingredients":["Chicken thighs (4)","Rice (mug, uncooked)","Broccoli (1 head)","Peppers (2)","Olive oil","Garlic (2 cloves)","Mixed herbs"],"instructions":"Roast chicken and chopped veg with oil, garlic and herbs at 200C for 30-35 min. Cook rice separately.","inPlan":false,"day":"Unassigned"},{"id":"r4","title":"Salmon, sweet potato & greens","tag":"Dinner","ingredients":["Salmon fillets (2)","Sweet potato (2)","Spinach or kale (large handful)","Lemon (1)","Olive oil"],"instructions":"Roast cubed sweet potato at 200C for 25 min, add salmon for the last 12-15 min. Wilt spinach, finish with lemon and oil.","inPlan":false,"day":"Unassigned"},{"id":"r5","title":"Mince chilli (beef or turkey)","tag":"Dinner","ingredients":["Mince, beef or turkey (500g)","Kidney beans (1 tin)","Chopped tomatoes (1 tin)","Onion (1)","Pepper (1)","Rice","Cumin, paprika, chilli powder"],"instructions":"Brown the mince and onion, add pepper, spices, tomatoes and beans, simmer 20 min. Serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r6","title":"Egg & veg scramble wrap","tag":"Lunch","ingredients":["Eggs (3)","Spinach (handful)","Mushrooms (4)","Wholemeal wrap (1)","Cheese, optional"],"instructions":"Scramble eggs with sauteed mushrooms and spinach, fold into a wrap.","inPlan":false,"day":"Unassigned"},{"id":"r7","title":"Post-training recovery shake","tag":"Snack","ingredients":["Milk or plant milk (300ml)","Banana (1)","Oats (30g)","Peanut butter (1 tbsp)","Protein powder, optional","Ice"],"instructions":"Blend everything.","inPlan":false,"day":"Unassigned"},{"id":"r8","title":"Scrambled eggs, avocado & toast","tag":"Breakfast","ingredients":["Eggs (3)","Avocado (1/2)","Wholemeal bread (2 slices)","Chilli flakes (pinch)","Butter or oil"],"instructions":"Scramble the eggs gently, toast the bread, mash avocado on top, pile the eggs on.","inPlan":false,"day":"Unassigned"},{"id":"r9","title":"Protein porridge, peanut butter & banana","tag":"Breakfast","ingredients":["Porridge oats (60g)","Milk (250ml)","Protein powder (1 scoop, optional)","Banana (1)","Peanut butter (1 tbsp)"],"instructions":"Cook oats with milk, stir in protein powder off the heat, top with banana and peanut butter.","inPlan":false,"day":"Unassigned"},{"id":"r10","title":"Breakfast burrito","tag":"Breakfast","ingredients":["Eggs (3)","Tinned black beans (100g)","Cheddar cheese, grated","Salsa","Large tortilla wrap (1)"],"instructions":"Scramble eggs, warm the beans, layer into the wrap with cheese and salsa, fold and go.","inPlan":false,"day":"Unassigned"},{"id":"r11","title":"Smoked salmon & cream cheese bagel","tag":"Breakfast","ingredients":["Bagel (1)","Cream cheese (2 tbsp)","Smoked salmon (60g)","Black pepper","Lemon wedge"],"instructions":"Toast the bagel, spread cream cheese, top with salmon, lemon and pepper.","inPlan":false,"day":"Unassigned"},{"id":"r12","title":"Cottage cheese, pineapple & nuts","tag":"Breakfast","ingredients":["Cottage cheese (200g)","Pineapple chunks (handful)","Mixed nuts (small handful)","Honey, optional"],"instructions":"Combine straight from the fridge.","inPlan":false,"day":"Unassigned"},{"id":"r13","title":"Breakfast hash","tag":"Breakfast","ingredients":["Potatoes (2, diced)","Turkey bacon or chorizo (80g)","Pepper (1)","Egg (1-2)","Oil"],"instructions":"Fry the potato until golden, add bacon/chorizo and pepper, finish with an egg on top.","inPlan":false,"day":"Unassigned"},{"id":"r14","title":"Tuna, sweetcorn & mayo jacket potato","tag":"Lunch","ingredients":["Baking potato (1)","Tinned tuna (1)","Sweetcorn (handful)","Mayonnaise (1 tbsp)","Spring onion, optional"],"instructions":"Bake or microwave the potato, mix tuna, sweetcorn and mayo, spoon over.","inPlan":false,"day":"Unassigned"},{"id":"r15","title":"Chicken Caesar-style wrap","tag":"Lunch","ingredients":["Cooked chicken breast (1, sliced)","Romaine lettuce","Parmesan, grated","Caesar dressing","Tortilla wrap"],"instructions":"Toss chicken, lettuce, parmesan and dressing, roll into the wrap.","inPlan":false,"day":"Unassigned"},{"id":"r16","title":"Falafel & hummus flatbread","tag":"Lunch","ingredients":["Falafel (4-6)","Hummus (2 tbsp)","Flatbread","Mixed salad leaves","Tomato"],"instructions":"Warm the falafel, spread hummus, layer with salad and falafel.","inPlan":false,"day":"Unassigned"},{"id":"r17","title":"Turkey club sandwich","tag":"Lunch","ingredients":["Turkey breast slices","Cheese","Bacon","Lettuce","Tomato","Bread (2-3 slices)","Mayo"],"instructions":"Layer everything between toasted bread.","inPlan":false,"day":"Unassigned"},{"id":"r18","title":"Burrito bowl","tag":"Lunch","ingredients":["Rice","Black beans (tin)","Cooked chicken or leftover mince","Salsa","Cheese","Sweetcorn","Lime"],"instructions":"Layer rice, beans, protein, salsa, cheese and lime in a bowl.","inPlan":false,"day":"Unassigned"},{"id":"r19","title":"Soba noodle & edamame salad","tag":"Lunch","ingredients":["Soba noodles","Edamame beans (handful)","Carrot, grated","Soy sauce","Sesame oil","Rice vinegar"],"instructions":"Cook and cool noodles, toss with edamame, carrot and dressing.","inPlan":false,"day":"Unassigned"},{"id":"r20","title":"Ham, cheese & spinach toastie","tag":"Lunch","ingredients":["Bread (2 slices)","Ham","Cheese","Spinach","Butter"],"instructions":"Layer and toast until golden.","inPlan":false,"day":"Unassigned"},{"id":"r21","title":"Quinoa, roast veg & feta salad","tag":"Lunch","ingredients":["Quinoa (80g)","Courgette, pepper, red onion","Feta cheese","Olive oil","Lemon"],"instructions":"Roast the veg, cook quinoa, combine with feta and a lemon-oil dressing.","inPlan":false,"day":"Unassigned"},{"id":"r22","title":"Prawn stir-fry noodles","tag":"Lunch","ingredients":["Prawns (150g)","Noodles","Mixed stir-fry veg","Soy sauce","Garlic","Ginger"],"instructions":"Stir-fry garlic, ginger, veg then prawns, toss through noodles with soy sauce.","inPlan":false,"day":"Unassigned"},{"id":"r23","title":"Chickpea & spinach curry","tag":"Lunch","ingredients":["Chickpeas (tin)","Spinach (large handful)","Chopped tomatoes (tin)","Onion","Curry powder or paste","Rice"],"instructions":"Fry onion and curry powder, add tomatoes and chickpeas, simmer, stir through spinach. Serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r24","title":"Spaghetti bolognese","tag":"Dinner","ingredients":["Beef mince (500g)","Chopped tomatoes (tin)","Onion","Garlic","Mixed herbs","Spaghetti"],"instructions":"Brown mince with onion and garlic, add tomatoes and herbs, simmer 25-30 min, serve over spaghetti.","inPlan":false,"day":"Unassigned"},{"id":"r25","title":"Chicken fajitas","tag":"Dinner","ingredients":["Chicken breast (2-3, sliced)","Peppers (2)","Onion (1)","Fajita seasoning","Tortilla wraps","Soured cream"],"instructions":"Fry chicken and veg with seasoning, serve with warm wraps and soured cream.","inPlan":false,"day":"Unassigned"},{"id":"r26","title":"Sausages, mash & greens","tag":"Dinner","ingredients":["Sausages (4-6)","Potatoes, for mash","Broccoli or cabbage","Gravy","Butter/milk for mash"],"instructions":"Grill sausages, boil and mash potatoes, steam the greens.","inPlan":false,"day":"Unassigned"},{"id":"r27","title":"Thai green chicken curry","tag":"Dinner","ingredients":["Chicken breast (2, sliced)","Thai green curry paste","Coconut milk (tin)","Mixed vegetables","Rice"],"instructions":"Fry the paste, add chicken and coconut milk, simmer 15 min with veg, serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r28","title":"Beef stir-fry with noodles","tag":"Dinner","ingredients":["Beef strips (300g)","Broccoli","Noodles","Soy sauce","Garlic","Ginger","Oyster sauce"],"instructions":"Stir-fry beef hot and fast, add garlic, ginger, broccoli, toss through noodles.","inPlan":false,"day":"Unassigned"},{"id":"r29","title":"Cottage pie","tag":"Dinner","ingredients":["Beef mince (500g)","Carrots","Onion","Beef stock","Worcestershire sauce","Potatoes, for mash topping"],"instructions":"Brown mince with onion and carrot, add stock and sauce, simmer, top with mash, bake at 200C for 20 min.","inPlan":false,"day":"Unassigned"},{"id":"r30","title":"Baked cod with new potatoes","tag":"Dinner","ingredients":["Cod fillets (2)","New potatoes","Green beans","Lemon","Olive oil","Dill or parsley"],"instructions":"Boil potatoes, bake cod at 200C for 12-15 min with lemon and oil, steam beans.","inPlan":false,"day":"Unassigned"},{"id":"r31","title":"Pork chops with roasted veg","tag":"Dinner","ingredients":["Pork chops (2)","Carrot, parsnip, potato","Olive oil","Rosemary"],"instructions":"Roast veg at 200C for 25 min, cook chops for the last 10-12 min, rest before serving.","inPlan":false,"day":"Unassigned"},{"id":"r32","title":"Bean & vegetable chilli (veggie)","tag":"Dinner","ingredients":["Mixed beans (2 tins)","Chopped tomatoes (tin)","Peppers","Onion","Cumin, paprika, chilli powder","Rice"],"instructions":"Fry onion and peppers, add spices, tomatoes and beans, simmer 20 min, serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r33","title":"One-pan chicken and rice","tag":"Dinner","ingredients":["Chicken thighs (4)","Rice","Peppers","Paprika","Chicken stock","Chopped tomatoes (tin)"],"instructions":"Brown chicken, add rice, paprika, stock and tomatoes, simmer covered 20-25 min.","inPlan":false,"day":"Unassigned"},{"id":"r34","title":"Rice cakes, peanut butter & banana","tag":"Snack","ingredients":["Rice cakes (2)","Peanut butter (1 tbsp)","Banana (1/2)"],"instructions":"Spread and top.","inPlan":false,"day":"Unassigned"},{"id":"r35","title":"Hard-boiled eggs & oatcakes","tag":"Snack","ingredients":["Eggs (2)","Oatcakes (3-4)","Salt and pepper"],"instructions":"Boil eggs 8-10 min, cool, peel, eat with oatcakes.","inPlan":false,"day":"Unassigned"},{"id":"r36","title":"Greek yoghurt, honey & seeds","tag":"Snack","ingredients":["Greek yoghurt (200g)","Honey (drizzle)","Mixed seeds (1 tbsp)"],"instructions":"Combine.","inPlan":false,"day":"Unassigned"},{"id":"r37","title":"Homemade trail mix","tag":"Snack","ingredients":["Mixed nuts","Dried fruit (raisins/apricots)","Dark chocolate chunks","Pumpkin seeds"],"instructions":"Mix in a jar in whatever ratio you like, portion it out rather than eating from the bag.","inPlan":false,"day":"Unassigned"}],"uiTab":"today","uiViewingSession":false,"uiSlide":5});</script></body></html>
+})({"waterTarget":8,"totalXp":31,"days":{"2026-08-29":{"water":0,"workout":{"done":false,"type":null},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":false},"2026-08-30":{"water":12,"workout":{"done":true,"type":"Strength"},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":true},"2026-08-31":{"water":0,"workout":{"done":false,"type":null},"rest":false,"alcohol":0,"smoking":0,"weed":0,"touched":false}},"shoppingChecked":[],"workoutLogs":[{"id":"wl1788070912139","workoutId":"w12","title":"Cardio — gym","tag":"Conditioning","date":"2026-08-30","logs":{"cardio_gym_warmup":[{"v":5,"w":null}],"cardio_gym_intervals":[{"v":15,"w":null}],"cardio_gym_steady":[{"v":2,"w":null}]}},{"id":"wl1788083112190","workoutId":"w6","title":"Push","tag":"Strength","date":"2026-08-30","logs":{"press_bench":[{"v":10,"w":40},{"v":8,"w":60},{"v":6,"w":70},{"v":10,"w":60}],"press_ohp":[{"v":10,"w":20},{"v":8,"w":30},{"v":8,"w":30}],"press_incline":[{"v":8,"w":24},{"v":10,"w":22},{"v":10,"w":22}],"dip":[{"v":8,"w":null},{"v":10,"w":null},{"v":9,"w":null}],"triceps_ext":[{"v":8,"w":27},{"v":12,"w":23},{"v":10,"w":23}],"deadhang":[{"v":60,"w":null},{"v":35,"w":null}]}}],"activeSession":null,"library":[{"id":"t1","title":"Weekly training template","tag":"Overview","notes":"Mon: Boxing/MMA technical + short mobility warm-up.\nTue: Strength — functional full-body.\nWed: Power & speed.\nThu: Boxing/MMA technical + a conditioning finisher.\nFri: Flexibility & mobility.\nSat: Conditioning.\nSun: Full rest.\nAdapt the days to your actual gym/class times. Keep 48h between sessions hitting the same movement pattern, don't stack strength and power on the same day early on, and start conservative in week one. Start any workout from the cards below, swipe through each exercise with an example and a place to log, and add extras from the full exercise list mid-session if you want."}],"recipes":[{"id":"r1","title":"Overnight oats, berries & peanut butter","tag":"Breakfast","ingredients":["Porridge oats (80g)","Milk or yoghurt (200ml)","Chia seeds (1 tbsp)","Mixed berries (handful)","Peanut butter (1 tbsp)","Honey (drizzle)"],"instructions":"Stir oats, milk and chia together, leave overnight in the fridge. Top with berries, peanut butter and honey before eating.","inPlan":false,"day":"Unassigned"},{"id":"r2","title":"Greek yoghurt, granola & banana","tag":"Breakfast","ingredients":["Greek yoghurt (200g)","Granola (40g)","Banana (1)","Honey (drizzle)"],"instructions":"Layer yoghurt, granola and sliced banana.","inPlan":false,"day":"Unassigned"},{"id":"r3","title":"Chicken, rice & veg tray bake","tag":"Lunch/Dinner","ingredients":["Chicken thighs (4)","Rice (mug, uncooked)","Broccoli (1 head)","Peppers (2)","Olive oil","Garlic (2 cloves)","Mixed herbs"],"instructions":"Roast chicken and chopped veg with oil, garlic and herbs at 200C for 30-35 min. Cook rice separately.","inPlan":false,"day":"Unassigned"},{"id":"r4","title":"Salmon, sweet potato & greens","tag":"Dinner","ingredients":["Salmon fillets (2)","Sweet potato (2)","Spinach or kale (large handful)","Lemon (1)","Olive oil"],"instructions":"Roast cubed sweet potato at 200C for 25 min, add salmon for the last 12-15 min. Wilt spinach, finish with lemon and oil.","inPlan":false,"day":"Unassigned"},{"id":"r5","title":"Mince chilli (beef or turkey)","tag":"Dinner","ingredients":["Mince, beef or turkey (500g)","Kidney beans (1 tin)","Chopped tomatoes (1 tin)","Onion (1)","Pepper (1)","Rice","Cumin, paprika, chilli powder"],"instructions":"Brown the mince and onion, add pepper, spices, tomatoes and beans, simmer 20 min. Serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r6","title":"Egg & veg scramble wrap","tag":"Lunch","ingredients":["Eggs (3)","Spinach (handful)","Mushrooms (4)","Wholemeal wrap (1)","Cheese, optional"],"instructions":"Scramble eggs with sauteed mushrooms and spinach, fold into a wrap.","inPlan":false,"day":"Unassigned"},{"id":"r7","title":"Post-training recovery shake","tag":"Snack","ingredients":["Milk or plant milk (300ml)","Banana (1)","Oats (30g)","Peanut butter (1 tbsp)","Protein powder, optional","Ice"],"instructions":"Blend everything.","inPlan":false,"day":"Unassigned"},{"id":"r8","title":"Scrambled eggs, avocado & toast","tag":"Breakfast","ingredients":["Eggs (3)","Avocado (1/2)","Wholemeal bread (2 slices)","Chilli flakes (pinch)","Butter or oil"],"instructions":"Scramble the eggs gently, toast the bread, mash avocado on top, pile the eggs on.","inPlan":false,"day":"Unassigned"},{"id":"r9","title":"Protein porridge, peanut butter & banana","tag":"Breakfast","ingredients":["Porridge oats (60g)","Milk (250ml)","Protein powder (1 scoop, optional)","Banana (1)","Peanut butter (1 tbsp)"],"instructions":"Cook oats with milk, stir in protein powder off the heat, top with banana and peanut butter.","inPlan":false,"day":"Unassigned"},{"id":"r10","title":"Breakfast burrito","tag":"Breakfast","ingredients":["Eggs (3)","Tinned black beans (100g)","Cheddar cheese, grated","Salsa","Large tortilla wrap (1)"],"instructions":"Scramble eggs, warm the beans, layer into the wrap with cheese and salsa, fold and go.","inPlan":false,"day":"Unassigned"},{"id":"r11","title":"Smoked salmon & cream cheese bagel","tag":"Breakfast","ingredients":["Bagel (1)","Cream cheese (2 tbsp)","Smoked salmon (60g)","Black pepper","Lemon wedge"],"instructions":"Toast the bagel, spread cream cheese, top with salmon, lemon and pepper.","inPlan":false,"day":"Unassigned"},{"id":"r12","title":"Cottage cheese, pineapple & nuts","tag":"Breakfast","ingredients":["Cottage cheese (200g)","Pineapple chunks (handful)","Mixed nuts (small handful)","Honey, optional"],"instructions":"Combine straight from the fridge.","inPlan":false,"day":"Unassigned"},{"id":"r13","title":"Breakfast hash","tag":"Breakfast","ingredients":["Potatoes (2, diced)","Turkey bacon or chorizo (80g)","Pepper (1)","Egg (1-2)","Oil"],"instructions":"Fry the potato until golden, add bacon/chorizo and pepper, finish with an egg on top.","inPlan":false,"day":"Unassigned"},{"id":"r14","title":"Tuna, sweetcorn & mayo jacket potato","tag":"Lunch","ingredients":["Baking potato (1)","Tinned tuna (1)","Sweetcorn (handful)","Mayonnaise (1 tbsp)","Spring onion, optional"],"instructions":"Bake or microwave the potato, mix tuna, sweetcorn and mayo, spoon over.","inPlan":false,"day":"Unassigned"},{"id":"r15","title":"Chicken Caesar-style wrap","tag":"Lunch","ingredients":["Cooked chicken breast (1, sliced)","Romaine lettuce","Parmesan, grated","Caesar dressing","Tortilla wrap"],"instructions":"Toss chicken, lettuce, parmesan and dressing, roll into the wrap.","inPlan":false,"day":"Unassigned"},{"id":"r16","title":"Falafel & hummus flatbread","tag":"Lunch","ingredients":["Falafel (4-6)","Hummus (2 tbsp)","Flatbread","Mixed salad leaves","Tomato"],"instructions":"Warm the falafel, spread hummus, layer with salad and falafel.","inPlan":false,"day":"Unassigned"},{"id":"r17","title":"Turkey club sandwich","tag":"Lunch","ingredients":["Turkey breast slices","Cheese","Bacon","Lettuce","Tomato","Bread (2-3 slices)","Mayo"],"instructions":"Layer everything between toasted bread.","inPlan":false,"day":"Unassigned"},{"id":"r18","title":"Burrito bowl","tag":"Lunch","ingredients":["Rice","Black beans (tin)","Cooked chicken or leftover mince","Salsa","Cheese","Sweetcorn","Lime"],"instructions":"Layer rice, beans, protein, salsa, cheese and lime in a bowl.","inPlan":false,"day":"Unassigned"},{"id":"r19","title":"Soba noodle & edamame salad","tag":"Lunch","ingredients":["Soba noodles","Edamame beans (handful)","Carrot, grated","Soy sauce","Sesame oil","Rice vinegar"],"instructions":"Cook and cool noodles, toss with edamame, carrot and dressing.","inPlan":false,"day":"Unassigned"},{"id":"r20","title":"Ham, cheese & spinach toastie","tag":"Lunch","ingredients":["Bread (2 slices)","Ham","Cheese","Spinach","Butter"],"instructions":"Layer and toast until golden.","inPlan":false,"day":"Unassigned"},{"id":"r21","title":"Quinoa, roast veg & feta salad","tag":"Lunch","ingredients":["Quinoa (80g)","Courgette, pepper, red onion","Feta cheese","Olive oil","Lemon"],"instructions":"Roast the veg, cook quinoa, combine with feta and a lemon-oil dressing.","inPlan":false,"day":"Unassigned"},{"id":"r22","title":"Prawn stir-fry noodles","tag":"Lunch","ingredients":["Prawns (150g)","Noodles","Mixed stir-fry veg","Soy sauce","Garlic","Ginger"],"instructions":"Stir-fry garlic, ginger, veg then prawns, toss through noodles with soy sauce.","inPlan":false,"day":"Unassigned"},{"id":"r23","title":"Chickpea & spinach curry","tag":"Lunch","ingredients":["Chickpeas (tin)","Spinach (large handful)","Chopped tomatoes (tin)","Onion","Curry powder or paste","Rice"],"instructions":"Fry onion and curry powder, add tomatoes and chickpeas, simmer, stir through spinach. Serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r24","title":"Spaghetti bolognese","tag":"Dinner","ingredients":["Beef mince (500g)","Chopped tomatoes (tin)","Onion","Garlic","Mixed herbs","Spaghetti"],"instructions":"Brown mince with onion and garlic, add tomatoes and herbs, simmer 25-30 min, serve over spaghetti.","inPlan":false,"day":"Unassigned"},{"id":"r25","title":"Chicken fajitas","tag":"Dinner","ingredients":["Chicken breast (2-3, sliced)","Peppers (2)","Onion (1)","Fajita seasoning","Tortilla wraps","Soured cream"],"instructions":"Fry chicken and veg with seasoning, serve with warm wraps and soured cream.","inPlan":false,"day":"Unassigned"},{"id":"r26","title":"Sausages, mash & greens","tag":"Dinner","ingredients":["Sausages (4-6)","Potatoes, for mash","Broccoli or cabbage","Gravy","Butter/milk for mash"],"instructions":"Grill sausages, boil and mash potatoes, steam the greens.","inPlan":false,"day":"Unassigned"},{"id":"r27","title":"Thai green chicken curry","tag":"Dinner","ingredients":["Chicken breast (2, sliced)","Thai green curry paste","Coconut milk (tin)","Mixed vegetables","Rice"],"instructions":"Fry the paste, add chicken and coconut milk, simmer 15 min with veg, serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r28","title":"Beef stir-fry with noodles","tag":"Dinner","ingredients":["Beef strips (300g)","Broccoli","Noodles","Soy sauce","Garlic","Ginger","Oyster sauce"],"instructions":"Stir-fry beef hot and fast, add garlic, ginger, broccoli, toss through noodles.","inPlan":false,"day":"Unassigned"},{"id":"r29","title":"Cottage pie","tag":"Dinner","ingredients":["Beef mince (500g)","Carrots","Onion","Beef stock","Worcestershire sauce","Potatoes, for mash topping"],"instructions":"Brown mince with onion and carrot, add stock and sauce, simmer, top with mash, bake at 200C for 20 min.","inPlan":false,"day":"Unassigned"},{"id":"r30","title":"Baked cod with new potatoes","tag":"Dinner","ingredients":["Cod fillets (2)","New potatoes","Green beans","Lemon","Olive oil","Dill or parsley"],"instructions":"Boil potatoes, bake cod at 200C for 12-15 min with lemon and oil, steam beans.","inPlan":false,"day":"Unassigned"},{"id":"r31","title":"Pork chops with roasted veg","tag":"Dinner","ingredients":["Pork chops (2)","Carrot, parsnip, potato","Olive oil","Rosemary"],"instructions":"Roast veg at 200C for 25 min, cook chops for the last 10-12 min, rest before serving.","inPlan":false,"day":"Unassigned"},{"id":"r32","title":"Bean & vegetable chilli (veggie)","tag":"Dinner","ingredients":["Mixed beans (2 tins)","Chopped tomatoes (tin)","Peppers","Onion","Cumin, paprika, chilli powder","Rice"],"instructions":"Fry onion and peppers, add spices, tomatoes and beans, simmer 20 min, serve with rice.","inPlan":false,"day":"Unassigned"},{"id":"r33","title":"One-pan chicken and rice","tag":"Dinner","ingredients":["Chicken thighs (4)","Rice","Peppers","Paprika","Chicken stock","Chopped tomatoes (tin)"],"instructions":"Brown chicken, add rice, paprika, stock and tomatoes, simmer covered 20-25 min.","inPlan":false,"day":"Unassigned"},{"id":"r34","title":"Rice cakes, peanut butter & banana","tag":"Snack","ingredients":["Rice cakes (2)","Peanut butter (1 tbsp)","Banana (1/2)"],"instructions":"Spread and top.","inPlan":false,"day":"Unassigned"},{"id":"r35","title":"Hard-boiled eggs & oatcakes","tag":"Snack","ingredients":["Eggs (2)","Oatcakes (3-4)","Salt and pepper"],"instructions":"Boil eggs 8-10 min, cool, peel, eat with oatcakes.","inPlan":false,"day":"Unassigned"},{"id":"r36","title":"Greek yoghurt, honey & seeds","tag":"Snack","ingredients":["Greek yoghurt (200g)","Honey (drizzle)","Mixed seeds (1 tbsp)"],"instructions":"Combine.","inPlan":false,"day":"Unassigned"},{"id":"r37","title":"Homemade trail mix","tag":"Snack","ingredients":["Mixed nuts","Dried fruit (raisins/apricots)","Dark chocolate chunks","Pumpkin seeds"],"instructions":"Mix in a jar in whatever ratio you like, portion it out rather than eating from the bag.","inPlan":false,"day":"Unassigned"}],"uiTab":"today","uiViewingSession":false,"uiSlide":5});</script></body></html>
