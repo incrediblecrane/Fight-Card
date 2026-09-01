@@ -89,16 +89,66 @@ function update(ex,ref,u){
   if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
             R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
 }
+
+// ---- front-plane rendering ----
+function buildFront(ex,host){
+  var svg=el('svg',{viewBox:'20 18 100 168',role:'img','aria-label':ex.name+' front view'});
+  var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
+  var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
+  svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  var R={};
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){ R.fbar=el('rect',{height:5,rx:2.5,fill:soft}); svg.appendChild(R.fbar); }
+  if(ex.equip==='dumbbell'){ R.fdb=el('rect',{width:10,height:24,rx:3,fill:soft}); svg.appendChild(R.fdb); }
+  function limb(n,col,w){
+    R[n+'1']=el('polygon',{fill:col}); R[n+'j']=el('circle',{r:w[1]/2,fill:col});
+    R[n+'2']=el('polygon',{fill:col}); R[n+'e']=el('circle',{r:w[2]/2+0.8,fill:col});
+    [R[n+'1'],R[n+'j'],R[n+'2'],R[n+'e']].forEach(function(x){svg.appendChild(x);});
+  }
+  limb('flegL',legCol,[15,10,6.5]); limb('flegR',legCol,[15,10,6.5]);
+  R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
+  R.fhipC=el('circle',{r:8,fill:ink}); R.fshC=el('circle',{r:9,fill:ink});
+  svg.appendChild(R.fhipC); svg.appendChild(R.fshC);
+  limb('farmL',armCol,[10,7,5.5]); limb('farmR',armCol,[10,7,5.5]);
+  R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
+  host.appendChild(svg);
+  return R;
+}
+function updateFront(ex,R,u){
+  var f=frontAt(ex,u); if(!f) return;
+  var s=solveFront(f);
+  function setL(n,a,b,c,w){
+    R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
+    R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
+    R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
+    R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1));
+  }
+  setL('flegL',s.hipL,s.kneeL,s.footL,[15,10,6.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[15,10,6.5]);
+  setL('farmL',s.shL,s.elbL,s.handL,[10,7,5.5]);    setL('farmR',s.shR,s.elbR,s.handR,[10,7,5.5]);
+  R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
+  R.fhipC.setAttribute('cx',s.hipC.x.toFixed(1)); R.fhipC.setAttribute('cy',s.hipC.y.toFixed(1));
+  R.fshC.setAttribute('cx',s.shC.x.toFixed(1));   R.fshC.setAttribute('cy',s.shC.y.toFixed(1));
+  R.fhead.setAttribute('cx',s.head.x.toFixed(1)); R.fhead.setAttribute('cy',s.head.y.toFixed(1));
+  if(R.fbar){ var y=(s.handL.y+s.handR.y)/2;
+    R.fbar.setAttribute('x',(s.handL.x-10).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
+    R.fbar.setAttribute('width',(s.handR.x-s.handL.x+20).toFixed(1)); }
+  if(R.fdb){ R.fdb.setAttribute('x',((s.handL.x+s.handR.x)/2-5).toFixed(1));
+    R.fdb.setAttribute('y',((s.handL.y+s.handR.y)/2-12).toFixed(1)); }
+}
+
 var grid=document.getElementById('grid'), refs=[];
 EXERCISES.forEach(function(ex,i){
   var c=document.createElement('div');
   c.className='card'+(ex.flag?' flagged':'');
   c.innerHTML='<h3>'+ex.name+(ex.flag?'<span class="flag">you flagged</span>':'')+'</h3>'+
-    '<div class="figwrap"></div>'+
+    '<div class="views"><div class="figwrap"><div class="vlbl">Side</div></div>'+
+      (ex.front?'<div class="figwrap"><div class="vlbl">Front</div></div>':'')+'</div>'+
     '<div class="lbl">The real movement</div><p class="body-copy">'+ex.real+'</p>'+
     '<div class="lbl">What changed</div><p class="changed">'+ex.changed+'</p>';
   grid.appendChild(c);
-  refs.push(buildFigure(ex,c.querySelector('.figwrap')));
+  var wraps=c.querySelectorAll('.figwrap');
+  var ref=buildFigure(ex,wraps[0]);
+  ref.front = ex.front ? buildFront(ex,wraps[1]) : null;
+  refs.push(ref);
 });
 var playing=true, speed=1, t0=performance.now(), CYCLE=2400, showPath=false, manual=0;
 function frame(now){

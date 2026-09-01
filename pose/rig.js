@@ -83,3 +83,44 @@ function poseAt(ex,u){
   return lerpFrame(ex.frames[i], ex.frames[(i+1)%n], easeInOutSine(local));
 }
 if(typeof module!=='undefined') module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.easeInOutSine=easeInOutSine;
+
+// ---- frontal-plane rig ---------------------------------------------------
+// Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
+// this view carries what the side view cannot: stance width, grip width,
+// elbow flare, knee tracking, and which arm is doing the work.
+// frame: {cx, hipY, hipHW, shHW, footL/footR:[x,y], handL/handR:[x,y]}
+function solveFront(f){
+  var cx=f.cx===undefined?70:f.cx;
+  var hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?13:f.shHW;
+  var lean=f.lean||0;
+  var hipC=P(cx,f.hipY);
+  var shC=P(cx+lean, f.hipY-L.TORSO);
+  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF);
+  var hipL=P(hipC.x-hipHW,hipC.y), hipR=P(hipC.x+hipHW,hipC.y);
+  var shL=P(shC.x-shHW,shC.y),   shR=P(shC.x+shHW,shC.y);
+  var footL=P(f.footL[0],f.footL[1]), footR=P(f.footR[0],f.footR[1]);
+  var handL=P(f.handL[0],f.handL[1]), handR=P(f.handR[0],f.handR[1]);
+  // knees track outward, elbows flare outward
+  var kneeL=ik(hipL,footL,L.THIGH,L.SHIN,1), kneeR=ik(hipR,footR,L.THIGH,L.SHIN,-1);
+  var elbL=ik(shL,handL,L.UPPER,L.FORE,1),   elbR=ik(shR,handR,L.UPPER,L.FORE,-1);
+  return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
+    footL:footL,footR:footR,handL:handL,handR:handR,
+    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR};
+}
+function lerpFront(A,B,t){
+  return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
+    hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
+    shHW:lerp(A.shHW||13,B.shHW||13,t), lean:lerp(A.lean||0,B.lean||0,t),
+    footL:lerpPt(A.footL,B.footL,t), footR:lerpPt(A.footR,B.footR,t),
+    handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t)};
+}
+function frontAt(ex,u){
+  var fr=ex.front; if(!fr) return null;
+  var n=fr.length, tempo=ex.tempo||fr.map(function(){return 1;});
+  var total=tempo.reduce(function(a,b){return a+b;},0);
+  var target=((u%1)+1)%1*total, acc=0, i=0;
+  for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
+  if(i>=n) i=n-1;
+  return lerpFront(fr[i], fr[(i+1)%n], easeInOutSine((target-acc)/tempo[i]));
+}
+if(typeof module!=='undefined'){ module.exports.solveFront=solveFront; module.exports.frontAt=frontAt; module.exports.lerpFront=lerpFront; }

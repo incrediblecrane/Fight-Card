@@ -21,8 +21,10 @@ h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-
 .card.flagged{border-color:var(--accent);}
 .card h3{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1rem;margin:0 0 8px;display:flex;align-items:center;gap:7px;}
 .card h3 .flag{font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--accent);color:var(--accent-ink);padding:2px 6px;border-radius:5px;}
-.figwrap{background:var(--surface-raised);border-radius:10px;padding:6px 0;}
-.figwrap svg{width:100%;max-width:230px;height:auto;display:block;margin:0 auto;}
+.views{display:flex;gap:8px;}
+.figwrap{background:var(--surface-raised);border-radius:10px;padding:6px 0 2px;flex:1;min-width:0;position:relative;}
+.vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-faint);}
+.figwrap svg{width:100%;max-width:210px;height:auto;display:block;margin:0 auto;}
 .lbl{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-faint);margin:8px 0 4px;}
 .body-copy{font-size:0.82rem;color:var(--text-soft);line-height:1.5;margin:0 0 8px;}
 .changed{font-size:0.78rem;color:var(--text-soft);line-height:1.5;margin:0;border-left:2px solid var(--accent);padding-left:9px;}
@@ -34,10 +36,10 @@ h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-
 </style>
 <div class="wrap">
   <p class="eyebrow">Fight Card &middot; continuous motion</p>
-  <h1>Now actually animated</h1>
-  <p class="dek">You were right that animating properly would help. It also exposed a bug in the last version: it rebuilt the SVG markup every frame, which destroys the elements, so the transitions never applied &mdash; you were watching a four-frame flipbook with hard cuts, not motion.</p>
-  <p class="dek">This interpolates continuously through the pose itself, then re-solves the inverse kinematics at every step, so the in-between positions are anatomically real rather than a crossfade. Tempo is per exercise: lowering is slower than lifting, a kettlebell swing snaps, a dead bug is deliberately slow.</p>
-  <p class="dek">Animating it caught two errors that four static keyframes had hidden: <b>the far leg was being silently stretched 3 units beyond its own length on every standing lift</b>, and <b>the boxing stance was wider than the leg could physically span</b>. Both are fixed and now verified at 120 points through every rep, not just at the keyframes.</p>
+  <h1>Two views, corrected</h1>
+  <p class="dek">Full review of all twelve against the real movement, plus a second camera angle where it earns one.</p>
+  <p class="dek">Both things you flagged were real bugs. <b>The bench press bar was drifting 20 units sideways</b>, an absurdly exaggerated J-curve that read as pressing diagonally; it now travels a dead-straight vertical line over the lower chest, elbows dropping below the bench at the bottom. And <b>the jab and cross were using literally identical arm angles</b>, so only the limb differed and the two punches looked the same. The cross now reaches further, rotates the torso twice as far, drives the hip forward and pivots the rear heel off the floor.</p>
+  <p class="dek">Front views are authored for the <b>six</b> exercises where the frontal plane carries something the side view physically cannot: stance and grip width, elbow flare, knee tracking, and which hand is throwing. Deadlift, RDL, row, bench and the kettlebell swing are sagittal movements whose front view is either a person standing still or a foreshortened hinge this rig cannot honestly draw, so they stay single-view rather than showing you a panel that teaches nothing.</p>
   <div class="controls">
     <button class="btn on" id="playBtn">Pause</button>
     <button class="btn" id="slowBtn">Slow motion</button>
@@ -133,6 +135,46 @@ function poseAt(ex,u){
   return lerpFrame(ex.frames[i], ex.frames[(i+1)%n], easeInOutSine(local));
 }
 
+// ---- frontal-plane rig ---------------------------------------------------
+// Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
+// this view carries what the side view cannot: stance width, grip width,
+// elbow flare, knee tracking, and which arm is doing the work.
+// frame: {cx, hipY, hipHW, shHW, footL/footR:[x,y], handL/handR:[x,y]}
+function solveFront(f){
+  var cx=f.cx===undefined?70:f.cx;
+  var hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?13:f.shHW;
+  var lean=f.lean||0;
+  var hipC=P(cx,f.hipY);
+  var shC=P(cx+lean, f.hipY-L.TORSO);
+  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF);
+  var hipL=P(hipC.x-hipHW,hipC.y), hipR=P(hipC.x+hipHW,hipC.y);
+  var shL=P(shC.x-shHW,shC.y),   shR=P(shC.x+shHW,shC.y);
+  var footL=P(f.footL[0],f.footL[1]), footR=P(f.footR[0],f.footR[1]);
+  var handL=P(f.handL[0],f.handL[1]), handR=P(f.handR[0],f.handR[1]);
+  // knees track outward, elbows flare outward
+  var kneeL=ik(hipL,footL,L.THIGH,L.SHIN,1), kneeR=ik(hipR,footR,L.THIGH,L.SHIN,-1);
+  var elbL=ik(shL,handL,L.UPPER,L.FORE,1),   elbR=ik(shR,handR,L.UPPER,L.FORE,-1);
+  return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
+    footL:footL,footR:footR,handL:handL,handR:handR,
+    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR};
+}
+function lerpFront(A,B,t){
+  return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
+    hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
+    shHW:lerp(A.shHW||13,B.shHW||13,t), lean:lerp(A.lean||0,B.lean||0,t),
+    footL:lerpPt(A.footL,B.footL,t), footR:lerpPt(A.footR,B.footR,t),
+    handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t)};
+}
+function frontAt(ex,u){
+  var fr=ex.front; if(!fr) return null;
+  var n=fr.length, tempo=ex.tempo||fr.map(function(){return 1;});
+  var total=tempo.reduce(function(a,b){return a+b;},0);
+  var target=((u%1)+1)%1*total, acc=0, i=0;
+  for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
+  if(i>=n) i=n-1;
+  return lerpFront(fr[i], fr[(i+1)%n], easeInOutSine((target-acc)/tempo[i]));
+}
+
 // Exercise frames. Feet planted on GROUND=170 (ankle y=163) for standing lifts.
 // Standing hip y = 105. Figure faces +x.
 var EXERCISES = [
@@ -193,13 +235,13 @@ var EXERCISES = [
 
 { id:"bench", tempo:[500,500,380,380], name:"Bench press",
   real:"Lying on a bench with feet planted on the floor either side, knees bent. Bar starts locked out over the shoulders, lowers to the sternum with the elbows dropping below bench level, then presses back on a slight J-curve toward the shoulders.",
-  changed:"There is now an actual bench under the body with the feet planted on the floor beside it. Without it this read as a floor press. The bar also follows the real J-curve rather than moving straight up.",
+  changed:"There is now an actual bench under the body with the feet planted on the floor beside it. Without it this read as a floor press. The bar now presses on a straight vertical line over the lower chest; it previously drifted 20 units sideways, an exaggerated J-curve that read as pressing diagonally.",
   equip:"barbell", active:"arms", bench:true,
   frames:[
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[0,0], kneeSign:-1},
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[55,0], kneeSign:-1},
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[105,0], kneeSign:-1},
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[55,0], kneeSign:-1}
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,94], handF:[35,94], kneeSign:-1, elbowSign:1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,107],handF:[35,107],kneeSign:-1, elbowSign:1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,120],handF:[35,120],kneeSign:-1, elbowSign:1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,107],handF:[35,107],kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"ohp", tempo:[480,480,420,420], name:"Overhead press",
@@ -259,15 +301,53 @@ var EXERCISES = [
 
 { id:"jabcross", tempo:[170,240,170,240], name:"Jab-cross combo", flag:true,
   real:"Staggered stance, lead foot forward, rear foot back and turned out. The jab fires from the lead hand while the rear hand guards the chin; the cross then fires from the rear hand with the hips and rear shoulder rotating through. The guard hand never drops.",
-  changed:"It now throws two different punches. Lead hand jabs, returns to guard, then the rear hand crosses with the torso rotating into it. Previously one arm waved while the other stayed put, and the guard hand floated above the head.",
+  changed:"The jab and cross were using identical arm angles, so only the limb differed and both punches looked the same. The cross now reaches further, rotates the torso more than twice as far, drives the hip forward and lifts the rear heel, which is what actually separates it from a jab.",
   equip:null, active:"armN",
   frames:[
     {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
-    {hip:[56,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[93,88],  armF:[172,15]},
+    {hip:[56,112],torso:10,ankN:[70,163],ankF:[44,163], armN:[95,92],  armF:[172,15]},
     {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
-    {hip:[57,112],torso:14,ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[93,88]}
+    {hip:[60,111],torso:20,ankN:[70,163],ankF:[46,158], armN:[168,20], armF:[88,86]}
   ]}
 ];
+
+// Front-plane frames, authored only where this view carries something the side
+// view physically cannot: stance and grip width, elbow flare, knee tracking,
+// and which arm is working.
+var FRONTS = {
+  backsquat:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,70],handR:[96,70]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]},
+    {hipY:138,footL:[58,163],footR:[82,163],handL:[44,101],handR:[96,101]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]}],
+  frontsquat:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[58,66],handR:[82,66]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]},
+    {hipY:138,footL:[58,163],footR:[82,163],handL:[58,97],handR:[82,97]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]}],
+  goblet:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[66,95],handR:[74,95]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]},
+    {hipY:137,footL:[58,163],footR:[82,163],handL:[66,122],handR:[74,122]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]}],
+  ohp:[
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,73],handR:[88,73]},
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]},
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,35],handR:[88,35]},
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]}],
+  pullup:[
+    {hipY:100,footL:[62,156],footR:[78,156],handL:[52,30],handR:[88,30]},
+    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]},
+    {hipY:72, footL:[62,128],footR:[78,128],handL:[52,30],handR:[88,30]},
+    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]}],
+  jabcross:[
+    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
+    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[86,74]},
+    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
+    {hipY:111,footL:[56,163],footR:[84,158],handL:[50,72],handR:[78,80]}]
+};
+EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
+
 var NS='http://www.w3.org/2000/svg';
 function el(tag,attrs){ var n=document.createElementNS(NS,tag); for(var k in attrs) n.setAttribute(k,attrs[k]); return n; }
 function segPts(A,B,w1,w2){
@@ -359,16 +439,66 @@ function update(ex,ref,u){
   if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
             R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
 }
+
+// ---- front-plane rendering ----
+function buildFront(ex,host){
+  var svg=el('svg',{viewBox:'20 18 100 168',role:'img','aria-label':ex.name+' front view'});
+  var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
+  var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
+  svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  var R={};
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){ R.fbar=el('rect',{height:5,rx:2.5,fill:soft}); svg.appendChild(R.fbar); }
+  if(ex.equip==='dumbbell'){ R.fdb=el('rect',{width:10,height:24,rx:3,fill:soft}); svg.appendChild(R.fdb); }
+  function limb(n,col,w){
+    R[n+'1']=el('polygon',{fill:col}); R[n+'j']=el('circle',{r:w[1]/2,fill:col});
+    R[n+'2']=el('polygon',{fill:col}); R[n+'e']=el('circle',{r:w[2]/2+0.8,fill:col});
+    [R[n+'1'],R[n+'j'],R[n+'2'],R[n+'e']].forEach(function(x){svg.appendChild(x);});
+  }
+  limb('flegL',legCol,[15,10,6.5]); limb('flegR',legCol,[15,10,6.5]);
+  R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
+  R.fhipC=el('circle',{r:8,fill:ink}); R.fshC=el('circle',{r:9,fill:ink});
+  svg.appendChild(R.fhipC); svg.appendChild(R.fshC);
+  limb('farmL',armCol,[10,7,5.5]); limb('farmR',armCol,[10,7,5.5]);
+  R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
+  host.appendChild(svg);
+  return R;
+}
+function updateFront(ex,R,u){
+  var f=frontAt(ex,u); if(!f) return;
+  var s=solveFront(f);
+  function setL(n,a,b,c,w){
+    R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
+    R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
+    R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
+    R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1));
+  }
+  setL('flegL',s.hipL,s.kneeL,s.footL,[15,10,6.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[15,10,6.5]);
+  setL('farmL',s.shL,s.elbL,s.handL,[10,7,5.5]);    setL('farmR',s.shR,s.elbR,s.handR,[10,7,5.5]);
+  R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
+  R.fhipC.setAttribute('cx',s.hipC.x.toFixed(1)); R.fhipC.setAttribute('cy',s.hipC.y.toFixed(1));
+  R.fshC.setAttribute('cx',s.shC.x.toFixed(1));   R.fshC.setAttribute('cy',s.shC.y.toFixed(1));
+  R.fhead.setAttribute('cx',s.head.x.toFixed(1)); R.fhead.setAttribute('cy',s.head.y.toFixed(1));
+  if(R.fbar){ var y=(s.handL.y+s.handR.y)/2;
+    R.fbar.setAttribute('x',(s.handL.x-10).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
+    R.fbar.setAttribute('width',(s.handR.x-s.handL.x+20).toFixed(1)); }
+  if(R.fdb){ R.fdb.setAttribute('x',((s.handL.x+s.handR.x)/2-5).toFixed(1));
+    R.fdb.setAttribute('y',((s.handL.y+s.handR.y)/2-12).toFixed(1)); }
+}
+
 var grid=document.getElementById('grid'), refs=[];
 EXERCISES.forEach(function(ex,i){
   var c=document.createElement('div');
   c.className='card'+(ex.flag?' flagged':'');
   c.innerHTML='<h3>'+ex.name+(ex.flag?'<span class="flag">you flagged</span>':'')+'</h3>'+
-    '<div class="figwrap"></div>'+
+    '<div class="views"><div class="figwrap"><div class="vlbl">Side</div></div>'+
+      (ex.front?'<div class="figwrap"><div class="vlbl">Front</div></div>':'')+'</div>'+
     '<div class="lbl">The real movement</div><p class="body-copy">'+ex.real+'</p>'+
     '<div class="lbl">What changed</div><p class="changed">'+ex.changed+'</p>';
   grid.appendChild(c);
-  refs.push(buildFigure(ex,c.querySelector('.figwrap')));
+  var wraps=c.querySelectorAll('.figwrap');
+  var ref=buildFigure(ex,wraps[0]);
+  ref.front = ex.front ? buildFront(ex,wraps[1]) : null;
+  refs.push(ref);
 });
 var playing=true, speed=1, t0=performance.now(), CYCLE=2400, showPath=false, manual=0;
 function frame(now){

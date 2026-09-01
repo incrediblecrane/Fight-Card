@@ -58,13 +58,13 @@ var EXERCISES = [
 
 { id:"bench", tempo:[500,500,380,380], name:"Bench press",
   real:"Lying on a bench with feet planted on the floor either side, knees bent. Bar starts locked out over the shoulders, lowers to the sternum with the elbows dropping below bench level, then presses back on a slight J-curve toward the shoulders.",
-  changed:"There is now an actual bench under the body with the feet planted on the floor beside it. Without it this read as a floor press. The bar also follows the real J-curve rather than moving straight up.",
+  changed:"There is now an actual bench under the body with the feet planted on the floor beside it. Without it this read as a floor press. The bar now presses on a straight vertical line over the lower chest; it previously drifted 20 units sideways, an exaggerated J-curve that read as pressing diagonally.",
   equip:"barbell", active:"arms", bench:true,
   frames:[
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[0,0], kneeSign:-1},
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[55,0], kneeSign:-1},
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[105,0], kneeSign:-1},
-    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[55,0], kneeSign:-1}
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,94], handF:[35,94], kneeSign:-1, elbowSign:1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,107],handF:[35,107],kneeSign:-1, elbowSign:1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,120],handF:[35,120],kneeSign:-1, elbowSign:1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,107],handF:[35,107],kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"ohp", tempo:[480,480,420,420], name:"Overhead press",
@@ -124,13 +124,51 @@ var EXERCISES = [
 
 { id:"jabcross", tempo:[170,240,170,240], name:"Jab-cross combo", flag:true,
   real:"Staggered stance, lead foot forward, rear foot back and turned out. The jab fires from the lead hand while the rear hand guards the chin; the cross then fires from the rear hand with the hips and rear shoulder rotating through. The guard hand never drops.",
-  changed:"It now throws two different punches. Lead hand jabs, returns to guard, then the rear hand crosses with the torso rotating into it. Previously one arm waved while the other stayed put, and the guard hand floated above the head.",
+  changed:"The jab and cross were using identical arm angles, so only the limb differed and both punches looked the same. The cross now reaches further, rotates the torso more than twice as far, drives the hip forward and lifts the rear heel, which is what actually separates it from a jab.",
   equip:null, active:"armN",
   frames:[
     {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
-    {hip:[56,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[93,88],  armF:[172,15]},
+    {hip:[56,112],torso:10,ankN:[70,163],ankF:[44,163], armN:[95,92],  armF:[172,15]},
     {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
-    {hip:[57,112],torso:14,ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[93,88]}
+    {hip:[60,111],torso:20,ankN:[70,163],ankF:[46,158], armN:[168,20], armF:[88,86]}
   ]}
 ];
+
+// Front-plane frames, authored only where this view carries something the side
+// view physically cannot: stance and grip width, elbow flare, knee tracking,
+// and which arm is working.
+var FRONTS = {
+  backsquat:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,70],handR:[96,70]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]},
+    {hipY:138,footL:[58,163],footR:[82,163],handL:[44,101],handR:[96,101]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]}],
+  frontsquat:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[58,66],handR:[82,66]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]},
+    {hipY:138,footL:[58,163],footR:[82,163],handL:[58,97],handR:[82,97]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]}],
+  goblet:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[66,95],handR:[74,95]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]},
+    {hipY:137,footL:[58,163],footR:[82,163],handL:[66,122],handR:[74,122]},
+    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]}],
+  ohp:[
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,73],handR:[88,73]},
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]},
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,35],handR:[88,35]},
+    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]}],
+  pullup:[
+    {hipY:100,footL:[62,156],footR:[78,156],handL:[52,30],handR:[88,30]},
+    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]},
+    {hipY:72, footL:[62,128],footR:[78,128],handL:[52,30],handR:[88,30]},
+    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]}],
+  jabcross:[
+    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
+    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[86,74]},
+    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
+    {hipY:111,footL:[56,163],footR:[84,158],handL:[50,72],handR:[78,80]}]
+};
+EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
+
 if(typeof module!=='undefined') module.exports=EXERCISES;
