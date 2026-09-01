@@ -54,6 +54,15 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
     ck(tag,'arms never over-extend', d(s.shR,s.handR)<=L.UPPER+L.FORE+0.5,'reach '+r(d(s.shR,s.handR)));
     ck(tag,'stays above the floor', Math.max(s.footL.y,s.footR.y,s.hipC.y)<=GROUND+1,'lowest '+r(Math.max(s.footL.y,s.footR.y)));
     ck(tag,'left stays left of right', s.hipL.x<s.hipR.x && s.footL.x<s.footR.x,'sides crossed');
+    var chordY=(s.shL.y+s.handL.y)/2;
+    ck(tag,'left elbow droops below the shoulder-hand line (never bends upward)',
+      s.elbL.y>=chordY-1,'elbow '+r(s.elbL.y)+' chord '+r(chordY));
+    var chordYR=(s.shR.y+s.handR.y)/2;
+    ck(tag,'right elbow droops below the shoulder-hand line',
+      s.elbR.y>=chordYR-1,'elbow '+r(s.elbR.y)+' chord '+r(chordYR));
+    ck(tag,'shoulders are wider than the hips', s.shR.x-s.shL.x > s.hipR.x-s.hipL.x,
+      'shoulders '+r(s.shR.x-s.shL.x)+' hips '+r(s.hipR.x-s.hipL.x));
+
   }
   var A=rig.solveFront(ex.front[0]), B=rig.solveFront(ex.front[2]);
   if(['backsquat','frontsquat','goblet','kbswing'].indexOf(ex.id)>=0){
@@ -73,9 +82,21 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
     A.handL.x===B.handL.x && A.handL.y===B.handL.y,'hands moved');
   if(ex.id==='jabcross'){
     var g=rig.solveFront(ex.front[0]), jb=rig.solveFront(ex.front[1]), cr=rig.solveFront(ex.front[3]);
-    ck(ex.id+' front','jab and cross are thrown by different hands',
-      (jb.handR.x>g.handR.x+4) && (cr.handL.x<g.handL.x-4),
-      'jab R '+r(jb.handR.x)+' vs guard '+r(g.handR.x)+'; cross L '+r(cr.handL.x)+' vs guard '+r(g.handL.x));
+    // A straight punch goes at the camera, so it must foreshorten toward the
+    // centreline and grow, never swing out sideways like a hook.
+    ck(ex.id+' front','jab fist travels toward the centreline, not outward',
+      jb.handR.x < g.handR.x && jb.handR.x >= 68,'guard '+r(g.handR.x)+' jab '+r(jb.handR.x));
+    ck(ex.id+' front','cross fist travels toward the centreline, not outward',
+      cr.handL.x > g.handL.x && cr.handL.x <= 72,'guard '+r(g.handL.x)+' cross '+r(cr.handL.x));
+    ck(ex.id+' front','jab fist foreshortens (grows toward viewer)', jb.fistR>1.5,'scale '+r(jb.fistR));
+    ck(ex.id+' front','cross fist foreshortens further than the jab', cr.fistL>jb.fistR,
+      'cross '+r(cr.fistL)+' jab '+r(jb.fistR));
+    ck(ex.id+' front','only the punching hand foreshortens',
+      jb.fistL===1 && cr.fistR===1,'jab off-hand '+r(jb.fistL)+' cross off-hand '+r(cr.fistR));
+    ck(ex.id+' front','rear shoulder rotates through on the cross', cr.shC.x>g.shC.x+3,
+      'guard '+r(g.shC.x)+' cross '+r(cr.shC.x));
+    ck(ex.id+' front','stance is staggered in depth (lead foot nearer/lower)',
+      g.footR.y>g.footL.y+5,'lead '+r(g.footR.y)+' rear '+r(g.footL.y));
   }
 });
 

@@ -163,11 +163,17 @@ var FRONTS = {
     {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]},
     {hipY:72, footL:[62,128],footR:[78,128],handL:[52,30],handR:[88,30]},
     {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]}],
+  // Facing the boxer. Lead (jabbing) hand is on screen right, rear (cross) hand
+  // on screen left. Feet are staggered in depth, so the lead foot sits lower on
+  // screen (nearer the viewer) and the rear foot higher and wider.
+  // A straight punch travels at the camera, so it foreshortens: the fist moves
+  // toward the centreline and grows, and the shoulder line rotates behind it.
+  // Swinging the hand out sideways would read as a hook, which is what it did.
   jabcross:[
-    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
-    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[86,74]},
-    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
-    {hipY:111,footL:[56,163],footR:[84,158],handL:[50,72],handR:[78,80]}]
+    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
+    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[72,72],fistL:1,fistR:1.9,lean:-3},
+    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
+    {hipY:111,footL:[58,152],footR:[80,166],handL:[69,71],handR:[77,74],fistL:2.1,fistR:1,lean:6}]
 };
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 

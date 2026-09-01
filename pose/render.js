@@ -97,19 +97,37 @@ function buildFront(ex,host){
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
   svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
   var R={};
-  if(ex.equip==='barbell'||ex.equip==='fixedbar'){ R.fbar=el('rect',{height:5,rx:2.5,fill:soft}); svg.appendChild(R.fbar); }
-  if(ex.equip==='dumbbell'){ R.fdb=el('rect',{width:10,height:24,rx:3,fill:soft}); svg.appendChild(R.fdb); }
   function limb(n,col,w){
     R[n+'1']=el('polygon',{fill:col}); R[n+'j']=el('circle',{r:w[1]/2,fill:col});
-    R[n+'2']=el('polygon',{fill:col}); R[n+'e']=el('circle',{r:w[2]/2+0.8,fill:col});
-    [R[n+'1'],R[n+'j'],R[n+'2'],R[n+'e']].forEach(function(x){svg.appendChild(x);});
+    R[n+'2']=el('polygon',{fill:col});
+    [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){svg.appendChild(x);});
   }
   limb('flegL',legCol,[15,10,6.5]); limb('flegR',legCol,[15,10,6.5]);
+  R.ffootL=el('ellipse',{rx:7,ry:4,fill:legCol}); R.ffootR=el('ellipse',{rx:7,ry:4,fill:legCol});
+  svg.appendChild(R.ffootL); svg.appendChild(R.ffootR);
+  R.fneck=el('rect',{width:9,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
   R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
-  R.fhipC=el('circle',{r:8,fill:ink}); R.fshC=el('circle',{r:9,fill:ink});
-  svg.appendChild(R.fhipC); svg.appendChild(R.fshC);
+  R.fhipL=el('circle',{r:7,fill:ink}); R.fhipR=el('circle',{r:7,fill:ink});
+  svg.appendChild(R.fhipL); svg.appendChild(R.fhipR);
   limb('farmL',armCol,[10,7,5.5]); limb('farmR',armCol,[10,7,5.5]);
+  R.fshL=el('circle',{r:8,fill:ink}); R.fshR=el('circle',{r:8,fill:ink});
+  svg.appendChild(R.fshL); svg.appendChild(R.fshR);
   R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
+  R.fhandL=el('circle',{fill:armCol}); R.fhandR=el('circle',{fill:armCol});
+  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
+    R.fbar=el('rect',{height:5,rx:2.5,fill:soft});
+    R.fpL=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    R.fpR=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    svg.appendChild(R.fbar);
+    if(ex.equip==='barbell'){ svg.appendChild(R.fpL); svg.appendChild(R.fpR); }
+  }
+  if(ex.equip==='dumbbell'){
+    R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
+    R.fdb1=el('rect',{width:19,height:7,rx:2.5,fill:soft});
+    R.fdb2=el('rect',{width:19,height:7,rx:2.5,fill:soft});
+    svg.appendChild(R.fdb); svg.appendChild(R.fdb1); svg.appendChild(R.fdb2);
+  }
   host.appendChild(svg);
   return R;
 }
@@ -120,19 +138,33 @@ function updateFront(ex,R,u){
     R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
-    R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1));
   }
   setL('flegL',s.hipL,s.kneeL,s.footL,[15,10,6.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[15,10,6.5]);
   setL('farmL',s.shL,s.elbL,s.handL,[10,7,5.5]);    setL('farmR',s.shR,s.elbR,s.handR,[10,7,5.5]);
+  [['ffootL',s.footL],['ffootR',s.footR]].forEach(function(p){
+    R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',(p[1].y+3).toFixed(1)); });
   R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
-  R.fhipC.setAttribute('cx',s.hipC.x.toFixed(1)); R.fhipC.setAttribute('cy',s.hipC.y.toFixed(1));
-  R.fshC.setAttribute('cx',s.shC.x.toFixed(1));   R.fshC.setAttribute('cy',s.shC.y.toFixed(1));
+  R.fneck.setAttribute('x',(s.shC.x-4.5).toFixed(1)); R.fneck.setAttribute('y',(s.shC.y-12).toFixed(1));
+  [['fshL',s.shL],['fshR',s.shR],['fhipL',s.hipL],['fhipR',s.hipR]].forEach(function(p){
+    R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',p[1].y.toFixed(1)); });
   R.fhead.setAttribute('cx',s.head.x.toFixed(1)); R.fhead.setAttribute('cy',s.head.y.toFixed(1));
-  if(R.fbar){ var y=(s.handL.y+s.handR.y)/2;
-    R.fbar.setAttribute('x',(s.handL.x-10).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
-    R.fbar.setAttribute('width',(s.handR.x-s.handL.x+20).toFixed(1)); }
-  if(R.fdb){ R.fdb.setAttribute('x',((s.handL.x+s.handR.x)/2-5).toFixed(1));
-    R.fdb.setAttribute('y',((s.handL.y+s.handR.y)/2-12).toFixed(1)); }
+  R.fhandL.setAttribute('cx',s.handL.x.toFixed(1)); R.fhandL.setAttribute('cy',s.handL.y.toFixed(1));
+  R.fhandL.setAttribute('r',(5.5*s.fistL).toFixed(1));
+  R.fhandR.setAttribute('cx',s.handR.x.toFixed(1)); R.fhandR.setAttribute('cy',s.handR.y.toFixed(1));
+  R.fhandR.setAttribute('r',(5.5*s.fistR).toFixed(1));
+  if(R.fbar){
+    var y=(s.handL.y+s.handR.y)/2, x1=Math.min(s.handL.x,s.handR.x), x2=Math.max(s.handL.x,s.handR.x);
+    R.fbar.setAttribute('x',(x1-16).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
+    R.fbar.setAttribute('width',(x2-x1+32).toFixed(1));
+    if(R.fpL){ R.fpL.setAttribute('cx',(x1-13).toFixed(1)); R.fpL.setAttribute('cy',y.toFixed(1));
+               R.fpR.setAttribute('cx',(x2+13).toFixed(1)); R.fpR.setAttribute('cy',y.toFixed(1)); }
+  }
+  if(R.fdb){
+    var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;
+    R.fdb.setAttribute('x',(mx-4.5).toFixed(1));  R.fdb.setAttribute('y',(my-10).toFixed(1));
+    R.fdb1.setAttribute('x',(mx-9.5).toFixed(1)); R.fdb1.setAttribute('y',(my-14).toFixed(1));
+    R.fdb2.setAttribute('x',(mx-9.5).toFixed(1)); R.fdb2.setAttribute('y',(my+7).toFixed(1));
+  }
 }
 
 var grid=document.getElementById('grid'), refs=[];

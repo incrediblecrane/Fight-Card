@@ -36,10 +36,11 @@ h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-
 </style>
 <div class="wrap">
   <p class="eyebrow">Fight Card &middot; continuous motion</p>
-  <h1>Two views, corrected</h1>
-  <p class="dek">Full review of all twelve against the real movement, plus a second camera angle where it earns one.</p>
-  <p class="dek">Both things you flagged were real bugs. <b>The bench press bar was drifting 20 units sideways</b>, an absurdly exaggerated J-curve that read as pressing diagonally; it now travels a dead-straight vertical line over the lower chest, elbows dropping below the bench at the bottom. And <b>the jab and cross were using literally identical arm angles</b>, so only the limb differed and the two punches looked the same. The cross now reaches further, rotates the torso twice as far, drives the hip forward and pivots the rear heel off the floor.</p>
-  <p class="dek">Front views are authored for the <b>six</b> exercises where the frontal plane carries something the side view physically cannot: stance and grip width, elbow flare, knee tracking, and which hand is throwing. Deadlift, RDL, row, bench and the kettlebell swing are sagittal movements whose front view is either a person standing still or a foreshortened hinge this rig cannot honestly draw, so they stay single-view rather than showing you a panel that teaches nothing.</p>
+  <h1>Front views, rebuilt</h1>
+  <p class="dek">The front views were wrong in four separate ways, all now fixed.</p>
+  <p class="dek"><b>Every arm bent backwards.</b> The rig picked the elbow solution by a hardcoded sign, which bent elbows upward. A human elbow droops below the shoulder-to-hand line in all of these positions; it now picks that branch by anatomy rather than by a fixed number, and the same rule makes knees track outward away from the midline.</p>
+  <p class="dek"><b>The goblet squat bell was invisible</b> because equipment was drawn before the body, so the torso painted straight over a weight held at the chest. Held equipment now draws in front. Barbells gained proper end plates so they read as loaded bars, and the figure gained deltoid caps, hip caps and a neck, which is what was missing when it looked like it had no shoulders.</p>
+  <p class="dek"><b>The jab-cross front view was nonsense.</b> Both punches swung the fist out sideways, which reads as a hook. A straight punch travels at the camera: the fist now moves toward the centreline and grows as it foreshortens, the shoulder line rotates through behind the cross, and the feet are staggered in depth so the lead foot sits nearer the viewer.</p>
   <div class="controls">
     <button class="btn on" id="playBtn">Pause</button>
     <button class="btn" id="slowBtn">Slow motion</button>
@@ -151,17 +152,27 @@ function solveFront(f){
   var shL=P(shC.x-shHW,shC.y),   shR=P(shC.x+shHW,shC.y);
   var footL=P(f.footL[0],f.footL[1]), footR=P(f.footR[0],f.footR[1]);
   var handL=P(f.handL[0],f.handL[1]), handR=P(f.handR[0],f.handR[1]);
-  // knees track outward, elbows flare outward
-  var kneeL=ik(hipL,footL,L.THIGH,L.SHIN,1), kneeR=ik(hipR,footR,L.THIGH,L.SHIN,-1);
-  var elbL=ik(shL,handL,L.UPPER,L.FORE,1),   elbR=ik(shR,handR,L.UPPER,L.FORE,-1);
+  // Pick the anatomically correct branch rather than a fixed sign:
+  // knees track outward away from the midline, elbows always droop below the
+  // shoulder-to-hand line (a human elbow never bends upward).
+  function both(a,b,l1,l2){ return [ik(a,b,l1,l2,1), ik(a,b,l1,l2,-1)]; }
+  function lower(p){ return p[0].y>=p[1].y?p[0]:p[1]; }
+  var kL=both(hipL,footL,L.THIGH,L.SHIN), kR=both(hipR,footR,L.THIGH,L.SHIN);
+  var kneeL=kL[0].x<=kL[1].x?kL[0]:kL[1];
+  var kneeR=kR[0].x>=kR[1].x?kR[0]:kR[1];
+  var elbL=lower(both(shL,handL,L.UPPER,L.FORE));
+  var elbR=lower(both(shR,handR,L.UPPER,L.FORE));
   return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
     footL:footL,footR:footR,handL:handL,handR:handR,
-    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR};
+    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,
+    fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
 }
 function lerpFront(A,B,t){
   return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
-    shHW:lerp(A.shHW||13,B.shHW||13,t), lean:lerp(A.lean||0,B.lean||0,t),
+    shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
+    fistL:lerp(A.fistL===undefined?1:A.fistL,B.fistL===undefined?1:B.fistL,t),
+    fistR:lerp(A.fistR===undefined?1:A.fistR,B.fistR===undefined?1:B.fistR,t),
     footL:lerpPt(A.footL,B.footL,t), footR:lerpPt(A.footR,B.footR,t),
     handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t)};
 }
@@ -340,11 +351,17 @@ var FRONTS = {
     {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]},
     {hipY:72, footL:[62,128],footR:[78,128],handL:[52,30],handR:[88,30]},
     {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]}],
+  // Facing the boxer. Lead (jabbing) hand is on screen right, rear (cross) hand
+  // on screen left. Feet are staggered in depth, so the lead foot sits lower on
+  // screen (nearer the viewer) and the rear foot higher and wider.
+  // A straight punch travels at the camera, so it foreshortens: the fist moves
+  // toward the centreline and grows, and the shoulder line rotates behind it.
+  // Swinging the hand out sideways would read as a hook, which is what it did.
   jabcross:[
-    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
-    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[86,74]},
-    {hipY:112,footL:[56,163],footR:[84,163],handL:[62,80],handR:[78,80]},
-    {hipY:111,footL:[56,163],footR:[84,158],handL:[50,72],handR:[78,80]}]
+    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
+    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[72,72],fistL:1,fistR:1.9,lean:-3},
+    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
+    {hipY:111,footL:[58,152],footR:[80,166],handL:[69,71],handR:[77,74],fistL:2.1,fistR:1,lean:6}]
 };
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 
@@ -447,19 +464,37 @@ function buildFront(ex,host){
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
   svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
   var R={};
-  if(ex.equip==='barbell'||ex.equip==='fixedbar'){ R.fbar=el('rect',{height:5,rx:2.5,fill:soft}); svg.appendChild(R.fbar); }
-  if(ex.equip==='dumbbell'){ R.fdb=el('rect',{width:10,height:24,rx:3,fill:soft}); svg.appendChild(R.fdb); }
   function limb(n,col,w){
     R[n+'1']=el('polygon',{fill:col}); R[n+'j']=el('circle',{r:w[1]/2,fill:col});
-    R[n+'2']=el('polygon',{fill:col}); R[n+'e']=el('circle',{r:w[2]/2+0.8,fill:col});
-    [R[n+'1'],R[n+'j'],R[n+'2'],R[n+'e']].forEach(function(x){svg.appendChild(x);});
+    R[n+'2']=el('polygon',{fill:col});
+    [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){svg.appendChild(x);});
   }
   limb('flegL',legCol,[15,10,6.5]); limb('flegR',legCol,[15,10,6.5]);
+  R.ffootL=el('ellipse',{rx:7,ry:4,fill:legCol}); R.ffootR=el('ellipse',{rx:7,ry:4,fill:legCol});
+  svg.appendChild(R.ffootL); svg.appendChild(R.ffootR);
+  R.fneck=el('rect',{width:9,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
   R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
-  R.fhipC=el('circle',{r:8,fill:ink}); R.fshC=el('circle',{r:9,fill:ink});
-  svg.appendChild(R.fhipC); svg.appendChild(R.fshC);
+  R.fhipL=el('circle',{r:7,fill:ink}); R.fhipR=el('circle',{r:7,fill:ink});
+  svg.appendChild(R.fhipL); svg.appendChild(R.fhipR);
   limb('farmL',armCol,[10,7,5.5]); limb('farmR',armCol,[10,7,5.5]);
+  R.fshL=el('circle',{r:8,fill:ink}); R.fshR=el('circle',{r:8,fill:ink});
+  svg.appendChild(R.fshL); svg.appendChild(R.fshR);
   R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
+  R.fhandL=el('circle',{fill:armCol}); R.fhandR=el('circle',{fill:armCol});
+  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
+    R.fbar=el('rect',{height:5,rx:2.5,fill:soft});
+    R.fpL=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    R.fpR=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    svg.appendChild(R.fbar);
+    if(ex.equip==='barbell'){ svg.appendChild(R.fpL); svg.appendChild(R.fpR); }
+  }
+  if(ex.equip==='dumbbell'){
+    R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
+    R.fdb1=el('rect',{width:19,height:7,rx:2.5,fill:soft});
+    R.fdb2=el('rect',{width:19,height:7,rx:2.5,fill:soft});
+    svg.appendChild(R.fdb); svg.appendChild(R.fdb1); svg.appendChild(R.fdb2);
+  }
   host.appendChild(svg);
   return R;
 }
@@ -470,19 +505,33 @@ function updateFront(ex,R,u){
     R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
-    R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1));
   }
   setL('flegL',s.hipL,s.kneeL,s.footL,[15,10,6.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[15,10,6.5]);
   setL('farmL',s.shL,s.elbL,s.handL,[10,7,5.5]);    setL('farmR',s.shR,s.elbR,s.handR,[10,7,5.5]);
+  [['ffootL',s.footL],['ffootR',s.footR]].forEach(function(p){
+    R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',(p[1].y+3).toFixed(1)); });
   R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
-  R.fhipC.setAttribute('cx',s.hipC.x.toFixed(1)); R.fhipC.setAttribute('cy',s.hipC.y.toFixed(1));
-  R.fshC.setAttribute('cx',s.shC.x.toFixed(1));   R.fshC.setAttribute('cy',s.shC.y.toFixed(1));
+  R.fneck.setAttribute('x',(s.shC.x-4.5).toFixed(1)); R.fneck.setAttribute('y',(s.shC.y-12).toFixed(1));
+  [['fshL',s.shL],['fshR',s.shR],['fhipL',s.hipL],['fhipR',s.hipR]].forEach(function(p){
+    R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',p[1].y.toFixed(1)); });
   R.fhead.setAttribute('cx',s.head.x.toFixed(1)); R.fhead.setAttribute('cy',s.head.y.toFixed(1));
-  if(R.fbar){ var y=(s.handL.y+s.handR.y)/2;
-    R.fbar.setAttribute('x',(s.handL.x-10).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
-    R.fbar.setAttribute('width',(s.handR.x-s.handL.x+20).toFixed(1)); }
-  if(R.fdb){ R.fdb.setAttribute('x',((s.handL.x+s.handR.x)/2-5).toFixed(1));
-    R.fdb.setAttribute('y',((s.handL.y+s.handR.y)/2-12).toFixed(1)); }
+  R.fhandL.setAttribute('cx',s.handL.x.toFixed(1)); R.fhandL.setAttribute('cy',s.handL.y.toFixed(1));
+  R.fhandL.setAttribute('r',(5.5*s.fistL).toFixed(1));
+  R.fhandR.setAttribute('cx',s.handR.x.toFixed(1)); R.fhandR.setAttribute('cy',s.handR.y.toFixed(1));
+  R.fhandR.setAttribute('r',(5.5*s.fistR).toFixed(1));
+  if(R.fbar){
+    var y=(s.handL.y+s.handR.y)/2, x1=Math.min(s.handL.x,s.handR.x), x2=Math.max(s.handL.x,s.handR.x);
+    R.fbar.setAttribute('x',(x1-16).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
+    R.fbar.setAttribute('width',(x2-x1+32).toFixed(1));
+    if(R.fpL){ R.fpL.setAttribute('cx',(x1-13).toFixed(1)); R.fpL.setAttribute('cy',y.toFixed(1));
+               R.fpR.setAttribute('cx',(x2+13).toFixed(1)); R.fpR.setAttribute('cy',y.toFixed(1)); }
+  }
+  if(R.fdb){
+    var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;
+    R.fdb.setAttribute('x',(mx-4.5).toFixed(1));  R.fdb.setAttribute('y',(my-10).toFixed(1));
+    R.fdb1.setAttribute('x',(mx-9.5).toFixed(1)); R.fdb1.setAttribute('y',(my-14).toFixed(1));
+    R.fdb2.setAttribute('x',(mx-9.5).toFixed(1)); R.fdb2.setAttribute('y',(my+7).toFixed(1));
+  }
 }
 
 var grid=document.getElementById('grid'), refs=[];
