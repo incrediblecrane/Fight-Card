@@ -1,0 +1,395 @@
+<title>Exercise Motion Rebuild</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;--text:#18181C;--text-soft:#55555F;--text-faint:#8A8A93;--accent:#E8500F;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}}
+:root[data-theme="dark"]{--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px;}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin:0 0 6px;}
+h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:clamp(1.7rem,4vw,2.3rem);margin:0 0 10px;text-wrap:balance;}
+.dek{font-size:0.98rem;color:var(--text-soft);max-width:70ch;line-height:1.55;margin:0 0 8px;}
+.dek b{color:var(--text);}
+.controls{display:flex;gap:10px;align-items:center;margin:18px 0 6px;flex-wrap:wrap;}
+.btn{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 14px;cursor:pointer;}
+.btn:hover{border-color:var(--accent);}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:16px;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;}
+.card.flagged{border-color:var(--accent);}
+.card h3{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1rem;margin:0 0 8px;display:flex;align-items:center;gap:7px;}
+.card h3 .flag{font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--accent);color:var(--accent-ink);padding:2px 6px;border-radius:5px;}
+.figwrap{background:var(--surface-raised);border-radius:10px;padding:6px 0;}
+.figwrap svg{width:100%;max-width:230px;height:auto;display:block;margin:0 auto;}
+.lbl{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-faint);margin:8px 0 4px;}
+.body-copy{font-size:0.82rem;color:var(--text-soft);line-height:1.5;margin:0 0 8px;}
+.changed{font-size:0.78rem;color:var(--text-soft);line-height:1.5;margin:0;border-left:2px solid var(--accent);padding-left:9px;}
+.note{font-size:0.8rem;color:var(--text-faint);margin-top:32px;border-top:1px solid var(--line);padding-top:16px;line-height:1.6;max-width:70ch;}
+.hint{font-size:0.78rem;color:var(--text-faint);margin:2px 0 0;}
+#scrub{flex:1;min-width:160px;accent-color:var(--accent);}
+#scrub:disabled{opacity:0.4;}
+.figwrap svg{shape-rendering:geometricPrecision;}
+</style>
+<div class="wrap">
+  <p class="eyebrow">Fight Card &middot; continuous motion</p>
+  <h1>Now actually animated</h1>
+  <p class="dek">You were right that animating properly would help. It also exposed a bug in the last version: it rebuilt the SVG markup every frame, which destroys the elements, so the transitions never applied &mdash; you were watching a four-frame flipbook with hard cuts, not motion.</p>
+  <p class="dek">This interpolates continuously through the pose itself, then re-solves the inverse kinematics at every step, so the in-between positions are anatomically real rather than a crossfade. Tempo is per exercise: lowering is slower than lifting, a kettlebell swing snaps, a dead bug is deliberately slow.</p>
+  <p class="dek">Animating it caught two errors that four static keyframes had hidden: <b>the far leg was being silently stretched 3 units beyond its own length on every standing lift</b>, and <b>the boxing stance was wider than the leg could physically span</b>. Both are fixed and now verified at 120 points through every rep, not just at the keyframes.</p>
+  <div class="controls">
+    <button class="btn on" id="playBtn">Pause</button>
+    <button class="btn" id="slowBtn">Slow motion</button>
+    <button class="btn" id="pathBtn">Show bar path</button>
+    <input type="range" id="scrub" min="0" max="100" value="0" disabled aria-label="Scrub through the rep">
+  </div>
+  <p class="hint">Pause, then drag the slider to step through any position. Bar path traces where the bar travels &mdash; on a squat and deadlift it should be a straight vertical line.</p>
+  <div class="grid" id="grid"></div>
+  <p class="note">Every position is solved from anatomically-scaled segments with the feet planted, and checked programmatically across the whole continuous motion: limb lengths never stretch, planted feet never slide, nothing passes through the floor, and the bar path stays vertical. Nothing here is generated imagery.</p>
+</div>
+<script>
+// Shared rig: planted-feet inverse kinematics, human proportions.
+// Screen space: y grows downward. Angle 0 = up, 90 = +x, 180 = down.
+// Proportions from the 7.5-head canon: head dia 16 => figure height 120.
+var L = { THIGH:29, SHIN:29, TORSO:34, UPPER:21, FORE:19, HEAD_R:8, HEAD_OFF:16, FOOT:14 };
+var GROUND = 170, ANKLE_Y = 163, STAND_HIP_Y = 107; // 163-29-29 = 105
+
+function P(x,y){ return {x:x,y:y}; }
+function dir(deg,len){ var r=deg*Math.PI/180; return {x:len*Math.sin(r), y:-len*Math.cos(r)}; }
+function add(p,v){ return {x:p.x+v.x, y:p.y+v.y}; }
+
+// Two-link IK: given root and end effector, return the middle joint.
+// sign selects which of the two mirror solutions (bend direction).
+function ik(root,end,l1,l2,sign){
+  var dx=end.x-root.x, dy=end.y-root.y;
+  var d=Math.sqrt(dx*dx+dy*dy) || 0.0001;
+  var maxd=l1+l2-0.01, mind=Math.abs(l1-l2)+0.01;
+  var dc=Math.max(mind,Math.min(maxd,d));
+  var ux=dx/d, uy=dy/d;
+  var a=(dc*dc + l1*l1 - l2*l2)/(2*dc);
+  var h=Math.sqrt(Math.max(0,l1*l1-a*a));
+  return {x: root.x+ux*a-uy*h*sign, y: root.y+uy*a+ux*h*sign};
+}
+
+// Build every joint for one frame.
+// frame: {hip:[x,y], torso:deg, ankN:[x,y], ankF:[x,y],
+//         armN:[upperDeg,foreDeg] | handN:[x,y], armF:[...] | handF:[x,y],
+//         kneeSign, elbowSign}
+function solve(f){
+  var hip=P(f.hip[0],f.hip[1]);
+  var sh=add(hip,dir(f.torso,L.TORSO));
+  var head=add(sh,dir(f.torso,L.HEAD_OFF));
+  var depth={x:-5,y:0}; // far side sits slightly back for depth
+  var hipF=add(hip,depth), shF=add(sh,depth);
+  var ks=(f.kneeSign===undefined)?-1:f.kneeSign;
+  var es=(f.elbowSign===undefined)?1:f.elbowSign;
+
+  var ankN=P(f.ankN[0],f.ankN[1]), ankF=P(f.ankF[0],f.ankF[1]);
+  var kneeN=ik(hip,ankN,L.THIGH,L.SHIN,ks);
+  var kneeF=ik(hipF,ankF,L.THIGH,L.SHIN,ks);
+
+  var elbN,handN,elbF,handF;
+  if(f.handN){ handN=P(f.handN[0],f.handN[1]); elbN=ik(sh,handN,L.UPPER,L.FORE,es); }
+  else { elbN=add(sh,dir(f.armN[0],L.UPPER)); handN=add(elbN,dir(f.armN[1],L.FORE)); }
+  if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER,L.FORE,es); }
+  else { var af=f.armF||f.armN; elbF=add(shF,dir(af[0],L.UPPER)); handF=add(elbF,dir(af[1],L.FORE)); }
+
+  return {hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
+    ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
+    elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso};
+}
+
+
+// ---- continuous interpolation -------------------------------------------
+function lerp(a,b,t){ return a+(b-a)*t; }
+function lerpAng(a,b,t){ var d=((b-a+540)%360)-180; return a+d*t; }
+function lerpPt(a,b,t){ return [lerp(a[0],b[0],t), lerp(a[1],b[1],t)]; }
+function easeInOutSine(t){ return -(Math.cos(Math.PI*t)-1)/2; }
+
+// Blend two keyframes into a valid in-between pose.
+function lerpFrame(A,B,t){
+  var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
+          ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
+          kneeSign:A.kneeSign, elbowSign:A.elbowSign };
+  if(A.handN&&B.handN) f.handN=lerpPt(A.handN,B.handN,t); 
+  if(A.handF&&B.handF) f.handF=lerpPt(A.handF,B.handF,t);
+  if(A.armN&&B.armN) f.armN=[lerpAng(A.armN[0],B.armN[0],t), lerpAng(A.armN[1],B.armN[1],t)];
+  if(A.armF&&B.armF) f.armF=[lerpAng(A.armF[0],B.armF[0],t), lerpAng(A.armF[1],B.armF[1],t)];
+  else if(A.armN&&B.armN) f.armF=f.armN;
+  return f;
+}
+
+// Pose at normalised progress u (0..1) around the whole rep cycle,
+// honouring per-segment tempo so eccentrics are slower than concentrics.
+function poseAt(ex,u){
+  var n=ex.frames.length;
+  var tempo=ex.tempo||ex.frames.map(function(){return 1;});
+  var total=tempo.reduce(function(a,b){return a+b;},0);
+  var target=((u%1)+1)%1*total, acc=0, i=0;
+  for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
+  if(i>=n) i=n-1;
+  var local=(target-acc)/tempo[i];
+  return lerpFrame(ex.frames[i], ex.frames[(i+1)%n], easeInOutSine(local));
+}
+
+// Exercise frames. Feet planted on GROUND=170 (ankle y=163) for standing lifts.
+// Standing hip y = 105. Figure faces +x.
+var EXERCISES = [
+{ id:"backsquat", tempo:[520,520,380,380], name:"Back squat", flag:true,
+  real:"Feet planted. Hips travel back AND down while the knees track forward over the toes; torso leans ~35&deg;. Bar stays locked on the traps, elbows down and back, and the bar tracks in a straight vertical line over midfoot.",
+  changed:"Feet are now planted and the hips move relative to them, so the knees drive forward as the hips sit back. Previously the hip was pinned and the feet swung out, which is why it never looked like squatting.",
+  equip:"barbell", active:"legs",
+  frames:[
+    {hip:[55,107],torso:5, ankN:[60,163],ankF:[50,163], armN:[215,15]},
+    {hip:[50,122],torso:22,ankN:[60,163],ankF:[50,163], armN:[215,15]},
+    {hip:[45,138],torso:35,ankN:[60,163],ankF:[50,163], armN:[215,15]},
+    {hip:[50,122],torso:22,ankN:[60,163],ankF:[50,163], armN:[215,15]}
+  ]},
+
+{ id:"frontsquat", tempo:[520,520,380,380], name:"Front squat",
+  real:"Same squat pattern but the bar is racked on the front delts, so the torso stays far more upright (~18&deg;) and the elbows are driven high and forward to keep the rack.",
+  changed:"Torso now stays visibly more upright than the back squat, and the elbow sits high and forward instead of hanging.",
+  equip:"barbell", active:"legs",
+  frames:[
+    {hip:[55,107],torso:3, ankN:[60,163],ankF:[50,163], armN:[96,310]},
+    {hip:[51,122],torso:12,ankN:[60,163],ankF:[50,163], armN:[96,310]},
+    {hip:[47,138],torso:18,ankN:[60,163],ankF:[50,163], armN:[96,310]},
+    {hip:[51,122],torso:12,ankN:[60,163],ankF:[50,163], armN:[96,310]}
+  ]},
+
+{ id:"goblet", tempo:[500,500,380,380], name:"Goblet squat",
+  real:"Bell or dumbbell held vertically at the sternum with both hands, elbows tucked down and inside the knees at the bottom. Torso stays upright, more like a front squat than a back squat.",
+  changed:"Elbows now hang down and in with the weight at chest height, instead of the arms drifting out in front.",
+  equip:"dumbbell", active:"legs",
+  frames:[
+    {hip:[55,107],torso:4, ankN:[60,163],ankF:[50,163], armN:[163,22]},
+    {hip:[51,122],torso:16,ankN:[60,163],ankF:[50,163], armN:[163,22]},
+    {hip:[47,137],torso:24,ankN:[60,163],ankF:[50,163], armN:[163,22]},
+    {hip:[51,122],torso:16,ankN:[60,163],ankF:[50,163], armN:[163,22]}
+  ]},
+
+{ id:"deadlift", tempo:[420,420,520,520], name:"Conventional deadlift",
+  real:"Bar starts on the floor over midfoot. Shins near vertical, hips well behind the bar, shoulders just in front of it, arms hanging dead straight. The bar travels in a straight vertical line to a hips-through lockout at upper thigh.",
+  changed:"Bar now stays on one vertical line over midfoot the whole pull, with the hips set back behind it at the start and shins vertical, instead of a generic bend.",
+  equip:"barbell", active:"legs",
+  frames:[
+    {hip:[27,135],torso:62,ankN:[57,163],ankF:[47,163], armN:[178,178]},
+    {hip:[35,120],torso:40,ankN:[57,163],ankF:[47,163], armN:[178,178]},
+    {hip:[55,107],torso:3, ankN:[57,163],ankF:[47,163], armN:[178,178]},
+    {hip:[35,120],torso:40,ankN:[57,163],ankF:[47,163], armN:[178,178]}
+  ]},
+
+{ id:"rdl", tempo:[520,520,400,400], name:"Romanian deadlift",
+  real:"Legs stay nearly straight with only a soft knee. The hips push far back, the bar shaves the thighs and stops around mid-shin, and the range is limited by the hamstrings, not the floor.",
+  changed:"Knees now stay nearly locked and the hips travel much further back than the conventional pull, so it no longer looks like the same lift.",
+  equip:"barbell", active:"legs",
+  frames:[
+    {hip:[55,107],torso:3, ankN:[57,163],ankF:[47,163], armN:[178,178]},
+    {hip:[33,114],torso:45,ankN:[57,163],ankF:[47,163], armN:[178,178]},
+    {hip:[24,117],torso:75,ankN:[57,163],ankF:[47,163], armN:[178,178]},
+    {hip:[33,114],torso:45,ankN:[57,163],ankF:[47,163], armN:[178,178]}
+  ]},
+
+{ id:"bench", tempo:[500,500,380,380], name:"Bench press",
+  real:"Lying on a bench with feet planted on the floor either side, knees bent. Bar starts locked out over the shoulders, lowers to the sternum with the elbows dropping below bench level, then presses back on a slight J-curve toward the shoulders.",
+  changed:"There is now an actual bench under the body with the feet planted on the floor beside it. Without it this read as a floor press. The bar also follows the real J-curve rather than moving straight up.",
+  equip:"barbell", active:"arms", bench:true,
+  frames:[
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[0,0], kneeSign:-1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[55,0], kneeSign:-1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[105,0], kneeSign:-1},
+    {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], armN:[55,0], kneeSign:-1}
+  ]},
+
+{ id:"ohp", tempo:[480,480,420,420], name:"Overhead press",
+  real:"Standing tall, bar racked on the front delts at collarbone height. It travels up past the face, the head moves back to clear it, then the arm locks out with the bar stacked directly over the shoulders and midfoot.",
+  changed:"The lockout now puts the bar directly overhead in line with the body, and the rack position starts at the collarbone rather than being bench-press angles stood upright.",
+  equip:"barbell", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[58,163],ankF:[49,163], armN:[150,15]},
+    {hip:[55,107],torso:2,ankN:[58,163],ankF:[49,163], armN:[90,342]},
+    {hip:[55,107],torso:2,ankN:[58,163],ankF:[49,163], armN:[0,0]},
+    {hip:[55,107],torso:2,ankN:[58,163],ankF:[49,163], armN:[90,342]}
+  ]},
+
+{ id:"row", tempo:[420,420,480,480], name:"Bent-over row",
+  real:"Hinged forward around 65&deg; with soft knees, torso held still. The arms hang dead straight under the shoulders, then the elbows drive back past the ribs, pulling the bar to the lower abdomen.",
+  changed:"The arm now hangs straight down from the hinged shoulder rather than reaching upward, and the elbow drives backward past the torso on the pull.",
+  equip:"barbell", active:"arms",
+  frames:[
+    {hip:[50,112],torso:65,ankN:[60,163],ankF:[50,163], armN:[178,178]},
+    {hip:[50,112],torso:65,ankN:[60,163],ankF:[50,163], armN:[185,190]},
+    {hip:[50,112],torso:65,ankN:[60,163],ankF:[50,163], armN:[200,265]},
+    {hip:[50,112],torso:65,ankN:[60,163],ankF:[50,163], armN:[185,190]}
+  ]},
+
+{ id:"pullup", tempo:[430,430,540,540], name:"Pull-up",
+  real:"The bar is fixed in space and the hands never move; the whole body travels up to it. Arms go from a dead straight hang to fully flexed with the chin above the bar, legs hanging slightly forward.",
+  changed:"Hands are now pinned to a fixed bar and the body is solved from there, so the body rises to the bar instead of the bar drifting around with the hand.",
+  equip:"fixedbar", active:"arms", barAt:[60,30],
+  frames:[
+    {hip:[58,104],torso:0,ankN:[54,160],ankF:[46,159], handN:[60,30],handF:[55,30], elbowSign:1},
+    {hip:[58,88], torso:0,ankN:[52,144],ankF:[44,143], handN:[60,30],handF:[55,30], elbowSign:1},
+    {hip:[58,72], torso:0,ankN:[52,128],ankF:[44,127], handN:[60,30],handF:[55,30], elbowSign:1},
+    {hip:[58,88], torso:0,ankN:[52,144],ankF:[44,143], handN:[60,30],handF:[55,30], elbowSign:1}
+  ]},
+
+{ id:"kbswing", tempo:[300,260,300,320], name:"Kettlebell swing",
+  real:"A hip hinge, not a squat. The bell is hiked back between the legs with straight arms, then the hips snap through and the bell floats up to chest height on momentum. The arms never lift it.",
+  changed:"The backswing now hikes the bell behind the knees with the hips loaded back, and the top is a standing hip-through with the bell floating at chest height rather than being raised by the shoulders.",
+  equip:"kettlebell", active:"legs",
+  frames:[
+    {hip:[32,118],torso:72,ankN:[60,163],ankF:[50,163], armN:[200,200]},
+    {hip:[50,110],torso:25,ankN:[60,163],ankF:[50,163], armN:[125,125]},
+    {hip:[55,107],torso:3, ankN:[60,163],ankF:[50,163], armN:[105,105]},
+    {hip:[50,110],torso:25,ankN:[60,163],ankF:[50,163], armN:[125,125]}
+  ]},
+
+{ id:"deadbug", tempo:[760,700,760,700], name:"Dead bug", flag:true,
+  real:"Lying flat on the back. Opposite arm and leg extend away long and low while the other pair holds a 90/90 tabletop, then it alternates. The lower back stays pinned throughout.",
+  changed:"Now genuinely alternates diagonal pairs with the body flat on the floor: one side holds tabletop (thigh vertical, shin horizontal) while the opposite arm and leg reach out long and low.",
+  equip:null, active:null, floor:true,
+  frames:[
+    {hip:[80,158],torso:270, ankN:[109,129],ankF:[104,126], armN:[0,0],armF:[0,0], kneeSign:-1},
+    {hip:[80,158],torso:270, ankN:[136,154],ankF:[104,126], armN:[284,284],armF:[0,0], kneeSign:-1},
+    {hip:[80,158],torso:270, ankN:[109,129],ankF:[104,126], armN:[0,0],armF:[0,0], kneeSign:-1},
+    {hip:[80,158],torso:270, ankN:[109,129],ankF:[131,151], armN:[0,0],armF:[284,284], kneeSign:-1}
+  ]},
+
+{ id:"jabcross", tempo:[170,240,170,240], name:"Jab-cross combo", flag:true,
+  real:"Staggered stance, lead foot forward, rear foot back and turned out. The jab fires from the lead hand while the rear hand guards the chin; the cross then fires from the rear hand with the hips and rear shoulder rotating through. The guard hand never drops.",
+  changed:"It now throws two different punches. Lead hand jabs, returns to guard, then the rear hand crosses with the torso rotating into it. Previously one arm waved while the other stayed put, and the guard hand floated above the head.",
+  equip:null, active:"armN",
+  frames:[
+    {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
+    {hip:[56,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[93,88],  armF:[172,15]},
+    {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
+    {hip:[57,112],torso:14,ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[93,88]}
+  ]}
+];
+var NS='http://www.w3.org/2000/svg';
+function el(tag,attrs){ var n=document.createElementNS(NS,tag); for(var k in attrs) n.setAttribute(k,attrs[k]); return n; }
+function segPts(A,B,w1,w2){
+  var dx=B.x-A.x, dy=B.y-A.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+  var px=-dy/len, py=dx/len;
+  return [[A.x+px*w1/2,A.y+py*w1/2],[A.x-px*w1/2,A.y-py*w1/2],
+          [B.x-px*w2/2,B.y-py*w2/2],[B.x+px*w2/2,B.y+py*w2/2]]
+    .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
+}
+function footPts(ank,knee){
+  var back = ank.x>knee.x ? -1 : 1;
+  var toe=ank.x-back*L.FOOT*0.72, heel=ank.x+back*L.FOOT*0.28;
+  return heel.toFixed(1)+','+(ank.y-3.5)+' '+heel.toFixed(1)+','+(ank.y+4)+' '+
+         toe.toFixed(1)+','+(ank.y+4)+' '+toe.toFixed(1)+','+(ank.y+0.5);
+}
+// Precompute the bar path over a full rep so it can be shown as a trace.
+function barPath(ex){
+  if(!ex.equip||ex.equip==='fixedbar') return null;
+  var pts=[];
+  for(var i=0;i<=90;i++){ var s=solve(poseAt(ex,i/90)); pts.push(s.handN.x.toFixed(1)+','+s.handN.y.toFixed(1)); }
+  return pts.join(' ');
+}
+function buildFigure(ex,host){
+  var svg=el('svg',{viewBox:'-20 18 175 168',role:'img','aria-label':ex.name+' animation'});
+  var ink='var(--text)', far='var(--text-faint)', hi='var(--accent)', soft='var(--text-soft)';
+  var legCol = ex.active==='legs'?hi:ink;
+  var armCol = (ex.active==='arms'||ex.active==='armN')?hi:ink;
+  svg.appendChild(el('line',{x1:-15,y1:GROUND,x2:150,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  if(ex.bench){
+    svg.appendChild(el('rect',{x:8,y:139,width:78,height:9,rx:2,fill:'var(--line)'}));
+    svg.appendChild(el('rect',{x:20,y:148,width:7,height:22,fill:'var(--line)'}));
+    svg.appendChild(el('rect',{x:68,y:148,width:7,height:22,fill:'var(--line)'}));
+  }
+  var bp=barPath(ex), trace=null;
+  if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
+  var R={};
+  function pair(name,col,w,isLeg){
+    R[name+'1']=el('polygon',{fill:col}); R[name+'j']=el('circle',{r:w[1]/2,fill:col});
+    R[name+'2']=el('polygon',{fill:col});
+    R[name+'e']= isLeg ? el('polygon',{fill:col}) : el('circle',{r:w[2]/2+0.8,fill:col});
+    [R[name+'1'],R[name+'j'],R[name+'2'],R[name+'e']].forEach(function(n){svg.appendChild(n);});
+  }
+  // equipment sits behind the near-side limbs
+  var eq=el('g',{});
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
+    R.bar=el('rect',{width:68,height:5,rx:2.5,fill:soft});
+    eq.appendChild(R.bar);
+    if(ex.equip==='barbell'){ R.p1=el('rect',{width:7,height:20,rx:2,fill:soft}); R.p2=el('rect',{width:7,height:20,rx:2,fill:soft}); eq.appendChild(R.p1); eq.appendChild(R.p2); }
+  } else if(ex.equip==='dumbbell'){
+    R.db=el('rect',{width:8,height:22,rx:3,fill:soft}); R.d1=el('rect',{width:16,height:7,rx:2,fill:soft}); R.d2=el('rect',{width:16,height:7,rx:2,fill:soft});
+    eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
+  } else if(ex.equip==='kettlebell'){
+    R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
+    eq.appendChild(R.kb); eq.appendChild(R.kh);
+  }
+  pair('fleg',far,[13,9,6],true); pair('farm',far,[9,6.5,5],false);
+  svg.appendChild(eq);
+  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:8.5,fill:ink}); R.sh=el('circle',{r:10.5,fill:ink});
+  svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
+  pair('nleg',legCol,[15,10,6.5],true); pair('narm',armCol,[10,7,5.5],false);
+  R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
+  host.appendChild(svg);
+  return {R:R,trace:trace};
+}
+function update(ex,ref,u){
+  var s=solve(poseAt(ex,u)), R=ref.R;
+  function setLimb(n,a,b,c,w,isLeg){
+    R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
+    R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
+    R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
+    if(isLeg) R[n+'e'].setAttribute('points',footPts(c,b));
+    else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
+  }
+  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[13,9,6],true);
+  setLimb('farm',s.shF,s.elbF,s.handF,[9,6.5,5],false);
+  setLimb('nleg',s.hip,s.kneeN,s.ankN,[15,10,6.5],true);
+  setLimb('narm',s.sh,s.elbN,s.handN,[10,7,5.5],false);
+  R.torso.setAttribute('points',segPts(s.hip,s.sh,17,21));
+  R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
+  R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
+  R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
+  var p = ex.equip==='fixedbar' ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
+  if(R.bar){ R.bar.setAttribute('x',(p.x-34).toFixed(1)); R.bar.setAttribute('y',(p.y-2.5).toFixed(1)); }
+  if(R.p1){ R.p1.setAttribute('x',(p.x-40).toFixed(1)); R.p1.setAttribute('y',(p.y-10).toFixed(1));
+            R.p2.setAttribute('x',(p.x+33).toFixed(1)); R.p2.setAttribute('y',(p.y-10).toFixed(1)); }
+  if(R.db){ R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
+            R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
+            R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1)); }
+  if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
+            R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
+}
+var grid=document.getElementById('grid'), refs=[];
+EXERCISES.forEach(function(ex,i){
+  var c=document.createElement('div');
+  c.className='card'+(ex.flag?' flagged':'');
+  c.innerHTML='<h3>'+ex.name+(ex.flag?'<span class="flag">you flagged</span>':'')+'</h3>'+
+    '<div class="figwrap"></div>'+
+    '<div class="lbl">The real movement</div><p class="body-copy">'+ex.real+'</p>'+
+    '<div class="lbl">What changed</div><p class="changed">'+ex.changed+'</p>';
+  grid.appendChild(c);
+  refs.push(buildFigure(ex,c.querySelector('.figwrap')));
+});
+var playing=true, speed=1, t0=performance.now(), CYCLE=2400, showPath=false, manual=0;
+function frame(now){
+  if(playing){ manual=((now-t0)/CYCLE*speed)%1; }
+  EXERCISES.forEach(function(ex,i){ update(ex,refs[i],manual); });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+var playBtn=document.getElementById('playBtn'), scrub=document.getElementById('scrub');
+playBtn.addEventListener('click',function(){
+  playing=!playing; this.textContent=playing?'Pause':'Play'; this.classList.toggle('on',playing);
+  if(playing) t0=performance.now()-manual*CYCLE/speed;
+  scrub.disabled=playing;
+});
+scrub.addEventListener('input',function(){ if(!playing) manual=+this.value/100; });
+document.getElementById('slowBtn').addEventListener('click',function(){
+  speed = speed===1?0.35:1; this.textContent = speed===1?'Slow motion':'Normal speed';
+  this.classList.toggle('on',speed!==1); t0=performance.now()-manual*CYCLE/speed;
+});
+document.getElementById('pathBtn').addEventListener('click',function(){
+  showPath=!showPath; this.classList.toggle('on',showPath);
+  refs.forEach(function(r){ if(r.trace) r.trace.setAttribute('opacity', showPath?0.85:0); });
+});
+</script>

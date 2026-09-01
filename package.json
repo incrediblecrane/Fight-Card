@@ -1,0 +1,7 @@
+{
+  "name": "fight-card",
+  "private": true,
+  "scripts": {
+    "test": "node pose/checks/analyse.js && node pose/checks/adversarial.js && node pose/checks/continuous.js"
+  }
+}

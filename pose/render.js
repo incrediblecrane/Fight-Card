@@ -1,0 +1,124 @@
+var NS='http://www.w3.org/2000/svg';
+function el(tag,attrs){ var n=document.createElementNS(NS,tag); for(var k in attrs) n.setAttribute(k,attrs[k]); return n; }
+function segPts(A,B,w1,w2){
+  var dx=B.x-A.x, dy=B.y-A.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+  var px=-dy/len, py=dx/len;
+  return [[A.x+px*w1/2,A.y+py*w1/2],[A.x-px*w1/2,A.y-py*w1/2],
+          [B.x-px*w2/2,B.y-py*w2/2],[B.x+px*w2/2,B.y+py*w2/2]]
+    .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
+}
+function footPts(ank,knee){
+  var back = ank.x>knee.x ? -1 : 1;
+  var toe=ank.x-back*L.FOOT*0.72, heel=ank.x+back*L.FOOT*0.28;
+  return heel.toFixed(1)+','+(ank.y-3.5)+' '+heel.toFixed(1)+','+(ank.y+4)+' '+
+         toe.toFixed(1)+','+(ank.y+4)+' '+toe.toFixed(1)+','+(ank.y+0.5);
+}
+// Precompute the bar path over a full rep so it can be shown as a trace.
+function barPath(ex){
+  if(!ex.equip||ex.equip==='fixedbar') return null;
+  var pts=[];
+  for(var i=0;i<=90;i++){ var s=solve(poseAt(ex,i/90)); pts.push(s.handN.x.toFixed(1)+','+s.handN.y.toFixed(1)); }
+  return pts.join(' ');
+}
+function buildFigure(ex,host){
+  var svg=el('svg',{viewBox:'-20 18 175 168',role:'img','aria-label':ex.name+' animation'});
+  var ink='var(--text)', far='var(--text-faint)', hi='var(--accent)', soft='var(--text-soft)';
+  var legCol = ex.active==='legs'?hi:ink;
+  var armCol = (ex.active==='arms'||ex.active==='armN')?hi:ink;
+  svg.appendChild(el('line',{x1:-15,y1:GROUND,x2:150,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  if(ex.bench){
+    svg.appendChild(el('rect',{x:8,y:139,width:78,height:9,rx:2,fill:'var(--line)'}));
+    svg.appendChild(el('rect',{x:20,y:148,width:7,height:22,fill:'var(--line)'}));
+    svg.appendChild(el('rect',{x:68,y:148,width:7,height:22,fill:'var(--line)'}));
+  }
+  var bp=barPath(ex), trace=null;
+  if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
+  var R={};
+  function pair(name,col,w,isLeg){
+    R[name+'1']=el('polygon',{fill:col}); R[name+'j']=el('circle',{r:w[1]/2,fill:col});
+    R[name+'2']=el('polygon',{fill:col});
+    R[name+'e']= isLeg ? el('polygon',{fill:col}) : el('circle',{r:w[2]/2+0.8,fill:col});
+    [R[name+'1'],R[name+'j'],R[name+'2'],R[name+'e']].forEach(function(n){svg.appendChild(n);});
+  }
+  // equipment sits behind the near-side limbs
+  var eq=el('g',{});
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
+    R.bar=el('rect',{width:68,height:5,rx:2.5,fill:soft});
+    eq.appendChild(R.bar);
+    if(ex.equip==='barbell'){ R.p1=el('rect',{width:7,height:20,rx:2,fill:soft}); R.p2=el('rect',{width:7,height:20,rx:2,fill:soft}); eq.appendChild(R.p1); eq.appendChild(R.p2); }
+  } else if(ex.equip==='dumbbell'){
+    R.db=el('rect',{width:8,height:22,rx:3,fill:soft}); R.d1=el('rect',{width:16,height:7,rx:2,fill:soft}); R.d2=el('rect',{width:16,height:7,rx:2,fill:soft});
+    eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
+  } else if(ex.equip==='kettlebell'){
+    R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
+    eq.appendChild(R.kb); eq.appendChild(R.kh);
+  }
+  pair('fleg',far,[13,9,6],true); pair('farm',far,[9,6.5,5],false);
+  svg.appendChild(eq);
+  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:8.5,fill:ink}); R.sh=el('circle',{r:10.5,fill:ink});
+  svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
+  pair('nleg',legCol,[15,10,6.5],true); pair('narm',armCol,[10,7,5.5],false);
+  R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
+  host.appendChild(svg);
+  return {R:R,trace:trace};
+}
+function update(ex,ref,u){
+  var s=solve(poseAt(ex,u)), R=ref.R;
+  function setLimb(n,a,b,c,w,isLeg){
+    R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
+    R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
+    R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
+    if(isLeg) R[n+'e'].setAttribute('points',footPts(c,b));
+    else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
+  }
+  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[13,9,6],true);
+  setLimb('farm',s.shF,s.elbF,s.handF,[9,6.5,5],false);
+  setLimb('nleg',s.hip,s.kneeN,s.ankN,[15,10,6.5],true);
+  setLimb('narm',s.sh,s.elbN,s.handN,[10,7,5.5],false);
+  R.torso.setAttribute('points',segPts(s.hip,s.sh,17,21));
+  R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
+  R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
+  R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
+  var p = ex.equip==='fixedbar' ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
+  if(R.bar){ R.bar.setAttribute('x',(p.x-34).toFixed(1)); R.bar.setAttribute('y',(p.y-2.5).toFixed(1)); }
+  if(R.p1){ R.p1.setAttribute('x',(p.x-40).toFixed(1)); R.p1.setAttribute('y',(p.y-10).toFixed(1));
+            R.p2.setAttribute('x',(p.x+33).toFixed(1)); R.p2.setAttribute('y',(p.y-10).toFixed(1)); }
+  if(R.db){ R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
+            R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
+            R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1)); }
+  if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
+            R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
+}
+var grid=document.getElementById('grid'), refs=[];
+EXERCISES.forEach(function(ex,i){
+  var c=document.createElement('div');
+  c.className='card'+(ex.flag?' flagged':'');
+  c.innerHTML='<h3>'+ex.name+(ex.flag?'<span class="flag">you flagged</span>':'')+'</h3>'+
+    '<div class="figwrap"></div>'+
+    '<div class="lbl">The real movement</div><p class="body-copy">'+ex.real+'</p>'+
+    '<div class="lbl">What changed</div><p class="changed">'+ex.changed+'</p>';
+  grid.appendChild(c);
+  refs.push(buildFigure(ex,c.querySelector('.figwrap')));
+});
+var playing=true, speed=1, t0=performance.now(), CYCLE=2400, showPath=false, manual=0;
+function frame(now){
+  if(playing){ manual=((now-t0)/CYCLE*speed)%1; }
+  EXERCISES.forEach(function(ex,i){ update(ex,refs[i],manual); });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+var playBtn=document.getElementById('playBtn'), scrub=document.getElementById('scrub');
+playBtn.addEventListener('click',function(){
+  playing=!playing; this.textContent=playing?'Pause':'Play'; this.classList.toggle('on',playing);
+  if(playing) t0=performance.now()-manual*CYCLE/speed;
+  scrub.disabled=playing;
+});
+scrub.addEventListener('input',function(){ if(!playing) manual=+this.value/100; });
+document.getElementById('slowBtn').addEventListener('click',function(){
+  speed = speed===1?0.35:1; this.textContent = speed===1?'Slow motion':'Normal speed';
+  this.classList.toggle('on',speed!==1); t0=performance.now()-manual*CYCLE/speed;
+});
+document.getElementById('pathBtn').addEventListener('click',function(){
+  showPath=!showPath; this.classList.toggle('on',showPath);
+  refs.forEach(function(r){ if(r.trace) r.trace.setAttribute('opacity', showPath?0.85:0); });
+});
