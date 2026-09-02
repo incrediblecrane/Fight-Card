@@ -59,7 +59,7 @@ var EXERCISES = [
 { id:"bench", tempo:[500,500,380,380], name:"Bench press",
   real:"Lying on a bench with feet planted on the floor either side, knees bent. Bar starts locked out over the shoulders, lowers to the sternum with the elbows dropping below bench level, then presses back on a slight J-curve toward the shoulders.",
   changed:"There is now an actual bench under the body with the feet planted on the floor beside it. Without it this read as a floor press. The bar now presses on a straight vertical line over the lower chest; it previously drifted 20 units sideways, an exaggerated J-curve that read as pressing diagonally.",
-  equip:"barbell", active:"arms", bench:true,
+  equip:"barbell", active:"arms", props:[[8,139,78,9],[20,148,7,22,0],[68,148,7,22,0]],
   frames:[
     {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,94], handF:[35,94], kneeSign:-1, elbowSign:1},
     {hip:[60,131],torso:270,ankN:[100,163],ankF:[91,163], handN:[40,107],handF:[35,107],kneeSign:-1, elbowSign:1},
@@ -109,6 +109,50 @@ var EXERCISES = [
     {hip:[50,110],torso:25,ankN:[60,163],ankF:[50,163], armN:[125,125]},
     {hip:[55,107],torso:3, ankN:[60,163],ankF:[50,163], armN:[105,105]},
     {hip:[50,110],torso:25,ankN:[60,163],ankF:[50,163], armN:[125,125]}
+  ]},
+
+{ id:"splitsq_bulg", tempo:[540,540,420,420], name:"Bulgarian split squat",
+  real:"Rear foot up on a bench behind you, front foot roughly two feet forward. Descend by bending the front knee until the front thigh is near parallel and the rear knee drops toward the floor. The torso leans slightly forward, the front shin stays close to vertical, and the front heel never lifts. The rear leg balances; it does not push.",
+  changed:"Now has the bench behind it with the rear foot actually on it, so it reads as a split squat rather than a lunge. The rear knee travels down toward the floor while the front foot stays planted, which is the part the shared LUNGE pose could not show.",
+  equip:"dumbbell", active:"legs", props:[[6,140,34,8],[10,148,6,22,0],[30,148,6,22,0]],
+  frames:[
+    {hip:[58,116],torso:6, ankN:[72,163],ankF:[26,140], armN:[178,178]},
+    {hip:[57,126],torso:10,ankN:[72,163],ankF:[26,140], armN:[178,178]},
+    {hip:[56,136],torso:14,ankN:[72,163],ankF:[26,140], armN:[178,178]},
+    {hip:[57,126],torso:10,ankN:[72,163],ankF:[26,140], armN:[178,178]}
+  ]},
+
+{ id:"hipthrust", tempo:[420,420,520,520], name:"Hip thrust",
+  real:"Upper back braced across a bench, feet planted, bar across the hips. Drive the hips straight up until the torso is horizontal and the shins are vertical, squeeze at the top, then lower under control. The shoulders stay on the bench and the ribs stay down; the movement is the hips travelling, not the back arching.",
+  changed:"There is now a bench under the shoulders and the bar sits across the hips, so the top is a horizontal torso with vertical shins instead of a generic floor bridge.",
+  equip:"barbell", active:"legs", props:[[-6,132,52,8],[0,140,6,30,0],[40,140,6,30,0]],
+  frames:[
+    {hip:[48,148],torso:308,ankN:[88,163],ankF:[79,163], handN:[50,147],handF:[42,147], kneeSign:-1, elbowSign:-1},
+    {hip:[52,139],torso:291,ankN:[88,163],ankF:[79,163], handN:[54,138],handF:[46,138], kneeSign:-1, elbowSign:-1},
+    {hip:[56,130],torso:275,ankN:[88,163],ankF:[79,163], handN:[58,129],handF:[50,129], kneeSign:-1, elbowSign:-1},
+    {hip:[52,139],torso:291,ankN:[88,163],ankF:[79,163], handN:[54,138],handF:[46,138], kneeSign:-1, elbowSign:-1}
+  ]},
+
+{ id:"calfraise", tempo:[380,380,460,460], name:"Calf raise",
+  real:"Balls of the feet on a step with the heels hanging off the back. Let the heels sink below the step for a stretch, then drive up onto the toes to full extension. The knees stay straight and the body stays vertical; the only joint moving is the ankle.",
+  changed:"The foot now pivots over the ball of the foot while the whole body rises, which is the entire exercise. A flat foot sliding up and down showed nothing. The heel also starts BELOW the step, which is the half of the range a floor calf raise cannot reach.",
+  equip:null, active:"legs", props:[[66,158,56,12]],
+  frames:[
+    {hip:[64,101],torso:2,ankN:[64,158],ankF:[58,158], armN:[178,178], footRot:-16},
+    {hip:[64,95], torso:2,ankN:[64,152],ankF:[58,152], armN:[178,178], footRot:0},
+    {hip:[64,87], torso:2,ankN:[64,144],ankF:[58,144], armN:[178,178], footRot:34},
+    {hip:[64,95], torso:2,ankN:[64,152],ankF:[58,152], armN:[178,178], footRot:0}
+  ]},
+
+{ id:"wallsit", tempo:[420,420,1000,1000], name:"Wall sit",
+  real:"Back flat against a wall, slide down until the thighs are parallel to the floor and the knees are at ninety degrees with the shins vertical. Then hold. Weight through the heels, no hands on the thighs.",
+  changed:"There is a wall to sit against and the hold is where the time goes, rather than a squat cycling up and down. At the bottom the knee sits directly over the ankle with the thigh level, which is the position being held.",
+  equip:null, active:"legs", props:[[16,52,10,118,0]],
+  frames:[
+    {hip:[33,120],torso:0,ankN:[62,163],ankF:[53,163], handN:[46,100],handF:[40,102], elbowSign:1},
+    {hip:[33,127],torso:0,ankN:[62,163],ankF:[53,163], handN:[46,107],handF:[40,109], elbowSign:1},
+    {hip:[33,134],torso:0,ankN:[62,163],ankF:[53,163], handN:[46,114],handF:[40,116], elbowSign:1},
+    {hip:[33,134],torso:0,ankN:[62,163],ankF:[53,163], handN:[46,114],handF:[40,116], elbowSign:1}
   ]},
 
 { id:"deadbug", tempo:[760,700,760,700], name:"Dead bug", flag:true,

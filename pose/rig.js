@@ -46,7 +46,8 @@ function solve(f){
 
   return {hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
-    elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso};
+    elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,
+    footRot:f.footRot||0};
 }
 
 if(typeof module!=='undefined') module.exports={L:L,GROUND:GROUND,ANKLE_Y:ANKLE_Y,STAND_HIP_Y:STAND_HIP_Y,solve:solve,ik:ik,dir:dir,add:add,P:P};
@@ -61,7 +62,8 @@ function easeInOutSine(t){ return -(Math.cos(Math.PI*t)-1)/2; }
 function lerpFrame(A,B,t){
   var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
-          kneeSign:A.kneeSign, elbowSign:A.elbowSign };
+          kneeSign:A.kneeSign, elbowSign:A.elbowSign,
+          footRot:lerp(A.footRot||0,B.footRot||0,t) };
   if(A.handN&&B.handN) f.handN=lerpPt(A.handN,B.handN,t); 
   if(A.handF&&B.handF) f.handF=lerpPt(A.handF,B.handF,t);
   if(A.armN&&B.armN) f.armN=[lerpAng(A.armN[0],B.armN[0],t), lerpAng(A.armN[1],B.armN[1],t)];

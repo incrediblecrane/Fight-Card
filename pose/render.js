@@ -10,7 +10,15 @@ function segPts(A,B,w1,w2){
 // The figure always faces +x, so the toe always points +x. This used to be
 // derived from whether the knee was forward of the ankle, which flipped the
 // foot backwards through most of every squat.
-function footPts(ank){
+function footPts(ank,rot){
+  if(rot){
+    // Pivot about the ball of the foot: the toe stays put and the heel lifts.
+    var r=rot*Math.PI/180, ball={x:ank.x+L.FOOT*0.72, y:ank.y};
+    function rp(x,y){ var dx=x-ball.x, dy=y-ball.y;
+      return (ball.x+dx*Math.cos(r)-dy*Math.sin(r)).toFixed(1)+','+(ball.y+dx*Math.sin(r)+dy*Math.cos(r)).toFixed(1); }
+    return [rp(ank.x+L.FOOT*0.72,ank.y+1), rp(ank.x+L.FOOT*0.72,ank.y+6),
+            rp(ank.x-L.FOOT*0.28,ank.y+6), rp(ank.x-L.FOOT*0.28,ank.y+1)].join(' ');
+  }
   var toe=ank.x+L.FOOT*0.72, heel=ank.x-L.FOOT*0.28;
   return heel.toFixed(1)+','+(ank.y-3.5)+' '+heel.toFixed(1)+','+(ank.y+4)+' '+
          toe.toFixed(1)+','+(ank.y+4)+' '+toe.toFixed(1)+','+(ank.y+0.5);
@@ -28,11 +36,11 @@ function buildFigure(ex,host){
   var legCol = ex.active==='legs'?hi:ink;
   var armCol = (ex.active==='arms'||ex.active==='armN')?hi:ink;
   svg.appendChild(el('line',{x1:-15,y1:GROUND,x2:150,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
-  if(ex.bench){
-    svg.appendChild(el('rect',{x:8,y:139,width:78,height:9,rx:2,fill:'var(--line)'}));
-    svg.appendChild(el('rect',{x:20,y:148,width:7,height:22,fill:'var(--line)'}));
-    svg.appendChild(el('rect',{x:68,y:148,width:7,height:22,fill:'var(--line)'}));
-  }
+  // Props are part of the movement, not decoration: a split squat without the
+  // bench behind it is a lunge, and a wall sit without the wall is a squat.
+  (ex.props||[]).forEach(function(p){
+    svg.appendChild(el('rect',{x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'}));
+  });
   var bp=barPath(ex), trace=null;
   if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
   var R={};
@@ -66,16 +74,16 @@ function buildFigure(ex,host){
 }
 function update(ex,ref,u){
   var s=solve(poseAt(ex,u)), R=ref.R;
-  function setLimb(n,a,b,c,w,isLeg){
+  function setLimb(n,a,b,c,w,isLeg,rot){
     R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
-    if(isLeg) R[n+'e'].setAttribute('points',footPts(c));
+    if(isLeg) R[n+'e'].setAttribute('points',footPts(c,rot));
     else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
   }
-  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true);
+  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true,s.footRot);
   setLimb('farm',s.shF,s.elbF,s.handF,[7,5,4],false);
-  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true);
+  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true,s.footRot);
   setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
   R.torso.setAttribute('points',segPts(s.hip,s.sh,13,17));
   R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
