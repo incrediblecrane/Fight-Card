@@ -52,6 +52,7 @@ h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-
   <p class="note">Every position is solved from anatomically-scaled segments with the feet planted, and checked programmatically across the whole continuous motion: limb lengths never stretch, planted feet never slide, nothing passes through the floor, and the bar path stays vertical. Nothing here is generated imagery.</p>
 </div>
 <script>
+// ---- rig.js ----
 // Shared rig: planted-feet inverse kinematics, human proportions.
 // Screen space: y grows downward. Angle 0 = up, 90 = +x, 180 = down.
 // Proportions from the 7.5-head canon: head dia 16 => figure height 120.
@@ -103,6 +104,7 @@ function solve(f){
     elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso};
 }
 
+if(typeof module!=='undefined') module.exports={L:L,GROUND:GROUND,ANKLE_Y:ANKLE_Y,STAND_HIP_Y:STAND_HIP_Y,solve:solve,ik:ik,dir:dir,add:add,P:P};
 
 // ---- continuous interpolation -------------------------------------------
 function lerp(a,b,t){ return a+(b-a)*t; }
@@ -135,6 +137,7 @@ function poseAt(ex,u){
   var local=(target-acc)/tempo[i];
   return lerpFrame(ex.frames[i], ex.frames[(i+1)%n], easeInOutSine(local));
 }
+if(typeof module!=='undefined') module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.easeInOutSine=easeInOutSine;
 
 // ---- frontal-plane rig ---------------------------------------------------
 // Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
@@ -143,11 +146,14 @@ function poseAt(ex,u){
 // frame: {cx, hipY, hipHW, shHW, footL/footR:[x,y], handL/handR:[x,y]}
 function solveFront(f){
   var cx=f.cx===undefined?70:f.cx;
-  var hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?13:f.shHW;
+  var hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?16:f.shHW;
   var lean=f.lean||0;
+  // A hinged torso seen from the front is foreshortened: it projects shorter and
+  // the head drops toward the shoulders because you start seeing the crown.
+  var tS=f.torsoScale===undefined?1:f.torsoScale;
   var hipC=P(cx,f.hipY);
-  var shC=P(cx+lean, f.hipY-L.TORSO);
-  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF);
+  var shC=P(cx+lean, f.hipY-L.TORSO*tS);
+  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF*(0.35+0.65*tS));
   var hipL=P(hipC.x-hipHW,hipC.y), hipR=P(hipC.x+hipHW,hipC.y);
   var shL=P(shC.x-shHW,shC.y),   shR=P(shC.x+shHW,shC.y);
   var footL=P(f.footL[0],f.footL[1]), footR=P(f.footR[0],f.footR[1]);
@@ -157,24 +163,40 @@ function solveFront(f){
   // shoulder-to-hand line (a human elbow never bends upward).
   function both(a,b,l1,l2){ return [ik(a,b,l1,l2,1), ik(a,b,l1,l2,-1)]; }
   function lower(p){ return p[0].y>=p[1].y?p[0]:p[1]; }
-  var kL=both(hipL,footL,L.THIGH,L.SHIN), kR=both(hipR,footR,L.THIGH,L.SHIN);
-  var kneeL=kL[0].x<=kL[1].x?kL[0]:kL[1];
-  var kneeR=kR[0].x>=kR[1].x?kR[0]:kR[1];
-  var elbL=lower(both(shL,handL,L.UPPER,L.FORE));
-  var elbR=lower(both(shR,handR,L.UPPER,L.FORE));
+  // Explicit joints win over IK. A limb that bends front-to-back (every hinge,
+  // every squat) has no lateral bend to solve for: its knee or elbow sits on
+  // the hip-to-foot line at the height the side view already gives it. Solving
+  // it as a frontal-plane bend instead threw the knees and elbows out sideways,
+  // which is why the row read as chicken-winged.
+  var aL=f.armScaleL===undefined?1:f.armScaleL, aR=f.armScaleR===undefined?1:f.armScaleR;
+  var kneeL = f.kneeL ? P(f.kneeL[0],f.kneeL[1])
+    : (function(k){ return k[0].x<=k[1].x?k[0]:k[1]; })(both(hipL,footL,L.THIGH,L.SHIN));
+  var kneeR = f.kneeR ? P(f.kneeR[0],f.kneeR[1])
+    : (function(k){ return k[0].x>=k[1].x?k[0]:k[1]; })(both(hipR,footR,L.THIGH,L.SHIN));
+  // An arm pointing at the camera projects short, so its segments scale down.
+  var elbL = f.elbL ? P(f.elbL[0],f.elbL[1]) : lower(both(shL,handL,L.UPPER*aL,L.FORE*aL));
+  var elbR = f.elbR ? P(f.elbR[0],f.elbR[1]) : lower(both(shR,handR,L.UPPER*aR,L.FORE*aR));
   return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
     footL:footL,footR:footR,handL:handL,handR:handR,
-    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,
+    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,armScaleL:aL,armScaleR:aR,
     fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
 }
+// Explicit joints only carry through when BOTH keyframes have them; a frame
+// that mixes the two would jump between a solved and a given joint.
+function both2(a,b,t){ return (a&&b)?lerpPt(a,b,t):undefined; }
 function lerpFront(A,B,t){
   return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
     shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
     fistL:lerp(A.fistL===undefined?1:A.fistL,B.fistL===undefined?1:B.fistL,t),
     fistR:lerp(A.fistR===undefined?1:A.fistR,B.fistR===undefined?1:B.fistR,t),
+    torsoScale:lerp(A.torsoScale===undefined?1:A.torsoScale,B.torsoScale===undefined?1:B.torsoScale,t),
+    armScaleL:lerp(A.armScaleL===undefined?1:A.armScaleL,B.armScaleL===undefined?1:B.armScaleL,t),
+    armScaleR:lerp(A.armScaleR===undefined?1:A.armScaleR,B.armScaleR===undefined?1:B.armScaleR,t),
     footL:lerpPt(A.footL,B.footL,t), footR:lerpPt(A.footR,B.footR,t),
-    handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t)};
+    handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t),
+    kneeL:both2(A.kneeL,B.kneeL,t), kneeR:both2(A.kneeR,B.kneeR,t),
+    elbL:both2(A.elbL,B.elbL,t),    elbR:both2(A.elbR,B.elbR,t)};
 }
 function frontAt(ex,u){
   var fr=ex.front; if(!fr) return null;
@@ -185,7 +207,9 @@ function frontAt(ex,u){
   if(i>=n) i=n-1;
   return lerpFront(fr[i], fr[(i+1)%n], easeInOutSine((target-acc)/tempo[i]));
 }
+if(typeof module!=='undefined'){ module.exports.solveFront=solveFront; module.exports.frontAt=frontAt; module.exports.lerpFront=lerpFront; }
 
+// ---- exercises.js ----
 // Exercise frames. Feet planted on GROUND=170 (ankle y=163) for standing lifts.
 // Standing hip y = 105. Figure faces +x.
 var EXERCISES = [
@@ -326,45 +350,100 @@ var EXERCISES = [
 // view physically cannot: stance and grip width, elbow flare, knee tracking,
 // and which arm is working.
 var FRONTS = {
-  backsquat:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,70],handR:[96,70]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]},
-    {hipY:138,footL:[58,163],footR:[82,163],handL:[44,101],handR:[96,101]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]}],
-  frontsquat:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[58,66],handR:[82,66]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]},
-    {hipY:138,footL:[58,163],footR:[82,163],handL:[58,97],handR:[82,97]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]}],
-  goblet:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[66,95],handR:[74,95]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]},
-    {hipY:137,footL:[58,163],footR:[82,163],handL:[66,122],handR:[74,122]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]}],
-  ohp:[
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,73],handR:[88,73]},
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]},
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,35],handR:[88,35]},
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]}],
-  pullup:[
-    {hipY:100,footL:[62,156],footR:[78,156],handL:[52,30],handR:[88,30]},
-    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]},
-    {hipY:72, footL:[62,128],footR:[78,128],handL:[52,30],handR:[88,30]},
-    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]}],
-  // Facing the boxer. Lead (jabbing) hand is on screen right, rear (cross) hand
-  // on screen left. Feet are staggered in depth, so the lead foot sits lower on
-  // screen (nearer the viewer) and the rear foot higher and wider.
-  // A straight punch travels at the camera, so it foreshortens: the fist moves
-  // toward the centreline and grows, and the shoulder line rotates behind it.
-  // Swinging the hand out sideways would read as a hook, which is what it did.
   jabcross:[
-    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
-    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[72,72],fistL:1,fistR:1.9,lean:-3},
-    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
-    {hipY:111,footL:[58,152],footR:[80,166],handL:[69,71],handR:[77,74],fistL:2.1,fistR:1,lean:6}]
+    {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
+     handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]},
+    {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
+     handL:[59,70],handR:[78,65],elbL:[56,88],elbR:[82,76],fistR:1.9},
+    {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
+     handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]},
+    {hipY:112,footL:[58,157],footR:[80,167],kneeL:[58,133],kneeR:[82,140],lean:5,
+     handL:[66,64],handR:[82,70],elbL:[64,76],elbR:[86,88],fistL:2.15}],
+
+  // Every other front view is DERIVED from the side frames. See frontFromSide().
 };
+
+// A hinge or a squat bends front-to-back, so its front view is that same
+// movement projected: joint heights are exactly the side view's, the torso
+// foreshortens by cos(lean), and only stance and grip width are new. Front
+// frames written by hand drifted out of phase with the side view (the deadlift
+// front stood up while the side view was on the floor) and threw the knees and
+// elbows out sideways, which is why the row read as chicken-winged and the
+// goblet squat as a sumo. Deriving them makes both impossible by construction.
+var RIG = (typeof require!=='undefined') ? require('./rig.js') : {L:L, solve:solve};
+
+// Place a middle joint at a wanted height and lateral position, then pull it
+// back inside what its two segments can actually reach. Solving that by hand is
+// where the earlier front frames went wrong; this states the intent and lets
+// the constraint settle it.
+function placeJoint(aLat,aY,bLat,bY,l1,l2,wantY,wantLat){
+  var midY=(aY+bY)/2;
+  for(var k=0;k<=10;k++){
+    var jY=wantY+(midY-wantY)*(k/10);
+    // A hair short of full reach: keyframes are exact, but the frames between them
+    // are linear blends of these joints and can bulge slightly past them.
+    var s1=l1*0.99, s2=l2*0.99;
+    var r1=Math.sqrt(Math.max(0,s1*s1-(jY-aY)*(jY-aY)));
+    var r2=Math.sqrt(Math.max(0,s2*s2-(jY-bY)*(jY-bY)));
+    var lo=Math.max(aLat-r1,bLat-r2), hi=Math.min(aLat+r1,bLat+r2);
+    if(lo<=hi) return [Math.max(lo,Math.min(hi,wantLat)), jY];
+  }
+  return [(aLat+bLat)/2, midY];
+}
+
+function frontFromSide(ex,opt){
+  var cx=70, hipHW=9, shHW=16, ARM=39.5, LEG=57.5;
+  var lat=Math.abs(opt.grip-shHW), legLat=Math.abs(opt.stance-hipHW);
+  var armV=Math.sqrt(Math.max(0,ARM*ARM-lat*lat)), legV=Math.sqrt(Math.max(0,LEG*LEG-legLat*legLat));
+  var kMul=opt.kneeOut===undefined?1:opt.kneeOut, eMul=opt.elbowOut===undefined?1:opt.elbowOut;
+  function D(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+  return ex.frames.map(function(f){
+    var s=RIG.solve(f);
+    var tS=Math.max(0.08,Math.cos(f.torso*Math.PI/180));
+    var shY=f.hip[1]-RIG.L.TORSO*tS;
+    var dy=s.handN.y-s.sh.y;
+    var handY=shY+(dy<0?-1:1)*Math.min(Math.abs(dy), armV);
+    var footY=Math.min(s.ankN.y, f.hip[1]+legV);
+    // Laterally a joint sits between its neighbours, pushed outward by however
+    // bent the limb is: knees track out over the toes, elbows flare off the
+    // ribs. Neither wanders far, because a limb bending front-to-back barely
+    // moves sideways at all.
+    var kOut=(2+9*(1-D(s.hip,s.ankN)/(RIG.L.THIGH+RIG.L.SHIN)))*kMul;
+    var eOut=(1.5+7*(1-D(s.sh,s.handN)/(RIG.L.UPPER+RIG.L.FORE)))*eMul;
+    var kL=placeJoint(cx-hipHW,f.hip[1],cx-opt.stance,footY,RIG.L.THIGH,RIG.L.SHIN,
+                      s.kneeN.y, cx-(hipHW+opt.stance)/2-kOut);
+    var kR=placeJoint(cx+hipHW,f.hip[1],cx+opt.stance,footY,RIG.L.THIGH,RIG.L.SHIN,
+                      s.kneeN.y, cx+(hipHW+opt.stance)/2+kOut);
+    var eL=placeJoint(cx-shHW,shY,cx-opt.grip,handY,RIG.L.UPPER,RIG.L.FORE,
+                      shY+(s.elbN.y-s.sh.y), cx-(shHW+opt.grip)/2-eOut);
+    var eR=placeJoint(cx+shHW,shY,cx+opt.grip,handY,RIG.L.UPPER,RIG.L.FORE,
+                      shY+(s.elbN.y-s.sh.y), cx+(shHW+opt.grip)/2+eOut);
+    return {hipY:f.hip[1], torsoScale:tS,
+      footL:[cx-opt.stance,footY], footR:[cx+opt.stance,footY],
+      handL:[cx-opt.grip,handY],   handR:[cx+opt.grip,handY],
+      kneeL:[kL[0],kL[1]], kneeR:[kR[0],kR[1]], elbL:[eL[0],eL[1]], elbR:[eR[0],eR[1]]};
+  });
+}
+
+// Stance and grip are the only genuinely new information a front view carries.
+// Squats stand wider than the hinges; the back-squat grip is wide out on the
+// bar, the front rack and goblet narrow at the neck and sternum, and both hands
+// share one bell on a swing. elbowOut 0 where the elbows tuck in rather than
+// flare (goblet, swing).
+[{id:'backsquat',stance:12,grip:26},{id:'frontsquat',stance:12,grip:13},
+ {id:'goblet',   stance:12,grip:4, elbowOut:0},
+ {id:'deadlift', stance:8, grip:18},{id:'rdl',    stance:8, grip:17},
+ {id:'row',      stance:9, grip:20},{id:'kbswing',stance:11,grip:5,elbowOut:0},
+ {id:'ohp',      stance:8, grip:16},{id:'pullup', stance:8, grip:19}].forEach(function(o){
+  var ex=EXERCISES.filter(function(e){return e.id===o.id;})[0];
+  FRONTS[o.id]=frontFromSide(ex,o);
+});
+
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 
+if(typeof module!=='undefined') module.exports=EXERCISES;
+
+// ---- render.js ----
 var NS='http://www.w3.org/2000/svg';
 function el(tag,attrs){ var n=document.createElementNS(NS,tag); for(var k in attrs) n.setAttribute(k,attrs[k]); return n; }
 function segPts(A,B,w1,w2){
@@ -374,9 +453,11 @@ function segPts(A,B,w1,w2){
           [B.x-px*w2/2,B.y-py*w2/2],[B.x+px*w2/2,B.y+py*w2/2]]
     .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
 }
-function footPts(ank,knee){
-  var back = ank.x>knee.x ? -1 : 1;
-  var toe=ank.x-back*L.FOOT*0.72, heel=ank.x+back*L.FOOT*0.28;
+// The figure always faces +x, so the toe always points +x. This used to be
+// derived from whether the knee was forward of the ankle, which flipped the
+// foot backwards through most of every squat.
+function footPts(ank){
+  var toe=ank.x+L.FOOT*0.72, heel=ank.x-L.FOOT*0.28;
   return heel.toFixed(1)+','+(ank.y-3.5)+' '+heel.toFixed(1)+','+(ank.y+4)+' '+
          toe.toFixed(1)+','+(ank.y+4)+' '+toe.toFixed(1)+','+(ank.y+0.5);
 }
@@ -420,11 +501,11 @@ function buildFigure(ex,host){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
     eq.appendChild(R.kb); eq.appendChild(R.kh);
   }
-  pair('fleg',far,[13,9,6],true); pair('farm',far,[9,6.5,5],false);
+  pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
   svg.appendChild(eq);
-  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:8.5,fill:ink}); R.sh=el('circle',{r:10.5,fill:ink});
+  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
   svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
-  pair('nleg',legCol,[15,10,6.5],true); pair('narm',armCol,[10,7,5.5],false);
+  pair('nleg',legCol,[11,8,5.5],true); pair('narm',armCol,[8,6,4.5],false);
   R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
   host.appendChild(svg);
   return {R:R,trace:trace};
@@ -435,14 +516,14 @@ function update(ex,ref,u){
     R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
-    if(isLeg) R[n+'e'].setAttribute('points',footPts(c,b));
+    if(isLeg) R[n+'e'].setAttribute('points',footPts(c));
     else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
   }
-  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[13,9,6],true);
-  setLimb('farm',s.shF,s.elbF,s.handF,[9,6.5,5],false);
-  setLimb('nleg',s.hip,s.kneeN,s.ankN,[15,10,6.5],true);
-  setLimb('narm',s.sh,s.elbN,s.handN,[10,7,5.5],false);
-  R.torso.setAttribute('points',segPts(s.hip,s.sh,17,21));
+  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true);
+  setLimb('farm',s.shF,s.elbF,s.handF,[7,5,4],false);
+  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true);
+  setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
+  R.torso.setAttribute('points',segPts(s.hip,s.sh,13,17));
   R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
   R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
   R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
@@ -464,30 +545,45 @@ function buildFront(ex,host){
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
   svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
   var R={};
-  function limb(n,col,w){
-    R[n+'1']=el('polygon',{fill:col}); R[n+'j']=el('circle',{r:w[1]/2,fill:col});
-    R[n+'2']=el('polygon',{fill:col});
+  // An arm foreshortened toward the camera lies on top of the torso in the same
+  // ink, so it disappears into the silhouette. A surface-coloured outline is
+  // what separates it; legs sit outside the body and do not need one.
+  function limb(n,col,w,outline){
+    var o = outline?{stroke:'var(--surface-raised)','stroke-width':1.6,'stroke-linejoin':'round'}:{};
+    function mk(t,a){ for(var k in o) a[k]=o[k]; return el(t,a); }
+    R[n+'1']=mk('polygon',{fill:col}); R[n+'j']=mk('circle',{r:w[1]/2,fill:col});
+    R[n+'2']=mk('polygon',{fill:col});
     [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){svg.appendChild(x);});
   }
-  limb('flegL',legCol,[15,10,6.5]); limb('flegR',legCol,[15,10,6.5]);
+  limb('flegL',legCol,[11,8,5.5]); limb('flegR',legCol,[11,8,5.5]);
   R.ffootL=el('ellipse',{rx:7,ry:4,fill:legCol}); R.ffootR=el('ellipse',{rx:7,ry:4,fill:legCol});
   svg.appendChild(R.ffootL); svg.appendChild(R.ffootR);
-  R.fneck=el('rect',{width:9,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
+  R.fneck=el('rect',{width:7,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
   R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
-  R.fhipL=el('circle',{r:7,fill:ink}); R.fhipR=el('circle',{r:7,fill:ink});
+  R.fhipL=el('circle',{r:5.5,fill:ink}); R.fhipR=el('circle',{r:5.5,fill:ink});
   svg.appendChild(R.fhipL); svg.appendChild(R.fhipR);
-  limb('farmL',armCol,[10,7,5.5]); limb('farmR',armCol,[10,7,5.5]);
-  R.fshL=el('circle',{r:8,fill:ink}); R.fshR=el('circle',{r:8,fill:ink});
+  limb('farmL',armCol,[8,6,4.5],true); limb('farmR',armCol,[8,6,4.5],true);
+  R.fshL=el('circle',{r:6.5,fill:ink}); R.fshR=el('circle',{r:6.5,fill:ink});
   svg.appendChild(R.fshL); svg.appendChild(R.fshR);
   R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
-  R.fhandL=el('circle',{fill:armCol}); R.fhandR=el('circle',{fill:armCol});
-  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
+  R.fhandL=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
+  R.fhandR=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
+  // A bar is gripped, so the hands go on top of it; a bell hangs from the
+  // hands, so it goes on top of them.
   if(ex.equip==='barbell'||ex.equip==='fixedbar'){
     R.fbar=el('rect',{height:5,rx:2.5,fill:soft});
     R.fpL=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
     R.fpR=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
     svg.appendChild(R.fbar);
     if(ex.equip==='barbell'){ svg.appendChild(R.fpL); svg.appendChild(R.fpR); }
+  }
+  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
+  if(ex.equip==='kettlebell'){
+    // Both hands share one handle, so the bell hangs as a single mass below
+    // them rather than one weight per hand.
+    R.fkbH=el('path',{fill:'none',stroke:soft,'stroke-width':3.4,'stroke-linecap':'round'});
+    R.fkb=el('circle',{r:9,fill:soft});
+    svg.appendChild(R.fkbH); svg.appendChild(R.fkb);
   }
   if(ex.equip==='dumbbell'){
     R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
@@ -506,8 +602,8 @@ function updateFront(ex,R,u){
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
   }
-  setL('flegL',s.hipL,s.kneeL,s.footL,[15,10,6.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[15,10,6.5]);
-  setL('farmL',s.shL,s.elbL,s.handL,[10,7,5.5]);    setL('farmR',s.shR,s.elbR,s.handR,[10,7,5.5]);
+  setL('flegL',s.hipL,s.kneeL,s.footL,[11,8,5.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[11,8,5.5]);
+  setL('farmL',s.shL,s.elbL,s.handL,[8,6,4.5]);    setL('farmR',s.shR,s.elbR,s.handR,[8,6,4.5]);
   [['ffootL',s.footL],['ffootR',s.footR]].forEach(function(p){
     R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',(p[1].y+3).toFixed(1)); });
   R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
@@ -525,6 +621,12 @@ function updateFront(ex,R,u){
     R.fbar.setAttribute('width',(x2-x1+32).toFixed(1));
     if(R.fpL){ R.fpL.setAttribute('cx',(x1-13).toFixed(1)); R.fpL.setAttribute('cy',y.toFixed(1));
                R.fpR.setAttribute('cx',(x2+13).toFixed(1)); R.fpR.setAttribute('cy',y.toFixed(1)); }
+  }
+  if(R.fkb){
+    var kx=(s.handL.x+s.handR.x)/2, ky=(s.handL.y+s.handR.y)/2;
+    R.fkbH.setAttribute('d','M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+
+      ' Q'+kx.toFixed(1)+','+(ky-7).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
+    R.fkb.setAttribute('cx',kx.toFixed(1)); R.fkb.setAttribute('cy',(ky+9).toFixed(1));
   }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;

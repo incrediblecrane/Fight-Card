@@ -7,9 +7,11 @@ function segPts(A,B,w1,w2){
           [B.x-px*w2/2,B.y-py*w2/2],[B.x+px*w2/2,B.y+py*w2/2]]
     .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
 }
-function footPts(ank,knee){
-  var back = ank.x>knee.x ? -1 : 1;
-  var toe=ank.x-back*L.FOOT*0.72, heel=ank.x+back*L.FOOT*0.28;
+// The figure always faces +x, so the toe always points +x. This used to be
+// derived from whether the knee was forward of the ankle, which flipped the
+// foot backwards through most of every squat.
+function footPts(ank){
+  var toe=ank.x+L.FOOT*0.72, heel=ank.x-L.FOOT*0.28;
   return heel.toFixed(1)+','+(ank.y-3.5)+' '+heel.toFixed(1)+','+(ank.y+4)+' '+
          toe.toFixed(1)+','+(ank.y+4)+' '+toe.toFixed(1)+','+(ank.y+0.5);
 }
@@ -53,11 +55,11 @@ function buildFigure(ex,host){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
     eq.appendChild(R.kb); eq.appendChild(R.kh);
   }
-  pair('fleg',far,[13,9,6],true); pair('farm',far,[9,6.5,5],false);
+  pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
   svg.appendChild(eq);
-  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:8.5,fill:ink}); R.sh=el('circle',{r:10.5,fill:ink});
+  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
   svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
-  pair('nleg',legCol,[15,10,6.5],true); pair('narm',armCol,[10,7,5.5],false);
+  pair('nleg',legCol,[11,8,5.5],true); pair('narm',armCol,[8,6,4.5],false);
   R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
   host.appendChild(svg);
   return {R:R,trace:trace};
@@ -68,14 +70,14 @@ function update(ex,ref,u){
     R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
-    if(isLeg) R[n+'e'].setAttribute('points',footPts(c,b));
+    if(isLeg) R[n+'e'].setAttribute('points',footPts(c));
     else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
   }
-  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[13,9,6],true);
-  setLimb('farm',s.shF,s.elbF,s.handF,[9,6.5,5],false);
-  setLimb('nleg',s.hip,s.kneeN,s.ankN,[15,10,6.5],true);
-  setLimb('narm',s.sh,s.elbN,s.handN,[10,7,5.5],false);
-  R.torso.setAttribute('points',segPts(s.hip,s.sh,17,21));
+  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true);
+  setLimb('farm',s.shF,s.elbF,s.handF,[7,5,4],false);
+  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true);
+  setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
+  R.torso.setAttribute('points',segPts(s.hip,s.sh,13,17));
   R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
   R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
   R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
@@ -97,30 +99,45 @@ function buildFront(ex,host){
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
   svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
   var R={};
-  function limb(n,col,w){
-    R[n+'1']=el('polygon',{fill:col}); R[n+'j']=el('circle',{r:w[1]/2,fill:col});
-    R[n+'2']=el('polygon',{fill:col});
+  // An arm foreshortened toward the camera lies on top of the torso in the same
+  // ink, so it disappears into the silhouette. A surface-coloured outline is
+  // what separates it; legs sit outside the body and do not need one.
+  function limb(n,col,w,outline){
+    var o = outline?{stroke:'var(--surface-raised)','stroke-width':1.6,'stroke-linejoin':'round'}:{};
+    function mk(t,a){ for(var k in o) a[k]=o[k]; return el(t,a); }
+    R[n+'1']=mk('polygon',{fill:col}); R[n+'j']=mk('circle',{r:w[1]/2,fill:col});
+    R[n+'2']=mk('polygon',{fill:col});
     [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){svg.appendChild(x);});
   }
-  limb('flegL',legCol,[15,10,6.5]); limb('flegR',legCol,[15,10,6.5]);
+  limb('flegL',legCol,[11,8,5.5]); limb('flegR',legCol,[11,8,5.5]);
   R.ffootL=el('ellipse',{rx:7,ry:4,fill:legCol}); R.ffootR=el('ellipse',{rx:7,ry:4,fill:legCol});
   svg.appendChild(R.ffootL); svg.appendChild(R.ffootR);
-  R.fneck=el('rect',{width:9,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
+  R.fneck=el('rect',{width:7,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
   R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
-  R.fhipL=el('circle',{r:7,fill:ink}); R.fhipR=el('circle',{r:7,fill:ink});
+  R.fhipL=el('circle',{r:5.5,fill:ink}); R.fhipR=el('circle',{r:5.5,fill:ink});
   svg.appendChild(R.fhipL); svg.appendChild(R.fhipR);
-  limb('farmL',armCol,[10,7,5.5]); limb('farmR',armCol,[10,7,5.5]);
-  R.fshL=el('circle',{r:8,fill:ink}); R.fshR=el('circle',{r:8,fill:ink});
+  limb('farmL',armCol,[8,6,4.5],true); limb('farmR',armCol,[8,6,4.5],true);
+  R.fshL=el('circle',{r:6.5,fill:ink}); R.fshR=el('circle',{r:6.5,fill:ink});
   svg.appendChild(R.fshL); svg.appendChild(R.fshR);
   R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
-  R.fhandL=el('circle',{fill:armCol}); R.fhandR=el('circle',{fill:armCol});
-  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
+  R.fhandL=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
+  R.fhandR=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
+  // A bar is gripped, so the hands go on top of it; a bell hangs from the
+  // hands, so it goes on top of them.
   if(ex.equip==='barbell'||ex.equip==='fixedbar'){
     R.fbar=el('rect',{height:5,rx:2.5,fill:soft});
     R.fpL=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
     R.fpR=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
     svg.appendChild(R.fbar);
     if(ex.equip==='barbell'){ svg.appendChild(R.fpL); svg.appendChild(R.fpR); }
+  }
+  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
+  if(ex.equip==='kettlebell'){
+    // Both hands share one handle, so the bell hangs as a single mass below
+    // them rather than one weight per hand.
+    R.fkbH=el('path',{fill:'none',stroke:soft,'stroke-width':3.4,'stroke-linecap':'round'});
+    R.fkb=el('circle',{r:9,fill:soft});
+    svg.appendChild(R.fkbH); svg.appendChild(R.fkb);
   }
   if(ex.equip==='dumbbell'){
     R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
@@ -139,8 +156,8 @@ function updateFront(ex,R,u){
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
     R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
   }
-  setL('flegL',s.hipL,s.kneeL,s.footL,[15,10,6.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[15,10,6.5]);
-  setL('farmL',s.shL,s.elbL,s.handL,[10,7,5.5]);    setL('farmR',s.shR,s.elbR,s.handR,[10,7,5.5]);
+  setL('flegL',s.hipL,s.kneeL,s.footL,[11,8,5.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[11,8,5.5]);
+  setL('farmL',s.shL,s.elbL,s.handL,[8,6,4.5]);    setL('farmR',s.shR,s.elbR,s.handR,[8,6,4.5]);
   [['ffootL',s.footL],['ffootR',s.footR]].forEach(function(p){
     R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',(p[1].y+3).toFixed(1)); });
   R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
@@ -158,6 +175,12 @@ function updateFront(ex,R,u){
     R.fbar.setAttribute('width',(x2-x1+32).toFixed(1));
     if(R.fpL){ R.fpL.setAttribute('cx',(x1-13).toFixed(1)); R.fpL.setAttribute('cy',y.toFixed(1));
                R.fpR.setAttribute('cx',(x2+13).toFixed(1)); R.fpR.setAttribute('cy',y.toFixed(1)); }
+  }
+  if(R.fkb){
+    var kx=(s.handL.x+s.handR.x)/2, ky=(s.handL.y+s.handR.y)/2;
+    R.fkbH.setAttribute('d','M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+
+      ' Q'+kx.toFixed(1)+','+(ky-7).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
+    R.fkb.setAttribute('cx',kx.toFixed(1)); R.fkb.setAttribute('cy',(ky+9).toFixed(1));
   }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;

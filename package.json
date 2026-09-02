@@ -2,9 +2,11 @@
   "name": "fight-card",
   "private": true,
   "scripts": {
-    "test": "node pose/checks/analyse.js && node pose/checks/adversarial.js && node pose/checks/continuous.js && node pose/checks/views.js && node pose/checks/render.js"
+    "build": "node pose/build.js",
+    "test": "node pose/build.js && node pose/checks/analyse.js && node pose/checks/adversarial.js && node pose/checks/continuous.js && node pose/checks/views.js && node pose/checks/render.js"
   },
   "devDependencies": {
-    "jsdom": "^30.0.1"
+    "jsdom": "^30.0.1",
+    "playwright": "^1.62.1"
   }
 }

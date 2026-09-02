@@ -138,43 +138,95 @@ var EXERCISES = [
 // view physically cannot: stance and grip width, elbow flare, knee tracking,
 // and which arm is working.
 var FRONTS = {
-  backsquat:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,70],handR:[96,70]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]},
-    {hipY:138,footL:[58,163],footR:[82,163],handL:[44,101],handR:[96,101]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[44,85],handR:[96,85]}],
-  frontsquat:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[58,66],handR:[82,66]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]},
-    {hipY:138,footL:[58,163],footR:[82,163],handL:[58,97],handR:[82,97]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[58,81],handR:[82,81]}],
-  goblet:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[66,95],handR:[74,95]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]},
-    {hipY:137,footL:[58,163],footR:[82,163],handL:[66,122],handR:[74,122]},
-    {hipY:122,footL:[58,163],footR:[82,163],handL:[66,108],handR:[74,108]}],
-  ohp:[
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,73],handR:[88,73]},
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]},
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,35],handR:[88,35]},
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,55],handR:[88,55]}],
-  pullup:[
-    {hipY:100,footL:[62,156],footR:[78,156],handL:[52,30],handR:[88,30]},
-    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]},
-    {hipY:72, footL:[62,128],footR:[78,128],handL:[52,30],handR:[88,30]},
-    {hipY:86, footL:[62,142],footR:[78,142],handL:[52,30],handR:[88,30]}],
-  // Facing the boxer. Lead (jabbing) hand is on screen right, rear (cross) hand
-  // on screen left. Feet are staggered in depth, so the lead foot sits lower on
-  // screen (nearer the viewer) and the rear foot higher and wider.
-  // A straight punch travels at the camera, so it foreshortens: the fist moves
-  // toward the centreline and grows, and the shoulder line rotates behind it.
-  // Swinging the hand out sideways would read as a hook, which is what it did.
   jabcross:[
-    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
-    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[72,72],fistL:1,fistR:1.9,lean:-3},
-    {hipY:112,footL:[58,157],footR:[80,166],handL:[63,74],handR:[77,74],fistL:1,fistR:1},
-    {hipY:111,footL:[58,152],footR:[80,166],handL:[69,71],handR:[77,74],fistL:2.1,fistR:1,lean:6}]
+    {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
+     handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]},
+    {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
+     handL:[59,70],handR:[78,65],elbL:[56,88],elbR:[82,76],fistR:1.9},
+    {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
+     handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]},
+    {hipY:112,footL:[58,157],footR:[80,167],kneeL:[58,133],kneeR:[82,140],lean:5,
+     handL:[66,64],handR:[82,70],elbL:[64,76],elbR:[86,88],fistL:2.15}],
+
+  // Every other front view is DERIVED from the side frames. See frontFromSide().
 };
+
+// A hinge or a squat bends front-to-back, so its front view is that same
+// movement projected: joint heights are exactly the side view's, the torso
+// foreshortens by cos(lean), and only stance and grip width are new. Front
+// frames written by hand drifted out of phase with the side view (the deadlift
+// front stood up while the side view was on the floor) and threw the knees and
+// elbows out sideways, which is why the row read as chicken-winged and the
+// goblet squat as a sumo. Deriving them makes both impossible by construction.
+var RIG = (typeof require!=='undefined') ? require('./rig.js') : {L:L, solve:solve};
+
+// Place a middle joint at a wanted height and lateral position, then pull it
+// back inside what its two segments can actually reach. Solving that by hand is
+// where the earlier front frames went wrong; this states the intent and lets
+// the constraint settle it.
+function placeJoint(aLat,aY,bLat,bY,l1,l2,wantY,wantLat){
+  var midY=(aY+bY)/2;
+  for(var k=0;k<=10;k++){
+    var jY=wantY+(midY-wantY)*(k/10);
+    // A hair short of full reach: keyframes are exact, but the frames between them
+    // are linear blends of these joints and can bulge slightly past them.
+    var s1=l1*0.99, s2=l2*0.99;
+    var r1=Math.sqrt(Math.max(0,s1*s1-(jY-aY)*(jY-aY)));
+    var r2=Math.sqrt(Math.max(0,s2*s2-(jY-bY)*(jY-bY)));
+    var lo=Math.max(aLat-r1,bLat-r2), hi=Math.min(aLat+r1,bLat+r2);
+    if(lo<=hi) return [Math.max(lo,Math.min(hi,wantLat)), jY];
+  }
+  return [(aLat+bLat)/2, midY];
+}
+
+function frontFromSide(ex,opt){
+  var cx=70, hipHW=9, shHW=16, ARM=39.5, LEG=57.5;
+  var lat=Math.abs(opt.grip-shHW), legLat=Math.abs(opt.stance-hipHW);
+  var armV=Math.sqrt(Math.max(0,ARM*ARM-lat*lat)), legV=Math.sqrt(Math.max(0,LEG*LEG-legLat*legLat));
+  var kMul=opt.kneeOut===undefined?1:opt.kneeOut, eMul=opt.elbowOut===undefined?1:opt.elbowOut;
+  function D(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+  return ex.frames.map(function(f){
+    var s=RIG.solve(f);
+    var tS=Math.max(0.08,Math.cos(f.torso*Math.PI/180));
+    var shY=f.hip[1]-RIG.L.TORSO*tS;
+    var dy=s.handN.y-s.sh.y;
+    var handY=shY+(dy<0?-1:1)*Math.min(Math.abs(dy), armV);
+    var footY=Math.min(s.ankN.y, f.hip[1]+legV);
+    // Laterally a joint sits between its neighbours, pushed outward by however
+    // bent the limb is: knees track out over the toes, elbows flare off the
+    // ribs. Neither wanders far, because a limb bending front-to-back barely
+    // moves sideways at all.
+    var kOut=(2+9*(1-D(s.hip,s.ankN)/(RIG.L.THIGH+RIG.L.SHIN)))*kMul;
+    var eOut=(1.5+7*(1-D(s.sh,s.handN)/(RIG.L.UPPER+RIG.L.FORE)))*eMul;
+    var kL=placeJoint(cx-hipHW,f.hip[1],cx-opt.stance,footY,RIG.L.THIGH,RIG.L.SHIN,
+                      s.kneeN.y, cx-(hipHW+opt.stance)/2-kOut);
+    var kR=placeJoint(cx+hipHW,f.hip[1],cx+opt.stance,footY,RIG.L.THIGH,RIG.L.SHIN,
+                      s.kneeN.y, cx+(hipHW+opt.stance)/2+kOut);
+    var eL=placeJoint(cx-shHW,shY,cx-opt.grip,handY,RIG.L.UPPER,RIG.L.FORE,
+                      shY+(s.elbN.y-s.sh.y), cx-(shHW+opt.grip)/2-eOut);
+    var eR=placeJoint(cx+shHW,shY,cx+opt.grip,handY,RIG.L.UPPER,RIG.L.FORE,
+                      shY+(s.elbN.y-s.sh.y), cx+(shHW+opt.grip)/2+eOut);
+    return {hipY:f.hip[1], torsoScale:tS,
+      footL:[cx-opt.stance,footY], footR:[cx+opt.stance,footY],
+      handL:[cx-opt.grip,handY],   handR:[cx+opt.grip,handY],
+      kneeL:[kL[0],kL[1]], kneeR:[kR[0],kR[1]], elbL:[eL[0],eL[1]], elbR:[eR[0],eR[1]]};
+  });
+}
+
+// Stance and grip are the only genuinely new information a front view carries.
+// Squats stand wider than the hinges; the back-squat grip is wide out on the
+// bar, the front rack and goblet narrow at the neck and sternum, and both hands
+// share one bell on a swing. elbowOut 0 where the elbows tuck in rather than
+// flare (goblet, swing).
+[{id:'backsquat',stance:12,grip:26},{id:'frontsquat',stance:12,grip:13},
+ {id:'goblet',   stance:12,grip:4, elbowOut:0},
+ {id:'deadlift', stance:8, grip:18},{id:'rdl',    stance:8, grip:17},
+ {id:'row',      stance:9, grip:20},{id:'kbswing',stance:11,grip:5,elbowOut:0},
+ {id:'ohp',      stance:8, grip:16},{id:'pullup', stance:8, grip:19}].forEach(function(o){
+  var ex=EXERCISES.filter(function(e){return e.id===o.id;})[0];
+  FRONTS[o.id]=frontFromSide(ex,o);
+});
+
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 
 if(typeof module!=='undefined') module.exports=EXERCISES;

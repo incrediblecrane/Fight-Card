@@ -91,11 +91,14 @@ if(typeof module!=='undefined') module.exports.lerpFrame=lerpFrame, module.expor
 // frame: {cx, hipY, hipHW, shHW, footL/footR:[x,y], handL/handR:[x,y]}
 function solveFront(f){
   var cx=f.cx===undefined?70:f.cx;
-  var hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?13:f.shHW;
+  var hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?16:f.shHW;
   var lean=f.lean||0;
+  // A hinged torso seen from the front is foreshortened: it projects shorter and
+  // the head drops toward the shoulders because you start seeing the crown.
+  var tS=f.torsoScale===undefined?1:f.torsoScale;
   var hipC=P(cx,f.hipY);
-  var shC=P(cx+lean, f.hipY-L.TORSO);
-  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF);
+  var shC=P(cx+lean, f.hipY-L.TORSO*tS);
+  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF*(0.35+0.65*tS));
   var hipL=P(hipC.x-hipHW,hipC.y), hipR=P(hipC.x+hipHW,hipC.y);
   var shL=P(shC.x-shHW,shC.y),   shR=P(shC.x+shHW,shC.y);
   var footL=P(f.footL[0],f.footL[1]), footR=P(f.footR[0],f.footR[1]);
@@ -105,24 +108,40 @@ function solveFront(f){
   // shoulder-to-hand line (a human elbow never bends upward).
   function both(a,b,l1,l2){ return [ik(a,b,l1,l2,1), ik(a,b,l1,l2,-1)]; }
   function lower(p){ return p[0].y>=p[1].y?p[0]:p[1]; }
-  var kL=both(hipL,footL,L.THIGH,L.SHIN), kR=both(hipR,footR,L.THIGH,L.SHIN);
-  var kneeL=kL[0].x<=kL[1].x?kL[0]:kL[1];
-  var kneeR=kR[0].x>=kR[1].x?kR[0]:kR[1];
-  var elbL=lower(both(shL,handL,L.UPPER,L.FORE));
-  var elbR=lower(both(shR,handR,L.UPPER,L.FORE));
+  // Explicit joints win over IK. A limb that bends front-to-back (every hinge,
+  // every squat) has no lateral bend to solve for: its knee or elbow sits on
+  // the hip-to-foot line at the height the side view already gives it. Solving
+  // it as a frontal-plane bend instead threw the knees and elbows out sideways,
+  // which is why the row read as chicken-winged.
+  var aL=f.armScaleL===undefined?1:f.armScaleL, aR=f.armScaleR===undefined?1:f.armScaleR;
+  var kneeL = f.kneeL ? P(f.kneeL[0],f.kneeL[1])
+    : (function(k){ return k[0].x<=k[1].x?k[0]:k[1]; })(both(hipL,footL,L.THIGH,L.SHIN));
+  var kneeR = f.kneeR ? P(f.kneeR[0],f.kneeR[1])
+    : (function(k){ return k[0].x>=k[1].x?k[0]:k[1]; })(both(hipR,footR,L.THIGH,L.SHIN));
+  // An arm pointing at the camera projects short, so its segments scale down.
+  var elbL = f.elbL ? P(f.elbL[0],f.elbL[1]) : lower(both(shL,handL,L.UPPER*aL,L.FORE*aL));
+  var elbR = f.elbR ? P(f.elbR[0],f.elbR[1]) : lower(both(shR,handR,L.UPPER*aR,L.FORE*aR));
   return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
     footL:footL,footR:footR,handL:handL,handR:handR,
-    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,
+    kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,armScaleL:aL,armScaleR:aR,
     fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
 }
+// Explicit joints only carry through when BOTH keyframes have them; a frame
+// that mixes the two would jump between a solved and a given joint.
+function both2(a,b,t){ return (a&&b)?lerpPt(a,b,t):undefined; }
 function lerpFront(A,B,t){
   return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
     shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
     fistL:lerp(A.fistL===undefined?1:A.fistL,B.fistL===undefined?1:B.fistL,t),
     fistR:lerp(A.fistR===undefined?1:A.fistR,B.fistR===undefined?1:B.fistR,t),
+    torsoScale:lerp(A.torsoScale===undefined?1:A.torsoScale,B.torsoScale===undefined?1:B.torsoScale,t),
+    armScaleL:lerp(A.armScaleL===undefined?1:A.armScaleL,B.armScaleL===undefined?1:B.armScaleL,t),
+    armScaleR:lerp(A.armScaleR===undefined?1:A.armScaleR,B.armScaleR===undefined?1:B.armScaleR,t),
     footL:lerpPt(A.footL,B.footL,t), footR:lerpPt(A.footR,B.footR,t),
-    handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t)};
+    handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t),
+    kneeL:both2(A.kneeL,B.kneeL,t), kneeR:both2(A.kneeR,B.kneeR,t),
+    elbL:both2(A.elbL,B.elbL,t),    elbR:both2(A.elbR,B.elbR,t)};
 }
 function frontAt(ex,u){
   var fr=ex.front; if(!fr) return null;

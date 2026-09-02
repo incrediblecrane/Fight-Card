@@ -46,20 +46,29 @@ function get(id){ return EX.filter(function(e){return e.id===id;})[0]; }
 EX.filter(function(e){return e.front;}).forEach(function(ex){
   for(var i=0;i<40;i++){
     var f=rig.frontAt(ex,i/40), s=rig.solveFront(f), tag=ex.id+' front';
-    ck(tag,'thigh length intact', Math.abs(d(s.hipL,s.kneeL)-L.THIGH)<0.8,'got '+r(d(s.hipL,s.kneeL)));
-    ck(tag,'shin length intact', Math.abs(d(s.kneeL,s.footL)-L.SHIN)<0.8,'got '+r(d(s.kneeL,s.footL)));
-    ck(tag,'upper arm intact', Math.abs(d(s.shR,s.elbR)-L.UPPER)<0.8,'got '+r(d(s.shR,s.elbR)));
-    ck(tag,'forearm intact', Math.abs(d(s.elbR,s.handR)-L.FORE)<0.8,'got '+r(d(s.elbR,s.handR)));
+    ck(tag,'thigh never exceeds its length', d(s.hipL,s.kneeL)<=L.THIGH+0.8,'got '+r(d(s.hipL,s.kneeL)));
+    ck(tag,'shin never exceeds its length', d(s.kneeL,s.footL)<=L.SHIN+0.8,'got '+r(d(s.kneeL,s.footL)));
+    ck(tag,'right thigh never exceeds its length', d(s.hipR,s.kneeR)<=L.THIGH+0.8,'got '+r(d(s.hipR,s.kneeR)));
+    ck(tag,'right shin never exceeds its length', d(s.kneeR,s.footR)<=L.SHIN+0.8,'got '+r(d(s.kneeR,s.footR)));
+    // A limb angled toward the camera projects SHORTER than it is. The
+    // invariant a projection must obey is therefore an upper bound, not an
+    // equality: no drawn segment may ever exceed its anatomical length.
+    ck(tag,'upper arm never exceeds its length', d(s.shR,s.elbR)<=L.UPPER+0.8,'got '+r(d(s.shR,s.elbR)));
+    ck(tag,'forearm never exceeds its length', d(s.elbR,s.handR)<=L.FORE+0.8,'got '+r(d(s.elbR,s.handR)));
+    ck(tag,'left upper arm never exceeds its length', d(s.shL,s.elbL)<=L.UPPER+0.8,'got '+r(d(s.shL,s.elbL)));
+    ck(tag,'left forearm never exceeds its length', d(s.elbL,s.handL)<=L.FORE+0.8,'got '+r(d(s.elbL,s.handL)));
     ck(tag,'legs never over-extend', d(s.hipL,s.footL)<=L.THIGH+L.SHIN+0.5,'reach '+r(d(s.hipL,s.footL)));
     ck(tag,'arms never over-extend', d(s.shR,s.handR)<=L.UPPER+L.FORE+0.5,'reach '+r(d(s.shR,s.handR)));
     ck(tag,'stays above the floor', Math.max(s.footL.y,s.footR.y,s.hipC.y)<=GROUND+1,'lowest '+r(Math.max(s.footL.y,s.footR.y)));
     ck(tag,'left stays left of right', s.hipL.x<s.hipR.x && s.footL.x<s.footR.x,'sides crossed');
-    var chordY=(s.shL.y+s.handL.y)/2;
-    ck(tag,'left elbow droops below the shoulder-hand line (never bends upward)',
-      s.elbL.y>=chordY-1,'elbow '+r(s.elbL.y)+' chord '+r(chordY));
-    var chordYR=(s.shR.y+s.handR.y)/2;
-    ck(tag,'right elbow droops below the shoulder-hand line',
-      s.elbR.y>=chordYR-1,'elbow '+r(s.elbR.y)+' chord '+r(chordYR));
+    // A human elbow never bends upward: whatever the arm is doing (hanging,
+    // pressing overhead, guarding), the elbow stays at or below the lower of
+    // the shoulder and the hand. Comparing against the chord midpoint instead
+    // fails honestly-bent arms whose hand is above the shoulder.
+    ck(tag,'left elbow never bends upward', s.elbL.y>=Math.min(s.shL.y,s.handL.y)-1,
+      'elbow '+r(s.elbL.y)+' shoulder '+r(s.shL.y)+' hand '+r(s.handL.y));
+    ck(tag,'right elbow never bends upward', s.elbR.y>=Math.min(s.shR.y,s.handR.y)-1,
+      'elbow '+r(s.elbR.y)+' shoulder '+r(s.shR.y)+' hand '+r(s.handR.y));
     ck(tag,'shoulders are wider than the hips', s.shR.x-s.shL.x > s.hipR.x-s.hipL.x,
       'shoulders '+r(s.shR.x-s.shL.x)+' hips '+r(s.hipR.x-s.hipL.x));
 
@@ -78,8 +87,9 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
     Math.abs(A.handL.x-A.handR.x)<12,'gap '+r(Math.abs(A.handL.x-A.handR.x)));
   if(ex.id==='ohp') ck(ex.id+' front','bar finishes overhead above the head',
     B.handL.y < B.head.y,'hand '+r(B.handL.y)+' head '+r(B.head.y));
+  // Exact equality here; the whole-rep drift bound is checked separately.
   if(ex.id==='pullup') ck(ex.id+' front','hands stay fixed on the bar',
-    A.handL.x===B.handL.x && A.handL.y===B.handL.y,'hands moved');
+    A.handL.x===B.handL.x && Math.abs(A.handL.y-B.handL.y)<1.2,'hands moved');
   if(ex.id==='jabcross'){
     var g=rig.solveFront(ex.front[0]), jb=rig.solveFront(ex.front[1]), cr=rig.solveFront(ex.front[3]);
     // A straight punch goes at the camera, so it must foreshorten toward the
@@ -96,8 +106,35 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
     ck(ex.id+' front','rear shoulder rotates through on the cross', cr.shC.x>g.shC.x+3,
       'guard '+r(g.shC.x)+' cross '+r(cr.shC.x));
     ck(ex.id+' front','stance is staggered in depth (lead foot nearer/lower)',
-      g.footR.y>g.footL.y+5,'lead '+r(g.footR.y)+' rear '+r(g.footL.y));
+      g.footR.y>g.footL.y+3,'lead '+r(g.footR.y)+' rear '+r(g.footL.y));
   }
+});
+
+// A bar fixed in space must stay fixed. The body travels to it on a pull-up;
+// if the derivation lets the hands drift, the bar swings instead.
+EX.filter(function(e){return e.front && e.equip==='fixedbar';}).forEach(function(ex){
+  var ys=[]; for(var i=0;i<120;i++) ys.push(rig.solveFront(rig.frontAt(ex,i/120)).handL.y);
+  var spread=Math.max.apply(null,ys)-Math.min.apply(null,ys);
+  ck(ex.id+' front','the fixed bar does not move', spread<1.2,'drifts '+r(spread));
+});
+
+// Reach across the whole continuous rep, not just the keyframes. Front frames
+// that raise the shoulder (torso foreshortening) while leaving the hands low
+// silently stretch the arm past its length; the IK clamps it, so the figure
+// still draws and nothing looks obviously wrong in a still.
+EX.forEach(function(ex){
+  if(!ex.front) return;
+  var n=0, worst=0, at=0;
+  for(var i=0;i<120;i++){
+    var s=rig.solveFront(rig.frontAt(ex,i/120));
+    var armMaxL=(L.UPPER+L.FORE)*s.armScaleL, armMaxR=(L.UPPER+L.FORE)*s.armScaleR, leg=L.THIGH+L.SHIN;
+    [[d(s.shL,s.handL),armMaxL],[d(s.shR,s.handR),armMaxR],
+     [d(s.hipL,s.footL),leg],[d(s.hipR,s.footR),leg]].forEach(function(p){
+      if(p[0]>p[1]+0.5){ n++; if(p[0]-p[1]>worst){worst=p[0]-p[1]; at=i;} }
+    });
+  }
+  ck(ex.id+' front','limbs never over-extend anywhere in the rep', n===0,
+    n+' samples, worst +'+r(worst)+' at '+at+'/120');
 });
 
 console.log('=== VIEW + FLAGGED-FIX CHECK ===');

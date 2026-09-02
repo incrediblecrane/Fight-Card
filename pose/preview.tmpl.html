@@ -1,0 +1,56 @@
+<title>Exercise Motion Rebuild</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;--text:#18181C;--text-soft:#55555F;--text-faint:#8A8A93;--accent:#E8500F;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}}
+:root[data-theme="dark"]{--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px;}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin:0 0 6px;}
+h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:clamp(1.7rem,4vw,2.3rem);margin:0 0 10px;text-wrap:balance;}
+.dek{font-size:0.98rem;color:var(--text-soft);max-width:70ch;line-height:1.55;margin:0 0 8px;}
+.dek b{color:var(--text);}
+.controls{display:flex;gap:10px;align-items:center;margin:18px 0 6px;flex-wrap:wrap;}
+.btn{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 14px;cursor:pointer;}
+.btn:hover{border-color:var(--accent);}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:16px;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;}
+.card.flagged{border-color:var(--accent);}
+.card h3{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1rem;margin:0 0 8px;display:flex;align-items:center;gap:7px;}
+.card h3 .flag{font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--accent);color:var(--accent-ink);padding:2px 6px;border-radius:5px;}
+.views{display:flex;gap:8px;}
+.figwrap{background:var(--surface-raised);border-radius:10px;padding:6px 0 2px;flex:1;min-width:0;position:relative;}
+.vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-faint);}
+.figwrap svg{width:100%;max-width:210px;height:auto;display:block;margin:0 auto;}
+.lbl{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-faint);margin:8px 0 4px;}
+.body-copy{font-size:0.82rem;color:var(--text-soft);line-height:1.5;margin:0 0 8px;}
+.changed{font-size:0.78rem;color:var(--text-soft);line-height:1.5;margin:0;border-left:2px solid var(--accent);padding-left:9px;}
+.note{font-size:0.8rem;color:var(--text-faint);margin-top:32px;border-top:1px solid var(--line);padding-top:16px;line-height:1.6;max-width:70ch;}
+.hint{font-size:0.78rem;color:var(--text-faint);margin:2px 0 0;}
+#scrub{flex:1;min-width:160px;accent-color:var(--accent);}
+#scrub:disabled{opacity:0.4;}
+.figwrap svg{shape-rendering:geometricPrecision;}
+</style>
+<div class="wrap">
+  <p class="eyebrow">Fight Card &middot; continuous motion</p>
+  <h1>Front views, rebuilt</h1>
+  <p class="dek">The front views were wrong in four separate ways, all now fixed.</p>
+  <p class="dek"><b>Every arm bent backwards.</b> The rig picked the elbow solution by a hardcoded sign, which bent elbows upward. A human elbow droops below the shoulder-to-hand line in all of these positions; it now picks that branch by anatomy rather than by a fixed number, and the same rule makes knees track outward away from the midline.</p>
+  <p class="dek"><b>The goblet squat bell was invisible</b> because equipment was drawn before the body, so the torso painted straight over a weight held at the chest. Held equipment now draws in front. Barbells gained proper end plates so they read as loaded bars, and the figure gained deltoid caps, hip caps and a neck, which is what was missing when it looked like it had no shoulders.</p>
+  <p class="dek"><b>The jab-cross front view was nonsense.</b> Both punches swung the fist out sideways, which reads as a hook. A straight punch travels at the camera: the fist now moves toward the centreline and grows as it foreshortens, the shoulder line rotates through behind the cross, and the feet are staggered in depth so the lead foot sits nearer the viewer.</p>
+  <div class="controls">
+    <button class="btn on" id="playBtn">Pause</button>
+    <button class="btn" id="slowBtn">Slow motion</button>
+    <button class="btn" id="pathBtn">Show bar path</button>
+    <input type="range" id="scrub" min="0" max="100" value="0" disabled aria-label="Scrub through the rep">
+  </div>
+  <p class="hint">Pause, then drag the slider to step through any position. Bar path traces where the bar travels &mdash; on a squat and deadlift it should be a straight vertical line.</p>
+  <div class="grid" id="grid"></div>
+  <p class="note">Every position is solved from anatomically-scaled segments with the feet planted, and checked programmatically across the whole continuous motion: limb lengths never stretch, planted feet never slide, nothing passes through the floor, and the bar path stays vertical. Nothing here is generated imagery.</p>
+</div>
+<script>
+/* BUILD:SOURCES */
+</script>
