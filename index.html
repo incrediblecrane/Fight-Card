@@ -454,10 +454,26 @@ function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.get
 function realToday(){return dateKey(new Date());}
 var BACKFILL_DAYS=14;
 function minLogDate(){ var d=new Date(); d.setDate(d.getDate()-(BACKFILL_DAYS-1)); return dateKey(d); }
+// Saving republishes the whole document and EVERY open view reloads onto it,
+// so anything held only in a variable is wiped on every single tap. That is why
+// the app keeps uiTab and friends in state. The log date needs the opposite
+// pair of properties: survive a save, but NOT survive closing the app. That is
+// exactly sessionStorage, which the reload keeps and closing the tab clears.
+// It deliberately does not go in state: a backdate is this device's editing
+// position, not part of the record, and it must never sync to another device.
+var LOGDATE_KEY='fc.logDate';
+function readStoredDate(){ try{ return sessionStorage.getItem(LOGDATE_KEY); }catch(e){ return null; } }
+function writeStoredDate(v){ try{ if(v) sessionStorage.setItem(LOGDATE_KEY,v); else sessionStorage.removeItem(LOGDATE_KEY); }catch(e){} }
+function setLogDate(v){
+  logDate=(v && v>=minLogDate() && v<=realToday()) ? v : realToday();
+  writeStoredDate(logDate===realToday()?null:logDate);
+  return logDate;
+}
 function activeDate(){
-  // Never trust the held value: a tab left open overnight would otherwise
-  // keep writing to yesterday.
-  if(!logDate || logDate>realToday() || logDate<minLogDate()) logDate=realToday();
+  if(logDate===null) logDate=readStoredDate();
+  // Re-check the bounds every time: a tab left open for weeks must not keep
+  // writing to a day that has fallen outside the backfill window.
+  if(!logDate || logDate>realToday() || logDate<minLogDate()) setLogDate(null);
   return logDate;
 }
 function backfilling(){ return activeDate()!==realToday(); }
@@ -483,7 +499,7 @@ var viewingSession=!!state.uiViewingSession;
 var expanded={};
 var slide=state.uiSlide||0;
 var progRange=state.uiProgRange||14;
-var logDate=null; // in-memory only, so a reload always returns to today
+var logDate=null; // null means 'not read yet'; the value lives in sessionStorage
 var addingExercise=false;
 var exSearch='';
 var poseFlip=false;
@@ -1125,8 +1141,8 @@ function onClick(e){
   var uiOnly=false;
 
   if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
-  else if(action==='today'){ logDate=realToday(); tab='today'; render(); return; }
-  else if(action==='pickday'){ logDate=t.getAttribute('data-k'); tab='today'; render(); return; }
+  else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
+  else if(action==='pickday'){ setLogDate(t.getAttribute('data-k')); tab='today'; render(); return; }
   else if(action==='prange'){ progRange=parseInt(t.getAttribute('data-n'),10)||14; uiOnly=true; }
   else if(action==='toggleex'){ var id0=t.getAttribute('data-id'); expanded[id0]=!expanded[id0]; uiOnly=true; }
   else if(action==='cancelsession'){ viewingSession=false; addingExercise=false; uiOnly=true; }
@@ -1197,11 +1213,7 @@ function onChange(e){
   var t=e.target.closest('[data-action]');
   if(!t) return;
   var action=t.getAttribute('data-action');
-  if(action==='logdate'){
-    var v=t.value;
-    if(v && v>=minLogDate() && v<=realToday()) logDate=v;
-    render(); return;
-  }
+  if(action==='logdate'){ setLogDate(t.value); render(); return; }
   else if(action==='inplan'){ var id=t.getAttribute('data-id'); var r=state.recipes.filter(function(x){return x.id===id;})[0]; if(r) r.inPlan=t.checked; }
   else if(action==='recipeday'){ var id2=t.getAttribute('data-id'); var r2=state.recipes.filter(function(x){return x.id===id2;})[0]; if(r2) r2.day=t.value; }
   render(); scheduleSave();
