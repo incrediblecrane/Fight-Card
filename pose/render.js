@@ -39,7 +39,9 @@ function buildFigure(ex,host){
   // Props are part of the movement, not decoration: a split squat without the
   // bench behind it is a lunge, and a wall sit without the wall is a squat.
   (ex.props||[]).forEach(function(p){
-    svg.appendChild(el('rect',{x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'}));
+    var a={x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'};
+    if(p[5]) a.transform='rotate('+p[5]+' '+(p[0]+p[2]/2)+' '+(p[1]+p[3]/2)+')';
+    svg.appendChild(el('rect',a));
   });
   var bp=barPath(ex), trace=null;
   if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
@@ -52,12 +54,35 @@ function buildFigure(ex,host){
   }
   // equipment sits behind the near-side limbs
   var eq=el('g',{});
-  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
-    R.bar=el('rect',{width:68,height:5,rx:2.5,fill:soft});
-    eq.appendChild(R.bar);
-    if(ex.equip==='barbell'){ R.p1=el('rect',{width:7,height:20,rx:2,fill:soft}); R.p2=el('rect',{width:7,height:20,rx:2,fill:soft}); eq.appendChild(R.p1); eq.appendChild(R.p2); }
-  } else if(ex.equip==='dumbbell'){
+  // An implement is drawn as it PROJECTS in this view, not as a generic icon.
+  // A barbell runs across the body, so from the side its axis points at the
+  // viewer: you see the plate face-on as a disc with the bar end as a hub. It
+  // used to be drawn as a 68-wide horizontal bar here, which is what a barbell
+  // looks like from the FRONT. Scale is honest: a 45cm plate is r=15 against a
+  // 120-unit figure. axis: 'lateral' runs across the body, 'sagittal' front to
+  // back (a dumbbell hanging in a neutral grip), 'vertical' upright (a goblet).
+  var axis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
+  if(ex.equip==='barbell'){
+    R.plate=el('circle',{r:15,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    R.hub=el('circle',{r:3.5,fill:soft});
+    eq.appendChild(R.plate); eq.appendChild(R.hub);
+  } else if(ex.equip==='fixedbar'){
+    R.hub=el('circle',{r:3.2,fill:soft});
+    eq.appendChild(R.hub);
+  } else if(ex.equip==='dumbbell' && axis==='vertical'){
     R.db=el('rect',{width:8,height:22,rx:3,fill:soft}); R.d1=el('rect',{width:16,height:7,rx:2,fill:soft}); R.d2=el('rect',{width:16,height:7,rx:2,fill:soft});
+    eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
+  } else if(ex.equip==='dumbbell' && axis==='lateral'){
+    // A pressed or supinated-curl dumbbell has its handle across the body, so
+    // from the side you look down the handle and see one bell face.
+    R.bell=el('circle',{r:6.5,fill:soft}); eq.appendChild(R.bell);
+  } else if(ex.equip==='cable'){
+    R.cable=el('line',{stroke:soft,'stroke-width':1.8}); R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+    eq.appendChild(R.cable); eq.appendChild(R.grip);
+  } else if(ex.equip==='dumbbell'){
+    // Hanging in a neutral grip the handle runs front to back, so from the side
+    // you see the whole dumbbell in profile, lying horizontal.
+    R.db=el('rect',{width:22,height:7,rx:3,fill:soft}); R.d1=el('rect',{width:7,height:17,rx:2,fill:soft}); R.d2=el('rect',{width:7,height:17,rx:2,fill:soft});
     eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
   } else if(ex.equip==='kettlebell'){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
@@ -90,12 +115,24 @@ function update(ex,ref,u){
   R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
   R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
   var p = ex.equip==='fixedbar' ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
-  if(R.bar){ R.bar.setAttribute('x',(p.x-34).toFixed(1)); R.bar.setAttribute('y',(p.y-2.5).toFixed(1)); }
-  if(R.p1){ R.p1.setAttribute('x',(p.x-40).toFixed(1)); R.p1.setAttribute('y',(p.y-10).toFixed(1));
-            R.p2.setAttribute('x',(p.x+33).toFixed(1)); R.p2.setAttribute('y',(p.y-10).toFixed(1)); }
-  if(R.db){ R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
-            R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
-            R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1)); }
+  var axis2 = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
+  if(R.plate){ R.plate.setAttribute('cx',p.x.toFixed(1)); R.plate.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.bell){ R.bell.setAttribute('cx',p.x.toFixed(1)); R.bell.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.cable && ex.anchorAt){
+    R.cable.setAttribute('x1',ex.anchorAt[0]); R.cable.setAttribute('y1',ex.anchorAt[1]);
+    R.cable.setAttribute('x2',p.x.toFixed(1)); R.cable.setAttribute('y2',p.y.toFixed(1));
+    R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1));
+  }
+  if(R.db && axis2==='vertical'){
+    R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
+    R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
+    R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1));
+  } else if(R.db){
+    R.db.setAttribute('x',(p.x-11).toFixed(1)); R.db.setAttribute('y',(p.y-3.5).toFixed(1));
+    R.d1.setAttribute('x',(p.x-14).toFixed(1)); R.d1.setAttribute('y',(p.y-8.5).toFixed(1));
+    R.d2.setAttribute('x',(p.x+7).toFixed(1));  R.d2.setAttribute('y',(p.y-8.5).toFixed(1));
+  }
   if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
             R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
 }
@@ -147,11 +184,33 @@ function buildFront(ex,host){
     R.fkb=el('circle',{r:9,fill:soft});
     svg.appendChild(R.fkbH); svg.appendChild(R.fkb);
   }
-  if(ex.equip==='dumbbell'){
+  var faxis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
+  if(ex.equip==='dumbbell' && faxis==='vertical'){
     R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
     R.fdb1=el('rect',{width:19,height:7,rx:2.5,fill:soft});
     R.fdb2=el('rect',{width:19,height:7,rx:2.5,fill:soft});
     svg.appendChild(R.fdb); svg.appendChild(R.fdb1); svg.appendChild(R.fdb2);
+  } else if(ex.equip==='dumbbell' && faxis==='lateral'){
+    // Handle across the body: from the front you see the whole dumbbell in
+    // profile at each hand. This is what separates a hammer curl from a
+    // supinated curl at a glance, in both views.
+    R.fdbL=el('g',{}); R.fdbR=el('g',{});
+    [['L',R.fdbL],['R',R.fdbR]].forEach(function(pr){
+      R['fh'+pr[0]]=el('rect',{width:20,height:6,rx:3,fill:soft});
+      R['fc'+pr[0]+'1']=el('rect',{width:6,height:16,rx:2,fill:soft});
+      R['fc'+pr[0]+'2']=el('rect',{width:6,height:16,rx:2,fill:soft});
+      pr[1].appendChild(R['fh'+pr[0]]); pr[1].appendChild(R['fc'+pr[0]+'1']); pr[1].appendChild(R['fc'+pr[0]+'2']);
+      svg.appendChild(pr[1]);
+    });
+  } else if(ex.equip==='dumbbell'){
+    // Handle running front to back means you look straight down its axis: one
+    // bell face per hand, not a dumbbell lying sideways across the body.
+    R.fbellL=el('circle',{r:6,fill:soft}); R.fbellR=el('circle',{r:6,fill:soft});
+    svg.appendChild(R.fbellL); svg.appendChild(R.fbellR);
+  } else if(ex.equip==='cable'){
+    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fcabR=el('line',{stroke:soft,'stroke-width':1.8});
+    R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+    svg.appendChild(R.fcabL); svg.appendChild(R.fcabR); svg.appendChild(R.fgripL); svg.appendChild(R.fgripR);
   }
   host.appendChild(svg);
   return R;
@@ -189,6 +248,26 @@ function updateFront(ex,R,u){
     R.fkbH.setAttribute('d','M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+
       ' Q'+kx.toFixed(1)+','+(ky-7).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
     R.fkb.setAttribute('cx',kx.toFixed(1)); R.fkb.setAttribute('cy',(ky+9).toFixed(1));
+  }
+  if(R.fhL){
+    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+      var h=pr[1];
+      R['fh'+pr[0]].setAttribute('x',(h.x-10).toFixed(1)); R['fh'+pr[0]].setAttribute('y',(h.y-3).toFixed(1));
+      R['fc'+pr[0]+'1'].setAttribute('x',(h.x-13).toFixed(1)); R['fc'+pr[0]+'1'].setAttribute('y',(h.y-8).toFixed(1));
+      R['fc'+pr[0]+'2'].setAttribute('x',(h.x+7).toFixed(1));  R['fc'+pr[0]+'2'].setAttribute('y',(h.y-8).toFixed(1));
+    });
+  }
+  if(R.fcabL && ex.anchorFront){
+    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+      var h=pr[1], ax=ex.anchorFront[pr[0]==='L'?0:2], ay=ex.anchorFront[pr[0]==='L'?1:3];
+      R['fcab'+pr[0]].setAttribute('x1',ax); R['fcab'+pr[0]].setAttribute('y1',ay);
+      R['fcab'+pr[0]].setAttribute('x2',h.x.toFixed(1)); R['fcab'+pr[0]].setAttribute('y2',h.y.toFixed(1));
+      R['fgrip'+pr[0]].setAttribute('x',(h.x-2.5).toFixed(1)); R['fgrip'+pr[0]].setAttribute('y',(h.y-6.5).toFixed(1));
+    });
+  }
+  if(R.fbellL){
+    R.fbellL.setAttribute('cx',s.handL.x.toFixed(1)); R.fbellL.setAttribute('cy',s.handL.y.toFixed(1));
+    R.fbellR.setAttribute('cx',s.handR.x.toFixed(1)); R.fbellR.setAttribute('cy',s.handR.y.toFixed(1));
   }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;

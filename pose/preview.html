@@ -240,7 +240,7 @@ var EXERCISES = [
 { id:"goblet", tempo:[500,500,380,380], name:"Goblet squat",
   real:"Bell or dumbbell held vertically at the sternum with both hands, elbows tucked down and inside the knees at the bottom. Torso stays upright, more like a front squat than a back squat.",
   changed:"Elbows now hang down and in with the weight at chest height, instead of the arms drifting out in front.",
-  equip:"dumbbell", active:"legs",
+  equip:"dumbbell", axis:"vertical", active:"legs",
   frames:[
     {hip:[55,107],torso:4, ankN:[60,163],ankF:[50,163], armN:[163,22]},
     {hip:[51,122],torso:16,ankN:[60,163],ankF:[50,163], armN:[163,22]},
@@ -369,6 +369,119 @@ var EXERCISES = [
     {hip:[33,134],torso:0,ankN:[62,163],ankF:[53,163], handN:[46,114],handF:[40,116], elbowSign:1}
   ]},
 
+{ id:"deadhang", tempo:[600,900,900,600], name:"Dead hang",
+  real:"Full grip on a fixed bar, arms dead straight, feet off the floor. Let the shoulders relax up toward the ears at first, then gently pack them down without bending the arms. The point is time under a decompressing spine, so almost nothing moves.",
+  changed:"It is a hold, not a pull. The bar is fixed, the arms stay straight throughout, and the only travel is the shoulders settling. It used to share the pull-up pose and looked like a rep.",
+  equip:"fixedbar", active:"arms", barAt:[60,30],
+  frames:[
+    {hip:[58,100],torso:0,ankN:[54,156],ankF:[46,155], handN:[60,30],handF:[55,30], elbowSign:1},
+    {hip:[58,103],torso:0,ankN:[54,159],ankF:[46,158], handN:[60,30],handF:[55,30], elbowSign:1},
+    {hip:[58,103],torso:0,ankN:[54,159],ankF:[46,158], handN:[60,30],handF:[55,30], elbowSign:1},
+    {hip:[58,101],torso:0,ankN:[54,157],ankF:[46,156], handN:[60,30],handF:[55,30], elbowSign:1}
+  ]},
+
+{ id:"dip", tempo:[520,520,420,420], name:"Dip",
+  real:"Hands fixed on parallel bars, body supported between them. Lower until the shoulder drops below the elbow, with a slight forward lean and the elbows tracking back rather than flaring wide, then press back to straight arms.",
+  changed:"The hands are now pinned to the bars and the BODY travels down to them, which is the whole movement. The old pose swung the arms instead.",
+  equip:null, active:"arms", props:[[50,108,44,5]],
+  frames:[
+    {hip:[58,106],torso:8, ankN:[46,150],ankF:[39,148], handN:[72,110],handF:[64,110], elbowSign:1},
+    {hip:[58,114],torso:11,ankN:[46,150],ankF:[39,148], handN:[72,110],handF:[64,110], elbowSign:1},
+    {hip:[58,122],torso:14,ankN:[46,150],ankF:[39,148], handN:[72,110],handF:[64,110], elbowSign:1},
+    {hip:[58,114],torso:11,ankN:[46,150],ankF:[39,148], handN:[72,110],handF:[64,110], elbowSign:1}
+  ]},
+
+{ id:"pulldown", tempo:[420,420,520,520], name:"Lat pulldown",
+  real:"Seated with the thighs pinned under a pad. Start with the arms fully extended overhead and a slight backward lean, then drive the elbows DOWN and back to bring the bar to the upper chest. The torso angle barely changes; leaning back to move the weight turns it into a row.",
+  changed:"The cable now runs to a fixed overhead anchor and the elbows lead the pull, rather than the arm reaching up and back like a bent-over row stood upright.",
+  equip:"cable", anchorAt:[58,24], anchorFront:[52,24,88,24], active:"arms",
+  props:[[24,134,46,8],[30,142,7,26,0],[60,120,9,15]],
+  frames:[
+    {hip:[50,132],torso:350,ankN:[80,163],ankF:[72,163], handN:[56,62],handF:[50,63], elbowSign:1},
+    {hip:[50,132],torso:350,ankN:[80,163],ankF:[72,163], handN:[57,76],handF:[51,77], elbowSign:1},
+    {hip:[50,132],torso:350,ankN:[80,163],ankF:[72,163], handN:[58,90],handF:[52,91], elbowSign:1},
+    {hip:[50,132],torso:350,ankN:[80,163],ankF:[72,163], handN:[57,76],handF:[51,77], elbowSign:1}
+  ]},
+
+{ id:"facepull", tempo:[420,420,480,480], name:"Face pull",
+  real:"Cable set at face height. Start with the arms extended forward, then pull toward the face with the elbows staying HIGH, finishing with the hands beside the ears and the rear shoulders squeezed. The elbows leading low turns it into a row.",
+  changed:"The elbows now stay above the wrists through the whole pull and the hands finish beside the head, which is what separates a face pull from every other row. It used to share the generic ROW pose.",
+  equip:"cable", anchorAt:[132,62], anchorFront:[24,58,116,58], active:"arms",
+  frames:[
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[94,66],handF:[88,68], elbowSign:-1},
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,63],handF:[76,65], elbowSign:-1},
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[71,60],handF:[65,62], elbowSign:-1},
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,63],handF:[76,65], elbowSign:-1}
+  ]},
+
+{ id:"press_incline", tempo:[500,500,400,400], name:"Incline dumbbell press",
+  real:"Bench set around thirty to forty degrees. Dumbbells start at chest level just outside the shoulders and press up and slightly together, following the angle of the bench rather than straight up. Feet stay planted on the floor.",
+  changed:"There is an actual inclined bench under the torso and the press follows its angle, so it no longer reads as a flat bench press. The dumbbell handles run across the body, so from the side you see one bell face and from the front the whole dumbbell.",
+  equip:"dumbbell", axis:"lateral", active:"arms", props:[[6,108,58,10,3,-34],[16,146,7,24,0]],
+  frames:[
+    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[58,86],handF:[52,88], elbowSign:1},
+    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[50,96],handF:[44,98], elbowSign:1},
+    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[43,106],handF:[37,108], elbowSign:1},
+    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[50,96],handF:[44,98], elbowSign:1}
+  ]},
+
+{ id:"triceps_ext", tempo:[480,480,420,420], name:"Triceps extension",
+  real:"One weight held overhead in both hands. Only the elbows bend: the upper arms stay pointing at the ceiling while the weight lowers behind the head, then press back to straight. If the elbows drift forward and down it becomes a press.",
+  changed:"The upper arm now stays vertical and only the forearm moves, which is the entire point of the exercise. It used to share the overhead press pose, where the whole arm travels.",
+  equip:"dumbbell", axis:"vertical", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[58,36],handF:[52,38], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[50,46],handF:[44,48], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[41,54],handF:[35,56], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[50,46],handF:[44,48], elbowSign:1}
+  ]},
+
+{ id:"curl_bicep", tempo:[420,420,520,520], name:"Bicep curl",
+  real:"Palms facing up, elbows pinned to the ribs. The forearm rotates around a fixed elbow; the upper arm does not swing forward and the shoulders do not shrug up to help.",
+  changed:"The elbow now stays pinned at the ribs instead of the whole arm swinging. Supinated grip means the handle runs across the body, so the side view sees a bell face and the front view the full dumbbell. That is what tells it apart from the hammer curl.",
+  equip:"dumbbell", axis:"lateral", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[71,84], handF:[65,83],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
+  ]},
+
+{ id:"curl_hammer", tempo:[420,420,520,520], name:"Hammer curl",
+  real:"Neutral grip, palms facing each other, thumbs up the whole way. Same pinned elbow as a supinated curl; only the grip changes, and with it which muscles take the load.",
+  changed:"Neutral grip means the handle runs front to back, so from the side you see the whole dumbbell in profile and from the front you see one bell face. That is the exact opposite of the bicep curl, and it is the only thing that distinguishes them at a glance.",
+  equip:"dumbbell", axis:"sagittal", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[71,84], handF:[65,83],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
+  ]},
+
+{ id:"curl_21s", tempo:[280,280,280,280,340,340], name:"21s (biceps)",
+  real:"Twenty-one reps in three unbroken blocks: seven from full stretch to halfway, seven from halfway to the top, then seven full reps. Far lighter than a straight curl, elbows still throughout.",
+  changed:"It now shows the actual structure: two short pulses in the bottom half, then the range opening out to the top. A single full curl looked identical to every other curl in the list, which is the whole problem with sharing one pose.",
+  equip:"barbell", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[71,84], handF:[65,83],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
+  ]},
+
+{ id:"curl_cable_single", tempo:[420,420,520,520], name:"Single-arm cable curl",
+  real:"A handle on each low pulley, both arms curling at the same time. Stand mid-stack with the elbows pinned by the ribs. The cable keeps tension at the bottom of the range where a dumbbell goes slack, which is the reason to choose it.",
+  changed:"The cable now runs to a low anchor so the line of pull is visible, which is the only thing that separates this from a dumbbell curl. Both arms work together rather than one at a time.",
+  equip:"cable", anchorAt:[112,160], anchorFront:[26,160,114,160], active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[71,84], handF:[65,83],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
+  ]},
+
 { id:"deadbug", tempo:[760,700,760,700], name:"Dead bug", flag:true,
   real:"Lying flat on the back. Opposite arm and leg extend away long and low while the other pair holds a 90/90 tabletop, then it alternates. The lower back stays pinned throughout.",
   changed:"Now genuinely alternates diagonal pairs with the body flat on the floor: one side holds tabletop (thigh vertical, shin horizontal) while the opposite arm and leg reach out long and low.",
@@ -406,7 +519,85 @@ var FRONTS = {
     {hipY:112,footL:[58,157],footR:[80,167],kneeL:[58,133],kneeR:[82,140],lean:5,
      handL:[66,64],handR:[82,70],elbL:[64,76],elbR:[86,88],fistL:2.15}],
 
-  // Every other front view is DERIVED from the side frames. See frontFromSide().
+    // Bench press seen from ABOVE (frontPlan): lying supine, the frontal plane
+  // faces the ceiling, so this is a plan view. Head at the top, feet at the
+  // bottom. The bar does not move laterally, so what this view carries is grip
+  // width and elbow flare: tucked at lockout, wide at the chest. An arm pressed
+  // straight up points AT the camera and projects to almost nothing.
+  bench:[
+    {hipY:150,footL:[50,168],footR:[90,168],kneeL:[46,158],kneeR:[94,158],
+     handL:[44,116],handR:[96,116],elbL:[49,118],elbR:[91,118]},
+    {hipY:150,footL:[50,168],footR:[90,168],kneeL:[46,158],kneeR:[94,158],
+     handL:[44,116],handR:[96,116],elbL:[43,123],elbR:[97,123]},
+    {hipY:150,footL:[50,168],footR:[90,168],kneeL:[46,158],kneeR:[94,158],
+     handL:[44,116],handR:[96,116],elbL:[38,128],elbR:[102,128]},
+    {hipY:150,footL:[50,168],footR:[90,168],kneeL:[46,158],kneeR:[94,158],
+     handL:[44,116],handR:[96,116],elbL:[43,123],elbR:[97,123]}],
+
+  // Dead bug seen from ABOVE (frontPlan). A limb pointing at the ceiling
+  // projects to almost nothing, so the tabletop side collapses toward the joint
+  // it hangs from while the reaching side extends long up or down the screen.
+  // Which diagonal is working is the whole point and the side view cannot say.
+  deadbug:[
+    {hipY:130,footL:[61,152],footR:[79,152],kneeL:[61,138],kneeR:[79,138],
+     handL:[56,92],handR:[84,92],elbL:[56,99],elbR:[84,99]},
+    {hipY:130,footL:[61,178],footR:[79,152],kneeL:[61,154],kneeR:[79,138],
+     handL:[56,60],handR:[84,92],elbL:[56,78],elbR:[84,99]},
+    {hipY:130,footL:[61,152],footR:[79,152],kneeL:[61,138],kneeR:[79,138],
+     handL:[56,92],handR:[84,92],elbL:[56,99],elbR:[84,99]},
+    {hipY:130,footL:[61,152],footR:[79,178],kneeL:[61,138],kneeR:[79,154],
+     handL:[56,92],handR:[84,60],elbL:[56,99],elbR:[84,78]}],
+
+  // Split squat from the front. The rear foot is behind and higher on screen;
+  // the front knee must track over the toes, not collapse inward, which is the
+  // single thing this view is worth having for.
+  splitsq_bulg:[
+    {hipY:116,footL:[58,146],footR:[80,166],kneeL:[57,132],kneeR:[83,142],handL:[52,150],handR:[88,150]},
+    {hipY:126,footL:[58,146],footR:[80,166],kneeL:[56,138],kneeR:[84,148],handL:[52,158],handR:[88,158]},
+    {hipY:136,footL:[58,146],footR:[80,166],kneeL:[55,144],kneeR:[85,153],handL:[52,166],handR:[88,166]},
+    {hipY:126,footL:[58,146],footR:[80,166],kneeL:[56,138],kneeR:[84,148],handL:[52,158],handR:[88,158]}],
+
+  // Hip thrust from the feet end: knees track out over the toes and the bar
+  // sits square across both hips.
+  hipthrust:[
+    {hipY:148,torsoScale:0.16,footL:[56,163],footR:[84,163],kneeL:[52,150],kneeR:[88,150],
+     handL:[48,148],handR:[92,148],elbL:[40,152],elbR:[100,152]},
+    {hipY:139,torsoScale:0.1, footL:[56,163],footR:[84,163],kneeL:[52,146],kneeR:[88,146],
+     handL:[48,139],handR:[92,139],elbL:[40,144],elbR:[100,144]},
+    {hipY:130,torsoScale:0.08,footL:[56,163],footR:[84,163],kneeL:[52,142],kneeR:[88,142],
+     handL:[48,130],handR:[92,130],elbL:[40,136],elbR:[100,136]},
+    {hipY:139,torsoScale:0.1, footL:[56,163],footR:[84,163],kneeL:[52,146],kneeR:[88,146],
+     handL:[48,139],handR:[92,139],elbL:[40,144],elbR:[100,144]}],
+
+  // Calf raise from the front: both heels rise together and the ankles must not
+  // roll out to the little toe, which is the common fault.
+  calfraise:[
+    {hipY:101,footL:[62,158],footR:[78,158],kneeL:[61,130],kneeR:[79,130],handL:[54,140],handR:[86,140]},
+    {hipY:95, footL:[62,152],footR:[78,152],kneeL:[61,124],kneeR:[79,124],handL:[54,134],handR:[86,134]},
+    {hipY:87, footL:[62,144],footR:[78,144],kneeL:[61,116],kneeR:[79,116],handL:[54,126],handR:[86,126]},
+    {hipY:95, footL:[62,152],footR:[78,152],kneeL:[61,124],kneeR:[79,124],handL:[54,134],handR:[86,134]}],
+
+  // Wall sit from the front: knees stay stacked over the ankles rather than
+  // falling in, and the stance stays hip width.
+  wallsit:[
+    {hipY:120,footL:[61,163],footR:[79,163],kneeL:[60,142],kneeR:[80,142],handL:[58,112],handR:[82,112]},
+    {hipY:127,footL:[61,163],footR:[79,163],kneeL:[60,148],kneeR:[80,148],handL:[58,119],handR:[82,119]},
+    {hipY:134,footL:[61,163],footR:[79,163],kneeL:[60,154],kneeR:[80,154],handL:[58,126],handR:[82,126]},
+    {hipY:134,footL:[61,163],footR:[79,163],kneeL:[60,154],kneeR:[80,154],handL:[58,126],handR:[82,126]}],
+
+  // Dead bug from above: opposite arm and leg reach away while the other pair
+  // holds tabletop. Which diagonal is working is only visible from here.
+  deadbug:[
+    {hipY:150,torsoScale:0.5,footL:[56,120],footR:[84,120],kneeL:[54,134],kneeR:[86,134],
+     handL:[52,108],handR:[88,108],elbL:[46,124],elbR:[94,124]},
+    {hipY:150,torsoScale:0.5,footL:[58,96], footR:[84,120],kneeL:[56,122],kneeR:[86,134],
+     handL:[52,108],handR:[92,146],elbL:[46,124],elbR:[96,130]},
+    {hipY:150,torsoScale:0.5,footL:[56,120],footR:[84,120],kneeL:[54,134],kneeR:[86,134],
+     handL:[52,108],handR:[88,108],elbL:[46,124],elbR:[94,124]},
+    {hipY:150,torsoScale:0.5,footL:[56,120],footR:[82,96], kneeL:[54,134],kneeR:[84,122],
+     handL:[48,146],handR:[88,108],elbL:[44,130],elbR:[94,124]}],
+
+// Every other front view is DERIVED from the side frames. See frontFromSide().
 };
 
 // A hinge or a squat bends front-to-back, so its front view is that same
@@ -471,6 +662,58 @@ function frontFromSide(ex,opt){
   });
 }
 
+// Hand-authored front frames state intent (where the grip is, where the elbow
+// flares) and routinely state it slightly out of reach. Rather than hand-tuning
+// coordinates until the checks go quiet, pull every one of them inside what the
+// limbs can actually do, keeping the direction asked for and only shortening
+// the distance. placeJoint then settles the elbow and knee.
+function clampFront(fr){
+  var cx=70, hipHW=9, shHW=16, ARM=39.2, LEG=57.2;
+  return fr.map(function(f){
+    var g=JSON.parse(JSON.stringify(f));
+    var lean=g.lean||0, tS=g.torsoScale===undefined?1:g.torsoScale;
+    var shY=g.hipY-RIG.L.TORSO*tS;
+    var sh={L:[cx+lean-shHW,shY], R:[cx+lean+shHW,shY]};
+    var hip={L:[cx-hipHW,g.hipY], R:[cx+hipHW,g.hipY]};
+    function pull(pt,root,max){
+      var dx=pt[0]-root[0], dy=pt[1]-root[1], d=Math.hypot(dx,dy);
+      if(d<=max||d===0) return pt;
+      return [root[0]+dx/d*max, root[1]+dy/d*max];
+    }
+    ['L','R'].forEach(function(k){
+      var aS=g['armScale'+k]===undefined?1:g['armScale'+k];
+      g['hand'+k]=pull(g['hand'+k], sh[k], ARM*aS);
+      g['foot'+k]=pull(g['foot'+k], hip[k], LEG);
+      if(g['elb'+k]){
+        var e=placeJoint(sh[k][0],sh[k][1],g['hand'+k][0],g['hand'+k][1],
+              RIG.L.UPPER*aS,RIG.L.FORE*aS,g['elb'+k][1],g['elb'+k][0]);
+        g['elb'+k]=[e[0],e[1]];
+      }
+      if(g['knee'+k]){
+        var n=placeJoint(hip[k][0],hip[k][1],g['foot'+k][0],g['foot'+k][1],
+              RIG.L.THIGH,RIG.L.SHIN,g['knee'+k][1],g['knee'+k][0]);
+        g['knee'+k]=[n[0],n[1]];
+      }
+    });
+    return g;
+  });
+}
+Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
+
+// These ten are upright and sagittal, so the same derivation applies. Grip is
+// the point of most of them: a hammer curl and a supinated curl are the same
+// geometry and differ only in what the implement does, which is why the
+// equipment axis matters as much as the joints.
+[{id:'deadhang',stance:8, grip:19},{id:'dip',          stance:8, grip:14},
+ {id:'pulldown',stance:9, grip:24},{id:'facepull',     stance:9, grip:15},
+ {id:'press_incline',stance:9,grip:20},{id:'triceps_ext',stance:8,grip:5},
+ {id:'curl_bicep',stance:8,grip:13},{id:'curl_hammer',  stance:8, grip:13},
+ {id:'curl_21s', stance:8, grip:14},{id:'curl_cable_single',stance:9,grip:16}
+].forEach(function(o){
+  var ex=EXERCISES.filter(function(e){return e.id===o.id;})[0];
+  if(ex) FRONTS[o.id]=frontFromSide(ex,o);
+});
+
 // Stance and grip are the only genuinely new information a front view carries.
 // Squats stand wider than the hinges; the back-squat grip is wide out on the
 // bar, the front rack and goblet narrow at the neck and sternum, and both hands
@@ -485,6 +728,10 @@ function frontFromSide(ex,opt){
   FRONTS[o.id]=frontFromSide(ex,o);
 });
 
+// A plan view has no gravity in it: "up the screen" means toward the head.
+['bench','deadbug'].forEach(function(id){
+  var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.frontPlan=true;
+});
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 
 if(typeof module!=='undefined') module.exports=EXERCISES;
@@ -531,7 +778,9 @@ function buildFigure(ex,host){
   // Props are part of the movement, not decoration: a split squat without the
   // bench behind it is a lunge, and a wall sit without the wall is a squat.
   (ex.props||[]).forEach(function(p){
-    svg.appendChild(el('rect',{x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'}));
+    var a={x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'};
+    if(p[5]) a.transform='rotate('+p[5]+' '+(p[0]+p[2]/2)+' '+(p[1]+p[3]/2)+')';
+    svg.appendChild(el('rect',a));
   });
   var bp=barPath(ex), trace=null;
   if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
@@ -544,12 +793,35 @@ function buildFigure(ex,host){
   }
   // equipment sits behind the near-side limbs
   var eq=el('g',{});
-  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
-    R.bar=el('rect',{width:68,height:5,rx:2.5,fill:soft});
-    eq.appendChild(R.bar);
-    if(ex.equip==='barbell'){ R.p1=el('rect',{width:7,height:20,rx:2,fill:soft}); R.p2=el('rect',{width:7,height:20,rx:2,fill:soft}); eq.appendChild(R.p1); eq.appendChild(R.p2); }
-  } else if(ex.equip==='dumbbell'){
+  // An implement is drawn as it PROJECTS in this view, not as a generic icon.
+  // A barbell runs across the body, so from the side its axis points at the
+  // viewer: you see the plate face-on as a disc with the bar end as a hub. It
+  // used to be drawn as a 68-wide horizontal bar here, which is what a barbell
+  // looks like from the FRONT. Scale is honest: a 45cm plate is r=15 against a
+  // 120-unit figure. axis: 'lateral' runs across the body, 'sagittal' front to
+  // back (a dumbbell hanging in a neutral grip), 'vertical' upright (a goblet).
+  var axis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
+  if(ex.equip==='barbell'){
+    R.plate=el('circle',{r:15,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    R.hub=el('circle',{r:3.5,fill:soft});
+    eq.appendChild(R.plate); eq.appendChild(R.hub);
+  } else if(ex.equip==='fixedbar'){
+    R.hub=el('circle',{r:3.2,fill:soft});
+    eq.appendChild(R.hub);
+  } else if(ex.equip==='dumbbell' && axis==='vertical'){
     R.db=el('rect',{width:8,height:22,rx:3,fill:soft}); R.d1=el('rect',{width:16,height:7,rx:2,fill:soft}); R.d2=el('rect',{width:16,height:7,rx:2,fill:soft});
+    eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
+  } else if(ex.equip==='dumbbell' && axis==='lateral'){
+    // A pressed or supinated-curl dumbbell has its handle across the body, so
+    // from the side you look down the handle and see one bell face.
+    R.bell=el('circle',{r:6.5,fill:soft}); eq.appendChild(R.bell);
+  } else if(ex.equip==='cable'){
+    R.cable=el('line',{stroke:soft,'stroke-width':1.8}); R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+    eq.appendChild(R.cable); eq.appendChild(R.grip);
+  } else if(ex.equip==='dumbbell'){
+    // Hanging in a neutral grip the handle runs front to back, so from the side
+    // you see the whole dumbbell in profile, lying horizontal.
+    R.db=el('rect',{width:22,height:7,rx:3,fill:soft}); R.d1=el('rect',{width:7,height:17,rx:2,fill:soft}); R.d2=el('rect',{width:7,height:17,rx:2,fill:soft});
     eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
   } else if(ex.equip==='kettlebell'){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
@@ -582,12 +854,24 @@ function update(ex,ref,u){
   R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
   R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
   var p = ex.equip==='fixedbar' ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
-  if(R.bar){ R.bar.setAttribute('x',(p.x-34).toFixed(1)); R.bar.setAttribute('y',(p.y-2.5).toFixed(1)); }
-  if(R.p1){ R.p1.setAttribute('x',(p.x-40).toFixed(1)); R.p1.setAttribute('y',(p.y-10).toFixed(1));
-            R.p2.setAttribute('x',(p.x+33).toFixed(1)); R.p2.setAttribute('y',(p.y-10).toFixed(1)); }
-  if(R.db){ R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
-            R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
-            R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1)); }
+  var axis2 = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
+  if(R.plate){ R.plate.setAttribute('cx',p.x.toFixed(1)); R.plate.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.bell){ R.bell.setAttribute('cx',p.x.toFixed(1)); R.bell.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.cable && ex.anchorAt){
+    R.cable.setAttribute('x1',ex.anchorAt[0]); R.cable.setAttribute('y1',ex.anchorAt[1]);
+    R.cable.setAttribute('x2',p.x.toFixed(1)); R.cable.setAttribute('y2',p.y.toFixed(1));
+    R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1));
+  }
+  if(R.db && axis2==='vertical'){
+    R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
+    R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
+    R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1));
+  } else if(R.db){
+    R.db.setAttribute('x',(p.x-11).toFixed(1)); R.db.setAttribute('y',(p.y-3.5).toFixed(1));
+    R.d1.setAttribute('x',(p.x-14).toFixed(1)); R.d1.setAttribute('y',(p.y-8.5).toFixed(1));
+    R.d2.setAttribute('x',(p.x+7).toFixed(1));  R.d2.setAttribute('y',(p.y-8.5).toFixed(1));
+  }
   if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
             R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
 }
@@ -639,11 +923,33 @@ function buildFront(ex,host){
     R.fkb=el('circle',{r:9,fill:soft});
     svg.appendChild(R.fkbH); svg.appendChild(R.fkb);
   }
-  if(ex.equip==='dumbbell'){
+  var faxis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
+  if(ex.equip==='dumbbell' && faxis==='vertical'){
     R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
     R.fdb1=el('rect',{width:19,height:7,rx:2.5,fill:soft});
     R.fdb2=el('rect',{width:19,height:7,rx:2.5,fill:soft});
     svg.appendChild(R.fdb); svg.appendChild(R.fdb1); svg.appendChild(R.fdb2);
+  } else if(ex.equip==='dumbbell' && faxis==='lateral'){
+    // Handle across the body: from the front you see the whole dumbbell in
+    // profile at each hand. This is what separates a hammer curl from a
+    // supinated curl at a glance, in both views.
+    R.fdbL=el('g',{}); R.fdbR=el('g',{});
+    [['L',R.fdbL],['R',R.fdbR]].forEach(function(pr){
+      R['fh'+pr[0]]=el('rect',{width:20,height:6,rx:3,fill:soft});
+      R['fc'+pr[0]+'1']=el('rect',{width:6,height:16,rx:2,fill:soft});
+      R['fc'+pr[0]+'2']=el('rect',{width:6,height:16,rx:2,fill:soft});
+      pr[1].appendChild(R['fh'+pr[0]]); pr[1].appendChild(R['fc'+pr[0]+'1']); pr[1].appendChild(R['fc'+pr[0]+'2']);
+      svg.appendChild(pr[1]);
+    });
+  } else if(ex.equip==='dumbbell'){
+    // Handle running front to back means you look straight down its axis: one
+    // bell face per hand, not a dumbbell lying sideways across the body.
+    R.fbellL=el('circle',{r:6,fill:soft}); R.fbellR=el('circle',{r:6,fill:soft});
+    svg.appendChild(R.fbellL); svg.appendChild(R.fbellR);
+  } else if(ex.equip==='cable'){
+    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fcabR=el('line',{stroke:soft,'stroke-width':1.8});
+    R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+    svg.appendChild(R.fcabL); svg.appendChild(R.fcabR); svg.appendChild(R.fgripL); svg.appendChild(R.fgripR);
   }
   host.appendChild(svg);
   return R;
@@ -681,6 +987,26 @@ function updateFront(ex,R,u){
     R.fkbH.setAttribute('d','M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+
       ' Q'+kx.toFixed(1)+','+(ky-7).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
     R.fkb.setAttribute('cx',kx.toFixed(1)); R.fkb.setAttribute('cy',(ky+9).toFixed(1));
+  }
+  if(R.fhL){
+    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+      var h=pr[1];
+      R['fh'+pr[0]].setAttribute('x',(h.x-10).toFixed(1)); R['fh'+pr[0]].setAttribute('y',(h.y-3).toFixed(1));
+      R['fc'+pr[0]+'1'].setAttribute('x',(h.x-13).toFixed(1)); R['fc'+pr[0]+'1'].setAttribute('y',(h.y-8).toFixed(1));
+      R['fc'+pr[0]+'2'].setAttribute('x',(h.x+7).toFixed(1));  R['fc'+pr[0]+'2'].setAttribute('y',(h.y-8).toFixed(1));
+    });
+  }
+  if(R.fcabL && ex.anchorFront){
+    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+      var h=pr[1], ax=ex.anchorFront[pr[0]==='L'?0:2], ay=ex.anchorFront[pr[0]==='L'?1:3];
+      R['fcab'+pr[0]].setAttribute('x1',ax); R['fcab'+pr[0]].setAttribute('y1',ay);
+      R['fcab'+pr[0]].setAttribute('x2',h.x.toFixed(1)); R['fcab'+pr[0]].setAttribute('y2',h.y.toFixed(1));
+      R['fgrip'+pr[0]].setAttribute('x',(h.x-2.5).toFixed(1)); R['fgrip'+pr[0]].setAttribute('y',(h.y-6.5).toFixed(1));
+    });
+  }
+  if(R.fbellL){
+    R.fbellL.setAttribute('cx',s.handL.x.toFixed(1)); R.fbellL.setAttribute('cy',s.handL.y.toFixed(1));
+    R.fbellR.setAttribute('cx',s.handR.x.toFixed(1)); R.fbellR.setAttribute('cy',s.handR.y.toFixed(1));
   }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;

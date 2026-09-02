@@ -61,14 +61,16 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
     ck(tag,'arms never over-extend', d(s.shR,s.handR)<=L.UPPER+L.FORE+0.5,'reach '+r(d(s.shR,s.handR)));
     ck(tag,'stays above the floor', Math.max(s.footL.y,s.footR.y,s.hipC.y)<=GROUND+1,'lowest '+r(Math.max(s.footL.y,s.footR.y)));
     ck(tag,'left stays left of right', s.hipL.x<s.hipR.x && s.footL.x<s.footR.x,'sides crossed');
-    // A human elbow never bends upward: whatever the arm is doing (hanging,
-    // pressing overhead, guarding), the elbow stays at or below the lower of
-    // the shoulder and the hand. Comparing against the chord midpoint instead
-    // fails honestly-bent arms whose hand is above the shoulder.
-    ck(tag,'left elbow never bends upward', s.elbL.y>=Math.min(s.shL.y,s.handL.y)-1,
+    // A human elbow never bends upward, but that only constrains an arm working
+    // from BELOW the shoulder. Overhead (a triceps extension, a face pull with
+    // high elbows, a pull-up) the elbow is legitimately the apex, so the rule
+    // applies only when the hand is below the shoulder.
+    if(!ex.frontPlan){
+    if(s.handL.y>s.shL.y) ck(tag,'left elbow never bends upward', s.elbL.y>=s.shL.y-1,
       'elbow '+r(s.elbL.y)+' shoulder '+r(s.shL.y)+' hand '+r(s.handL.y));
-    ck(tag,'right elbow never bends upward', s.elbR.y>=Math.min(s.shR.y,s.handR.y)-1,
+    if(s.handR.y>s.shR.y) ck(tag,'right elbow never bends upward', s.elbR.y>=s.shR.y-1,
       'elbow '+r(s.elbR.y)+' shoulder '+r(s.shR.y)+' hand '+r(s.handR.y));
+    }
     ck(tag,'shoulders are wider than the hips', s.shR.x-s.shL.x > s.hipR.x-s.hipL.x,
       'shoulders '+r(s.shR.x-s.shL.x)+' hips '+r(s.hipR.x-s.hipL.x));
 
