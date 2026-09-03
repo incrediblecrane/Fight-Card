@@ -7,7 +7,7 @@ function ck(id,label,cond,detail){ if(!cond) fails.push(id+' :: '+label+'  ['+de
 
 EX.forEach(function(ex){
   var worstStretch=0, floorBreak=0, footDrift=0, barXs=[], ankles=[];
-  var planted = ['backsquat','frontsquat','goblet','deadlift','rdl','ohp','row','kbswing'].indexOf(ex.id)>=0;
+  var planted = ['backsquat','frontsquat','goblet','deadlift','rdl','ohp','row','kbswing','press_push','sq_air','wallsit'].indexOf(ex.id)>=0;
   for(var i=0;i<SAMPLES;i++){
     var s=rig.solve(rig.poseAt(ex,i/SAMPLES));
     // limb integrity across the WHOLE motion, not just keyframes

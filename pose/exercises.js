@@ -268,6 +268,86 @@ var EXERCISES = [
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
   ]},
 
+{ id:"press_push", tempo:[380,260,300,420], name:"Push press",
+  real:"A strict press with legs. Bar racked on the front delts, a short sharp dip of about a fifth of a squat with the torso staying vertical, then drive the floor away and let that momentum carry the bar past the sticking point. The arms finish the job overhead. The dip is a dip, not a squat: if the torso pitches forward the bar goes with it.",
+  changed:"It has the dip-and-drive, which is the only thing separating it from an overhead press. It used to share the generic PRESS pose, where the legs never move.",
+  equip:"barbell", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[60,163],ankF:[51,163], handN:[64,74],handF:[58,75], elbowSign:1},
+    {hip:[55,118],torso:2,ankN:[60,163],ankF:[51,163], handN:[64,85],handF:[58,86], elbowSign:1},
+    {hip:[55,106],torso:2,ankN:[60,163],ankF:[51,163], handN:[58,34],handF:[52,35], elbowSign:1},
+    {hip:[55,110],torso:2,ankN:[60,163],ankF:[51,163], handN:[60,55],handF:[54,56], elbowSign:1}
+  ]},
+
+{ id:"sq_air", tempo:[480,480,380,380], name:"Air squat",
+  real:"Same squat pattern with no bar. Arms come forward as a counterweight, which lets the torso stay more upright than a loaded squat. Feet planted, hips back and down past parallel, knees tracking over the toes.",
+  changed:"The arms now reach forward as the hips go back, which is what a bodyweight squat actually looks like and what stops you falling backwards. It used to share the loaded SQUAT pose with the arms racked on a bar that is not there.",
+  equip:null, active:"legs",
+  frames:[
+    {hip:[55,107],torso:5, ankN:[60,163],ankF:[50,163], handN:[88,84],handF:[82,86], elbowSign:1},
+    {hip:[50,122],torso:22,ankN:[60,163],ankF:[50,163], handN:[86,96],handF:[80,98], elbowSign:1},
+    {hip:[45,138],torso:35,ankN:[60,163],ankF:[50,163], handN:[84,110],handF:[78,112], elbowSign:1},
+    {hip:[50,122],torso:22,ankN:[60,163],ankF:[50,163], handN:[86,96],handF:[80,98], elbowSign:1}
+  ]},
+
+{ id:"farmerscarry", tempo:[340,340,340,340], name:"Farmer\'s carry",
+  real:"Heavy in each hand, walk. Ribs down, shoulders pulled back and away from the ears, short deliberate steps. The load hangs; you do not shrug it. Grip usually gives out before anything else, which is the point.",
+  changed:"It walks. The old pose was a static stand, which showed nothing about the exercise. Neutral grip means the handles run front to back, so the side view sees the whole dumbbell and the front view sees the bell faces.",
+  equip:"dumbbell", axis:"sagittal", active:"arms",
+  frames:[
+    {hip:[55,107],torso:3,ankN:[66,163],ankF:[46,163], armN:[178,178]},
+    {hip:[55,105],torso:3,ankN:[60,157],ankF:[52,163], armN:[178,178]},
+    {hip:[55,107],torso:3,ankN:[46,163],ankF:[66,163], armN:[178,178]},
+    {hip:[55,105],torso:3,ankN:[52,163],ankF:[60,157], armN:[178,178]}
+  ]},
+
+{ id:"pushup", tempo:[480,480,380,380], name:"Push-up",
+  real:"Hands under the shoulders, body one rigid line from heel to head. Lower until the chest is a fist off the floor with the elbows tracking back at about forty-five degrees, not flared to the sides, then press away. The hips do not sag or pike.",
+  changed:"The hands are pinned to the floor and the BODY travels, which is the movement. The old pose swung the arms while the torso stayed put.",
+  equip:null, active:"arms", floor:true,
+  frames:[
+    {hip:[52,126],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
+    {hip:[52,133],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
+    {hip:[52,140],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
+    {hip:[52,133],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1}
+  ]},
+
+{ id:"plank", tempo:[420,900,900,420], name:"Plank",
+  real:"Forearms flat on the floor, elbows under the shoulders, body one line from heel to head. Squeeze the glutes and pull the ribs down so the lower back does not sag. It is a hold, so nothing should be moving except your breathing.",
+  changed:"It is on the forearms with the elbows under the shoulders, and it holds instead of cycling. The old pose was a generic straight-body shape that could have been anything.",
+  equip:null, active:null, floor:true,
+  frames:[
+    {hip:[44,137],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1},
+    {hip:[44,138],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1},
+    {hip:[44,138],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1},
+    {hip:[44,137],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1}
+  ]},
+
+{ id:"mtnclimb", tempo:[240,240,240,240], name:"Mountain climbers",
+  real:"Hold a push-up top position and drive the knees to the chest one at a time. The hips stay low and level: as soon as they pike up toward the ceiling it becomes a hip flexor exercise and the core stops working.",
+  changed:"The knees now drive alternately toward the chest from a held plank, rather than the whole body cycling. Which side is working is the movement.",
+  equip:null, active:"legs", floor:true,
+  frames:[
+    {hip:[50,128],torso:92,ankN:[8,161],ankF:[4,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
+    {hip:[50,128],torso:92,ankN:[58,150],ankF:[4,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
+    {hip:[50,128],torso:92,ankN:[8,161],ankF:[4,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
+    {hip:[50,128],torso:92,ankN:[8,161],ankF:[54,149], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1}
+  ]},
+
+{ id:"burpee", tempo:[300,260,300,240,260,300,340], name:"Burpee",
+  real:"Stand, drop the hands to the floor, kick the feet back to a plank, snap them in again, then jump and land soft. The plank is the bit people skip: the hips should reach a straight line before the feet come back, or it turns into a squat thrust with extra steps.",
+  changed:"All five positions are there in order, including the plank and the jump. The old pose was a two-frame crouch that showed neither. The arms swing forward and up on the way out of the squat rather than folding through the shoulder, which is both what happens and the only path the joint can actually take.",
+  equip:null, active:null, floor:true,
+  frames:[
+    {hip:[55,107],torso:4, ankN:[60,163],ankF:[50,163], handN:[59,111],handF:[53,111], kneeSign:-1, elbowSign:-1},
+    {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
+    {hip:[46,136],torso:92,ankN:[4,161],ankF:[0,160],  handN:[80,163],handF:[72,163], kneeSign:1,  elbowSign:-1},
+    {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
+    {hip:[55,112],torso:8, ankN:[60,163],ankF:[50,163], handN:[78,100],handF:[72,102], kneeSign:-1, elbowSign:-1},
+    {hip:[55,96], torso:2, ankN:[60,152],ankF:[50,151], handN:[58,26], handF:[52,26],  kneeSign:-1, elbowSign:-1},
+    {hip:[55,110],torso:6, ankN:[60,163],ankF:[50,163], handN:[74,100],handF:[68,102], kneeSign:-1, elbowSign:-1}
+  ]},
+
 { id:"deadbug", tempo:[760,700,760,700], name:"Dead bug", flag:true,
   real:"Lying flat on the back. Opposite arm and leg extend away long and low while the other pair holds a 90/90 tabletop, then it alternates. The lower back stays pinned throughout.",
   changed:"Now genuinely alternates diagonal pairs with the body flat on the floor: one side holds tabletop (thigh vertical, shin horizontal) while the opposite arm and leg reach out long and low.",
@@ -383,6 +463,40 @@ var FRONTS = {
     {hipY:150,torsoScale:0.5,footL:[56,120],footR:[82,96], kneeL:[54,134],kneeR:[84,122],
      handL:[48,146],handR:[88,108],elbL:[44,130],elbR:[94,124]}],
 
+  // Floor work seen from ABOVE (frontPlan). Hand and foot width is the whole
+  // point here: a push-up with the hands too wide, or a plank with the elbows
+  // outside the shoulders, is the fault you cannot see from the side.
+  pushup:[
+    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
+    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[32,118],elbR:[108,118]},
+    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[28,124],elbR:[112,124]},
+    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[32,118],elbR:[108,118]}],
+
+  plank:[
+    {hipY:132,footL:[62,178],footR:[78,178],kneeL:[61,157],kneeR:[79,157],
+     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]},
+    {hipY:133,footL:[62,178],footR:[78,178],kneeL:[61,158],kneeR:[79,158],
+     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]},
+    {hipY:133,footL:[62,178],footR:[78,178],kneeL:[61,158],kneeR:[79,158],
+     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]},
+    {hipY:132,footL:[62,178],footR:[78,178],kneeL:[61,157],kneeR:[79,157],
+     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]}],
+
+  // Which knee is driving is only visible from here.
+  mtnclimb:[
+    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
+    {hipY:132,footL:[64,146],footR:[78,176],kneeL:[62,140],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
+    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
+     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
+    {hipY:132,footL:[62,176],footR:[76,146],kneeL:[61,156],kneeR:[78,140],
+     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]}],
+
 // Every other front view is DERIVED from the side frames. See frontFromSide().
 };
 
@@ -490,7 +604,9 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 // the point of most of them: a hammer curl and a supinated curl are the same
 // geometry and differ only in what the implement does, which is why the
 // equipment axis matters as much as the joints.
-[{id:'deadhang',stance:8, grip:19},{id:'dip',          stance:8, grip:14},
+[{id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
+ {id:'farmerscarry',stance:8,grip:20},{id:'burpee',stance:10,grip:16},
+ {id:'deadhang',stance:8, grip:19},{id:'dip',          stance:8, grip:14},
  {id:'pulldown',stance:9, grip:24},{id:'facepull',     stance:9, grip:15},
  {id:'press_incline',stance:9,grip:20},{id:'triceps_ext',stance:8,grip:5},
  {id:'curl_bicep',stance:8,grip:13},{id:'curl_hammer',  stance:8, grip:13},
@@ -515,7 +631,7 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 });
 
 // A plan view has no gravity in it: "up the screen" means toward the head.
-['bench','deadbug'].forEach(function(id){
+['bench','deadbug','pushup','plank','mtnclimb'].forEach(function(id){
   var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.frontPlan=true;
 });
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });

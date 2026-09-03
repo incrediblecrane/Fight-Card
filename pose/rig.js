@@ -40,9 +40,9 @@ function solve(f){
 
   var elbN,handN,elbF,handF;
   if(f.handN){ handN=P(f.handN[0],f.handN[1]); elbN=ik(sh,handN,L.UPPER,L.FORE,es); }
-  else { elbN=add(sh,dir(f.armN[0],L.UPPER)); handN=add(elbN,dir(f.armN[1],L.FORE)); }
+  else { var an=f.armN||[178,178]; elbN=add(sh,dir(an[0],L.UPPER)); handN=add(elbN,dir(an[1],L.FORE)); }
   if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER,L.FORE,es); }
-  else { var af=f.armF||f.armN; elbF=add(shF,dir(af[0],L.UPPER)); handF=add(elbF,dir(af[1],L.FORE)); }
+  else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],L.UPPER)); handF=add(elbF,dir(af[1],L.FORE)); }
 
   return {hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
@@ -58,17 +58,39 @@ function lerpAng(a,b,t){ var d=((b-a+540)%360)-180; return a+d*t; }
 function lerpPt(a,b,t){ return [lerp(a[0],b[0],t), lerp(a[1],b[1],t)]; }
 function easeInOutSine(t){ return -(Math.cos(Math.PI*t)-1)/2; }
 
+// An arm is given either as joint angles (armN) or as a target the hand must
+// reach (handN). A movement can legitimately switch between the two mid-rep: a
+// burpee has the arms hanging while standing and planted on the floor a moment
+// later. Blending an angle frame with a target frame used to produce a frame
+// with neither, which crashed the solver, so resolve the angles to where that
+// hand actually is and interpolate positions.
+function handFromAngles(f,arm,far){
+  var hip=P(f.hip[0],f.hip[1]), sh=add(hip,dir(f.torso,L.TORSO));
+  if(far) sh=add(sh,{x:-5,y:0});
+  var elb=add(sh,dir(arm[0],L.UPPER));
+  var h=add(elb,dir(arm[1],L.FORE));
+  return [h.x,h.y];
+}
 // Blend two keyframes into a valid in-between pose.
 function lerpFrame(A,B,t){
   var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
           kneeSign:A.kneeSign, elbowSign:A.elbowSign,
           footRot:lerp(A.footRot||0,B.footRot||0,t) };
-  if(A.handN&&B.handN) f.handN=lerpPt(A.handN,B.handN,t); 
-  if(A.handF&&B.handF) f.handF=lerpPt(A.handF,B.handF,t);
-  if(A.armN&&B.armN) f.armN=[lerpAng(A.armN[0],B.armN[0],t), lerpAng(A.armN[1],B.armN[1],t)];
-  if(A.armF&&B.armF) f.armF=[lerpAng(A.armF[0],B.armF[0],t), lerpAng(A.armF[1],B.armF[1],t)];
-  else if(A.armN&&B.armN) f.armF=f.armN;
+  function arm(key,angKey,far){
+    var a=A[key], b=B[key];
+    if(!a && A[angKey]) a=handFromAngles(A,A[angKey],far);
+    if(!b && B[angKey]) b=handFromAngles(B,B[angKey],far);
+    return (a&&b)?lerpPt(a,b,t):null;
+  }
+  if((A.handN||B.handN) && (A.handN||A.armN) && (B.handN||B.armN)) f.handN=arm('handN','armN',false);
+  if((A.handF||B.handF) && (A.handF||A.armF||A.armN) && (B.handF||B.armF||B.armN))
+    f.handF=arm('handF', A.armF?'armF':'armN', true) || arm('handF','armN',true);
+  if(!f.handN && A.armN && B.armN) f.armN=[lerpAng(A.armN[0],B.armN[0],t), lerpAng(A.armN[1],B.armN[1],t)];
+  if(!f.handF){
+    if(A.armF&&B.armF) f.armF=[lerpAng(A.armF[0],B.armF[0],t), lerpAng(A.armF[1],B.armF[1],t)];
+    else if(f.armN) f.armF=f.armN;
+  }
   return f;
 }
 

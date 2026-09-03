@@ -142,7 +142,7 @@ function buildFront(ex,host){
   var svg=el('svg',{viewBox:'20 18 100 168',role:'img','aria-label':ex.name+' front view'});
   var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
-  svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  if(!ex.frontPlan) svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
   var R={};
   // An arm foreshortened toward the camera lies on top of the torso in the same
   // ink, so it disappears into the silhouette. A surface-coloured outline is
@@ -283,7 +283,7 @@ EXERCISES.forEach(function(ex,i){
   c.className='card'+(ex.flag?' flagged':'');
   c.innerHTML='<h3>'+ex.name+(ex.flag?'<span class="flag">you flagged</span>':'')+'</h3>'+
     '<div class="views"><div class="figwrap"><div class="vlbl">Side</div></div>'+
-      (ex.front?'<div class="figwrap"><div class="vlbl">Front</div></div>':'')+'</div>'+
+      (ex.front?('<div class="figwrap"><div class="vlbl">'+(ex.frontPlan?'Above':'Front')+'</div></div>'):'')+'</div>'+
     '<div class="lbl">The real movement</div><p class="body-copy">'+ex.real+'</p>'+
     '<div class="lbl">What changed</div><p class="changed">'+ex.changed+'</p>';
   grid.appendChild(c);

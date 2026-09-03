@@ -59,16 +59,24 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
     ck(tag,'left forearm never exceeds its length', d(s.elbL,s.handL)<=L.FORE+0.8,'got '+r(d(s.elbL,s.handL)));
     ck(tag,'legs never over-extend', d(s.hipL,s.footL)<=L.THIGH+L.SHIN+0.5,'reach '+r(d(s.hipL,s.footL)));
     ck(tag,'arms never over-extend', d(s.shR,s.handR)<=L.UPPER+L.FORE+0.5,'reach '+r(d(s.shR,s.handR)));
-    ck(tag,'stays above the floor', Math.max(s.footL.y,s.footR.y,s.hipC.y)<=GROUND+1,'lowest '+r(Math.max(s.footL.y,s.footR.y)));
+    // A plan view looks DOWN at someone on the floor: there is no ground plane
+    // in it, so "below the floor" is meaningless there.
+    if(!ex.frontPlan) ck(tag,'stays above the floor', Math.max(s.footL.y,s.footR.y,s.hipC.y)<=GROUND+1,'lowest '+r(Math.max(s.footL.y,s.footR.y)));
     ck(tag,'left stays left of right', s.hipL.x<s.hipR.x && s.footL.x<s.footR.x,'sides crossed');
     // A human elbow never bends upward, but that only constrains an arm working
     // from BELOW the shoulder. Overhead (a triceps extension, a face pull with
     // high elbows, a pull-up) the elbow is legitimately the apex, so the rule
     // applies only when the hand is below the shoulder.
     if(!ex.frontPlan){
-    if(s.handL.y>s.shL.y) ck(tag,'left elbow never bends upward', s.elbL.y>=s.shL.y-1,
+    // ...and only when the arm is near-straight. That is the case the original
+    // bug produced: a hanging arm with the elbow flicked up above the shoulder.
+    // A bent arm mid-swing can legitimately raise the elbow while the hand is
+    // still low, and the segment-length checks already stop it hyperextending.
+    var straightL=d(s.shL,s.handL)>(L.UPPER+L.FORE)*0.75*(f.armScaleL===undefined?1:f.armScaleL);
+    var straightR=d(s.shR,s.handR)>(L.UPPER+L.FORE)*0.75*(f.armScaleR===undefined?1:f.armScaleR);
+    if(straightL && s.handL.y>s.shL.y) ck(tag,'left elbow never bends upward', s.elbL.y>=s.shL.y-1,
       'elbow '+r(s.elbL.y)+' shoulder '+r(s.shL.y)+' hand '+r(s.handL.y));
-    if(s.handR.y>s.shR.y) ck(tag,'right elbow never bends upward', s.elbR.y>=s.shR.y-1,
+    if(straightR && s.handR.y>s.shR.y) ck(tag,'right elbow never bends upward', s.elbR.y>=s.shR.y-1,
       'elbow '+r(s.elbR.y)+' shoulder '+r(s.shR.y)+' hand '+r(s.handR.y));
     }
     ck(tag,'shoulders are wider than the hips', s.shR.x-s.shL.x > s.hipR.x-s.hipL.x,
