@@ -1716,29 +1716,13 @@ function bodyContent(){
     if(slide>=n) slide=Math.max(0,n-1);
 
     if(addingExercise){
-      var already=sess.exIds;
-      var q=exSearch.toLowerCase();
-      var results=EX.filter(function(e){ return already.indexOf(e.id)===-1 && (e.name.toLowerCase().indexOf(q)>-1 || e.cat.toLowerCase().indexOf(q)>-1 || e.area.toLowerCase().indexOf(q)>-1); });
-      var grouped=AREA_ORDER.map(function(area){
-        var inArea=results.filter(function(e){return e.area===area;});
-        if(!inArea.length) return '';
-        var rowsHtml=inArea.map(function(e){
-          var isOpen=!!expanded[e.id];
-          return '<div class="pickrow">'+
-            '<div class="pickrow-head">'+
-              '<div class="pickrow-main" data-action="toggleex" data-id="'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
-              '<button data-action="addex" data-id="'+e.id+'">Add</button>'+
-            '</div>'+
-            (isOpen?('<div class="pickpreview"><div class="preview-figs"><div class="pf">'+
-              (rigFor(e.id)?rigSVG(e.id,0.5):figureSVG(e.pose,false,equipFor(e.id)))+'</div><span class="arrow">'+
-              (rigFor(e.id)&&rigFor(e.id).front?'':'&rarr;')+'</span><div class="pf">'+
-              (rigFor(e.id)&&rigFor(e.id).front?rigFrontSVG(e.id,0.5):(rigFor(e.id)?rigSVG(e.id,0):figureSVG(e.pose,true,equipFor(e.id))))+'</div></div><p class="cue">'+esc(e.cue)+'</p></div>'):'')+
-          '</div>';
-        }).join('');
-        return '<div class="pickgroup"><div class="pickgroup-title">'+esc(area)+'</div>'+rowsHtml+'</div>';
-      }).join('') || '<p class="note" style="margin-top:0;">No matches.</p>';
+      // The results live in their own container so typing can replace just
+      // them. Re-rendering the whole view on each keystroke destroyed the
+      // search box mid-type, which dropped every letter after the first.
       sessionHtml='<div class="story"><div class="story-head"><h2 class="story-title">Add an exercise</h2><button data-action="closepicker">Close</button></div>'+
-        '<div class="picker"><input id="ex-search" placeholder="Search by name, area or category (try &#39;grip&#39; or &#39;dead hang&#39;)" value="'+esc(exSearch)+'">'+grouped+'</div></div>';
+        '<div class="picker"><input id="ex-search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" '+
+          'placeholder="Search by name, area or category (try &#39;grip&#39; or &#39;dead hang&#39;)" value="'+esc(exSearch)+'">'+
+          '<div id="pick-results">'+pickerResults()+'</div></div></div>';
     } else if(n===0){
       sessionHtml='<div class="story"><div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+'</h2><button data-action="cancelsession">Back</button></div>'+
         '<div class="slide"><p class="note" style="margin-top:0;">No exercises in this session. Add one to get going.</p>'+
@@ -1859,10 +1843,64 @@ function syncUi(){
   state.uiTab=tab; state.uiViewingSession=viewingSession; state.uiSlide=slide; state.uiProgRange=progRange;
 }
 
+/* Matching is forgiving about a trailing plural, because "shrugs" and "dips"
+   are what a person actually types and neither matched the singular name. */
+function pickerMatches(q){
+  var already=(state.activeSession&&state.activeSession.exIds)||[];
+  function hits(term){
+    return EX.filter(function(e){
+      return already.indexOf(e.id)===-1 &&
+        (e.name.toLowerCase().indexOf(term)>-1 || e.cat.toLowerCase().indexOf(term)>-1 || e.area.toLowerCase().indexOf(term)>-1);
+    });
+  }
+  var found=hits(q);
+  if(!found.length && q.length>2 && q.charAt(q.length-1)==='s') found=hits(q.slice(0,-1));
+  return found;
+}
+function pickerResults(){
+  var results=pickerMatches(exSearch.toLowerCase().trim());
+  return AREA_ORDER.map(function(area){
+    var inArea=results.filter(function(e){return e.area===area;});
+    if(!inArea.length) return '';
+    var rowsHtml=inArea.map(function(e){
+      var isOpen=!!expanded[e.id];
+      return '<div class="pickrow">'+
+        '<div class="pickrow-head">'+
+          '<div class="pickrow-main" data-action="toggleex" data-id="'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
+          '<button data-action="addex" data-id="'+e.id+'">Add</button>'+
+        '</div>'+
+        (isOpen?('<div class="pickpreview"><div class="preview-figs"><div class="pf">'+
+          (rigFor(e.id)?rigSVG(e.id,0.5):figureSVG(e.pose,false,equipFor(e.id)))+'</div><span class="arrow">'+
+          (rigFor(e.id)&&rigFor(e.id).front?'':'&rarr;')+'</span><div class="pf">'+
+          (rigFor(e.id)&&rigFor(e.id).front?rigFrontSVG(e.id,0.5):(rigFor(e.id)?rigSVG(e.id,0):figureSVG(e.pose,true,equipFor(e.id))))+'</div></div><p class="cue">'+esc(e.cue)+'</p></div>'):'')+
+      '</div>';
+    }).join('');
+    return '<div class="pickgroup"><div class="pickgroup-title">'+esc(area)+'</div>'+rowsHtml+'</div>';
+  }).join('') || '<p class="note" style="margin-top:0;">No matches.</p>';
+}
+
 function render(){
   syncUi();
   var app=document.getElementById('app');
-  if(app) app.innerHTML=bodyContent();
+  if(!app) return;
+  // Replacing innerHTML throws away whatever field was being typed into. Note
+  // what had focus and where the caret was, and put it back afterwards, so a
+  // save landing mid-keystroke cannot interrupt typing.
+  var act=document.activeElement, keep=null;
+  if(act && act.id && app.contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)){
+    keep={id:act.id, start:null, end:null};
+    try{ keep.start=act.selectionStart; keep.end=act.selectionEnd; }catch(err){}
+  }
+  app.innerHTML=bodyContent();
+  if(keep){
+    var back=document.getElementById(keep.id);
+    if(back){
+      try{
+        back.focus({preventScroll:true});
+        if(keep.start!==null && keep.start!==undefined) back.setSelectionRange(keep.start,keep.end);
+      }catch(err){}
+    }
+  }
   stopPoseLoop();
   if(viewingSession && state.activeSession && !addingExercise && state.activeSession.exIds.length){ startPoseLoop(); }
 }
@@ -1991,7 +2029,15 @@ function onChange(e){
 }
 
 function onInput(e){
-  if(e.target && e.target.id==='ex-search'){ exSearch=e.target.value; render(); return; }
+  if(e.target && e.target.id==='ex-search'){
+    exSearch=e.target.value;
+    // Swap the results only. A full render would replace the box being typed
+    // into, taking focus and the caret with it, which silently ate every
+    // keystroke after the first.
+    var box=document.getElementById('pick-results');
+    if(box) box.innerHTML=pickerResults(); else render();
+    return;
+  }
   // Deliberately no render: this only has to be remembered for the re-render
   // that swapping the prep option triggers.
   var pm=e.target && e.target.getAttribute && e.target.getAttribute('data-prepmins');

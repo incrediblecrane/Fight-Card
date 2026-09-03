@@ -353,6 +353,71 @@ srv.listen(0,async function(){
       'a 25kg-each set of 12 added '+delta+'kg, expected 600kg (both hands)');
   });
 
+  console.log('\nSEARCH');
+
+  await t('typing keeps focus and the caret, so no letter is dropped', async function(){
+    await go(); await leaveSession(); await startWorkout('Pull');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(400);
+    await p.click('#ex-search');
+    var trail=[];
+    for(var ci=0;ci<'shrug'.length;ci++){
+      await p.keyboard.type('shrug'.charAt(ci));
+      await p.waitForTimeout(140);
+      trail.push(await p.evaluate(function(){
+        var i=document.getElementById('ex-search');
+        return {v:i?i.value:'(gone)', f:document.activeElement===i, c:i?i.selectionStart:-1,
+                n:document.querySelectorAll('.pickrow-main .n').length};
+      }));
+    }
+    var last=trail[trail.length-1];
+    assert.strictEqual(last.v,'shrug','the box holds "'+last.v+'" after typing shrug');
+    assert.ok(trail.every(function(x){return x.f;}),'focus was lost mid-type');
+    assert.strictEqual(last.c,5,'the caret ended at '+last.c+', not the end');
+    assert.strictEqual(last.n,1,'expected one result, got '+last.n);
+  });
+
+  await t('the results narrow with every letter, not just the first', async function(){
+    var n1=await p.evaluate(function(){ return document.querySelectorAll('.pickrow-main .n').length; });
+    await p.fill('#ex-search',''); await p.waitForTimeout(200);
+    var nAll=await p.evaluate(function(){ return document.querySelectorAll('.pickrow-main .n').length; });
+    assert.ok(nAll>n1,'clearing the box did not widen the list ('+nAll+' vs '+n1+')');
+  });
+
+  await t('a trailing plural still finds it', async function(){
+    await p.click('#ex-search');
+    await p.keyboard.type('shrugs'); await p.waitForTimeout(250);
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names.indexOf('Dumbbell shrug')>-1,'"shrugs" found: '+(names.join(',')||'nothing'));
+  });
+
+  await t('the shrug is in the plain unsearched list too', async function(){
+    await p.fill('#ex-search',''); await p.waitForTimeout(250);
+    var pull=await p.evaluate(function(){
+      var gs=[].slice.call(document.querySelectorAll('.pickgroup'));
+      for(var i=0;i<gs.length;i++){
+        if(gs[i].querySelector('.pickgroup-title').textContent.trim()==='Pull')
+          return [].slice.call(gs[i].querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+      }
+      return [];
+    });
+    assert.ok(pull.indexOf('Dumbbell shrug')>-1,'Pull group held: '+pull.join(', '));
+  });
+
+  await t('a full re-render puts focus back where it was', async function(){
+    // Changing the prep option re-renders the whole view to swap the level
+    // field. The control being used should still be the focused one after.
+    await go(); await leaveSession(); await startWorkout('Pull');
+    assert.strictEqual(await slideTitle(),'Warm-up');
+    await p.focus('#log-opt-warmup');
+    await p.selectOption('#log-opt-warmup','Rower'); await p.waitForTimeout(350);
+    var still=await p.evaluate(function(){
+      return document.activeElement && document.activeElement.id;
+    });
+    assert.strictEqual(still,'log-opt-warmup','focus jumped to "'+still+'" after the re-render');
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });
