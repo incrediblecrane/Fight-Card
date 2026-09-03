@@ -269,9 +269,9 @@ var EXERCISES = [
   ]},
 
 { id:"press_push", tempo:[380,260,300,420], name:"Push press",
-  real:"A strict press with legs. Bar racked on the front delts, a short sharp dip of about a fifth of a squat with the torso staying vertical, then drive the floor away and let that momentum carry the bar past the sticking point. The arms finish the job overhead. The dip is a dip, not a squat: if the torso pitches forward the bar goes with it.",
-  changed:"It has the dip-and-drive, which is the only thing separating it from an overhead press. It used to share the generic PRESS pose, where the legs never move.",
-  equip:"barbell", active:"arms",
+  real:"A strict press with legs. Dumbbells racked at the front delts, a short sharp dip of about a fifth of a squat with the torso staying vertical, then drive the floor away and let that momentum carry the load past the sticking point. The arms finish the job overhead. The dip is a dip, not a squat: if the torso pitches forward the load goes with it.",
+  changed:"It has the dip-and-drive, which is the only thing separating it from an overhead press. It used to share the generic PRESS pose, where the legs never move. The implement is now dumbbells, matching the cue in the app, which said dumbbells while the picture drew a barbell. Handles run across the body, so the side view sees a bell face and the front the full dumbbell.",
+  equip:"dumbbell", axis:"lateral", active:"arms",
   frames:[
     {hip:[55,107],torso:2,ankN:[60,163],ankF:[51,163], handN:[64,74],handF:[58,75], elbowSign:1},
     {hip:[55,118],torso:2,ankN:[60,163],ankF:[51,163], handN:[64,85],handF:[58,86], elbowSign:1},
@@ -288,6 +288,17 @@ var EXERCISES = [
     {hip:[50,122],torso:22,ankN:[60,163],ankF:[50,163], handN:[86,96],handF:[80,98], elbowSign:1},
     {hip:[45,138],torso:35,ankN:[60,163],ankF:[50,163], handN:[84,110],handF:[78,112], elbowSign:1},
     {hip:[50,122],torso:22,ankN:[60,163],ankF:[50,163], handN:[86,96],handF:[80,98], elbowSign:1}
+  ]},
+
+{ id:"shrug", tempo:[360,360,440,440], name:"Dumbbell shrug",
+  real:"Stand tall with a dumbbell hanging at each side, arms dead straight. Lift the shoulders straight up toward the ears and hold a beat, then lower under control. The elbows never bend and the head never nods forward to meet the shoulders, which is the usual cheat.",
+  changed:"New rig, and it needed a new degree of freedom: every other movement here is a joint angle, but a shrug is the shoulder girdle sliding up a fixed ribcage. Travel is small on purpose, about five centimetres scaled, because that is the real range. Neutral grip means the handles run front to back, so the side view shows the whole dumbbell and the front view the bell faces.",
+  equip:"dumbbell", axis:"sagittal", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], armN:[178,178], shrug:0},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], armN:[178,178], shrug:2.5},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], armN:[178,178], shrug:5},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], armN:[178,178], shrug:2.5}
   ]},
 
 { id:"farmerscarry", tempo:[340,340,340,340], name:"Farmer\'s carry",
@@ -537,7 +548,9 @@ function frontFromSide(ex,opt){
   return ex.frames.map(function(f){
     var s=RIG.solve(f);
     var tS=Math.max(0.08,Math.cos(f.torso*Math.PI/180));
-    var shY=f.hip[1]-RIG.L.TORSO*tS;
+    // The shoulder the arms hang from is the shrugged one; the head is not,
+    // which solveFront handles from the same field.
+    var shY=f.hip[1]-RIG.L.TORSO*tS-(f.shrug||0);
     var dy=s.handN.y-s.sh.y;
     var handY=shY+(dy<0?-1:1)*Math.min(Math.abs(dy), armV);
     var footY=Math.min(s.ankN.y, f.hip[1]+legV);
@@ -555,10 +568,12 @@ function frontFromSide(ex,opt){
                       shY+(s.elbN.y-s.sh.y), cx-(shHW+opt.grip)/2-eOut);
     var eR=placeJoint(cx+shHW,shY,cx+opt.grip,handY,RIG.L.UPPER,RIG.L.FORE,
                       shY+(s.elbN.y-s.sh.y), cx+(shHW+opt.grip)/2+eOut);
-    return {hipY:f.hip[1], torsoScale:tS,
+    var out={hipY:f.hip[1], torsoScale:tS,
       footL:[cx-opt.stance,footY], footR:[cx+opt.stance,footY],
       handL:[cx-opt.grip,handY],   handR:[cx+opt.grip,handY],
       kneeL:[kL[0],kL[1]], kneeR:[kR[0],kR[1]], elbL:[eL[0],eL[1]], elbR:[eR[0],eR[1]]};
+    if(f.shrug) out.shrug=f.shrug;
+    return out;
   });
 }
 
@@ -572,7 +587,11 @@ function clampFront(fr){
   return fr.map(function(f){
     var g=JSON.parse(JSON.stringify(f));
     var lean=g.lean||0, tS=g.torsoScale===undefined?1:g.torsoScale;
-    var shY=g.hipY-RIG.L.TORSO*tS;
+    // Same shrugged shoulder the solver uses. Inert for everything authored so
+    // far, since the shrug frames are derived after this runs, but re-solving
+    // elbows from an unshrugged shoulder would be silently wrong the moment
+    // that ordering changed.
+    var shY=g.hipY-RIG.L.TORSO*tS-(g.shrug||0);
     var sh={L:[cx+lean-shHW,shY], R:[cx+lean+shHW,shY]};
     var hip={L:[cx-hipHW,g.hipY], R:[cx+hipHW,g.hipY]};
     function pull(pt,root,max){
@@ -606,6 +625,7 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 // equipment axis matters as much as the joints.
 [{id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
  {id:'farmerscarry',stance:8,grip:20},{id:'burpee',stance:10,grip:16},
+ {id:'shrug',   stance:8, grip:20},
  {id:'deadhang',stance:8, grip:19},{id:'dip',          stance:8, grip:14},
  {id:'pulldown',stance:9, grip:24},{id:'facepull',     stance:9, grip:15},
  {id:'press_incline',stance:9,grip:20},{id:'triceps_ext',stance:8,grip:5},

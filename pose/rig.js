@@ -24,11 +24,15 @@ function ik(root,end,l1,l2,sign){
 // Build every joint for one frame.
 // frame: {hip:[x,y], torso:deg, ankN:[x,y], ankF:[x,y],
 //         armN:[upperDeg,foreDeg] | handN:[x,y], armF:[...] | handF:[x,y],
-//         kneeSign, elbowSign}
+//         kneeSign, elbowSign, shrug:px of shoulder elevation}
 function solve(f){
   var hip=P(f.hip[0],f.hip[1]);
-  var sh=add(hip,dir(f.torso,L.TORSO));
-  var head=add(sh,dir(f.torso,L.HEAD_OFF));
+  var shBase=add(hip,dir(f.torso,L.TORSO));
+  var head=add(shBase,dir(f.torso,L.HEAD_OFF));
+  // A shrug is the one movement with no joint angle behind it: the shoulder
+  // girdle rides up the ribcage toward a head that stays put. Every other DOF
+  // here is an angle, so without this the figure cannot move at all.
+  var sh=f.shrug?P(shBase.x,shBase.y-f.shrug):shBase;
   var depth={x:-5,y:0}; // far side sits slightly back for depth
   var hipF=add(hip,depth), shF=add(sh,depth);
   var ks=(f.kneeSign===undefined)?-1:f.kneeSign;
@@ -66,6 +70,7 @@ function easeInOutSine(t){ return -(Math.cos(Math.PI*t)-1)/2; }
 // hand actually is and interpolate positions.
 function handFromAngles(f,arm,far){
   var hip=P(f.hip[0],f.hip[1]), sh=add(hip,dir(f.torso,L.TORSO));
+  if(f.shrug) sh=add(sh,{x:0,y:-f.shrug});
   if(far) sh=add(sh,{x:-5,y:0});
   var elb=add(sh,dir(arm[0],L.UPPER));
   var h=add(elb,dir(arm[1],L.FORE));
@@ -76,6 +81,7 @@ function lerpFrame(A,B,t){
   var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
           kneeSign:A.kneeSign, elbowSign:A.elbowSign,
+          shrug:lerp(A.shrug||0,B.shrug||0,t),
           footRot:lerp(A.footRot||0,B.footRot||0,t) };
   function arm(key,angKey,far){
     var a=A[key], b=B[key];
@@ -121,8 +127,10 @@ function solveFront(f){
   // the head drops toward the shoulders because you start seeing the crown.
   var tS=f.torsoScale===undefined?1:f.torsoScale;
   var hipC=P(cx,f.hipY);
-  var shC=P(cx+lean, f.hipY-L.TORSO*tS);
-  var head=P(shC.x+lean*0.5, shC.y-L.HEAD_OFF*(0.35+0.65*tS));
+  var shBase=P(cx+lean, f.hipY-L.TORSO*tS);
+  var head=P(shBase.x+lean*0.5, shBase.y-L.HEAD_OFF*(0.35+0.65*tS));
+  // Shoulders rise, head does not. See solve().
+  var shC=f.shrug?P(shBase.x,shBase.y-f.shrug):shBase;
   var hipL=P(hipC.x-hipHW,hipC.y), hipR=P(hipC.x+hipHW,hipC.y);
   var shL=P(shC.x-shHW,shC.y),   shR=P(shC.x+shHW,shC.y);
   var footL=P(f.footL[0],f.footL[1]), footR=P(f.footR[0],f.footR[1]);
@@ -157,6 +165,7 @@ function lerpFront(A,B,t){
   return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
     shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
+    shrug:lerp(A.shrug||0,B.shrug||0,t),
     fistL:lerp(A.fistL===undefined?1:A.fistL,B.fistL===undefined?1:B.fistL,t),
     fistR:lerp(A.fistR===undefined?1:A.fistR,B.fistR===undefined?1:B.fistR,t),
     torsoScale:lerp(A.torsoScale===undefined?1:A.torsoScale,B.torsoScale===undefined?1:B.torsoScale,t),

@@ -137,6 +137,26 @@ EX.forEach(function(ex){
     check(ex.id,'alternates to the other diagonal', alt.handF.x < alt.head.x && alt.ankF.x > alt.ankN.x,
       'second diagonal not mirrored');
   }
+  if(ex.id==='shrug'){
+    var lo=S[0], hi=S[2];
+    // Without the shrug degree of freedom the shoulder is a pure function of
+    // hip and torso, both of which are identical in every frame here, so the
+    // figure stands perfectly still. These three assertions are the whole
+    // reason the DOF exists.
+    check(ex.id,'shoulders actually rise', hi.sh.y < lo.sh.y-3,
+      'top='+r(hi.sh.y)+' bottom='+r(lo.sh.y));
+    check(ex.id,'the head does not ride up with them', Math.abs(hi.head.y-lo.head.y)<0.5,
+      'top='+r(hi.head.y)+' bottom='+r(lo.head.y));
+    check(ex.id,'the load rises with the shoulders, not by bending the elbow',
+      hi.handN.y < lo.handN.y-3 && Math.abs((lo.handN.y-hi.handN.y)-(lo.sh.y-hi.sh.y))<0.5,
+      'hand travel='+r(lo.handN.y-hi.handN.y)+' shoulder travel='+r(lo.sh.y-hi.sh.y));
+    check(ex.id,'travel stays anatomical, not a caricature', (lo.sh.y-hi.sh.y)<10,
+      'travel='+r(lo.sh.y-hi.sh.y));
+    check(ex.id,'arms stay straight throughout', S.every(function(s){
+      return Math.abs(Math.hypot(s.handN.x-s.sh.x,s.handN.y-s.sh.y)-(rig.L.UPPER+rig.L.FORE))<2; }),
+      'an elbow bent');
+    check(ex.id,'feet stay planted', S.every(function(s){ return s.ankN.y===lo.ankN.y; }),'feet moved');
+  }
   if(ex.id==='jabcross'){
     var g=S[0], jab=S[1], cross=S[3];
     check(ex.id,'stance is staggered', Math.abs(g.ankN.x-g.ankF.x)>20,
