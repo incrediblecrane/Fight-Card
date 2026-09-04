@@ -19,6 +19,7 @@ willpower or memory to keep up.
   - `checks/` — movement and rig verification suites (`npm test`)
   - `preview.html` — animated preview, published separately from the app
 - `.claude/skills/` — vendored engineering skills. See its README.
+- `CONTEXT.md` — the domain model: what the words mean, where data lives.
 
 ## Workflow
 
@@ -44,9 +45,11 @@ Follow this on every change:
   imagery: a realistic-looking image carries authority it hasn't earned, and a
   wrong one gets copied literally. Everything is drawn from explicit joint
   angles that can be pointed at and checked.
-- **State and code currently share one file.** Every save rewrites the whole
-  document, which is the mechanism behind past data-loss conflicts. Moving user
-  data to a storage capability is the open architectural question.
+- **State and code are now separate.** Logged data lives in the `db` capability
+  as small documents; the artifact holds only code. A water tap writes ~150
+  bytes and nothing reloads, and shipping code no longer touches data. See
+  CONTEXT.md for the layout. Declaring `db` makes the artifact
+  organization-internal: it cannot be shared publicly.
 
 ## Style
 

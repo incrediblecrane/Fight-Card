@@ -682,6 +682,90 @@ var artifactApi=null;
 var saving=false;
 var touchX=null;
 
+/* ---------- storage ------------------------------------------------------
+   Data used to live inside this document. Every water tap rewrote the whole
+   334KB page and republished it, and a republish reloads every open view,
+   which is the mechanism behind the backfill date resetting, the swallowed
+   change events, and the conflicts when the app was open twice. It now lives
+   in the db capability as small documents: a tap writes about 150 bytes and
+   nothing reloads.
+
+   The seed embedded at the bottom of this file is still real. It is what a
+   view that cannot run db falls back to, and it is what the store is seeded
+   from the first time. Once the store has been seeded it is the truth, so
+   republishing the app to ship code no longer touches a single logged set.
+
+   dbState: 'loading' until we know, then 'db' or 'local'. Mutations are held
+   off while loading rather than applied to state that is about to be
+   replaced, because a tap silently thrown away is worse than a slow one.  */
+var dbApi=null, dbState='loading', dbErr=null;
+var lastSaved={};   // path -> JSON of what the store already holds
+
+/* One flat map of every document this state implies. Diffing two of these is
+   what turns "something changed" into the two or three documents that
+   actually did, without every mutation site having to declare what it dirtied. */
+function dbDocs(st){
+  var out={};
+  out['state/profile']={waterTarget:st.waterTarget, totalXp:st.totalXp,
+    uiTab:st.uiTab||'today', uiSlide:st.uiSlide||0, uiProgRange:st.uiProgRange||14,
+    uiViewingSession:!!st.uiViewingSession};
+  // A document body is an object, so a list or a nullable session is wrapped.
+  out['state/shopping']={checked:(st.shoppingChecked||[]).slice()};
+  out['state/session']={active:st.activeSession||null};
+  Object.keys(st.days||{}).forEach(function(k){ out['days/'+k]=st.days[k]; });
+  (st.workoutLogs||[]).forEach(function(l){ if(l&&l.id) out['workoutLogs/'+l.id]=l; });
+  (st.saunaSessions||[]).forEach(function(x){ if(x&&x.id) out['sauna/'+x.id]=x; });
+  (st.library||[]).forEach(function(x){ if(x&&x.id) out['library/'+x.id]=x; });
+  (st.recipes||[]).forEach(function(x){ if(x&&x.id) out['recipes/'+x.id]=x; });
+  return out;
+}
+var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library', recipes:'recipes'};
+/* Rebuild state from what the store returned. Order matters for the lists:
+   the app renders workout logs and sauna sessions newest-last, and document
+   ids sort lexically, so anything order-dependent is sorted explicitly. */
+function dbApply(map){
+  var st={days:{}, workoutLogs:[], saunaSessions:[], library:[], recipes:[],
+          shoppingChecked:[], activeSession:null};
+  var prof=map['state/profile']||{};
+  st.waterTarget=prof.waterTarget||8; st.totalXp=prof.totalXp||0;
+  st.uiTab=prof.uiTab||'today'; st.uiSlide=prof.uiSlide||0;
+  st.uiProgRange=prof.uiProgRange||14; st.uiViewingSession=!!prof.uiViewingSession;
+  if(map['state/shopping']) st.shoppingChecked=(map['state/shopping'].checked||[]).slice();
+  if(map['state/session']) st.activeSession=map['state/session'].active||null;
+  var buckets={};
+  Object.keys(map).forEach(function(path){
+    var cut=path.indexOf('/'); if(cut<0) return;
+    var coll=path.slice(0,cut), id=path.slice(cut+1);
+    if(coll==='days'){ st.days[id]=map[path]; return; }
+    var key=DB_LISTS[coll]; if(!key) return;
+    (buckets[key]=buckets[key]||[]).push(map[path]);
+  });
+  Object.keys(buckets).forEach(function(key){ st[key]=buckets[key]; });
+  // Logged work is read back in the order it happened.
+  st.workoutLogs.sort(function(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); });
+  st.saunaSessions.sort(function(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); });
+  return st;
+}
+/* Key order, canonicalised. The store hands documents back with their keys in
+   alphabetical order rather than the order they were written in. That does not
+   bite today, because state and lastSaved are both built from the very same
+   returned objects, so the two orders already agree. It is one refactor away
+   from biting: the moment either side rebuilds a document from its parts, a
+   plain JSON.stringify would call every document changed and the diff would
+   rewrite all seventy instead of the one that moved. Comparing on a canonical
+   form costs nothing and removes the trap. */
+function stableJson(v){
+  if(v===null||typeof v!=='object') return JSON.stringify(v);
+  if(Array.isArray(v)) return '['+v.map(stableJson).join(',')+']';
+  return '{'+Object.keys(v).sort().map(function(k){
+    return JSON.stringify(k)+':'+stableJson(v[k]);
+  }).join(',')+'}';
+}
+function dbSnapshot(map){
+  var snap={}; Object.keys(map).forEach(function(k){ snap[k]=stableJson(map[k]); });
+  return snap;
+}
+
 function ensureDay(k){
   if(!state.days[k]) state.days[k]={water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false};
   return state.days[k];
@@ -833,7 +917,110 @@ function applyUndo(){
 
 function addXp(n){ state.totalXp+=n; if(state.totalXp<0) state.totalXp=0; }
 function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(persist,1000); }
+
+var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes'];
+var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
+
+/* Read the whole store. Five collection reads and three document reads, once
+   at boot. Everything here is small and there are well under a hundred
+   documents, so this is one round trip's worth of work, not a paging problem. */
+function dbReadAll(db){
+  var jobs=DB_COLLECTIONS.map(function(coll){
+    return db.collection(coll).get().then(function(snap){
+      var part={}; snap.docs.forEach(function(d){ if(d.exists) part[coll+'/'+d.id]=d.data(); });
+      return part;
+    });
+  }).concat(DB_STATE_DOCS.map(function(path){
+    return db.doc(path).get().then(function(d){
+      var part={}; if(d.exists) part[path]=d.data(); return part;
+    });
+  }));
+  return Promise.all(jobs).then(function(parts){
+    var map={}; parts.forEach(function(part){ Object.keys(part).forEach(function(k){ map[k]=part[k]; }); });
+    return map;
+  });
+}
+
+/* Write every document the seed implies, then mark the store seeded. The
+   marker is written LAST and only after every write resolved, so a migration
+   that dies halfway is simply retried on the next load rather than leaving a
+   store that claims to be complete and is not. */
+var DB_SEED_BATCH=8;
+function dbSeed(db, st){
+  var docs=dbDocs(st), paths=Object.keys(docs);
+  // In batches, not seventy writes at once: a burst that size is the shape the
+  // store calls resource_exhausted, and a seed that always trips it would
+  // never get past its first attempt.
+  function batch(i){
+    if(i>=paths.length) return Promise.resolve();
+    var slice=paths.slice(i,i+DB_SEED_BATCH);
+    return Promise.all(slice.map(function(path){ return db.doc(path).set(docs[path]); }))
+      .then(function(){ return batch(i+DB_SEED_BATCH); });
+  }
+  return batch(0)
+    .then(function(){ return db.doc('state/meta').set({seeded:true, seededAt:new Date().toISOString(), docs:paths.length}); })
+    .then(function(){ return docs; });
+}
+
+function dbBoot(){
+  if(!window.claude || !window.claude.use){ dbState='local'; return; }
+  claude.use('db').then(function(db){
+    if(!db){ dbState='local'; render(); return; }
+    dbApi=db;
+    return db.doc('state/meta').get().then(function(meta){
+      if(meta.exists) return dbReadAll(db).then(function(map){
+        state=dbApply(map);
+        lastSaved=dbSnapshot(map);
+      });
+      // First run on this store: the document's own seed is the truth.
+      return dbSeed(db, state).then(function(docs){ lastSaved=dbSnapshot(docs); });
+    }).then(function(){
+      dbState='db';
+      syncFromState();
+      render();
+    });
+  }).catch(function(e){
+    // Fall back rather than lock the app: the embedded seed is real data and
+    // publish-to-save still works, it is just the expensive old path.
+    dbErr=(e&&e.code)||'unavailable'; dbState='local'; render();
+  });
+}
+
+/* The UI reads a few fields off state at load. After the store replaces
+   state wholesale those locals are stale, so they are re-read here. */
+function syncFromState(){
+  tab=state.uiTab||'today';
+  viewingSession=!!state.uiViewingSession;
+  slide=state.uiSlide||0;
+  progRange=state.uiProgRange||14;
+  ensurePrep(state.activeSession);
+}
+
+/* Save = write the documents that actually changed. Everything else the app
+   does is unchanged: every mutation still just calls scheduleSave(). */
+function dbSave(){
+  if(!dbApi) return;
+  var docs=dbDocs(state), next=dbSnapshot(docs), writes=[];
+  Object.keys(next).forEach(function(path){
+    if(lastSaved[path]!==next[path]) writes.push(dbApi.doc(path).set(docs[path]));
+  });
+  Object.keys(lastSaved).forEach(function(path){
+    if(next[path]===undefined) writes.push(dbApi.doc(path).delete());
+  });
+  if(!writes.length) return;
+  saving=true; render();
+  Promise.all(writes).then(function(){
+    lastSaved=next; saving=false; dbErr=null; render();
+  }).catch(function(e){
+    // Leave lastSaved alone so the next save retries the same documents.
+    saving=false; dbErr=(e&&e.code)||'unavailable'; render();
+  });
+}
 function persist(){
+  // Once the store is live it is the only place data goes; republishing the
+  // whole document would put a stale copy of it back inside the code.
+  if(dbState==='db'){ dbSave(); return; }
+  if(dbState==='loading') return;   // dbBoot will settle and save from there
   if(!window.claude || !window.claude.use){ render(); return; }
   saving=true; render();
   claude.use('artifact').then(function(ns){
@@ -1862,7 +2049,9 @@ function bodyContent(){
        '<button data-action="today">Back to today</button></div>')
     : '';
   return '<div class="wrap'+(backfilling()?' backfilling':'')+'">'+
+      (dbState==='loading'?'<div class="banner">loading your data&hellip;</div>':'')+
       (saving?'<div class="banner">saving&hellip;</div>':'')+
+      (dbErr?'<div class="banner">Trouble reaching your saved data ('+esc(dbErr)+'). The last thing you did may not have stuck.</div>':'')+
       backfillBar+
       (window.claude && window.claude.use ? '' : '<div class="banner">Open this from your artifact link to sync across devices &mdash; changes here are local to this tab only.</div>')+
       '<div class="hud"><div class="hud-top"><h1 class="brand">Fight <span>Card</span></h1><div class="date">'+prettyDate()+'</div></div>'+
@@ -1954,6 +2143,11 @@ function onClick(e){
   // click handler runs first, and replacing the DOM detaches the element before
   // its change event can reach the document, so the change was silently lost.
   if(action==='inplan'||action==='recipeday'||action==='prepopt') return;
+  // Until we know where data lives, a tap would be applied to state that is
+  // about to be replaced by the store. Reading and moving around is fine.
+  var UI_ONLY_WHILE_LOADING={tab:1,prevslide:1,nextslide:1,toggleex:1,openpicker:1,
+    closepicker:1,prange:1,cancelsession:1,resumesession:1,dismissundo:1};
+  if(dbState==='loading' && !UI_ONLY_WHILE_LOADING[action]) return;
   if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
   else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
   else if(action==='pickday'){ setLogDate(t.getAttribute('data-k')); tab='today'; render(); return; }
@@ -2061,6 +2255,9 @@ function onChange(e){
   var action=t.getAttribute('data-action');
   if(action==='logdate'){ setLogDate(t.value); render(); return; }
   else if(action==='prepopt'){ prepPick[t.getAttribute('data-ex')]=t.value; render(); return; }
+  // Same reason as onClick: state is about to be replaced by the store, so a
+  // change applied now would be thrown away rather than saved.
+  else if(dbState==='loading'){ render(); return; }
   else if(action==='inplan'){ var id=t.getAttribute('data-id'); var r=state.recipes.filter(function(x){return x.id===id;})[0]; if(r) r.inPlan=t.checked; }
   else if(action==='recipeday'){ var id2=t.getAttribute('data-id'); var r2=state.recipes.filter(function(x){return x.id===id2;})[0]; if(r2) r2.day=t.value; }
   render(); scheduleSave();
@@ -2129,6 +2326,7 @@ function boot(){
   // back through startWorkout.
   ensurePrep(state.activeSession);
   render();
+  dbBoot();
   if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); }); }
 }
 boot();
