@@ -18,7 +18,8 @@ function grab(name){
 }
 var DB_LISTS=h.match(/var DB_LISTS=\{[^}]*\};/)[0];
 var sandbox={};
-new Function(DB_LISTS+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+'\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
+new Function(DB_LISTS+'\n'+grab('dbClone')+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+
+  '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
 var seedRaw=h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>'));
 var cases=[['the repo seed', JSON.parse(seedRaw)]];
@@ -28,7 +29,23 @@ try{ cases.push(['live artifact state', JSON.parse(fs.readFileSync(process.env.F
 var fails=0;
 cases.forEach(function(pair){
   var name=pair[0], st=pair[1];
-  var back=sandbox.dbApply(sandbox.dbDocs(st));
+  function deepFreeze(v){
+    if(v===null||typeof v!=='object') return v;
+    Object.keys(v).forEach(function(k){ deepFreeze(v[k]); });
+    return Object.freeze(v);
+  }
+  var docs0=sandbox.dbDocs(st);
+  Object.keys(docs0).forEach(function(k){ deepFreeze(docs0[k]); });
+  var back=sandbox.dbApply(docs0);
+  // What comes out must be writable: the app mutates all of it in place.
+  var stillFrozen=[];
+  ['days','workoutLogs','saunaSessions','recipes','library'].forEach(function(key){
+    var v=back[key]; if(!v) return;
+    Object.keys(v).forEach(function(k){ if(v[k]&&Object.isFrozen(v[k])) stillFrozen.push(key+'/'+k); });
+  });
+  if(back.activeSession&&Object.isFrozen(back.activeSession)) stillFrozen.push('activeSession');
+  if(stillFrozen.length){ fails++; console.log('  FAIL  '+name+': frozen after load -> '+stillFrozen.slice(0,5).join(', ')); }
+  else console.log('  PASS  '+name+': everything loaded is writable, not frozen');
   function cmp(label,a,b){
     if(JSON.stringify(a)===JSON.stringify(b)){ console.log('  PASS  '+name+': '+label); return; }
     fails++;

@@ -723,6 +723,12 @@ var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library
 /* Rebuild state from what the store returned. Order matters for the lists:
    the app renders workout logs and sauna sessions newest-last, and document
    ids sort lexically, so anything order-dependent is sorted explicitly. */
+/* Documents come back FROZEN, and the app mutates state in place everywhere:
+   a water tap does `today.water = n`. Against a frozen body that assignment is
+   a silent no-op outside strict mode, so the tap does nothing and the document
+   never looks changed, which is exactly how water stopped working. Every body
+   out of the store is cloned before it becomes app state. */
+function dbClone(v){ return v===undefined?v:JSON.parse(JSON.stringify(v)); }
 function dbApply(map){
   var st={days:{}, workoutLogs:[], saunaSessions:[], library:[], recipes:[],
           shoppingChecked:[], activeSession:null};
@@ -730,15 +736,15 @@ function dbApply(map){
   st.waterTarget=prof.waterTarget||8; st.totalXp=prof.totalXp||0;
   st.uiTab=prof.uiTab||'today'; st.uiSlide=prof.uiSlide||0;
   st.uiProgRange=prof.uiProgRange||14; st.uiViewingSession=!!prof.uiViewingSession;
-  if(map['state/shopping']) st.shoppingChecked=(map['state/shopping'].checked||[]).slice();
-  if(map['state/session']) st.activeSession=map['state/session'].active||null;
+  if(map['state/shopping']) st.shoppingChecked=dbClone(map['state/shopping'].checked)||[];
+  if(map['state/session']) st.activeSession=dbClone(map['state/session'].active)||null;
   var buckets={};
   Object.keys(map).forEach(function(path){
     var cut=path.indexOf('/'); if(cut<0) return;
     var coll=path.slice(0,cut), id=path.slice(cut+1);
-    if(coll==='days'){ st.days[id]=map[path]; return; }
+    if(coll==='days'){ st.days[id]=dbClone(map[path]); return; }
     var key=DB_LISTS[coll]; if(!key) return;
-    (buckets[key]=buckets[key]||[]).push(map[path]);
+    (buckets[key]=buckets[key]||[]).push(dbClone(map[path]));
   });
   Object.keys(buckets).forEach(function(key){ st[key]=buckets[key]; });
   // Logged work is read back in the order it happened.

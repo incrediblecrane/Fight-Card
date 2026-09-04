@@ -14,6 +14,14 @@ var inflight=0, peak=0, slowGetMs=0;
 function srvJson(r,body){ var b=JSON.stringify(body); r.setHeader('content-type','application/json'); r.setHeader('content-length',Buffer.byteLength(b)); r.end(b); }
 
 var SHIM=`<script>(function(){
+  // The contract says delivered snapshots and their data() are FROZEN. A stub
+  // that hands back mutable objects lets in-place mutation look like it works
+  // when against the real store it is a silent no-op.
+  function deepFreeze(v){
+    if(v===null||typeof v!=='object') return v;
+    Object.keys(v).forEach(function(k){ deepFreeze(v[k]); });
+    return Object.freeze(v);
+  }
   function post(op,body){
     return fetch('/db/'+op,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
       .then(function(r){return r.json();});
@@ -24,7 +32,8 @@ var SHIM=`<script>(function(){
     return {
       id:segs[segs.length-1], path:path,
       get:function(){ return post('get',{path:path}).then(function(r){
-        return {id:segs[segs.length-1], exists:r.exists, data:function(){ return r.data; },
+        var body=deepFreeze(r.data);
+        return {id:segs[segs.length-1], exists:r.exists, data:function(){ return body; },
                 metadata:{fromCache:false,hasPendingWrites:false}}; }); },
       set:function(data){ return post('set',{path:path,data:data}).then(function(){}); },
       update:function(data){ return post('update',{path:path,data:data}).then(function(){}); },
@@ -39,7 +48,8 @@ var SHIM=`<script>(function(){
       doc:function(id){ return docRef(path+'/'+id); },
       get:function(){ return post('coll',{path:path}).then(function(r){
         return {size:r.docs.length, empty:!r.docs.length,
-          docs:r.docs.map(function(d){ return {id:d.id, exists:true, data:function(){return d.data;},
+          docs:r.docs.map(function(d){ var body=deepFreeze(d.data);
+            return {id:d.id, exists:true, data:function(){return body;},
             metadata:{fromCache:false,hasPendingWrites:false}}; }),
           docChanges:function(){return [];}, metadata:{fromCache:false,hasPendingWrites:false}}; }); }
     };
@@ -177,6 +187,55 @@ srv.listen(0,async function(){
     await p.waitForTimeout(1800);
     assert.ok(calls.set>0,'nothing was saved at all');
     assert.ok(calls.set<=2,'a single tap rewrote '+calls.set+' documents');
+  });
+
+  await t('a day loaded from the store can still be changed', async function(){
+    // The store hands back frozen bodies. If the app keeps one as its own
+    // state, `today.water = n` is a silent no-op and the tap does nothing.
+    await go();
+    var day=(new Date()).toISOString().slice(0,10);
+    calls.set=0;
+    var moved=await p.evaluate(function(){
+      var c=document.querySelectorAll('.card');
+      for(var i=0;i<c.length;i++){ var h=c[i].querySelector('h3');
+        if(h&&/Water/i.test(h.textContent)){
+          var b=c[i].querySelector('[data-action="water"][data-d="1"]');
+          var before=c[i].querySelector('.count').textContent.trim();
+          b.click();
+          var after=document.querySelectorAll('.card')[i].querySelector('.count').textContent.trim();
+          return {before:before, after:after};
+        } }
+      return null;
+    });
+    assert.ok(moved,'no water card');
+    assert.notStrictEqual(moved.after,moved.before,
+      'the counter did not move: '+moved.before+' -> '+moved.after+' (a frozen body was mutated in place)');
+    await p.waitForTimeout(1800);
+    assert.ok(store['days/'+day],'no document for today at all');
+    assert.ok(store['days/'+day].water>0,
+      'the day document in the store still reads water='+store['days/'+day].water);
+  });
+
+  await t('nothing the app holds as state is frozen', async function(){
+    // The general form of the same trap: every part of state is mutated in
+    // place somewhere (a recipe's plan flag, a session's logs, a day's water),
+    // so a frozen body anywhere in there is a silent no-op waiting to happen.
+    // State is not reachable from outside the app, so assert the observable
+    // consequence instead: every kind of it can still be changed after a load.
+    await go();
+    var day=(new Date()).toISOString().slice(0,10);
+    calls.set=0;
+    await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1700);
+    assert.ok(store['days/'+day] && store['days/'+day].water>0,'a day could not be changed');
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(500);
+    var box=await p.$('[data-action="inplan"]');
+    if(box){
+      var id=await box.getAttribute('data-id');
+      var was=!!(store['recipes/'+id]||{}).inPlan;
+      await box.click(); await p.waitForTimeout(1700);
+      assert.notStrictEqual(!!(store['recipes/'+id]||{}).inPlan,was,'a recipe could not be changed');
+    }
+    await toToday();   // leave the app where the next check expects it
   });
 
   console.log('\nIT SURVIVES A RELOAD, WITH THE DOCUMENT UNCHANGED');
