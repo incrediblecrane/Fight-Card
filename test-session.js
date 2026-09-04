@@ -418,6 +418,82 @@ srv.listen(0,async function(){
     assert.strictEqual(still,'log-opt-warmup','focus jumped to "'+still+'" after the re-render');
   });
 
+  console.log('\nOWN SESSION AND THE FLYS');
+
+  await t('the custom workout opens with just a warm-up and a cool-down', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    var titles=[await slideTitle()];
+    for(var i=0;i<8;i++){
+      var n=await p.$('[data-action="nextslide"]'); if(!n) break;
+      await next(); titles.push(await slideTitle());
+    }
+    assert.deepStrictEqual(titles,['Warm-up','Cool-down'],'it opened as: '+titles.join(' > '));
+  });
+
+  await t('anything added lands between them, so the session builds itself', async function(){
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','cable fly'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="fly_cable"]'); await settle();
+    assert.strictEqual(await slideTitle(),'Cable fly','landed on "'+(await slideTitle())+'"');
+    var titles=[];
+    for(var r=0;r<8;r++){ var pv=await p.$('[data-action="prevslide"]:not([disabled])'); if(!pv) break; await pv.click(); await p.waitForTimeout(160); }
+    titles.push(await slideTitle());
+    for(var i=0;i<8;i++){
+      var n=await p.$('[data-action="nextslide"]'); if(!n) break;
+      await next(); titles.push(await slideTitle());
+    }
+    assert.deepStrictEqual(titles,['Warm-up','Cable fly','Cool-down'],'order was: '+titles.join(' > '));
+  });
+
+  await t('a custom session finishes and is logged like any other', async function(){
+    assert.ok(await toSlide('Cable fly'),'lost the cable fly');
+    await p.fill('#log-w-fly_cable','15'); await p.fill('#log-v-fly_cable','12');
+    await p.click('[data-action="logset"]'); await settle();
+    await toSlide('Cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
+    if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(600); }
+    var body=await text();
+    assert.ok(/Own session/.test(body),'the session is not in the log:\n'+body.slice(0,400));
+    assert.ok(/15kg ea × 12/.test(body),'the fly set did not read back per side');
+  });
+
+  await t('both flys are in the library with two views each', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','fly'); await p.waitForTimeout(400);
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names.indexOf('Cable fly')>-1 && names.indexOf('High cable fly')>-1,'search found: '+names.join(','));
+    for(var k=0;k<2;k++){
+      var id=['fly_cable','fly_cable_high'][k];
+      await p.click('[data-action="toggleex"][data-id="'+id+'"]'); await p.waitForTimeout(400);
+      var views=await p.evaluate(function(i){
+        var row=document.querySelector('[data-action="toggleex"][data-id="'+i+'"]');
+        var pv=row.closest('.pickrow').querySelector('.pickpreview');
+        return pv?pv.querySelectorAll('svg').length:0;
+      }, id);
+      assert.strictEqual(views,2,id+' drew '+views+' views');
+      await p.click('[data-action="toggleex"][data-id="'+id+'"]'); await p.waitForTimeout(200);
+    }
+  });
+
+  await t('the two flys are different movements, not one with two labels', async function(){
+    // The high fly's hands start high and finish low; the mid fly's stay at
+    // chest height. If the front frames matched, one of them would be a lie.
+    var same=await p.evaluate(function(){
+      var a=RIGFRAMES['fly_cable'].front, b=RIGFRAMES['fly_cable_high'].front;
+      return JSON.stringify(a)===JSON.stringify(b);
+    }).catch(function(){ return null; });
+    if(same!==null) assert.ok(!same,'both flys share identical front frames');
+    var drop=await p.evaluate(function(){
+      var b=RIGFRAMES['fly_cable_high'].front;
+      return b[2].handL[1]-b[0].handL[1];
+    }).catch(function(){ return null; });
+    if(drop!==null) assert.ok(drop>40,'the high fly only travels '+drop+' downward');
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

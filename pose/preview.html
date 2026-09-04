@@ -1041,6 +1041,28 @@ var EXERCISES = [
     {hip:[52,138],torso:8, ankN:[74,140],ankF:[68,142], handN:[76,124],handF:[70,126], kneeSign:-1, elbowSign:1}
   ]},
 
+{ id:"fly_cable", tempo:[420,420,520,520], name:"Cable fly",
+  real:"Handles from pulleys at about chest height, one foot forward for balance, a slight forward lean. Elbows stay softly bent at a fixed angle and the hands sweep out wide then back together in front of the chest. The angle at the elbow does not change: the moment it opens and closes you are pressing, not flying.",
+  changed:"New rig. The front view carries it, because the hands sweep across the body and a side view sees that arc almost end-on. From the side the arm is genuinely foreshortened at the stretch, which is why the hand sits close to the shoulder there rather than far behind it.",
+  equip:"cable", active:"arms", anchorAt:[8,84], anchorFront:[18,80,122,80],
+  frames:[
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[36,95],handF:[32,97], elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[90,95],handF:[86,97], elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], elbowSign:1}
+  ]},
+
+{ id:"fly_cable_high", tempo:[420,420,520,520], name:"High cable fly",
+  real:"Same movement from pulleys set high, so the hands travel down and in and meet low, around the belly button. Coming from above puts the line of pull across the lower chest rather than the mid chest, which is the only reason to do both. Same fixed soft elbow throughout.",
+  changed:"New rig, and it is deliberately NOT the mid-height fly with a different label: the hands start high and finish low, so the arc runs downward across the body. That difference is the whole point of having the two, and it is visible in both views.",
+  equip:"cable", active:"arms", anchorAt:[8,38], anchorFront:[20,36,120,36],
+  frames:[
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[44,50],handF:[40,52], elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[80,100],handF:[76,102], elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], elbowSign:1}
+  ]},
+
 { id:"farmerscarry", tempo:[340,340,340,340], name:"Farmer\'s carry",
   real:"Heavy in each hand, walk. Ribs down, shoulders pulled back and away from the ears, short deliberate steps. The load hangs; you do not shrug it. Grip usually gives out before anything else, which is the point.",
   changed:"It walks. The old pose was a static stand, which showed nothing about the exercise. Neutral grip means the handles run front to back, so the side view sees the whole dumbbell and the front view sees the bell faces.",
@@ -1416,6 +1438,24 @@ var FRONTS = {
     {hipY:138,footL:[60,146],footR:[80,146],handL:[64,126],handR:[76,126]},
     {hipY:138,footL:[60,146],footR:[80,146],handL:[62,128],handR:[78,128]},
     {hipY:138,footL:[60,146],footR:[80,146],handL:[64,126],handR:[76,126]}],
+
+  // Cable fly from the front. This is the view the movement lives in: the
+  // hands sweep from wide out to together in front of the chest. An arm
+  // reaching toward the camera at the finish projects short, so the hands
+  // converge near the midline rather than crossing it.
+  fly_cable:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[26,78],handR:[114,78]},
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,82],handR:[96,82]},
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[62,86],handR:[78,86]},
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,82],handR:[96,82]}],
+
+  // High cable fly from the front. Hands start high and wide and finish low
+  // and together: the downward arc is the whole difference from the mid fly.
+  fly_cable_high:[
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[28,50],handR:[112,50]},
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[46,76],handR:[94,76]},
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[62,104],handR:[78,104]},
+    {hipY:107,footL:[58,163],footR:[82,163],handL:[46,76],handR:[94,76]}],
 
   // Pistol squat from the front. The free leg points AT the camera, so it
   // projects short and sits high on screen; the standing leg does all the

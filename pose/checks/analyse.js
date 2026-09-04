@@ -481,6 +481,45 @@ EX.forEach(function(ex){
     check(ex.id,'the finish pulls the handle in to the body', S[2].handN.x<S[1].handN.x-16,
       'mid '+r(S[1].handN.x)+' finish '+r(S[2].handN.x));
   }
+  if(ex.id==='fly_cable'||ex.id==='fly_cable_high'){
+    check(ex.id,'the hands sweep together across the body', ex.front &&
+      (ex.front[0].handR[0]-ex.front[0].handL[0]) - (ex.front[2].handR[0]-ex.front[2].handL[0]) > 50,
+      'gap '+(ex.front?r(ex.front[0].handR[0]-ex.front[0].handL[0]):'?')+' -> '+(ex.front?r(ex.front[2].handR[0]-ex.front[2].handL[0]):'?'));
+    // NOT "the projected reach stays constant": the hand travels an arc centred
+    // on the shoulder, so as the arm rotates toward the camera it legitimately
+    // projects shorter. What is always wrong is the arm collapsing to a stub,
+    // which is what a path cutting across the shoulder produces.
+    check(ex.id,'the arm never collapses to nothing mid-sweep',
+      (function(){
+        for(var i=0;i<80;i++){
+          var x=solve(rig.poseAt(ex,i/80));
+          if(Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y)<14) return false;
+        }
+        return true;
+      })(),'shortest drawn arm '+r(Math.min.apply(null,(function(){var o=[];for(var i=0;i<80;i++){
+        var x=solve(rig.poseAt(ex,i/80)); o.push(Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y));} return o;})())));
+    check(ex.id,'the hands meet, they do not cross over each other',
+      ex.front.every(function(f){ return f.handL[0]<=f.handR[0]; }),'the hands crossed the midline');
+    check(ex.id,'the body does not move: it is the arms that travel',
+      S.every(function(x){ return x.hip.x===S[0].hip.x && x.hip.y===S[0].hip.y && Math.abs(x.sh.y-S[0].sh.y)<1; }),
+      'the torso moved with the arms');
+    check(ex.id,'the feet stay planted', S.every(function(x){return x.ankN.y===GROUND-7;}),'a foot moved');
+  }
+  if(ex.id==='fly_cable_high'){
+    var mid=EX.filter(function(e){return e.id==='fly_cable';})[0];
+    check(ex.id,'it starts higher than the mid-height fly',
+      ex.front[0].handL[1] < mid.front[0].handL[1]-20,
+      'high starts at '+ex.front[0].handL[1]+', mid at '+mid.front[0].handL[1]);
+    check(ex.id,'and finishes lower, so the arc runs downward',
+      ex.front[2].handL[1] > ex.front[0].handL[1]+40,
+      'start '+ex.front[0].handL[1]+' finish '+ex.front[2].handL[1]);
+    check(ex.id,'its pulleys are set above the mid fly\'s',
+      ex.anchorAt[1] < mid.anchorAt[1]-20,'high anchor '+ex.anchorAt[1]+' mid '+mid.anchorAt[1]);
+  }
+  if(ex.id==='fly_cable'){
+    check(ex.id,'the hands meet around chest height, not at the hips',
+      Math.abs(ex.front[2].handL[1]-(107-34))<22,'hands finish at y '+ex.front[2].handL[1]);
+  }
   if(ex.id==='shrug'){
     var lo=S[0], hi=S[2];
     // Without the shrug degree of freedom the shoulder is a pure function of
