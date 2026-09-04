@@ -1,5 +1,5 @@
 var rig=require('../rig.js'), EX=require('../exercises.js');
-var solve=rig.solve, GROUND=rig.GROUND;
+var solve=rig.solve, GROUND=rig.GROUND, L=rig.L;
 function r(n){return Math.round(n*10)/10;}
 var fails=[], warns=[];
 function check(id,label,cond,detail){ (cond?null:fails.push(id+': '+label+'  ['+detail+']')); }
@@ -136,6 +136,350 @@ EX.forEach(function(ex){
     var alt=S[3];
     check(ex.id,'alternates to the other diagonal', alt.handF.x < alt.head.x && alt.ankF.x > alt.ankN.x,
       'second diagonal not mirrored');
+  }
+  /* ---- the 45 rigs added in one pass. Each of these is the claim its own
+     description makes; passing the geometry checks only proves a figure can be
+     drawn, not that it is doing the exercise. ---- */
+  if(ex.id==='pistol'){
+    check(ex.id,'the free leg never touches the floor', S.every(function(x){return x.ankF.y<GROUND-6;}),
+      'lowest free foot '+r(Math.max.apply(null,S.map(function(x){return x.ankF.y;}))));
+    check(ex.id,'the standing foot stays planted', S.every(function(x){return x.ankN.y===S[0].ankN.y && x.ankN.x===S[0].ankN.x;}),'standing foot moved');
+    check(ex.id,'the hips drop a long way', S[2].hip.y>S[0].hip.y+25,'drop '+r(S[2].hip.y-S[0].hip.y));
+    check(ex.id,'the free leg is straighter than the working one',
+      Math.hypot(S[2].hipF.x-S[2].ankF.x,S[2].hipF.y-S[2].ankF.y) > Math.hypot(S[2].hip.x-S[2].ankN.x,S[2].hip.y-S[2].ankN.y),'free leg not extended');
+  }
+  if(ex.id==='lunge_walk'){
+    check(ex.id,'the trailing leg swings through past the lead one, so it walks',
+      ex.frames[3].ankF[0]-ex.frames[0].ankF[0]>30 &&
+      ex.frames[3].ankF[0]>=ex.frames[0].ankN[0]-2,
+      'trailing foot '+r(ex.frames[0].ankF[0])+' -> '+r(ex.frames[3].ankF[0])+', lead was at '+r(ex.frames[0].ankN[0]));
+    check(ex.id,'the swinging foot lifts off the floor to get there',
+      ex.frames[1].ankF[1]<GROUND-14,'swing foot '+r(ex.frames[1].ankF[1]));
+    check(ex.id,'the back knee drops toward the floor', S[1].kneeF.y>S[0].kneeF.y+6,
+      'rear knee '+r(S[0].kneeF.y)+' -> '+r(S[1].kneeF.y));
+  }
+  if(ex.id==='glutebridge'){
+    check(ex.id,'the shoulders stay on the floor, which is what makes it a bridge not a hip thrust',
+      S.every(function(x){return x.sh.y>GROUND-22;}),'highest shoulder '+r(Math.min.apply(null,S.map(function(x){return x.sh.y;}))));
+    // Capped by geometry, not taste: the torso pivots about an anchored
+    // shoulder and the head hangs past that pivot, so more travel than this
+    // buries the head. It is also about the range a real bridge covers.
+    check(ex.id,'the hips actually lift', S[0].hip.y-S[2].hip.y>6,'lift '+r(S[0].hip.y-S[2].hip.y));
+    check(ex.id,'the feet stay planted', S.every(function(x){return x.ankN.y===GROUND-7;}),'a foot left the floor');
+  }
+  if(ex.id==='row_single'){
+    check(ex.id,'the torso is horizontal over a bench, not upright', ex.frames[0].torso>70,'torso '+ex.frames[0].torso);
+    check(ex.id,'the working hand travels up toward the hip', S[0].handN.y-S[2].handN.y>16,
+      'travel '+r(S[0].handN.y-S[2].handN.y));
+    check(ex.id,'the supporting hand does not move', S.every(function(x){return x.handF.y===S[0].handF.y;}),'support hand moved');
+    check(ex.id,'the torso does not rotate up to help', S.every(function(x){return x.sh.y===S[0].sh.y;}),'the torso moved');
+  }
+  if(ex.id==='chinup'||ex.id==='hangingkneeraise'){
+    check(ex.id,'the bar is fixed in space', S.every(function(x){return x.handN.x===S[0].handN.x && x.handN.y===S[0].handN.y;}),'the bar moved');
+    check(ex.id,'the arms are near straight at the hang',
+      Math.hypot(S[0].handN.x-S[0].sh.x,S[0].handN.y-S[0].sh.y)>36,'hang reach '+r(Math.hypot(S[0].handN.x-S[0].sh.x,S[0].handN.y-S[0].sh.y)));
+    check(ex.id,'the feet are off the floor', S.every(function(x){return x.ankN.y<GROUND-4;}),'a foot reached the floor');
+  }
+  if(ex.id==='chinup'){
+    check(ex.id,'the body rises to the bar', S[0].hip.y-S[2].hip.y>18,'rise '+r(S[0].hip.y-S[2].hip.y));
+    check(ex.id,'the grip is narrower than a pull-up',
+      ex.front && ex.front[0].handR[0]-ex.front[0].handL[0] < 42,'grip width '+r(ex.front[0].handR[0]-ex.front[0].handL[0]));
+  }
+  if(ex.id==='hangingkneeraise'){
+    check(ex.id,'the knees travel up toward the chest', S[0].ankN.y-S[2].ankN.y>28,'travel '+r(S[0].ankN.y-S[2].ankN.y));
+    check(ex.id,'the torso barely moves, so it is not a swing', Math.abs(S[2].hip.y-S[0].hip.y)<4,
+      'hip moved '+r(Math.abs(S[2].hip.y-S[0].hip.y)));
+  }
+  if(ex.id==='invertedrow'){
+    check(ex.id,'the bar is fixed in space', S.every(function(x){return x.handN.y===S[0].handN.y;}),'the bar moved');
+    check(ex.id,'the heels stay on the floor', S.every(function(x){return x.ankN.y<=GROUND;}),'a heel sank');
+    check(ex.id,'the chest travels up to the bar', S[0].sh.y-S[2].sh.y>8,'rise '+r(S[0].sh.y-S[2].sh.y));
+    check(ex.id,'the body stays one line, hips do not sag behind the shoulders',
+      S.every(function(x){return Math.abs((x.hip.y-x.sh.y)-(S[0].hip.y-S[0].sh.y))<3;}),'the body folded');
+  }
+  if(ex.id==='kb_clean'||ex.id==='kb_snatch'){
+    check(ex.id,'it starts from a hinge with the bell behind the knees',
+      ex.frames[0].torso>60 && S[0].handN.x<S[0].kneeN.x,'torso '+ex.frames[0].torso+' hand '+r(S[0].handN.x)+' knee '+r(S[0].kneeN.x));
+    check(ex.id,'it finishes standing tall', ex.frames[2].torso<10,'finish torso '+ex.frames[2].torso);
+    check(ex.id,'the feet stay planted throughout', S.every(function(x){return x.ankN.y===GROUND-7;}),'a foot moved');
+  }
+  if(ex.id==='kb_snatch'){
+    var cl=EX.filter(function(e){return e.id==='kb_clean';})[0];
+    var clTop=solve(cl.frames[2]);
+    check(ex.id,'it finishes overhead, higher than a clean racks',
+      S[2].handN.y < clTop.handN.y-30,'snatch '+r(S[2].handN.y)+' clean '+r(clTop.handN.y));
+    check(ex.id,'the lockout arm is straight',
+      Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y)>37,'reach '+r(Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y)));
+  }
+  if(ex.id==='kb_clean'){
+    check(ex.id,'the rack is at chest height, not overhead', S[2].handN.y>S[2].sh.y+6 && S[2].handN.y<S[2].hip.y,
+      'rack '+r(S[2].handN.y)+' shoulder '+r(S[2].sh.y));
+  }
+  if(ex.id==='kb_press'){
+    check(ex.id,'only one arm presses; the other hangs still',
+      S.every(function(x){return Math.abs(x.handF.y-S[0].handF.y)<1;}),'the free arm moved');
+    check(ex.id,'the press goes from the rack to a straight arm overhead',
+      S[2].handN.y<S[0].handN.y-40 && Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y)>34,
+      'rack '+r(S[0].handN.y)+' top '+r(S[2].handN.y));
+    check(ex.id,'the torso stays upright rather than leaning away from the load',
+      S.every(function(x){return Math.abs(x.sh.x-x.hip.x)<4;}),'the torso leaned');
+  }
+  if(ex.id==='suitcasecarry'||ex.id==='kb_bottomsup'||ex.id==='briskwalkjog'){
+    var strides={};
+    S.forEach(function(x){ strides[r(x.ankN.x)+','+r(x.ankN.y)]=1; });
+    check(ex.id,'it walks: the feet take more than one position', Object.keys(strides).length>2,
+      'foot positions '+Object.keys(strides).length);
+    check(ex.id,'it stays upright while walking', ex.frames.every(function(f){return f.torso<10;}),'it leaned over');
+  }
+  if(ex.id==='kb_bottomsup'){
+    check(ex.id,'the bell is racked at shoulder height, not hanging at the side',
+      S.every(function(x){return x.handN.y<x.sh.y+22;}),'hand '+r(S[0].handN.y)+' shoulder '+r(S[0].sh.y));
+  }
+  if(ex.id==='suitcasecarry'){
+    check(ex.id,'only one arm is loaded, so the two hands hang differently',
+      Math.abs(S[0].handN.y-S[0].handF.y)>2,'hands level, both look loaded');
+  }
+  if(ex.id==='platepinch'){
+    check(ex.id,'it is a hold: almost nothing moves',
+      Math.max.apply(null,S.map(function(x){return Math.abs(x.handN.y-S[0].handN.y);}))<4,'the hands travelled');
+    check(ex.id,'the plates hang at the sides, below the hips',
+      S.every(function(x){return x.handN.y>x.hip.y;}),'a hand was above the hip');
+  }
+  if(ex.id==='sideplank'||ex.id==='hollowhold'){
+    check(ex.id,'it is a hold, so nothing travels more than a breath',
+      Math.max.apply(null,S.map(function(x){return Math.abs(x.hip.y-S[0].hip.y);}))<4,'the hips travelled');
+  }
+  if(ex.id==='sideplank'){
+    check(ex.id,'the hips are lifted clear of the floor', S.every(function(x){return x.hip.y<GROUND-25;}),
+      'hip '+r(S[0].hip.y)+' ground '+GROUND);
+    check(ex.id,'one forearm is planted on the floor', S.every(function(x){return x.handN.y>GROUND-22;}),'the supporting hand floated');
+  }
+  if(ex.id==='hollowhold'){
+    check(ex.id,'the shoulders are lifted off the floor', S.every(function(x){return x.sh.y<GROUND-12;}),
+      'shoulder '+r(S[0].sh.y));
+    check(ex.id,'the legs hover rather than resting down', S.every(function(x){return x.ankN.y<GROUND-20;}),
+      'foot '+r(S[0].ankN.y));
+    check(ex.id,'the hips stay down, which is what pins the lower back', S.every(function(x){return x.hip.y>GROUND-16;}),
+      'hip '+r(S[0].hip.y));
+  }
+  if(ex.id==='bearcrawl'){
+    check(ex.id,'the knees hover, they never touch down', S.every(function(x){return x.kneeN.y<GROUND-4 && x.kneeF.y<GROUND-4;}),
+      'lowest knee '+r(Math.max.apply(null,S.map(function(x){return Math.max(x.kneeN.y,x.kneeF.y);}))));
+    check(ex.id,'opposite hand and foot travel together',
+      (S[1].ankN.x!==S[0].ankN.x) && (S[1].handF.x!==S[0].handF.x),'the limbs did not pair up');
+    check(ex.id,'the hips stay low and level', S.every(function(x){return Math.abs(x.hip.y-S[0].hip.y)<3;}),'the hips rocked');
+  }
+  if(ex.id==='woodchopper'){
+    check(ex.id,'the hands travel a long diagonal, high on one side to the opposite hip',
+      S[2].handN.y-S[0].handN.y>40 && S[0].handN.x-S[2].handN.x>20,
+      'dy '+r(S[2].handN.y-S[0].handN.y)+' dx '+r(S[0].handN.x-S[2].handN.x));
+    check(ex.id,'the torso rotates with them rather than staying square',
+      Math.abs(ex.frames[2].torso-ex.frames[0].torso)>15,'torso '+ex.frames[0].torso+' -> '+ex.frames[2].torso);
+  }
+  if(ex.id==='russiantwist'){
+    check(ex.id,'it is seated and leaned back', ex.frames[0].torso>30 && S[0].hip.y>GROUND-22,
+      'torso '+ex.frames[0].torso+' hip '+r(S[0].hip.y));
+    check(ex.id,'the weight tracks side to side', Math.abs(S[1].handN.x-S[3].handN.x)>10,
+      'travel '+r(Math.abs(S[1].handN.x-S[3].handN.x)));
+    check(ex.id,'the hips stay still while it rotates', S.every(function(x){return x.hip.x===S[0].hip.x && x.hip.y===S[0].hip.y;}),'the hips moved');
+    check(ex.id,'the feet stay up off the floor', S.every(function(x){return x.ankN.y<GROUND-16;}),'a foot went down');
+  }
+  if(ex.id==='palloffpress'){
+    check(ex.id,'the hands press straight out from the sternum', S[2].handN.x-S[0].handN.x>20,
+      'travel '+r(S[2].handN.x-S[0].handN.x));
+    check(ex.id,'nothing rotates, which is the entire exercise',
+      ex.frames.every(function(f){return f.torso===ex.frames[0].torso;}),'the torso turned');
+    check(ex.id,'the hands stay near chest height', S.every(function(x){return Math.abs(x.handN.y-x.sh.y)<20;}),'the hands drifted off the chest line');
+  }
+  if(ex.id==='kb_tgu'){
+    check(ex.id,'it starts lying down and finishes up off the floor', S[0].hip.y-S[2].hip.y>12,
+      'hip '+r(S[0].hip.y)+' -> '+r(S[2].hip.y));
+    check(ex.id,'the loaded arm never bends: it stays near full extension throughout',
+      S.every(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y)>32;}),
+      'shortest loaded reach '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);}))));
+    check(ex.id,'the loaded hand stays above the shoulder the whole way up',
+      S.every(function(x){return x.handN.y<x.sh.y;}),'the bell dropped below the shoulder');
+  }
+  if(ex.id==='sq_jump'||ex.id==='boxjump'||ex.id==='broadjump'){
+    check(ex.id,'the feet actually leave the floor', S.some(function(x){return x.ankN.y<GROUND-14;}),
+      'highest foot '+r(Math.min.apply(null,S.map(function(x){return x.ankN.y;}))));
+    check(ex.id,'it loads the hips before jumping', S[0].hip.y>S[1].hip.y+14,
+      'load '+r(S[0].hip.y)+' flight '+r(S[1].hip.y));
+    check(ex.id,'it lands with the knees bent to absorb', S[3].hip.y>S[1].hip.y+8,
+      'flight '+r(S[1].hip.y)+' landing '+r(S[3].hip.y));
+  }
+  if(ex.id==='boxjump'){
+    var box=ex.props&&ex.props[0];
+    check(ex.id,'it lands ON the box, not beside it',
+      !!box && S[2].ankN.x>box[0] && S[2].ankN.x<box[0]+box[2] && Math.abs(S[2].ankN.y-box[1])<4,
+      'foot '+r(S[2].ankN.x)+','+r(S[2].ankN.y)+' box '+JSON.stringify(box));
+    check(ex.id,'it ends higher than it started', S[2].ankN.y<S[0].ankN.y-14,
+      'start '+r(S[0].ankN.y)+' finish '+r(S[2].ankN.y));
+  }
+  if(ex.id==='broadjump'){
+    check(ex.id,'it travels forward across the frame, which is what makes it broad',
+      S[3].ankN.x-S[0].ankN.x>40,'travel '+r(S[3].ankN.x-S[0].ankN.x));
+    check(ex.id,'it sticks a two-footed landing on the floor',
+      Math.abs(S[3].ankN.y-GROUND)<9 && Math.abs(S[3].ankF.y-GROUND)<9,
+      'feet '+r(S[3].ankN.y)+','+r(S[3].ankF.y));
+  }
+  if(ex.id==='medballthrow'){
+    check(ex.id,'the ball travels across the body', S[2].handN.x-S[0].handN.x>35,
+      'travel '+r(S[2].handN.x-S[0].handN.x));
+    check(ex.id,'the torso rotates through it', ex.frames[2].torso-ex.frames[0].torso>20 ||
+      (ex.frames[2].torso+360)-ex.frames[0].torso>20,'torso '+ex.frames[0].torso+' -> '+ex.frames[2].torso);
+    check(ex.id,'the back heel pivots off the floor', ex.frames[2].ankF[1]<ex.frames[0].ankF[1]-4,
+      'rear heel '+ex.frames[0].ankF[1]+' -> '+ex.frames[2].ankF[1]);
+  }
+  if(ex.id==='medballslam'){
+    check(ex.id,'it starts fully extended overhead', S[0].handN.y<S[0].sh.y-30,
+      'hand '+r(S[0].handN.y)+' shoulder '+r(S[0].sh.y));
+    check(ex.id,'the ball ends near the floor', S[2].handN.y>GROUND-36,'hand '+r(S[2].handN.y));
+    check(ex.id,'the torso folds over the slam rather than staying upright', ex.frames[2].torso>40,
+      'torso '+ex.frames[2].torso);
+  }
+  if(ex.id==='sprint'||ex.id==='highknees'){
+    check(ex.id,'the legs alternate', (S[0].ankN.y<S[0].ankF.y)!==(S[2].ankN.y<S[2].ankF.y),'the legs did not swap');
+    check(ex.id,'a knee comes up high', Math.min(S[0].kneeN.y,S[2].kneeN.y)<S[0].hip.y+22,
+      'highest knee '+r(Math.min(S[0].kneeN.y,S[2].kneeN.y))+' hip '+r(S[0].hip.y));
+    check(ex.id,'opposite arm and leg drive together', (S[0].handN.y<S[0].handF.y)!==(S[2].handN.y<S[2].handF.y),
+      'the arms did not alternate with the legs');
+  }
+  if(ex.id==='skipping'){
+    check(ex.id,'the hops are small, an inch or two clear',
+      S[0].ankN.y-S[1].ankN.y>1 && S[0].ankN.y-S[1].ankN.y<10,'hop height '+r(S[0].ankN.y-S[1].ankN.y));
+    check(ex.id,'the elbows stay in near the ribs', S.every(function(x){return Math.abs(x.elbN.x-x.hip.x)<18;}),
+      'furthest elbow '+r(Math.max.apply(null,S.map(function(x){return Math.abs(x.elbN.x-x.hip.x);}))));
+  }
+  if(ex.id==='jumpingjack'){
+    check(ex.id,'the arms sweep from the sides to overhead',
+      S[0].handN.y-S[2].handN.y>40,'travel '+r(S[0].handN.y-S[2].handN.y));
+    check(ex.id,'the legs open and close', (S[2].ankN.x-S[2].ankF.x)-(S[0].ankN.x-S[0].ankF.x)>20,
+      'stance '+r(S[0].ankN.x-S[0].ankF.x)+' -> '+r(S[2].ankN.x-S[2].ankF.x));
+    check(ex.id,'arms and legs move together, not in sequence',
+      (S[1].handN.y<S[0].handN.y)===((S[1].ankN.x-S[1].ankF.x)>(S[0].ankN.x-S[0].ankF.x)),'they were out of phase');
+  }
+  if(ex.id==='hipflexor'||ex.id==='couchstretch'){
+    check(ex.id,'it is half-kneeling: one knee down, one foot planted in front',
+      S.every(function(x){return x.kneeF.y>GROUND-16 && x.ankN.y>GROUND-8;}),
+      'rear knee '+r(S[0].kneeF.y)+' front foot '+r(S[0].ankN.y));
+    check(ex.id,'the hips travel forward into the stretch', S[2].hip.x>S[0].hip.x+2,
+      'hip x '+r(S[0].hip.x)+' -> '+r(S[2].hip.x));
+    check(ex.id,'the torso stays tall rather than folding forward',
+      ex.frames.every(function(f){return f.torso<20;}),'the torso folded');
+  }
+  if(ex.id==='couchstretch'){
+    var wall=ex.props&&ex.props[0];
+    check(ex.id,'the rear shin is up against the wall, which is the whole difference',
+      !!wall && ex.frames[0].ankF[1]<GROUND-30 && Math.abs(ex.frames[0].ankF[0]-(wall[0]+wall[2]))<10,
+      'rear foot '+JSON.stringify(ex.frames[0].ankF)+' wall '+JSON.stringify(wall));
+  }
+  if(ex.id==='ankle_mob'){
+    var w=ex.props&&ex.props[0];
+    check(ex.id,'the knee travels forward toward the wall and gets close to it',
+      !!w && (w[0]-S[2].kneeN.x)<8 && S[2].kneeN.x>S[0].kneeN.x+3,
+      'knee '+r(S[0].kneeN.x)+' -> '+r(S[2].kneeN.x)+' wall at '+(w&&w[0]));
+    check(ex.id,'the heel never lifts, which is the point of the test',
+      S.every(function(x){return x.ankN.y===GROUND-7;}),'the heel came up');
+  }
+  if(ex.id==='catcow'){
+    check(ex.id,'the hands stay planted under the shoulders',
+      S.every(function(x){return x.handN.x===S[0].handN.x && x.handN.y===S[0].handN.y;}),'a hand moved');
+    check(ex.id,'the shoulders stay put; it is the pelvis that rocks',
+      S.every(function(x){return Math.abs(x.sh.y-S[0].sh.y)<3;}),
+      'shoulder moved '+r(Math.max.apply(null,S.map(function(x){return Math.abs(x.sh.y-S[0].sh.y);}))));
+    check(ex.id,'the pelvis actually tilts through a range', Math.abs(S[2].hip.y-S[0].hip.y)>10,
+      'pelvis travel '+r(Math.abs(S[2].hip.y-S[0].hip.y)));
+  }
+  if(ex.id==='childspose'){
+    check(ex.id,'it sits back onto the heels with the arms stretched long forward',
+      S[0].handN.x>S[0].hip.x+50,'hand '+r(S[0].handN.x)+' hip '+r(S[0].hip.x));
+    check(ex.id,'the head is down near the floor', S[0].head.y>GROUND-40,'head '+r(S[0].head.y));
+  }
+  if(ex.id==='worldsgreatest'){
+    check(ex.id,'the inside hand stays planted by the front foot',
+      S.every(function(x){return x.handN.x===S[0].handN.x && x.handN.y===S[0].handN.y;}),'the planted hand moved');
+    check(ex.id,'the free arm reaches to the ceiling', S[0].handF.y-S[2].handF.y>50,
+      'reach travel '+r(S[0].handF.y-S[2].handF.y));
+    check(ex.id,'it is a deep lunge underneath', S[0].ankN.x-S[0].ankF.x>50,'stride '+r(S[0].ankN.x-S[0].ankF.x));
+  }
+  if(ex.id==='hamstring'){
+    check(ex.id,'the front leg is straight',
+      S.every(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y)>L.THIGH+L.SHIN-12;}),
+      'shortest hip-ankle '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y);}))));
+    check(ex.id,'it hinges further over as it goes', ex.frames[2].torso>ex.frames[0].torso+8,
+      'torso '+ex.frames[0].torso+' -> '+ex.frames[2].torso);
+  }
+  if(ex.id==='shoulderdisloc'){
+    check(ex.id,'the stick travels from in front of the thighs to behind the head',
+      S[0].handN.y>S[0].hip.y-10 && S[2].handN.y<S[2].head.y,
+      'start '+r(S[0].handN.y)+' hip '+r(S[0].hip.y)+' top '+r(S[2].handN.y)+' head '+r(S[2].head.y));
+    check(ex.id,'the arms stay locked straight the whole way',
+      S.every(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y)>L.UPPER+L.FORE-2;}),
+      'shortest reach '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);}))));
+    check(ex.id,'it goes past vertical and behind, not just up to overhead',
+      S[3].handN.x<S[3].sh.x,'end hand '+r(S[3].handN.x)+' shoulder '+r(S[3].sh.x));
+  }
+  if(ex.id==='pigeon'){
+    check(ex.id,'the front shin is folded across, not straight out',
+      Math.hypot(S[0].hip.x-S[0].ankN.x,S[0].hip.y-S[0].ankN.y)<L.THIGH+L.SHIN-18,
+      'hip-ankle '+r(Math.hypot(S[0].hip.x-S[0].ankN.x,S[0].hip.y-S[0].ankN.y)));
+    check(ex.id,'the rear leg is long behind',
+      Math.hypot(S[0].hipF.x-S[0].ankF.x,S[0].hipF.y-S[0].ankF.y)>44,
+      'rear leg '+r(Math.hypot(S[0].hipF.x-S[0].ankF.x,S[0].hipF.y-S[0].ankF.y)));
+    check(ex.id,'it folds forward over the front leg', ex.frames[2].torso>ex.frames[0].torso+10,
+      'torso '+ex.frames[0].torso+' -> '+ex.frames[2].torso);
+  }
+  if(ex.id==='nine0'){
+    check(ex.id,'it is seated on the floor', S.every(function(x){return x.hip.y>GROUND-26;}),'hip '+r(S[0].hip.y));
+    check(ex.id,'both knees are folded, neither leg is straight',
+      S.every(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y)<L.THIGH+L.SHIN-8 &&
+                                  Math.hypot(x.hipF.x-x.ankF.x,x.hipF.y-x.ankF.y)<L.THIGH+L.SHIN-8;}),'a leg was straight');
+    check(ex.id,'the front view carries the rotation the side view cannot',
+      !!ex.front && Math.abs(ex.front[0].footL[0]-ex.front[2].footL[0])>4,
+      'front feet did not travel');
+  }
+  if(ex.id==='thoracic'){
+    check(ex.id,'the hips stay square while the top arm opens',
+      S.every(function(x){return x.hip.x===S[0].hip.x && x.hip.y===S[0].hip.y;}),'the hips turned');
+    check(ex.id,'the top hand opens upward through a real range', S[0].handF.y-S[2].handF.y>25,
+      'travel '+r(S[0].handF.y-S[2].handF.y));
+    check(ex.id,'the supporting hand stays planted',
+      S.every(function(x){return x.handN.y===S[0].handN.y;}),'the support hand moved');
+  }
+  if(ex.id==='shadowbox'||ex.id==='bagspeed'){
+    check(ex.id,'the stance is staggered', Math.abs(S[0].ankN.x-S[0].ankF.x)>20,
+      'lead '+r(S[0].ankN.x)+' rear '+r(S[0].ankF.x));
+    var guardN=S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);});
+    check(ex.id,'a shot reaches near full extension', Math.max.apply(null,guardN)>28 ||
+      Math.max.apply(null,S.map(function(x){return Math.hypot(x.handF.x-x.shF.x,x.handF.y-x.shF.y);}))>28,
+      'longest reach '+r(Math.max.apply(null,guardN)));
+    check(ex.id,'the hands come back to a guard by the head',
+      S.some(function(x){return x.handN.y<x.head.y+18 && Math.abs(x.handN.x-x.head.x)<20;}),'no guard position found');
+  }
+  if(ex.id==='bagspeed'){
+    var bag=ex.props&&ex.props[0];
+    check(ex.id,'the punches actually reach the bag',
+      !!bag && Math.max.apply(null,S.map(function(x){return Math.max(x.handN.x,x.handF.x);}))>bag[0]-8,
+      'furthest fist '+r(Math.max.apply(null,S.map(function(x){return Math.max(x.handN.x,x.handF.x);})))+' bag at '+(bag&&bag[0]));
+  }
+  if(ex.id==='battleropes'){
+    check(ex.id,'it holds a braced quarter-squat', ex.frames.every(function(f){return f.torso>15 && f.torso<45;}),
+      'torso '+ex.frames[0].torso);
+    check(ex.id,'the hips stay put while the arms work',
+      S.every(function(x){return x.hip.y===S[0].hip.y;}),'the hips moved');
+    check(ex.id,'the arms alternate up and down', (S[0].handN.y<S[0].handF.y)!==(S[2].handN.y<S[2].handF.y),
+      'the waves did not alternate');
+  }
+  if(ex.id==='rowerg'){
+    check(ex.id,'the feet stay on the footplate', S.every(function(x){return x.ankN.y===S[0].ankN.y;}),'a foot moved');
+    check(ex.id,'the seat travels: the hips move back down the rail', S[2].hip.x-S[0].hip.x>16,
+      'hip '+r(S[0].hip.x)+' -> '+r(S[2].hip.x));
+    check(ex.id,'legs drive before the arms pull: at mid-drive the handle has barely moved',
+      Math.abs(S[1].handN.x-S[0].handN.x)<12 && S[1].hip.x>S[0].hip.x+6,
+      'handle moved '+r(Math.abs(S[1].handN.x-S[0].handN.x))+' while the seat moved '+r(S[1].hip.x-S[0].hip.x));
+    check(ex.id,'the finish pulls the handle in to the body', S[2].handN.x<S[1].handN.x-16,
+      'mid '+r(S[1].handN.x)+' finish '+r(S[2].handN.x));
   }
   if(ex.id==='shrug'){
     var lo=S[0], hi=S[2];

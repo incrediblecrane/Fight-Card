@@ -120,9 +120,22 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
   }
 });
 
+// Which way a weight faces is the thing that has been wrong most often here.
+// `axis` is read for dumbbells only, so a dumbbell without one silently falls
+// back to sagittal, and an axis on anything else states an intent the renderer
+// never honours. Both are quiet, and both look like the weight facing wrong.
+EX.forEach(function(ex){
+  if(!ex.equip) return;
+  if(ex.equip==='dumbbell') ck(ex.id,'a dumbbell says which way its handle runs', !!ex.axis,'axis is unset, so it defaults to sagittal');
+  else ck(ex.id,'axis is only meaningful on a dumbbell', !ex.axis,'axis="'+ex.axis+'" on a '+ex.equip+', which ignores it');
+});
+
 // A bar fixed in space must stay fixed. The body travels to it on a pull-up;
-// if the derivation lets the hands drift, the bar swings instead.
-EX.filter(function(e){return e.front && e.equip==='fixedbar';}).forEach(function(ex){
+// if the derivation lets the hands drift, the bar swings instead. What makes a
+// bar fixed is `barAt` saying where in the world it is bolted, not the equip
+// kind: a broomstick and a rower handle draw the same way and are supposed to
+// travel with the hands.
+EX.filter(function(e){return e.front && e.equip==='fixedbar' && e.barAt;}).forEach(function(ex){
   var ys=[]; for(var i=0;i<120;i++) ys.push(rig.solveFront(rig.frontAt(ex,i/120)).handL.y);
   var spread=Math.max.apply(null,ys)-Math.min.apply(null,ys);
   ck(ex.id+' front','the fixed bar does not move', spread<1.2,'drifts '+r(spread));

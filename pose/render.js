@@ -114,7 +114,9 @@ function update(ex,ref,u){
   R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
   R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
   R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
-  var p = ex.equip==='fixedbar' ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
+  // Only a bar with barAt is bolted in place; a broomstick or a rower handle
+  // uses the same mark but travels with the hands.
+  var p = (ex.equip==='fixedbar'&&ex.barAt) ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
   var axis2 = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
   if(R.plate){ R.plate.setAttribute('cx',p.x.toFixed(1)); R.plate.setAttribute('cy',p.y.toFixed(1)); }
   if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
