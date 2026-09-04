@@ -238,6 +238,40 @@ srv.listen(0,async function(){
     await toToday();   // leave the app where the next check expects it
   });
 
+  await t('a recipe ticked into the week reaches the week box and the shopping list', async function(){
+    // The visible half of the same freeze bug: the tick did nothing, so no
+    // week assignment and an empty shopping list.
+    await go();
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(600);
+    // Pick one that is NOT already planned: an earlier check ticks one, and
+    // clicking that again would just untick it.
+    var id=await p.evaluate(function(){
+      var boxes=[].slice.call(document.querySelectorAll('[data-action="inplan"]'));
+      for(var i=0;i<boxes.length;i++){ if(!boxes[i].checked) return boxes[i].getAttribute('data-id'); }
+      return null;
+    });
+    assert.ok(id,'every recipe is already in the plan, nothing left to tick');
+    await p.click('[data-action="inplan"][data-id="'+id+'"]');
+    await p.waitForTimeout(1800);
+
+    assert.ok((store['recipes/'+id]||{}).inPlan,'the recipe document was not marked in-plan');
+    var week=await p.evaluate(function(){
+      var w=document.querySelector('.weekbox'); return w?w.innerText:''; });
+    assert.ok(!/No recipes added/.test(week) && week.trim().length>0,
+      'the week box still says nothing is planned: '+week.slice(0,90));
+    var shop=await p.evaluate(function(){ return document.querySelectorAll('.shop').length; });
+    assert.ok(shop>0,'the shopping list is empty after adding a recipe to the week');
+
+    var sel=await p.$('[data-action="recipeday"][data-id="'+id+'"]');
+    assert.ok(sel,'no day selector for the planned recipe');
+    await sel.selectOption('Wed'); await p.waitForTimeout(1800);
+    assert.strictEqual((store['recipes/'+id]||{}).day,'Wed','the chosen day did not reach the store');
+    var week2=await p.evaluate(function(){
+      var w=document.querySelector('.weekbox'); return w?w.innerText:''; });
+    assert.ok(/Wed/i.test(week2),'the week box does not show the day: '+week2.slice(0,90));
+    await toToday();
+  });
+
   console.log('\nIT SURVIVES A RELOAD, WITH THE DOCUMENT UNCHANGED');
   var after=await waterCount();
   assert.notStrictEqual(after,before);
