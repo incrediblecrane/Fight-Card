@@ -18,7 +18,9 @@ function grab(name){
 }
 var DB_LISTS=h.match(/var DB_LISTS=\{[^}]*\};/)[0];
 var sandbox={};
-new Function(DB_LISTS+'\n'+grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+
+var SLOTS=h.match(/var SLOTS=\[[^\]]*\];/)[0];
+new Function(DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+
+  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+
   '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
 var seedRaw=h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>'));
@@ -29,6 +31,12 @@ var cases=[['the repo seed', JSON.parse(seedRaw)]];
   var st=JSON.parse(seedRaw);
   st.shopExtras=[{id:'x1',text:'Bin bags'},{id:'x2',text:'Coffee'}];
   st.shoppingChecked=['x|x2'];
+  // Same reasoning for the plan: an empty one round-trips trivially. Two
+  // meals of the SAME recipe on different days, because that pair is the whole
+  // reason the model changed and is the pair a careless save would collapse.
+  var rid=(st.recipes&&st.recipes[0]||{}).id||'r1';
+  st.plan=[{id:'pl1', recipeId:rid, date:'2026-09-07', slot:'dinner', portions:2},
+           {id:'pl2', recipeId:rid, date:'2026-09-10', slot:'lunch', portions:1}];
   cases.push(['the seed with your own shopping', st]);
 })();
 var live=__dirname+'/../live-state.json';
@@ -70,6 +78,7 @@ cases.forEach(function(pair){
   if(kept.length){ fails++; console.log('  FAIL  '+name+': the parse cache came back in '+kept.length+' recipes'); }
   else console.log('  PASS  '+name+': the derived parse cache is not carried through storage');
   cmp('library survives', (st.library||[]).slice().sort(byId), (back.library||[]).slice().sort(byId));
+  cmp('the planned meals survive', (st.plan||[]).slice().sort(byId), (back.plan||[]).slice().sort(byId));
   cmp('the shopping ticks survive', st.shoppingChecked||[], back.shoppingChecked);
   cmp('your own shopping items survive', st.shopExtras||[], back.shopExtras);
   cmp('an in-flight session survives', st.activeSession||null, back.activeSession);
@@ -80,7 +89,7 @@ cases.forEach(function(pair){
 
   // Nothing in state may be silently unmapped.
   var mapped={days:1,workoutLogs:1,saunaSessions:1,recipes:1,library:1,shoppingChecked:1,
-              shopExtras:1,activeSession:1,totalXp:1,waterTarget:1,uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
+              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
   var unmapped=Object.keys(st).filter(function(k){ return !mapped[k]; });
   if(unmapped.length){ fails++; console.log('  FAIL  '+name+': unmapped state keys -> '+unmapped.join(', ')); }
   else console.log('  PASS  '+name+': no state key is left unmapped');

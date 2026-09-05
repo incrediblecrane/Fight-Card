@@ -55,14 +55,14 @@ srv.listen(0,async function(){
   }catch(e){ bad('macros per portion',e); }
 
   try{
-    await p.click('input[data-action="inplan"][data-id="p2"]'); await p.waitForTimeout(2600);
+    await p.click('[data-action="addmeal"][data-id="p2"]'); await p.waitForTimeout(2600);
     var shop=await p.evaluate(function(){ return Array.prototype.slice.call(document.querySelectorAll('.shop')).map(function(x){return x.textContent.trim();}); });
     assert.ok(shop.some(x=>/Beef mince, 5% fat \(1.5kg\)/.test(x)),'shopping list not scaled: '+shop.join(' | '));
     ok('the shopping list uses the chosen portion count, not the recipe default');
   }catch(e){ bad('shopping list scales',e); }
 
   try{
-    await p.click('input[data-action="inplan"][data-id="p3"]'); await p.waitForTimeout(2600);
+    await p.click('[data-action="addmeal"][data-id="p3"]'); await p.waitForTimeout(2600);
     var shop2=await p.evaluate(function(){ return Array.prototype.slice.call(document.querySelectorAll('.shop')).map(function(x){return x.textContent.trim();}); });
     var toms=shop2.filter(x=>/Chopped tomatoes/.test(x));
     assert.strictEqual(toms.length,1,'tomatoes should aggregate to one line, got: '+toms.join(' / '));
@@ -75,7 +75,13 @@ srv.listen(0,async function(){
     await p.waitForTimeout(2600);
     var stillTicked=await p.evaluate(function(k){ var e=document.querySelector('.shop[data-item="'+k+'"]'); return e&&/checked/.test(e.className); },key);
     assert.ok(stillTicked,'tick did not stick');
-    await bump('p2',-1,2); await p.waitForTimeout(2600);
+    // Portions live on the planned meal now, so changing THAT is the move that
+    // must not disturb the ticks.
+    var bumped=await p.evaluate(function(){
+      var b=document.querySelector('[data-action="mealportions"][data-d="-1"]');
+      if(!b) return false; b.click(); return true; });
+    assert.ok(bumped,'no planned meal to change the portions of, so this proves nothing');
+    await p.waitForTimeout(2600);
     var afterBump=await p.evaluate(function(k){ var e=document.querySelector('.shop[data-item="'+k+'"]'); return e&&/checked/.test(e.className); },key);
     assert.ok(afterBump,'changing portions unticked the shopping list');
     ok('ticked items stay ticked when the portions change');
@@ -95,10 +101,10 @@ srv.listen(0,async function(){
     // One at a time, re-querying each round: ticking one re-renders the page,
     // which detaches every other element collected up front.
     for(var i=0;i<60;i++){
-      var more=await p.evaluate(function(){
-        var b=document.querySelector('[data-action="inplan"]:not(:checked)');
-        if(!b) return false; b.click(); return true;
-      });
+      var more=await p.evaluate(function(i){
+        var all=[].slice.call(document.querySelectorAll('[data-action="addmeal"]'));
+        if(i>=all.length) return false; all[i].click(); return true;
+      }, i);
       if(!more) break;
       await p.waitForTimeout(60);
     }

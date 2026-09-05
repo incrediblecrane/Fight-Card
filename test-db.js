@@ -22,9 +22,18 @@ var SHIM=`<script>(function(){
     Object.keys(v).forEach(function(k){ deepFreeze(v[k]); });
     return Object.freeze(v);
   }
+  // Concurrency measured HERE, in the page, not at the server. The browser
+  // opens at most six connections to one host, so the server can never observe
+  // more than six in flight however many the app fires at once: an assertion
+  // on the server's count cannot fail.
+  window.__db={inflight:0, peak:0};
   function post(op,body){
+    if(op==='set'||op==='del'){
+      window.__db.inflight++;
+      window.__db.peak=Math.max(window.__db.peak, window.__db.inflight);
+    }
     return fetch('/db/'+op,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
-      .then(function(r){return r.json();});
+      .then(function(r){ if(op==='set'||op==='del') window.__db.inflight--; return r.json(); });
   }
   function docRef(path){
     var segs=path.split('/');
@@ -152,9 +161,10 @@ srv.listen(0,async function(){
     assert.ok(Object.keys(store).indexOf('state/meta')>0,'meta was written first');
   });
 
-  await t('seeding writes in batches rather than firing every document at once', function(){
-    assert.ok(peak>0,'no writes were observed');
-    assert.ok(peak<=8,'up to '+peak+' writes were in flight at once, which is the shape the store rate-limits');
+  await t('seeding writes in batches rather than firing every document at once', async function(){
+    var pk=await p.evaluate(function(){ return window.__db.peak; });
+    assert.ok(pk>0,'no writes were observed');
+    assert.ok(pk<=8,'up to '+pk+' writes were in flight at once, which is the shape the store rate-limits');
   });
 
   console.log('\nSAVING IS SMALL AND DOES NOT REPUBLISH');
@@ -228,47 +238,72 @@ srv.listen(0,async function(){
     await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1700);
     assert.ok(store['days/'+day] && store['days/'+day].water>0,'a day could not be changed');
     await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(500);
-    var box=await p.$('[data-action="inplan"]');
-    if(box){
-      var id=await box.getAttribute('data-id');
-      var was=!!(store['recipes/'+id]||{}).inPlan;
-      await box.click(); await p.waitForTimeout(1700);
-      assert.notStrictEqual(!!(store['recipes/'+id]||{}).inPlan,was,'a recipe could not be changed');
+    var add=await p.$('[data-action="addmeal"]');
+    if(add){
+      var planBefore=Object.keys(store).filter(function(k){return k.indexOf('plan/')===0;}).length;
+      await add.click(); await p.waitForTimeout(1700);
+      var planAfter=Object.keys(store).filter(function(k){return k.indexOf('plan/')===0;}).length;
+      assert.strictEqual(planAfter,planBefore+1,'a meal could not be planned');
     }
     await toToday();   // leave the app where the next check expects it
   });
 
-  await t('a recipe ticked into the week reaches the week box and the shopping list', async function(){
-    // The visible half of the same freeze bug: the tick did nothing, so no
-    // week assignment and an empty shopping list.
+  await t('a meal added to the week reaches the calendar, the list and the store', async function(){
+    // The visible half of the freeze bug: the change did nothing, so no meal
+    // on the calendar and an empty shopping list.
     await go();
     await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(600);
-    // Pick one that is NOT already planned: an earlier check ticks one, and
-    // clicking that again would just untick it.
     var id=await p.evaluate(function(){
-      var boxes=[].slice.call(document.querySelectorAll('[data-action="inplan"]'));
-      for(var i=0;i<boxes.length;i++){ if(!boxes[i].checked) return boxes[i].getAttribute('data-id'); }
-      return null;
+      var b=document.querySelector('[data-action="addmeal"]');
+      return b?b.getAttribute('data-id'):null;
     });
-    assert.ok(id,'every recipe is already in the plan, nothing left to tick');
-    await p.click('[data-action="inplan"][data-id="'+id+'"]');
+    assert.ok(id,'no recipe offers an Add to plan button');
+    // Plan it on the third day, so the chosen day has to survive too rather
+    // than being right by accident.
+    var wanted=await p.evaluate(function(i){
+      var sel=document.querySelector('[data-action="planday"][data-id="'+i+'"]');
+      return sel.options[2].value; }, id);
+    await p.selectOption('[data-action="planday"][data-id="'+id+'"]', wanted);
+    await p.selectOption('[data-action="planslot"][data-id="'+id+'"]', 'lunch');
+    await p.click('[data-action="addmeal"][data-id="'+id+'"]');
     await p.waitForTimeout(1800);
 
-    assert.ok((store['recipes/'+id]||{}).inPlan,'the recipe document was not marked in-plan');
-    var week=await p.evaluate(function(){
-      var w=document.querySelector('.weekbox'); return w?w.innerText:''; });
-    assert.ok(!/No recipes added/.test(week) && week.trim().length>0,
-      'the week box still says nothing is planned: '+week.slice(0,90));
-    var shop=await p.evaluate(function(){ return document.querySelectorAll('.shop').length; });
-    assert.ok(shop>0,'the shopping list is empty after adding a recipe to the week');
+    var docs=Object.keys(store).filter(function(k){ return k.indexOf('plan/')===0; })
+      .map(function(k){ return store[k]; })
+      .filter(function(e){ return e.recipeId===id && e.date===wanted; });
+    assert.strictEqual(docs.length,1,'the planned meal did not reach the store as its own document');
+    assert.strictEqual(docs[0].slot,'lunch','the chosen slot did not reach the store');
 
-    var sel=await p.$('[data-action="recipeday"][data-id="'+id+'"]');
-    assert.ok(sel,'no day selector for the planned recipe');
-    await sel.selectOption('Wed'); await p.waitForTimeout(1800);
-    assert.strictEqual((store['recipes/'+id]||{}).day,'Wed','the chosen day did not reach the store');
-    var week2=await p.evaluate(function(){
-      var w=document.querySelector('.weekbox'); return w?w.innerText:''; });
-    assert.ok(/Wed/i.test(week2),'the week box does not show the day: '+week2.slice(0,90));
+    var cal=await p.evaluate(function(){
+      var c=document.querySelector('.cal'); return c?c.innerText:''; });
+    // innerText applies the CSS uppercasing, so match without case.
+    assert.ok(/lunch/i.test(cal),'the calendar does not show the planned lunch: '+cal.slice(0,120));
+    var shop=await p.evaluate(function(){ return document.querySelectorAll('.shop').length; });
+    assert.ok(shop>0,'the shopping list is empty after planning a meal');
+    await toToday();
+  });
+
+  await t('the migration save is batched the same way seeding is', async function(){
+    // This is the real burst: a store still holding recipes in the old shape.
+    // On load, migratePlan strips all forty-five at once and ONE save carries
+    // them. dbSeed batches at eight precisely to avoid that, and a save has no
+    // more right to forty-five parallel writes than seeding does.
+    Object.keys(store).forEach(function(k){
+      if(k.indexOf('recipes/')!==0) return;
+      store[k]=JSON.parse(JSON.stringify(store[k]));
+      store[k].inPlan=false; store[k].day='Unassigned';
+    });
+    var stale=Object.keys(store).filter(function(k){
+      return k.indexOf('recipes/')===0 && store[k].inPlan!==undefined; }).length;
+    assert.ok(stale>20,'only '+stale+' recipes put back into the old shape');
+    await go();
+    await p.waitForTimeout(4000);
+    var left=Object.keys(store).filter(function(k){
+      return k.indexOf('recipes/')===0 && store[k].inPlan!==undefined; }).length;
+    assert.strictEqual(left,0,left+' recipes are still stored in the old shape');
+    var pk=await p.evaluate(function(){ return window.__db.peak; });
+    assert.ok(pk>0,'no writes were observed, so this proves nothing');
+    assert.ok(pk<=8,'the migration put '+pk+' writes in flight at once');
     await toToday();
   });
 

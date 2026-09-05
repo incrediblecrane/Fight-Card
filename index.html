@@ -82,6 +82,24 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .weekrow{display:flex;justify-content:space-between;font-size:0.86rem;padding:4px 0;border-bottom:1px solid var(--line);}\
 .weekrow:last-child{border-bottom:none;}\
 .weekrow .d{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:0.72rem;text-transform:uppercase;min-width:3.2em;}\
+.cal{padding:6px 12px 10px;}\
+.calday{padding:9px 0;border-bottom:1px solid var(--line);}\
+.calday:last-child{border-bottom:none;}\
+.calday.bare .cd-n{color:var(--text-faint);}\
+.cd-head{display:flex;align-items:baseline;gap:10px;}\
+.cd-n{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-soft);}\
+.calday.today .cd-n{color:var(--accent);font-weight:600;}\
+.cd-none{font-size:0.76rem;color:var(--text-faint);}\
+.mealrow{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:0.88rem;}\
+.mealrow .slot{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);min-width:5.2em;}\
+.mealrow .mt{flex:1;min-width:0;}\
+.mealrow .mp{display:flex;align-items:center;gap:5px;flex-shrink:0;}\
+.mealrow .mp button{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-size:0.9rem;line-height:1;cursor:pointer;}\
+.mealrow .mp b{font-family:'IBM Plex Mono',monospace;font-size:0.82rem;min-width:1.4ch;text-align:center;}\
+.mealrow .mx{border:none;background:none;color:var(--text-faint);font-size:1.05rem;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0;}\
+.addplan{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;}\
+.planned{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--text-faint);}\
+.shoprange{margin-bottom:10px;}\
 .shop{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:0.9rem;}\
 .shop:last-child{border-bottom:none;}\
 .shop .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);flex-shrink:0;}\
@@ -209,7 +227,6 @@ var PREP_LEVEL={
 };
 function prepLevelKind(opt){ return PREP_LEVEL[opt]||'effort'; }
 var RESISTANCE_LEVELS=(function(a){ for(var i=1;i<=20;i++) a.push(String(i)); return a; })([]);
-var DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun","Unassigned"];
 var XP_PER_WATER=2, XP_WORKOUT=15, XP_REST=6, XP_SAUNA=5;
 var WATER_STEP_L=0.25;
 function litres(units){ var l=Math.round(units*WATER_STEP_L*100)/100; return l+'L'; }
@@ -581,6 +598,13 @@ if(!state.recipes) state.recipes=[];
 if(!state.shoppingChecked) state.shoppingChecked=[];
 // Things to buy that no recipe knows about: bin bags, coffee, whatever.
 if(!state.shopExtras) state.shopExtras=[];
+// Planned meals. migratePlan() converts anything still carrying the old
+// inPlan/day pair, and strips those fields so it cannot run twice.
+if(!state.plan) state.plan=[];
+// The migration itself runs from boot(), not here: it reads SLOTS and
+// WEEKDAY_INDEX, whose assignments are further down this file and so have not
+// run yet. Calling it here threw on exactly the data it exists to convert.
+
 if(!state.workoutLogs) state.workoutLogs=[];
 if(!state.saunaSessions) state.saunaSessions=[];
 // Sauna sessions were written without ids, so there was nothing stable to
@@ -672,7 +696,7 @@ var PREP_RECIPES=[
   PREP_RECIPES.forEach(function(p){
     if(have[p.id]) return;
     var c=JSON.parse(JSON.stringify(p));
-    c.portions=c.base; c.inPlan=false; c.day='Unassigned';
+    c.portions=c.base;
     state.recipes.push(c);
   });
 })();
@@ -698,6 +722,14 @@ var saunaDraft=[], saunaTemp='';
 // the page, and an input rebuilt from HTML comes back empty, so the draft has
 // to live here to be written back into the field.
 var shopDraft='';
+// How much of the week the shopping list covers. UI only: you shop for the
+// next few days or the whole week depending on when you are next in a shop,
+// and that is not worth remembering between sessions.
+var shopRange=7;
+// The day and slot picked on a recipe card but not yet added. Same reason as
+// prepPick: the selects are re-rendered, and a choice that does not survive
+// that is a choice you have to make twice.
+var planPick={};
 var poseFlip=false;
 var poseTimer=null;
 var saveTimer=null;
@@ -744,6 +776,7 @@ function dbDocs(st){
   // ingredients are read would never reach a recipe already saved. It also
   // made every render dirty all 45 recipe documents.
   (st.recipes||[]).forEach(function(x){ if(x&&x.id) out['recipes/'+x.id]=stripDerived(x); });
+  (st.plan||[]).forEach(function(x){ if(x&&x.id) out['plan/'+x.id]=x; });
   return out;
 }
 function stripDerived(r){
@@ -751,7 +784,7 @@ function stripDerived(r){
   var out={}; Object.keys(r).forEach(function(k){ if(k!=='_ings'&&k!=='_ingsFor') out[k]=r[k]; });
   return out;
 }
-var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library', recipes:'recipes'};
+var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library', recipes:'recipes', plan:'plan'};
 /* Rebuild state from what the store returned. Order matters for the lists:
    the app renders workout logs and sauna sessions newest-last, and document
    ids sort lexically, so anything order-dependent is sorted explicitly. */
@@ -762,7 +795,7 @@ var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library
    out of the store is cloned before it becomes app state. */
 function dbClone(v){ return v===undefined?v:JSON.parse(JSON.stringify(v)); }
 function dbApply(map){
-  var st={days:{}, workoutLogs:[], saunaSessions:[], library:[], recipes:[],
+  var st={days:{}, workoutLogs:[], saunaSessions:[], library:[], recipes:[], plan:[],
           shoppingChecked:[], shopExtras:[], activeSession:null};
   var prof=map['state/profile']||{};
   st.waterTarget=prof.waterTarget||8; st.totalXp=prof.totalXp||0;
@@ -787,6 +820,9 @@ function dbApply(map){
   // Logged work is read back in the order it happened.
   st.workoutLogs.sort(function(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); });
   st.saunaSessions.sort(function(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); });
+  // The calendar reads the plan in day then slot order, so sort it once here
+  // rather than at every render.
+  st.plan.sort(planOrder);
   return st;
 }
 /* Key order, canonicalised. The store hands documents back with their keys in
@@ -969,7 +1005,7 @@ function applyUndo(){
 function addXp(n){ state.totalXp+=n; if(state.totalXp<0) state.totalXp=0; }
 function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(persist,1000); }
 
-var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes'];
+var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
 
 /* Read the whole store. Five collection reads and three document reads, once
@@ -1022,6 +1058,12 @@ function dbBoot(){
       if(meta.exists) return dbReadAll(db).then(function(map){
         state=dbApply(map);
         lastSaved=dbSnapshot(map);
+        // Recipes saved under the old shape are converted here, once. The
+        // diff against lastSaved then writes the new plan documents and the
+        // stripped recipes, so the store ends up in the new shape too.
+        // Both write, so either one changing anything has to be saved.
+        var moved=migratePlan(); if(prunePlan()) moved=true;
+        if(moved) scheduleSave();
       });
       // First run on this store: the document's own seed is the truth.
       return dbSeed(db, state).then(function(docs){ lastSaved=dbSnapshot(docs); });
@@ -1051,16 +1093,24 @@ function syncFromState(){
    does is unchanged: every mutation still just calls scheduleSave(). */
 function dbSave(){
   if(!dbApi) return;
-  var docs=dbDocs(state), next=dbSnapshot(docs), writes=[];
+  var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[];
   Object.keys(next).forEach(function(path){
-    if(lastSaved[path]!==next[path]) writes.push(dbApi.doc(path).set(docs[path]));
+    if(lastSaved[path]!==next[path]) jobs.push(function(){ return dbApi.doc(path).set(docs[path]); });
   });
   Object.keys(lastSaved).forEach(function(path){
-    if(next[path]===undefined) writes.push(dbApi.doc(path).delete());
+    if(next[path]===undefined) jobs.push(function(){ return dbApi.doc(path).delete(); });
   });
-  if(!writes.length) return;
+  if(!jobs.length) return;
   saving=true; render();
-  Promise.all(writes).then(function(){
+  // Almost every save is one or two documents, but a migration dirties every
+  // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
+  // avoid, and a save has no more right to that burst than seeding does.
+  function batch(i){
+    if(i>=jobs.length) return Promise.resolve();
+    return Promise.all(jobs.slice(i,i+DB_SEED_BATCH).map(function(run){ return run(); }))
+      .then(function(){ return batch(i+DB_SEED_BATCH); });
+  }
+  batch(0).then(function(){
     lastSaved=next; saving=false; dbErr=null; render();
   }).catch(function(e){
     // Leave lastSaved alone so the next save retries the same documents.
@@ -1121,6 +1171,101 @@ function recipeIngs(r){
   if(!r._ings || r._ingsFor!==sig){ r._ings=(r.ingredients||[]).map(parseIng); r._ingsFor=sig; }
   return r._ings;
 }
+/* ---------------------------------------------------------------------------
+   THE PLAN. A planned meal is its own thing: a recipe, a real date, a slot,
+   and its own portion count. It used to be two fields on the recipe (inPlan
+   and a weekday name), which could not say "chilli on Monday AND Thursday" at
+   all: planning it a second time just moved it. Portions living on the meal
+   rather than the recipe is what lets Monday be two portions and Thursday one.
+   Real dates rather than weekday names are what let the list answer "shop for
+   the next three days" instead of only ever "the whole week".
+   ------------------------------------------------------------------------ */
+var SLOTS=['breakfast','lunch','dinner'];
+var SLOT_LABEL={breakfast:'Breakfast', lunch:'Lunch', dinner:'Dinner'};
+function slotRank(s){ var i=SLOTS.indexOf(s); return i<0?SLOTS.length:i; }
+function planOrder(a,b){
+  return (a.date<b.date?-1:a.date>b.date?1:0) || (slotRank(a.slot)-slotRank(b.slot))
+      || (a.id<b.id?-1:a.id>b.id?1:0);
+}
+/* The week is a rolling seven days from today, so there is no week to roll
+   over and nothing to reset: yesterday's dinner drops off the back on its own.
+   A fixed Mon-Sun week would need moving on by hand, and would sit there
+   looking wrong until it was. */
+function planDates(){
+  var out=[], d=new Date();
+  for(var i=0;i<7;i++){ out.push(dateKey(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+function planWindow(n){ return planDates().slice(0, n||7); }
+var WEEKDAY_NAME=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+// "Today" and "Tomorrow" read faster than a date, and after that the weekday
+// is what you actually plan by.
+function dayLabel(key,i){
+  if(i===0) return 'Today';
+  if(i===1) return 'Tomorrow';
+  var d=new Date(key+'T00:00:00');
+  return WEEKDAY_NAME[d.getDay()]+' '+d.getDate();
+}
+function planEntries(dates){
+  var want={}; (dates||planDates()).forEach(function(k){ want[k]=1; });
+  return (state.plan||[]).filter(function(e){ return want[e.date]; }).sort(planOrder);
+}
+function planRecipe(e){
+  var hit=null;
+  state.recipes.forEach(function(r){ if(r.id===e.recipeId) hit=r; });
+  return hit;
+}
+function planPortions(e){ var r=planRecipe(e); return e.portions||(r?recipeBase(r):1); }
+function addPlanEntry(recipeId,date,slot,portions){
+  var r=null; state.recipes.forEach(function(x){ if(x.id===recipeId) r=x; });
+  if(!r) return null;
+  // Nothing here refuses a second copy: two of the same meal in a week is the
+  // ordinary case, and it is the case the old model could not express.
+  var e={id:'pl'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+         recipeId:recipeId, date:date, slot:slot||'dinner',
+         portions:portions||recipePortions(r)};
+  state.plan.push(e); state.plan.sort(planOrder);
+  return e;
+}
+/* A meal whose day has gone is spent. Left alone they pile up as documents
+   that nothing renders and nothing can reach, so the store grows for ever with
+   invisible rows. */
+function prunePlan(){
+  var first=planDates()[0], before=(state.plan||[]).length;
+  state.plan=(state.plan||[]).filter(function(e){ return e.date>=first; });
+  return state.plan.length!==before;
+}
+function removePlanEntry(id){
+  var before=state.plan.length;
+  state.plan=state.plan.filter(function(e){ return e.id!==id; });
+  return state.plan.length!==before;
+}
+/* Migration off the old shape. A recipe carrying inPlan/day becomes one entry;
+   the fields are then stripped, so this is idempotent and cannot re-run and
+   duplicate the plan. A weekday name has no year in it, so it is read as the
+   next occurrence of that weekday inside the rolling window, and anything
+   unassigned lands on today rather than being dropped. */
+var WEEKDAY_INDEX={Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6,Sun:0};
+function migratePlan(){
+  var dates=planDates(), changed=false;
+  state.recipes.forEach(function(r){
+    if(r.inPlan===undefined && r.day===undefined) return;
+    changed=true;
+    if(r.inPlan){
+      var want=WEEKDAY_INDEX[r.day], date=dates[0];
+      if(want!==undefined){
+        for(var i=0;i<dates.length;i++){
+          if(new Date(dates[i]+'T00:00:00').getDay()===want){ date=dates[i]; break; }
+        }
+      }
+      state.plan.push({id:'pl-mig-'+r.id, recipeId:r.id, date:date, slot:'dinner',
+                       portions:recipePortions(r)});
+    }
+    delete r.inPlan; delete r.day;
+  });
+  if(changed) state.plan.sort(planOrder);
+  return changed;
+}
 function recipeBase(r){ return r.base||1; }
 function recipePortions(r){ return r.portions||recipeBase(r); }
 // Round to something you can actually shop for. Weight and volume tolerate a
@@ -1178,13 +1323,16 @@ function canonQty(q,u){
 // Mass and volume first, then named units, then the unitless count, so a row
 // reads the same way every time.
 function unitRank(u){ return u==='g'?0 : u==='ml'?1 : u===''?3 : 2; }
-// The shopping list adds the same ingredient across every recipe in the plan,
-// at each recipe's own portion count.
-function shoppingList(){
+// The shopping list adds the same ingredient across every planned MEAL, at
+// that meal's own portion count. Reading the plan rather than the recipes is
+// what makes the same recipe twice in a week add up to two lots, and what lets
+// the list be scoped to part of the week.
+function shoppingList(dates){
   var byName={}, order=[];
-  state.recipes.forEach(function(r){
-    if(!r.inPlan) return;
-    var f=recipePortions(r)/recipeBase(r);
+  planEntries(dates).forEach(function(e){
+    var r=planRecipe(e);
+    if(!r) return;
+    var f=planPortions(e)/recipeBase(r);
     recipeIngs(r).forEach(function(ing){
       var nameKey=String(ing.n||'').trim().toLowerCase();
       if(!nameKey) return;
@@ -1779,11 +1927,32 @@ function bodyContent(){
       '<textarea id="lib-notes" placeholder="Notes"></textarea>'+
       '<button data-action="addlib">Add to training plan</button></div>';
 
-  var inPlan=state.recipes.filter(function(r){return r.inPlan;});
-  var byDay={};
-  inPlan.forEach(function(r){ var d=r.day||'Unassigned'; (byDay[d]=byDay[d]||[]).push(r.title); });
-  var weekRows=DAYS.filter(function(d){return byDay[d];}).map(function(d){ return '<div class="weekrow"><span class="d">'+d+'</span><span>'+esc(byDay[d].join(', '))+'</span></div>'; }).join('');
-  var listSL=shoppingList();
+  // The calendar: seven rolling days, each showing the meals planned on it.
+  // Empty days are drawn too, because a gap in the week is the thing you want
+  // to notice.
+  var planDays=planDates();
+  var shopDates=planWindow(shopRange);
+  var calRows=planDays.map(function(k,i){
+    var meals=planEntries([k]);
+    var rows=meals.map(function(e){
+      var r=planRecipe(e);
+      return '<div class="mealrow">'+
+        '<span class="slot">'+esc(SLOT_LABEL[e.slot]||e.slot)+'</span>'+
+        '<span class="mt">'+esc(r?r.title:'(recipe removed)')+'</span>'+
+        '<span class="mp">'+
+          '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="-1">-</button>'+
+          '<b>'+planPortions(e)+'</b>'+
+          '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="1">+</button>'+
+        '</span>'+
+        '<button class="mx" data-action="delmeal" data-id="'+esc(e.id)+'" title="Remove">&times;</button>'+
+      '</div>';
+    }).join('');
+    return '<div class="calday'+(i===0?' today':'')+(meals.length?'':' bare')+'">'+
+      '<div class="cd-head"><span class="cd-n">'+esc(dayLabel(k,i))+'</span>'+
+        (meals.length?'':'<span class="cd-none">nothing planned</span>')+'</div>'+
+      rows+'</div>';
+  }).join('');
+  var listSL=shoppingList(shopDates);
   // Ticked off by a key that does not move when the portions change, so
   // changing a recipe's portions no longer silently unticks its ingredients.
   var shopRows=listSL.map(function(it){
@@ -1795,7 +1964,16 @@ function bodyContent(){
   function recipeCard(r){
     var f=recipePortions(r)/recipeBase(r);
     var ingList=recipeIngs(r).map(function(i){return '<li>'+esc(scaledIng(i,f))+'</li>';}).join('');
-    var dayOptions=DAYS.map(function(d){return '<option'+(r.day===d?' selected':'')+'>'+d+'</option>';}).join('');
+    // Adding is a day, a slot and a button rather than a tick, because the
+    // whole point is being able to add the same recipe more than once.
+    var dayOptions=planDays.map(function(k,i){
+      return '<option value="'+esc(k)+'"'+(planPick[r.id]&&planPick[r.id].date===k?' selected':'')+'>'+esc(dayLabel(k,i))+'</option>';
+    }).join('');
+    var slotOptions=SLOTS.map(function(sl){
+      var chosen=(planPick[r.id]&&planPick[r.id].slot)||'dinner';
+      return '<option value="'+sl+'"'+(chosen===sl?' selected':'')+'>'+SLOT_LABEL[sl]+'</option>';
+    }).join('');
+    var planned=(state.plan||[]).filter(function(e){return e.recipeId===r.id;}).length;
     var m=r.macros;
     return '<div class="libitem"><div class="row"><div><span class="tag">'+esc(r.tag||'Recipe')+'</span><h4>'+esc(r.title)+'</h4></div>'+
       '<button class="x" data-action="delrecipe" data-id="'+r.id+'">&times;</button></div>'+
@@ -1807,23 +1985,32 @@ function bodyContent(){
         (recipePortions(r)!==recipeBase(r)?'<button class="reset" data-action="portions" data-id="'+r.id+'" data-d="0">Reset to '+recipeBase(r)+'</button>':'')+
       '</div>'+
       (ingList?'<ul>'+ingList+'</ul>':'')+(r.instructions?'<p>'+esc(r.instructions)+'</p>':'')+
-      '<div class="recipe-controls"><label class="inplan"><input type="checkbox" data-action="inplan" data-id="'+r.id+'"'+(r.inPlan?' checked':'')+'> In this week&#39;s plan</label>'+
-      '<select data-action="recipeday" data-id="'+r.id+'">'+dayOptions+'</select></div></div>';
+      '<div class="recipe-controls">'+
+        '<select data-action="planday" data-id="'+r.id+'">'+dayOptions+'</select>'+
+        '<select data-action="planslot" data-id="'+r.id+'">'+slotOptions+'</select>'+
+        '<button class="addplan" data-action="addmeal" data-id="'+r.id+'">Add to plan</button>'+
+        (planned?'<span class="planned">'+planned+' in the week</span>':'')+
+      '</div></div>';
   }
   var prepItems=state.recipes.filter(function(r){return r.prep;}).map(recipeCard).join('');
   var recipeItems=state.recipes.filter(function(r){return !r.prep;}).map(recipeCard).join('');
 
   var mealsView =
     '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
-    '<div class="sectiontitle">This week</div><div class="weekbox">'+(weekRows||'<div class="empty">No recipes added to this week yet &mdash; tick &#39;in this week&#39;s plan&#39; on any recipe below.</div>')+'</div>'+
+    '<div class="sectiontitle">The week</div><div class="weekbox cal">'+calRows+'</div>'+
     '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+
-      (shopRows||'<div class="empty">Empty until a recipe is added to this week, or add something below.</div>')+
+      '<div class="rangebar shoprange">'+
+        [[3,'Next 3 days'],[7,'Whole week']].map(function(o){
+          return '<button data-action="shoprange" data-n="'+o[0]+'"'+(shopRange===o[0]?' class="on"':'')+'>'+o[1]+'</button>';
+        }).join('')+'</div>'+
+      (shopRows||'<div class="empty">Nothing planned in this stretch &mdash; add a meal below, or add your own item.</div>')+
       '<div class="addshop"><input id="shop-add" autocomplete="off" maxlength="60" '+
           'placeholder="Milk, bin bags, coffee&hellip;" value="'+esc(shopDraft)+'">'+
         '<button data-action="addextra">Add</button></div>'+
-      (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear week &amp; shopping list</button>':'')+'</div>'+
+      (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear '+
+        (shopRange===7?'the week':'these '+shopRange+' days')+' &amp; the ticks</button>':'')+'</div>'+
     '<div class="sectiontitle">Meal prep</div>'+
-    '<p class="note" style="margin-top:0;">Batch-cook meals that hold up after a few days and a reheat. Set the portions to however many you want to make and the ingredients and shopping list follow. Cool them within about an hour, keep for two days, reheat once until steaming. Rice is the strict one: fridge it fast and eat it the next day. <a href="https://www.nhs.uk/live-well/eat-well/how-to-prepare-and-cook-food-safely/" target="_blank" rel="noopener">NHS food safety guidance</a>.</p>'+
+    '<p class="note" style="margin-top:0;">Batch-cook meals that hold up after a few days and a reheat. The portions here scale the ingredients so you can see the batch; what the shopping list buys is set on each meal in the week above. Cool them within about an hour, keep for two days, reheat once until steaming. Rice is the strict one: fridge it fast and eat it the next day. <a href="https://www.nhs.uk/live-well/eat-well/how-to-prepare-and-cook-food-safely/" target="_blank" rel="noopener">NHS food safety guidance</a>.</p>'+
     prepItems+
     '<div class="sectiontitle">Recipes</div>'+(recipeItems||'<p class="note" style="margin-top:0;">No recipes yet.</p>')+
     '<div class="addform"><strong style="font-family:Work Sans;font-size:0.86rem;">Add a recipe</strong>'+
@@ -2244,7 +2431,7 @@ function onClick(e){
   // Controls whose value onChange reads must not be re-rendered on click: the
   // click handler runs first, and replacing the DOM detaches the element before
   // its change event can reach the document, so the change was silently lost.
-  if(action==='inplan'||action==='recipeday'||action==='prepopt') return;
+  if(action==='planday'||action==='planslot'||action==='prepopt') return;
   // Until we know where data lives, a tap would be applied to state that is
   // about to be replaced by the store. Reading and moving around is fine.
   var UI_ONLY_WHILE_LOADING={tab:1,prevslide:1,nextslide:1,toggleex:1,openpicker:1,
@@ -2336,14 +2523,20 @@ function onClick(e){
     var rp=parseInt((document.getElementById('rec-portions')||{}).value,10);
     if(!(rp>0)) rp=1;
     state.recipes.push({id:'r'+Date.now(),title:title2,tag:'Recipe',ingredients:ings,base:rp,portions:rp,
-      instructions:(rn.value||'').trim(),inPlan:false,day:'Unassigned'});
+      instructions:(rn.value||'').trim()});
   }
   else if(action==='portions'){
     var pid=t.getAttribute('data-id'), pd=parseInt(t.getAttribute('data-d'),10);
     var pr=state.recipes.filter(function(x){return x.id===pid;})[0];
     if(pr){ pr.portions = pd===0 ? recipeBase(pr) : Math.max(1, Math.min(20, recipePortions(pr)+pd)); }
   }
-  else if(action==='delrecipe'){ var rid=t.getAttribute('data-id'); state.recipes=state.recipes.filter(function(x){return x.id!==rid;}); }
+  else if(action==='delrecipe'){
+    var rid=t.getAttribute('data-id');
+    state.recipes=state.recipes.filter(function(x){return x.id!==rid;});
+    // Otherwise the week keeps showing meals whose recipe is gone, and the
+    // shopping list silently stops counting them while they still look planned.
+    state.plan=state.plan.filter(function(e){ return e.recipeId!==rid; });
+  }
   else if(action==='shopcheck'){ var item=t.getAttribute('data-item'); var sidx=state.shoppingChecked.indexOf(item); if(sidx>-1) state.shoppingChecked.splice(sidx,1); else state.shoppingChecked.push(item); }
   else if(action==='addextra'){
     var box=document.getElementById('shop-add');
@@ -2357,8 +2550,27 @@ function onClick(e){
     state.shopExtras=state.shopExtras.filter(function(x){return x.id!==xid;});
     state.shoppingChecked=state.shoppingChecked.filter(function(k){return k!=='x|'+xid;});
   }
+  else if(action==='addmeal'){
+    var rid2=t.getAttribute('data-id'), pick=planPick[rid2]||{}, days=planDates();
+    // A tab left open overnight holds a picked date that has rolled out of the
+    // window. Planning onto it would put the meal somewhere nothing can show.
+    var when=days.indexOf(pick.date)>-1?pick.date:days[0];
+    addPlanEntry(rid2, when, pick.slot||'dinner');
+  }
+  else if(action==='delmeal'){ removePlanEntry(t.getAttribute('data-id')); }
+  else if(action==='mealportions'){
+    var mid=t.getAttribute('data-id'), md=parseInt(t.getAttribute('data-d'),10)||0;
+    state.plan.forEach(function(e){
+      if(e.id!==mid) return;
+      e.portions=Math.max(1, Math.min(20, planPortions(e)+md));
+    });
+  }
+  else if(action==='shoprange'){ shopRange=parseInt(t.getAttribute('data-n'),10)||7; uiOnly=true; }
   else if(action==='clearweek'){
-    state.recipes.forEach(function(r){ r.inPlan=false; r.day='Unassigned'; });
+    // Only the days the shopping list above is actually covering. Clearing
+    // meals that are not on screen is not undoable and not what was asked.
+    var inWindow={}; planWindow(shopRange).forEach(function(k){ inWindow[k]=1; });
+    state.plan=state.plan.filter(function(e){ return !inWindow[e.date]; });
     // Your own items are not part of "the week", so they stay; only their ticks
     // are cleared, along with everything the recipes contributed.
     state.shoppingChecked=[];
@@ -2377,8 +2589,12 @@ function onChange(e){
   // Same reason as onClick: state is about to be replaced by the store, so a
   // change applied now would be thrown away rather than saved.
   else if(dbState==='loading'){ render(); return; }
-  else if(action==='inplan'){ var id=t.getAttribute('data-id'); var r=state.recipes.filter(function(x){return x.id===id;})[0]; if(r) r.inPlan=t.checked; }
-  else if(action==='recipeday'){ var id2=t.getAttribute('data-id'); var r2=state.recipes.filter(function(x){return x.id===id2;})[0]; if(r2) r2.day=t.value; }
+  // Picking a day or a slot plans nothing on its own, so there is nothing to
+  // save and nothing to redraw: it is remembered until Add is pressed.
+  else if(action==='planday'){ var id=t.getAttribute('data-id');
+    (planPick[id]=planPick[id]||{}).date=t.value; return; }
+  else if(action==='planslot'){ var id2=t.getAttribute('data-id');
+    (planPick[id2]=planPick[id2]||{}).slot=t.value; return; }
   render(); scheduleSave();
 }
 
@@ -2460,6 +2676,9 @@ function boot(){
   // them here, since viewingSession persists and such a session never goes
   // back through startWorkout.
   ensurePrep(state.activeSession);
+  // Everything this file declares has been assigned by now, which is why the
+  // plan migration is here rather than beside the other state fix-ups.
+  migratePlan(); prunePlan();
   render();
   dbBoot();
   if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); }); }

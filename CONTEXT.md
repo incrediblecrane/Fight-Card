@@ -24,6 +24,7 @@ documents:
 | `workoutLogs/<id>` | one finished session and its sets |
 | `sauna/<id>` | one sauna visit and its stints |
 | `library/<id>`, `recipes/<id>` | notes and recipes |
+| `plan/<id>` | one planned meal: recipe, date, slot, portions |
 
 Data used to live inside the document. Every water tap rewrote the whole page
 and republished it, and a republish reloads every open view, which is the
@@ -60,10 +61,20 @@ be shared publicly.
   A visit has many; its `mins` is their total.
 - **Backfill date** — the day being logged to, when it is not today. Lives in
   `sessionStorage` so it survives a reload but not closing the app.
+- **Planned meal** — one entry in `state.plan`: a recipe, a real date, a slot
+  (breakfast, lunch, dinner) and its own portion count. It is its own thing,
+  not a flag on the recipe, which is what lets the same recipe be planned twice
+  in one week and lets Monday be two portions while Thursday is one. The
+  portions the shopping list buys are these, not the recipe's.
+- **The week** — a rolling seven days from today, not a Mon-Sun week. Nothing
+  to roll over and nothing to reset: a meal drops off the back the day after it
+  was for, and `prunePlan()` deletes it rather than leaving documents nothing
+  can reach. Real dates rather than weekday names are also what let the
+  shopping list be scoped to part of the week.
 - **Shopping row** — one line of the shopping list, keyed so a tick survives a
   portion change. `i|<name>` is derived: every mention of an ingredient across
-  the week's recipes, added up into one row. `x|<id>` is an **extra**, typed by
-  hand and held in `state.shopExtras`. Extras carry no quantity and belong to
+  the planned meals in view, each at its own portion count, added up into one
+  row. `x|<id>` is an **extra**, typed by hand and held in `state.shopExtras`. Extras carry no quantity and belong to
   no recipe, so clearing the week leaves them behind; they sort into the same
   alphabetical list, because shopping from two lists is how the second one gets
   forgotten.
@@ -103,6 +114,10 @@ set's margins against the rig's limits while it is being authored.
   continuous motion, views, and rendering.
 - `test-app.js` — backfill dates and session dating.
 - `test-meals.js` — recipe portions and the shopping list.
+- `test-plan.js` — the meal planner in the browser: the same meal twice, slots,
+  partial-week shopping.
+- `test-planmodel.js` — the plan model headless, including the one-way
+  migration off the old `inPlan`/`day` pair.
 - `test-removal.js` — swipe-to-remove and undo.
 - `test-session.js` — prep steps, per-implement weights, sauna stints, search.
 - `test-db.js` — seeding, small saves, reload survival, and the fallback.
