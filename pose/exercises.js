@@ -576,6 +576,17 @@ var EXERCISES = [
     {hip:[50,114],torso:26,ankN:[62,163],ankF:[53,163], handN:[70,84], handF:[64,86], elbowSign:1}
   ]},
 
+{ id:"situpwallthrow", tempo:[300,240,300,460], name:"Sit-up wall throw",
+  real:"Sit on the floor facing a wall, knees bent and feet planted, ball held at the chest. Sit up and throw the ball into the wall at the top of the rep, catch the rebound and lower back down with it. The throw comes from the torso finishing the sit-up, not from pressing with the arms: if you can do it lying still, you are only pressing.",
+  changed:"New. The trunk travels from flat on the floor to fully sat up with the feet pinned, and the ball leaves the hands toward a wall in front rather than staying at the chest, which is the half of the movement that makes it a throw.",
+  equip:"ball", active:"arms", floor:true, props:[[116,36,7,134]],
+  frames:[
+    {hip:[58,158],torso:270,ankN:[96,163],ankF:[90,163], handN:[34,146],handF:[28,148], kneeSign:-1, elbowSign:1},
+    {hip:[58,156],torso:320,ankN:[96,163],ankF:[90,163], handN:[48,124],handF:[42,126], kneeSign:-1, elbowSign:1},
+    {hip:[58,156],torso:34, ankN:[96,163],ankF:[90,163], handN:[107,103],handF:[101,105], kneeSign:-1, elbowSign:1},
+    {hip:[58,156],torso:330,ankN:[96,163],ankF:[90,163], handN:[62,112],handF:[56,114], kneeSign:-1, elbowSign:1}
+  ]},
+
 { id:"sprint", tempo:[200,200,200,200], name:"Short sprint",
   real:"Tall posture, aggressive arm drive front to back rather than across the body, knees up and the foot striking under the hips. Short efforts at full speed with long rests, because the quality of each one is the point.",
   changed:"It now cycles a real sprint stride with opposite arm and leg driving and a front-to-back arm swing, instead of sharing a static forward-lean pose.",
@@ -1029,6 +1040,18 @@ var FRONTS = {
     {hipY:140,footL:[62,172],footR:[78,172],handL:[62,118],handR:[74,120]},
     {hipY:140,footL:[62,172],footR:[78,172],handL:[76,120],handR:[88,124]},
     {hipY:140,footL:[62,172],footR:[78,172],handL:[50,122],handR:[62,124]}],
+
+  // Sit-up wall throw seen from ABOVE (frontPlan): flat on your back to begin
+  // with, so the camera looks down at the chest. What only this view can show
+  // is that both hands stay on the ball and it leaves down the midline. Drifting
+  // to one side turns it into a rotational throw, which is a different exercise.
+  // Sitting up lifts the chest toward the camera, so the torso foreshortens and
+  // the hands close together as they drive away.
+  situpwallthrow:[
+    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[63,126],handR:[77,126]},
+    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[64,134],handR:[76,134]},
+    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[66,152],handR:[74,152]},
+    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[64,138],handR:[76,138]}],
 
   // Pallof press from the front. Hands together at the sternum pressing
   // straight out, and the shoulders staying square to the camera IS the
@@ -1487,8 +1510,8 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 
 // A plan view has no gravity in it: "up the screen" means toward the head.
 ['bench','deadbug','pushup','plank','mtnclimb','glutebridge','row_single',
- 'sideplank','hollowhold','bearcrawl','russiantwist','childspose','catcow',
- 'thoracic'].forEach(function(id){
+ 'sideplank','hollowhold','bearcrawl','russiantwist','situpwallthrow',
+ 'childspose','catcow','thoracic'].forEach(function(id){
   var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.frontPlan=true;
 });
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });

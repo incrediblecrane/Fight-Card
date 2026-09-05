@@ -37,6 +37,14 @@ var cases=[['the repo seed', JSON.parse(seedRaw)]];
   var rid=(st.recipes&&st.recipes[0]||{}).id||'r1';
   st.plan=[{id:'pl1', recipeId:rid, date:'2026-09-07', slot:'dinner', portions:2},
            {id:'pl2', recipeId:rid, date:'2026-09-10', slot:'lunch', portions:1}];
+  // A superset lives on the in-flight session, so it only survives a reload if
+  // activeSession round-trips whole. The seed's session is usually null, which
+  // would make that check vacuous.
+  st.activeSession={workoutId:'w_custom', startedAt:'2026-09-05',
+    exIds:['warmup','ss1','cooldown'],
+    supersets:{ss1:['press_bench','row_bent']},
+    targets:{ss1:{sets:3,reps:'rounds'}},
+    logs:{press_bench:[{v:10,w:60}], row_bent:[{v:12,w:50}]}};
   cases.push(['the seed with your own shopping', st]);
 })();
 var live=__dirname+'/../live-state.json';

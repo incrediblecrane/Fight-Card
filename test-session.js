@@ -494,6 +494,140 @@ srv.listen(0,async function(){
     if(drop!==null) assert.ok(drop>40,'the high fly only travels '+drop+' downward');
   });
 
+  console.log('\nSIT-UP WALL THROW');
+
+  await t('it is in the library where a sit-up would be looked for', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    // Typed a character at a time: fill() sets the value in one shot and would
+    // sail past anything that goes wrong between keystrokes.
+    await p.click('#ex-search');
+    await p.type('#ex-search','wall throw',{delay:35}); await p.waitForTimeout(500);
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names.indexOf('Sit-up wall throw')>-1,'search found: '+names.join(','));
+  });
+
+  await t('it draws its OWN rig, not the generic fallback pose', async function(){
+    // Counting svgs is not enough: the fallback also draws two figures, which
+    // is how this shipped green while the app drew a squat. The rig has to be
+    // reachable, and its own wall has to be in the drawing.
+    await p.click('[data-action="toggleex"][data-id="situpwallthrow"]'); await p.waitForTimeout(400);
+    var got=await p.evaluate(function(){
+      var row=document.querySelector('[data-action="toggleex"][data-id="situpwallthrow"]').closest('.pickrow');
+      return {views: row.querySelectorAll('.pickpreview svg').length,
+              props: row.querySelectorAll('.pickpreview svg rect').length,
+              shapes: row.querySelectorAll('.pickpreview svg polygon').length};
+    });
+    assert.strictEqual(got.views,2,'expected two views, got '+got.views);
+    assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
+    assert.ok(got.props>0,'no wall drawn: the generic pose is being used instead of the rig');
+  });
+
+  console.log('\nSUPERSETS');
+
+  await t('a superset can be added to a session', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','superset',{delay:35}); await p.waitForTimeout(500);
+    var found=await p.$('[data-action="addex"][data-id="superset"]');
+    assert.ok(found,'the picker does not offer a superset');
+    await found.click(); await settle();
+    assert.strictEqual(await slideTitle(),'Superset','landed on "'+(await slideTitle())+'"');
+    assert.ok(await p.$('.ssadd select'),'no dropdown to pick exercises with');
+  });
+
+  await t('the dropdown offers real exercises but not prep or another superset', async function(){
+    var opts=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.ssadd select option')).map(function(o){return o.value;});
+    });
+    assert.ok(opts.length>40,'only '+opts.length+' choices');
+    assert.ok(opts.indexOf('press_bench')>-1,'a normal exercise is missing');
+    assert.ok(opts.indexOf('warmup')<0 && opts.indexOf('cooldown')<0,'prep steps are offered');
+    assert.ok(opts.indexOf('superset')<0,'a superset can be put inside a superset');
+  });
+
+  await t('two exercises go into one round', async function(){
+    await p.selectOption('.ssadd select','press_bench');
+    await p.click('[data-action="ssadd"]'); await settle();
+    await p.selectOption('.ssadd select','row_bent');
+    await p.click('[data-action="ssadd"]'); await settle();
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.ssrow .ssn')).map(function(e){return e.textContent.trim();});
+    });
+    assert.strictEqual(names.length,2,'the round holds: '+names.join(', '));
+    assert.ok(await p.$('#log-v-press_bench'),'no log row for the first exercise');
+    assert.ok(await p.$('#log-v-row_bent'),'no log row for the second');
+  });
+
+  await t('one Log round button records a set against each of them', async function(){
+    await p.fill('#log-w-press_bench','60'); await p.fill('#log-v-press_bench','10');
+    await p.fill('#log-w-row_bent','50'); await p.fill('#log-v-row_bent','12');
+    await p.click('[data-action="loground"]'); await settle();
+    var rows=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.ssrow')).map(function(r){
+        return {name:r.querySelector('.ssn').textContent.trim(),
+                chips:[].slice.call(r.querySelectorAll('.setchip')).map(function(c){return c.textContent.trim();})};
+      });
+    });
+    assert.strictEqual(rows[0].chips.length,1,rows[0].name+' logged '+rows[0].chips.length+' sets');
+    assert.strictEqual(rows[1].chips.length,1,rows[1].name+' logged '+rows[1].chips.length+' sets');
+    assert.ok(/60/.test(rows[0].chips[0]),'the weight did not stick: '+rows[0].chips[0]);
+    var label=await p.evaluate(function(){
+      var b=document.querySelector('[data-action="loground"]'); return b?b.textContent.trim():''; });
+    assert.ok(/round 2/i.test(label),'the button still offers round 1: "'+label+'"');
+  });
+
+  await t('the sets land on the exercises themselves, so history reads normally', async function(){
+    // The whole reason a superset logs into its members rather than into
+    // itself: everything downstream keeps working with no idea it happened.
+    await toSlide('Cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
+    if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(600); }
+    var body=await text();
+    assert.ok(/60kg × 10/.test(body),'the bench set did not read back: '+body.slice(0,300));
+    assert.ok(!/Superset/i.test(body),'the superset itself leaked into the history as an exercise');
+  });
+
+  await t('a second superset is its own thing, not the same one again', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    for(var k=0;k<2;k++){
+      await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+      await p.click('#ex-search');
+      await p.type('#ex-search','superset',{delay:25}); await p.waitForTimeout(450);
+      await p.click('[data-action="addex"][data-id="superset"]'); await settle();
+    }
+    await p.selectOption('.ssadd select','curl_bicep');
+    await p.click('[data-action="ssadd"]'); await settle();
+    var here=await p.evaluate(function(){ return document.querySelectorAll('.ssrow').length; });
+    assert.strictEqual(here,1,'this superset holds '+here+' exercises');
+    await p.click('[data-action="prevslide"]'); await p.waitForTimeout(300);
+    assert.strictEqual(await slideTitle(),'Superset','the previous slide is "'+(await slideTitle())+'"');
+    var there=await p.evaluate(function(){ return document.querySelectorAll('.ssrow').length; });
+    assert.strictEqual(there,0,'the two supersets share their contents ('+there+' exercises)');
+  });
+
+  await t('taking an exercise out of a round keeps the sets it already has', async function(){
+    await p.click('[data-action="nextslide"]'); await p.waitForTimeout(300);
+    await p.fill('#log-v-curl_bicep','8');
+    await p.click('[data-action="loground"]'); await settle();
+    await p.click('[data-action="ssdel"]'); await settle();
+    assert.strictEqual(await p.evaluate(function(){ return document.querySelectorAll('.ssrow').length; }),0,
+      'it was not taken out of the round');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','bicep curl',{delay:25}); await p.waitForTimeout(450);
+    await p.click('[data-action="addex"][data-id="curl_bicep"]'); await settle();
+    var chips=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.setchip')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(chips.some(function(c){return /8/.test(c);}),
+      'the set logged inside the round was lost: '+chips.join(' | '));
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

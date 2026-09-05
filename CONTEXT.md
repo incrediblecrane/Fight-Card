@@ -51,6 +51,13 @@ be shared publicly.
 - **Set** — one logged effort. Its shape follows the exercise's `type`:
   `load` (weight and reps), `time`, `distance`, `reps`, `cardio` (minutes,
   machine, work/rest effort), `prep` (minutes, option, level).
+- **Superset** — several exercises done back to back as one round. It is a
+  slide in a session, not a movement: `ss1`, `ss2` are instances, and
+  `activeSession.supersets[ssId]` holds the exercise ids in the round. Logging
+  a round calls the normal per-exercise logger for each member, so the sets land
+  on the exercises themselves and history, PBs and volume need to know nothing
+  about it. The grouping lives on the in-flight session only; a finished
+  workout log records the sets, not the fact they were paired.
 - **Prep step** — the warm-up and cool-down injected into every session that
   does not already have its own. `role: "warmup"|"cooldown"` marks the ones a
   plan already provides.

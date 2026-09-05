@@ -338,6 +338,30 @@ EX.forEach(function(ex){
     check(ex.id,'the torso folds over the slam rather than staying upright', ex.frames[2].torso>40,
       'torso '+ex.frames[2].torso);
   }
+  if(ex.id==='situpwallthrow'){
+    // The two halves that make it this exercise and not a crunch: the trunk
+    // actually leaves the floor, and the ball actually leaves the chest.
+    check(ex.id,'it starts flat on the floor', S[0].sh.y>GROUND-20 && S[0].head.y>GROUND-20,
+      'shoulder '+r(S[0].sh.y)+' head '+r(S[0].head.y));
+    check(ex.id,'the trunk comes all the way up', S[2].sh.y<S[0].sh.y-24,
+      'shoulder '+r(S[0].sh.y)+' -> '+r(S[2].sh.y));
+    check(ex.id,'the feet never leave the floor', ex.frames.every(function(f){
+      return f.ankN[1]>=GROUND-8 && f.ankF[1]>=GROUND-8; }),
+      'ankles '+ex.frames.map(function(f){return f.ankN[1];}).join(','));
+    check(ex.id,'the hips stay down: it is a sit-up, not a bridge', ex.frames.every(function(f){
+      return f.hip[1]>=GROUND-16; }),'hips '+ex.frames.map(function(f){return f.hip[1];}).join(','));
+    check(ex.id,'the ball leaves the chest toward the wall', S[2].handN.x-S[0].handN.x>50,
+      'travel '+r(S[2].handN.x-S[0].handN.x));
+    check(ex.id,'the throwing arm reaches out rather than staying folded',
+      Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y)>L.UPPER+L.FORE-6,
+      'reach '+r(Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y))+' of '+(L.UPPER+L.FORE));
+    // The wall it is thrown at has to be somewhere the ball actually goes.
+    var wall=(ex.props||[])[0];
+    check(ex.id,'there is a wall in front of the release', !!wall && wall[0]>S[2].handN.x,
+      wall?('wall x '+wall[0]+' hand x '+r(S[2].handN.x)):'no wall prop');
+    check(ex.id,'the wall stands on the floor rather than floating',
+      !!wall && wall[1]+wall[3]>=GROUND, wall?('wall bottom '+(wall[1]+wall[3])):'no wall prop');
+  }
   if(ex.id==='sprint'||ex.id==='highknees'){
     check(ex.id,'the legs alternate', (S[0].ankN.y<S[0].ankF.y)!==(S[2].ankN.y<S[2].ankF.y),'the legs did not swap');
     check(ex.id,'a knee comes up high', Math.min(S[0].kneeN.y,S[2].kneeN.y)<S[0].hip.y+22,
