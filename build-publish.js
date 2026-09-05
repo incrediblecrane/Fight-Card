@@ -22,6 +22,13 @@ if(si>-1){
   });
   data=live;
 }
+// `_ings` is a cached parse of `ingredients`. Shipping it would freeze one
+// version of the ingredient parser into the seed, which is exactly the bug
+// that split chopped tomatoes across two shopping rows.
+if(data.recipes) data.recipes=data.recipes.map(function(r){
+  var o={}; Object.keys(r).forEach(function(k){ if(k!=='_ings'&&k!=='_ingsFor') o[k]=r[k]; });
+  return o;
+});
 var src=App.toString();
 
 var m=src.match(/var CSS = "([\s\S]*?)";\n/);

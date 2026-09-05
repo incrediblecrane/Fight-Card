@@ -18,7 +18,7 @@ function grab(name){
 }
 var DB_LISTS=h.match(/var DB_LISTS=\{[^}]*\};/)[0];
 var sandbox={};
-new Function(DB_LISTS+'\n'+grab('dbClone')+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+
+new Function(DB_LISTS+'\n'+grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+
   '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
 var seedRaw=h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>'));
@@ -55,7 +55,12 @@ cases.forEach(function(pair){
   cmp('every day survives', st.days, back.days);
   cmp('workout logs survive in order', st.workoutLogs, back.workoutLogs);
   cmp('sauna sessions survive in order', st.saunaSessions, back.saunaSessions);
-  cmp('recipes survive', (st.recipes||[]).slice().sort(byId), (back.recipes||[]).slice().sort(byId));
+  function bare(r){ var o={}; Object.keys(r).forEach(function(k){ if(k!=='_ings'&&k!=='_ingsFor') o[k]=r[k]; }); return o; }
+  cmp('recipes survive (minus the derived parse cache, which is rebuilt)',
+      (st.recipes||[]).slice().sort(byId).map(bare), (back.recipes||[]).slice().sort(byId).map(bare));
+  var kept=(back.recipes||[]).filter(function(r){ return r._ings!==undefined; });
+  if(kept.length){ fails++; console.log('  FAIL  '+name+': the parse cache came back in '+kept.length+' recipes'); }
+  else console.log('  PASS  '+name+': the derived parse cache is not carried through storage');
   cmp('library survives', (st.library||[]).slice().sort(byId), (back.library||[]).slice().sort(byId));
   cmp('the shopping ticks survive', st.shoppingChecked||[], back.shoppingChecked);
   cmp('an in-flight session survives', st.activeSession||null, back.activeSession);

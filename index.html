@@ -724,7 +724,16 @@ function dbDocs(st){
   (st.workoutLogs||[]).forEach(function(l){ if(l&&l.id) out['workoutLogs/'+l.id]=l; });
   (st.saunaSessions||[]).forEach(function(x){ if(x&&x.id) out['sauna/'+x.id]=x; });
   (st.library||[]).forEach(function(x){ if(x&&x.id) out['library/'+x.id]=x; });
-  (st.recipes||[]).forEach(function(x){ if(x&&x.id) out['recipes/'+x.id]=x; });
+  // `_ings` is a parse of `ingredients`, cached on the object during render.
+  // Storing it would freeze today's parser into the data: a fix to how
+  // ingredients are read would never reach a recipe already saved. It also
+  // made every render dirty all 45 recipe documents.
+  (st.recipes||[]).forEach(function(x){ if(x&&x.id) out['recipes/'+x.id]=stripDerived(x); });
+  return out;
+}
+function stripDerived(r){
+  if(!r||(r._ings===undefined&&r._ingsFor===undefined)) return r;
+  var out={}; Object.keys(r).forEach(function(k){ if(k!=='_ings'&&k!=='_ingsFor') out[k]=r[k]; });
   return out;
 }
 var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library', recipes:'recipes'};
@@ -752,7 +761,9 @@ function dbApply(map){
     var coll=path.slice(0,cut), id=path.slice(cut+1);
     if(coll==='days'){ st.days[id]=dbClone(map[path]); return; }
     var key=DB_LISTS[coll]; if(!key) return;
-    (buckets[key]=buckets[key]||[]).push(dbClone(map[path]));
+    // Drop any cache an older version wrote, so it is reparsed with the
+    // current parser rather than carried forward stale.
+    (buckets[key]=buckets[key]||[]).push(stripDerived(dbClone(map[path])));
   });
   Object.keys(buckets).forEach(function(key){ st[key]=buckets[key]; });
   // Logged work is read back in the order it happened.
@@ -1066,7 +1077,10 @@ function parseIng(text){
   var unit=(rest.match(/^(kg|g|ml|l|tbsp|tsp|[a-z]+)/i)||[])[1]||'';
   if(num===undefined){
     if(IMPLIED_ONE.test(inside)) return {n:name, q:1, u:inside.toLowerCase(), raw:raw};
-    return {n:raw, q:null, u:'', raw:raw};   // "drizzle", "mug, uncooked", "optional"
+    // "drizzle", "mug, uncooked", "optional": no measurement, but the NAME is
+    // still the name. Keeping the whole string as the name made "Honey
+    // (drizzle)" a different ingredient from "Honey (2 tbsp)".
+    return {n:name, q:null, u:'', d:inside, raw:raw};
   }
   if(unit && !/^(kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|scoop|bunch|wedge|sprig|handful)s?$/i.test(unit)) unit='';
   // Keep whatever followed the quantity (", diced", ", optional"): it is
@@ -1075,7 +1089,10 @@ function parseIng(text){
   return {n:name, q:+num, u:unit.toLowerCase(), d:desc, raw:raw};
 }
 function recipeIngs(r){
-  if(!r._ings) r._ings=(r.ingredients||[]).map(parseIng);
+  // Keyed on the ingredient list it was parsed from, so a cache carried in
+  // from saved data (or from an older parser) is rebuilt rather than trusted.
+  var sig=(r.ingredients||[]).join('|');
+  if(!r._ings || r._ingsFor!==sig){ r._ings=(r.ingredients||[]).map(parseIng); r._ingsFor=sig; }
   return r._ings;
 }
 function recipeBase(r){ return r.base||1; }
@@ -1094,38 +1111,71 @@ function fmtQty(q){
   if(Math.abs(v-Math.round(v))<0.05) return String(Math.round(v));
   return String(v);
 }
-function scaledIng(ing,factor){
-  if(ing.q===null) return ing.raw;
-  var q=ing.q*factor, unit=ing.u;
+function qtyText(q,unit){
   // 1400g is a number you have to think about; 1.4kg is one you can shop with.
   if(unit==='g' && q>=1000){ q=q/1000; unit='kg'; }
   else if(unit==='ml' && q>=1000){ q=q/1000; unit='l'; }
   q=roundQty(q,unit);
   // A count of things pluralises; grams and millilitres do not.
   if(unit && !/^(kg|g|ml|l|tbsp|tsp)$/.test(unit) && q>1 && !/s$/.test(unit)) unit=unit+'s';
-  return ing.n+' ('+fmtQty(q)+(unit?(/^(kg|g|ml|l)$/.test(unit)?unit:' '+unit):'')+
-    (ing.d?', '+ing.d:'')+')';
+  return fmtQty(q)+(unit?(/^(kg|g|ml|l)$/.test(unit)?unit:' '+unit):'');
 }
+function scaledIng(ing,factor){
+  if(ing.q===null) return ing.raw;
+  return ing.n+' ('+qtyText(ing.q*factor,ing.u)+(ing.d?', '+ing.d:'')+')';
+}
+
+/* Adding up a shopping list is where an ingredient quietly goes missing, so
+   the rule is: exactly one row per ingredient name, always. Three things used
+   to split one ingredient across two rows, and two rows is how something gets
+   bought twice or not at all.
+     - "1 tin" and "2 tins" are one unit written two ways
+     - 500g and 1kg are one measurement in two scales
+     - "Garlic" and "Garlic (4 cloves)" are one ingredient, one of them just
+       unmeasured
+   Units that genuinely do not add (200g of spinach and a handful of it) stay
+   as separate quantities, but on the SAME row: "Spinach (200g + 1 handful)".
+   Nothing is invented, and nothing can hide. */
+var UNIT_SCALE={kg:{u:'g',mul:1000}, l:{u:'ml',mul:1000}};
+var COUNT_UNIT=/^(tin|can|head|clove|slice|scoop|bunch|wedge|sprig|handful)s$/;
+function canonUnit(u){
+  var x=String(u||'').trim().toLowerCase();
+  if(UNIT_SCALE[x]) return UNIT_SCALE[x].u;
+  // "large handful" is deliberately NOT folded into "handful": they are
+  // different amounts, and pretending otherwise would invent a quantity.
+  return x.replace(COUNT_UNIT,'$1');
+}
+function canonQty(q,u){
+  var x=UNIT_SCALE[String(u||'').trim().toLowerCase()];
+  return x ? q*x.mul : q;
+}
+// Mass and volume first, then named units, then the unitless count, so a row
+// reads the same way every time.
+function unitRank(u){ return u==='g'?0 : u==='ml'?1 : u===''?3 : 2; }
 // The shopping list adds the same ingredient across every recipe in the plan,
 // at each recipe's own portion count.
 function shoppingList(){
-  var agg={}, plain={}, order=[];
+  var byName={}, order=[];
   state.recipes.forEach(function(r){
     if(!r.inPlan) return;
     var f=recipePortions(r)/recipeBase(r);
     recipeIngs(r).forEach(function(ing){
-      if(ing.q===null){
-        var pk='p|'+ing.n.toLowerCase();
-        if(!plain[pk]){ plain[pk]={key:pk,label:ing.n}; order.push(plain[pk]); }
-        return;
-      }
-      var k='q|'+ing.n.toLowerCase()+'|'+ing.u;
-      if(!agg[k]){ agg[k]={key:k,n:ing.n,u:ing.u,q:0}; order.push(agg[k]); }
-      agg[k].q+=ing.q*f;
+      var nameKey=String(ing.n||'').trim().toLowerCase();
+      if(!nameKey) return;
+      var slot=byName[nameKey];
+      if(!slot){ slot=byName[nameKey]={key:'i|'+nameKey, n:ing.n, parts:{}, order:[], plain:null}; order.push(slot); }
+      if(ing.q===null){ if(slot.plain===null) slot.plain=ing.raw; return; }
+      var u=canonUnit(ing.u), part=slot.parts[u];
+      if(!part){ part=slot.parts[u]={u:u,q:0}; slot.order.push(part); }
+      part.q+=canonQty(ing.q,ing.u)*f;
     });
   });
   order.forEach(function(o){
-    if(o.label===undefined) o.label=scaledIng({n:o.n,q:o.q,u:o.u,raw:o.n},1);
+    if(!o.order.length){ o.label=o.plain||o.n; return; }
+    // A measured amount answers the unmeasured mention too, so it is absorbed
+    // rather than left as a second row saying only "you also need this".
+    o.order.sort(function(a,b){ return unitRank(a.u)-unitRank(b.u) || (a.u<b.u?-1:a.u>b.u?1:0); });
+    o.label=o.n+' ('+o.order.map(function(p){ return qtyText(p.q,p.u); }).join(' + ')+')';
   });
   order.sort(function(a,b){return a.label.toLowerCase().localeCompare(b.label.toLowerCase());});
   return order;
@@ -2320,6 +2370,11 @@ function onTouchEnd(e){
 }
 
 function fullDocument(data){
+  // The parse cache is derived, so it does not belong in saved state on this
+  // path either: storing it froze one version of the parser into the data.
+  var out={}; Object.keys(data).forEach(function(k){ out[k]=data[k]; });
+  out.recipes=(data.recipes||[]).map(stripDerived);
+  data=out;
   return '<!doctype html><html><head><meta charset="utf-8">'+
   '<meta name="viewport" content="width=device-width, initial-scale=1">'+
   '<title>Fight Card</title>'+

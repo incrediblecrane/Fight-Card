@@ -14,6 +14,7 @@ srv.listen(0,async function(){
   var p=await b.newPage({viewport:{width:420,height:900}});
   p.setDefaultTimeout(9000);
   var errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  var published=()=>doc;   // whatever the app last saved
   var fails=0, ok=m=>console.log('  PASS  '+m), bad=(m,e)=>{fails++;console.log('  FAIL  '+m+'\n        '+e.message);};
   await p.goto('http://127.0.0.1:'+srv.address().port+'/'); await p.waitForTimeout(500);
   var back=await p.$('[data-action="cancelsession"]'); if(back){await back.click(); await p.waitForTimeout(400);}
@@ -85,6 +86,72 @@ srv.listen(0,async function(){
     assert.strictEqual(r3.portions,'4');
     ok('the original recipes got macros and editable portions too');
   }catch(e){ bad('existing recipes',e); }
+
+  console.log('\nNOTHING SPLITS ACROSS TWO SHOPPING ROWS');
+
+  var t=async(name,fn)=>{ try{ await fn(); ok(name); }catch(e){ bad(name,e); } };
+  await t('an ingredient never appears on two rows, whatever the recipes', async function(){
+    // Two rows for one thing is how something gets bought twice or missed.
+    // One at a time, re-querying each round: ticking one re-renders the page,
+    // which detaches every other element collected up front.
+    for(var i=0;i<60;i++){
+      var more=await p.evaluate(function(){
+        var b=document.querySelector('[data-action="inplan"]:not(:checked)');
+        if(!b) return false; b.click(); return true;
+      });
+      if(!more) break;
+      await p.waitForTimeout(60);
+    }
+    await p.waitForTimeout(1200);
+    var labels=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    });
+    assert.ok(labels.length>40,'only '+labels.length+' shopping rows with everything planned');
+    var seen={}, dup=[];
+    labels.forEach(function(l){
+      var name=l.replace(/\s*\(.*$/,'').trim().toLowerCase();
+      if(seen[name]) dup.push(name); else seen[name]=1;
+    });
+    assert.deepStrictEqual(dup,[],'these appear on more than one row: '+dup.join(', '));
+  });
+
+  await t('tins written singular and plural add up', async function(){
+    var toms=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop'))
+        .map(function(e){return e.innerText.trim();})
+        .filter(function(l){return /^Chopped tomatoes/i.test(l);});
+    });
+    assert.strictEqual(toms.length,1,'chopped tomatoes are on '+toms.length+' rows: '+toms.join(' | '));
+    var n=parseFloat((toms[0].match(/\(([\d.]+)/)||[])[1]);
+    assert.ok(n>=10,'they only added up to '+n+' tins, so the singular ones were dropped');
+  });
+
+  await t('a measured ingredient absorbs the unmeasured mentions of itself', async function(){
+    var garlic=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop'))
+        .map(function(e){return e.innerText.trim();})
+        .filter(function(l){return /^Garlic/i.test(l);});
+    });
+    assert.strictEqual(garlic.length,1,'garlic is on '+garlic.length+' rows: '+garlic.join(' | '));
+    assert.ok(/clove/i.test(garlic[0]),'garlic lost its count: '+garlic[0]);
+  });
+
+  await t('units that genuinely do not add stay on one row, side by side', async function(){
+    var spinach=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop'))
+        .map(function(e){return e.innerText.trim();})
+        .filter(function(l){return /^Spinach \(/i.test(l);});
+    });
+    assert.strictEqual(spinach.length,1,'spinach is on '+spinach.length+' rows');
+    assert.ok(/\+/.test(spinach[0]),
+      'grams and handfuls were silently added together instead of listed: '+spinach[0]);
+  });
+
+  await t('the ingredient parse is not frozen into saved data', async function(){
+    // A cached parse used to be stored with the recipe, so a fix to how
+    // ingredients are read could never reach a recipe already saved.
+    assert.ok(published().indexOf('"_ings"')<0,'the parse cache is being written into saved state');
+  });
 
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');
   await b.close(); srv.close();
