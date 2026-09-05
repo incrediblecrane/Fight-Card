@@ -19,10 +19,15 @@ srv.listen(0,async function(){
   var back=await p.$('[data-action="cancelsession"]'); if(back){await back.click(); await p.waitForTimeout(500);}
   await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
 
-  var count=function(){ return p.evaluate(function(){
-    var h=document.body.innerHTML; var m=h.match(/data-action="delsauna"/g); return m?m.length/2:0; }); };
-  var before=await count();
-  console.log('sauna rows before:', before);
+  // The list renders only the first six, so counting rows proves nothing once
+  // there are more than six sessions: deleting one just promotes the seventh.
+  // Follow the id of the row that was actually removed instead.
+  var ids=function(){ return p.evaluate(function(){
+    return [].slice.call(document.querySelectorAll('[data-action="delsauna"]'))
+      .map(function(e){ return e.getAttribute('data-id'); })
+      .filter(function(v,i,a){ return a.indexOf(v)===i; }); }); };
+  var before=await ids();
+  console.log('sauna rows before:', before.length);
 
   try{
     // swipe left on the first sauna row
@@ -47,9 +52,13 @@ srv.listen(0,async function(){
   }catch(e){ bad('swipe reveals Remove',e); }
 
   try{
+    var goneId=await p.evaluate(function(){
+      var b=document.querySelector('.swipe.open [data-action="delsauna"]');
+      return b?b.getAttribute('data-id'):null; });
+    assert.ok(goneId,'no id on the row about to be removed');
     await p.click('.swipe.open .swipe-del'); await p.waitForTimeout(2600);
-    var after=await count();
-    assert.strictEqual(after, before-1, 'row count went '+before+' -> '+after);
+    var after=await ids();
+    assert.ok(after.indexOf(goneId)<0,'the removed entry is still listed: '+goneId);
     ok('tapping Remove deletes the entry and it survives the save');
   }catch(e){ bad('remove deletes',e); }
 
@@ -61,8 +70,9 @@ srv.listen(0,async function(){
 
   try{
     await p.click('[data-action="undo"]'); await p.waitForTimeout(2600);
-    var restored=await count();
-    assert.strictEqual(restored, before, 'after undo count is '+restored+', expected '+before);
+    var restored=await ids();
+    assert.ok(restored.indexOf(goneId)>-1,'undo did not put '+goneId+' back: '+restored.join(', '));
+    assert.deepStrictEqual(restored, before, 'undo changed the list rather than restoring it');
     assert.strictEqual(await p.$('.undo-bar'), null, 'undo bar should clear');
     ok('Undo puts the entry back and clears the offer');
   }catch(e){ bad('undo restores',e); }

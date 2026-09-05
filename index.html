@@ -87,6 +87,11 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .shop .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);flex-shrink:0;}\
 .shop.checked{color:var(--text-faint);text-decoration:line-through;}\
 .shop.checked .box{background:var(--good);border-color:var(--good);}\
+.shop .shop-t{flex:1;}\
+.shop-x{border:none;background:none;color:var(--text-faint);font-size:1.05rem;line-height:1;padding:0 2px;cursor:pointer;}\
+.addshop{display:flex;gap:8px;margin-top:12px;}\
+.addshop input{flex:1;min-width:0;font-family:'Work Sans',sans-serif;font-size:0.88rem;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--text);}\
+.addshop button{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:9px;padding:9px 15px;cursor:pointer;}\
 .clearbtn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;margin-top:10px;}\
 .banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}\
 .resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}\
@@ -541,7 +546,11 @@ function dayWord(){ return backfilling()?('on '+prettyKey(activeDate())):'today'
 function prettyKey(k){ var d=new Date(k+'T12:00:00');
   return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
 function prettyDate(){var d=new Date();return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});}
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// Quotes too: every use of this is interpolated into HTML, and some of those
+// are attribute values, where a typed 6" shelf would otherwise end the
+// attribute early and mangle the rest of the tag.
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function saunaTotal(x){
   if(x.stints && x.stints.length) return x.stints.reduce(function(a,st){ return a+(st.mins||0); },0);
   return x.mins||0;
@@ -570,6 +579,8 @@ if(!state.days) state.days={};
 if(!state.library) state.library=[];
 if(!state.recipes) state.recipes=[];
 if(!state.shoppingChecked) state.shoppingChecked=[];
+// Things to buy that no recipe knows about: bin bags, coffee, whatever.
+if(!state.shopExtras) state.shopExtras=[];
 if(!state.workoutLogs) state.workoutLogs=[];
 if(!state.saunaSessions) state.saunaSessions=[];
 // Sauna sessions were written without ids, so there was nothing stable to
@@ -683,6 +694,10 @@ var prepPick={}, prepMins={};
 // so it does not have to be retyped for each one. UI-only: nothing is written
 // to state until the session is logged.
 var saunaDraft=[], saunaTemp='';
+// What is half-typed into the shopping box. A save landing mid-word re-renders
+// the page, and an input rebuilt from HTML comes back empty, so the draft has
+// to live here to be written back into the field.
+var shopDraft='';
 var poseFlip=false;
 var poseTimer=null;
 var saveTimer=null;
@@ -718,7 +733,7 @@ function dbDocs(st){
     uiTab:st.uiTab||'today', uiSlide:st.uiSlide||0, uiProgRange:st.uiProgRange||14,
     uiViewingSession:!!st.uiViewingSession};
   // A document body is an object, so a list or a nullable session is wrapped.
-  out['state/shopping']={checked:(st.shoppingChecked||[]).slice()};
+  out['state/shopping']={checked:(st.shoppingChecked||[]).slice(), extras:(st.shopExtras||[]).slice()};
   out['state/session']={active:st.activeSession||null};
   Object.keys(st.days||{}).forEach(function(k){ out['days/'+k]=st.days[k]; });
   (st.workoutLogs||[]).forEach(function(l){ if(l&&l.id) out['workoutLogs/'+l.id]=l; });
@@ -748,12 +763,15 @@ var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library
 function dbClone(v){ return v===undefined?v:JSON.parse(JSON.stringify(v)); }
 function dbApply(map){
   var st={days:{}, workoutLogs:[], saunaSessions:[], library:[], recipes:[],
-          shoppingChecked:[], activeSession:null};
+          shoppingChecked:[], shopExtras:[], activeSession:null};
   var prof=map['state/profile']||{};
   st.waterTarget=prof.waterTarget||8; st.totalXp=prof.totalXp||0;
   st.uiTab=prof.uiTab||'today'; st.uiSlide=prof.uiSlide||0;
   st.uiProgRange=prof.uiProgRange||14; st.uiViewingSession=!!prof.uiViewingSession;
-  if(map['state/shopping']) st.shoppingChecked=dbClone(map['state/shopping'].checked)||[];
+  if(map['state/shopping']){
+    st.shoppingChecked=dbClone(map['state/shopping'].checked)||[];
+    st.shopExtras=dbClone(map['state/shopping'].extras)||[];
+  }
   if(map['state/session']) st.activeSession=dbClone(map['state/session'].active)||null;
   var buckets={};
   Object.keys(map).forEach(function(path){
@@ -912,7 +930,9 @@ function removeSauna(id){
   if(i<0) return false;
   var item=state.saunaSessions.splice(i,1)[0];
   addXp(-XP_SAUNA);
-  parkUndo({kind:'sauna',item:item,xp:XP_SAUNA,label:item.mins+' min sauna on '+item.date});
+  // Where it was, so undo puts it back rather than on the end. The list is
+  // shown newest first, so appending moves an undone entry to the wrong place.
+  parkUndo({kind:'sauna',item:item,pos:i,xp:XP_SAUNA,label:item.mins+' min sauna on '+item.date});
   return true;
 }
 function removeWorkoutLog(id){
@@ -925,14 +945,20 @@ function removeWorkoutLog(id){
   var still=state.workoutLogs.some(function(x){ return x.date===item.date; });
   var d=state.days[item.date];
   if(!still && d && d.workout.done){ d.workout.done=false; d.workout.type=null; }
-  parkUndo({kind:'log',item:item,xp:XP_WORKOUT,label:item.title+' on '+item.date});
+  parkUndo({kind:'log',item:item,pos:i,xp:XP_WORKOUT,label:item.title+' on '+item.date});
   return true;
 }
 function applyUndo(){
   var u=readUndo(); if(!u) return;
-  if(u.kind==='sauna') state.saunaSessions.push(u.item);
+  // An undo parked before positions were recorded has no pos, so it goes on
+  // the end the way it always did.
+  function putBack(list,item,pos){
+    if(pos===undefined || pos===null || pos>list.length) list.push(item);
+    else list.splice(pos,0,item);
+  }
+  if(u.kind==='sauna') putBack(state.saunaSessions,u.item,u.pos);
   else if(u.kind==='log'){
-    state.workoutLogs.push(u.item);
+    putBack(state.workoutLogs,u.item,u.pos);
     var d=ensureDay(u.item.date);
     if(!d.workout.done){ d.workout.done=true; d.workout.type=u.item.tag; d.rest=false; }
     d.touched=true;
@@ -1176,6 +1202,11 @@ function shoppingList(){
     // rather than left as a second row saying only "you also need this".
     o.order.sort(function(a,b){ return unitRank(a.u)-unitRank(b.u) || (a.u<b.u?-1:a.u>b.u?1:0); });
     o.label=o.n+' ('+o.order.map(function(p){ return qtyText(p.q,p.u); }).join(' + ')+')';
+  });
+  // Added by hand, so they carry no quantity to add up, but they belong in the
+  // same list: shopping from two lists is how the second one gets forgotten.
+  (state.shopExtras||[]).forEach(function(x){
+    order.push({key:'x|'+x.id, extraId:x.id, label:x.text, extra:true});
   });
   order.sort(function(a,b){return a.label.toLowerCase().localeCompare(b.label.toLowerCase());});
   return order;
@@ -1757,7 +1788,9 @@ function bodyContent(){
   // changing a recipe's portions no longer silently unticks its ingredients.
   var shopRows=listSL.map(function(it){
     var checked=state.shoppingChecked.indexOf(it.key)>-1;
-    return '<div class="shop'+(checked?' checked':'')+'" data-action="shopcheck" data-item="'+esc(it.key)+'"><span class="box"></span>'+esc(it.label)+'</div>';
+    return '<div class="shop'+(checked?' checked':'')+'" data-action="shopcheck" data-item="'+esc(it.key)+'">'+
+      '<span class="box"></span><span class="shop-t">'+esc(it.label)+'</span>'+
+      (it.extra?'<button class="shop-x" data-action="delextra" data-id="'+esc(it.extraId)+'" title="Remove">&times;</button>':'')+'</div>';
   }).join('');
   function recipeCard(r){
     var f=recipePortions(r)/recipeBase(r);
@@ -1783,7 +1816,11 @@ function bodyContent(){
   var mealsView =
     '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
     '<div class="sectiontitle">This week</div><div class="weekbox">'+(weekRows||'<div class="empty">No recipes added to this week yet &mdash; tick &#39;in this week&#39;s plan&#39; on any recipe below.</div>')+'</div>'+
-    '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+(shopRows||'<div class="empty">Empty until a recipe is added to this week.</div>')+
+    '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+
+      (shopRows||'<div class="empty">Empty until a recipe is added to this week, or add something below.</div>')+
+      '<div class="addshop"><input id="shop-add" autocomplete="off" maxlength="60" '+
+          'placeholder="Milk, bin bags, coffee&hellip;" value="'+esc(shopDraft)+'">'+
+        '<button data-action="addextra">Add</button></div>'+
       (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear week &amp; shopping list</button>':'')+'</div>'+
     '<div class="sectiontitle">Meal prep</div>'+
     '<p class="note" style="margin-top:0;">Batch-cook meals that hold up after a few days and a reheat. Set the portions to however many you want to make and the ingredients and shopping list follow. Cool them within about an hour, keep for two days, reheat once until steaming. Rice is the strict one: fridge it fast and eat it the next day. <a href="https://www.nhs.uk/live-well/eat-well/how-to-prepare-and-cook-food-safely/" target="_blank" rel="noopener">NHS food safety guidance</a>.</p>'+
@@ -2308,7 +2345,24 @@ function onClick(e){
   }
   else if(action==='delrecipe'){ var rid=t.getAttribute('data-id'); state.recipes=state.recipes.filter(function(x){return x.id!==rid;}); }
   else if(action==='shopcheck'){ var item=t.getAttribute('data-item'); var sidx=state.shoppingChecked.indexOf(item); if(sidx>-1) state.shoppingChecked.splice(sidx,1); else state.shoppingChecked.push(item); }
-  else if(action==='clearweek'){ state.recipes.forEach(function(r){ r.inPlan=false; r.day='Unassigned'; }); state.shoppingChecked=[]; }
+  else if(action==='addextra'){
+    var box=document.getElementById('shop-add');
+    var txt=((box?box.value:shopDraft)||'').trim();
+    if(!txt) return;
+    state.shopExtras.push({id:'x'+Date.now(), text:txt});
+    shopDraft='';
+  }
+  else if(action==='delextra'){
+    var xid=t.getAttribute('data-id');
+    state.shopExtras=state.shopExtras.filter(function(x){return x.id!==xid;});
+    state.shoppingChecked=state.shoppingChecked.filter(function(k){return k!=='x|'+xid;});
+  }
+  else if(action==='clearweek'){
+    state.recipes.forEach(function(r){ r.inPlan=false; r.day='Unassigned'; });
+    // Your own items are not part of "the week", so they stay; only their ticks
+    // are cleared, along with everything the recipes contributed.
+    state.shoppingChecked=[];
+  }
 
   render();
   if(!uiOnly) scheduleSave();
@@ -2338,10 +2392,20 @@ function onInput(e){
     if(box) box.innerHTML=pickerResults(); else render();
     return;
   }
+  if(e.target && e.target.id==='shop-add'){ shopDraft=e.target.value; return; }
   // Deliberately no render: this only has to be remembered for the re-render
   // that swapping the prep option triggers.
   var pm=e.target && e.target.getAttribute && e.target.getAttribute('data-prepmins');
   if(pm) prepMins[pm]=e.target.value;
+}
+
+// Enter in the shopping box adds the item. Typing something and then having to
+// reach for a button is exactly the friction that stops a list being used.
+function onKeydown(e){
+  if(e.key!=='Enter' || !e.target || e.target.id!=='shop-add') return;
+  e.preventDefault();
+  var btn=document.querySelector('[data-action="addextra"]');
+  if(btn) btn.click();
 }
 
 var swipeX=null, swipeId=null;
@@ -2389,6 +2453,7 @@ function boot(){
   document.addEventListener('click',onClick);
   document.addEventListener('change',onChange);
   document.addEventListener('input',onInput);
+  document.addEventListener('keydown',onKeydown);
   document.addEventListener('touchstart',onTouchStart,{passive:true});
   document.addEventListener('touchend',onTouchEnd,{passive:true});
   // A session already in flight when this shipped has no prep steps; give it

@@ -153,6 +153,91 @@ srv.listen(0,async function(){
     assert.ok(published().indexOf('"_ings"')<0,'the parse cache is being written into saved state');
   });
 
+  console.log('\nYOUR OWN SHOPPING ITEMS');
+
+  await t('you can add something no recipe knows about', async function(){
+    await p.fill('#shop-add','Bin bags'); await p.click('[data-action="addextra"]');
+    await p.waitForTimeout(1600);
+    var labels=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    });
+    assert.ok(labels.some(function(l){return /Bin bags/.test(l);}),'it is not on the list: '+labels.slice(0,4).join(' | '));
+    var box=await p.inputValue('#shop-add');
+    assert.strictEqual(box,'','the box did not clear, so the next item appends to this one');
+  });
+
+  await t('it sits in the one list, sorted with everything else', async function(){
+    var labels=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim().toLowerCase();});
+    });
+    var sorted=labels.slice().sort(function(a,b){return a.localeCompare(b);});
+    assert.deepStrictEqual(labels,sorted,'the list is not in one alphabetical order');
+  });
+
+  await t('ticking it works like any other row', async function(){
+    await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.shop'));
+      for(var i=0;i<rows.length;i++){ if(/Bin bags/.test(rows[i].innerText)){ rows[i].click(); return; } }
+    });
+    await p.waitForTimeout(1600);
+    var checked=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.shop'));
+      for(var i=0;i<rows.length;i++){ if(/Bin bags/.test(rows[i].innerText)) return rows[i].className; }
+      return '';
+    });
+    assert.ok(/checked/.test(checked),'ticking it did nothing');
+  });
+
+  await t('clearing the week keeps your own items but drops the recipe ones', async function(){
+    var before=await p.evaluate(function(){ return document.querySelectorAll('.shop').length; });
+    var btn=await p.$('[data-action="clearweek"]');
+    assert.ok(btn,'no clear button'); await btn.click(); await p.waitForTimeout(1800);
+    var after=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    });
+    assert.ok(after.length<before,'clearing removed nothing');
+    assert.ok(after.some(function(l){return /Bin bags/.test(l);}),
+      'clearing the week threw away an item you added by hand');
+    assert.ok(after.every(function(l){return !/checked/.test(l);}),'ticks survived the clear');
+  });
+
+  await t('and you can remove one you no longer want', async function(){
+    await p.evaluate(function(){
+      var b=document.querySelector('[data-action="delextra"]'); if(b) b.click();
+    });
+    await p.waitForTimeout(1600);
+    var after=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    });
+    assert.ok(!after.some(function(l){return /Bin bags/.test(l);}),'it is still there: '+after.join(' | '));
+  });
+
+  await t('pressing Enter adds it, without reaching for the button', async function(){
+    // A character at a time on purpose: fill() sets the value in one shot and
+    // sails straight past anything that goes wrong between keystrokes.
+    await p.click('#shop-add');
+    await p.type('#shop-add','Washing up liquid',{delay:30});
+    await p.press('#shop-add','Enter');
+    await p.waitForTimeout(1600);
+    var labels=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    });
+    assert.ok(labels.some(function(l){return /Washing up liquid/.test(l);}),
+      'Enter did nothing: '+labels.join(' | '));
+    assert.strictEqual(await p.inputValue('#shop-add'),'','the box did not clear after Enter');
+  });
+
+  await t('and it is still there after a reload', async function(){
+    await p.reload({waitUntil:'networkidle'}); await p.waitForTimeout(1800);
+    await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
+    await p.waitForTimeout(400);
+    var labels=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    });
+    assert.ok(labels.some(function(l){return /Washing up liquid/.test(l);}),
+      'it did not survive a reload: '+labels.join(' | '));
+  });
+
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');
   await b.close(); srv.close();
   console.log(fails||errs.length?'\nFAILING\n':'\nAll meal checks pass.\n');

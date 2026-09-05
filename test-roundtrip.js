@@ -23,6 +23,14 @@ new Function(DB_LISTS+'\n'+grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('
 
 var seedRaw=h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>'));
 var cases=[['the repo seed', JSON.parse(seedRaw)]];
+// The seed carries no hand-added shopping, so the round-trip for it would be a
+// comparison of two empty arrays. Give it some, or the check proves nothing.
+(function(){
+  var st=JSON.parse(seedRaw);
+  st.shopExtras=[{id:'x1',text:'Bin bags'},{id:'x2',text:'Coffee'}];
+  st.shoppingChecked=['x|x2'];
+  cases.push(['the seed with your own shopping', st]);
+})();
 var live=__dirname+'/../live-state.json';
 try{ cases.push(['live artifact state', JSON.parse(fs.readFileSync(process.env.FC_LIVE_STATE||live,'utf8'))]); }catch(e){}
 
@@ -63,6 +71,7 @@ cases.forEach(function(pair){
   else console.log('  PASS  '+name+': the derived parse cache is not carried through storage');
   cmp('library survives', (st.library||[]).slice().sort(byId), (back.library||[]).slice().sort(byId));
   cmp('the shopping ticks survive', st.shoppingChecked||[], back.shoppingChecked);
+  cmp('your own shopping items survive', st.shopExtras||[], back.shopExtras);
   cmp('an in-flight session survives', st.activeSession||null, back.activeSession);
   cmp('xp survives', st.totalXp||0, back.totalXp);
   cmp('the water target survives', st.waterTarget||8, back.waterTarget);
@@ -71,7 +80,7 @@ cases.forEach(function(pair){
 
   // Nothing in state may be silently unmapped.
   var mapped={days:1,workoutLogs:1,saunaSessions:1,recipes:1,library:1,shoppingChecked:1,
-              activeSession:1,totalXp:1,waterTarget:1,uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
+              shopExtras:1,activeSession:1,totalXp:1,waterTarget:1,uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
   var unmapped=Object.keys(st).filter(function(k){ return !mapped[k]; });
   if(unmapped.length){ fails++; console.log('  FAIL  '+name+': unmapped state keys -> '+unmapped.join(', ')); }
   else console.log('  PASS  '+name+': no state key is left unmapped');

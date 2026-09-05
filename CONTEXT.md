@@ -17,7 +17,7 @@ documents:
 | path | what |
 |---|---|
 | `state/profile` | XP, water target, which tab and slide the app was on |
-| `state/shopping` | which shopping items are ticked |
+| `state/shopping` | which shopping items are ticked, plus the hand-added ones |
 | `state/session` | the in-flight workout, or null |
 | `state/meta` | the seeded marker; its presence means the store is the truth |
 | `days/<YYYY-MM-DD>` | one day: water, workout, rest, alcohol, smoking, weed |
@@ -60,6 +60,13 @@ be shared publicly.
   A visit has many; its `mins` is their total.
 - **Backfill date** — the day being logged to, when it is not today. Lives in
   `sessionStorage` so it survives a reload but not closing the app.
+- **Shopping row** — one line of the shopping list, keyed so a tick survives a
+  portion change. `i|<name>` is derived: every mention of an ingredient across
+  the week's recipes, added up into one row. `x|<id>` is an **extra**, typed by
+  hand and held in `state.shopExtras`. Extras carry no quantity and belong to
+  no recipe, so clearing the week leaves them behind; they sort into the same
+  alphabetical list, because shopping from two lists is how the second one gets
+  forgotten.
 
 ## The rig
 

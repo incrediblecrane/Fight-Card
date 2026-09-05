@@ -272,6 +272,40 @@ srv.listen(0,async function(){
     await toToday();
   });
 
+  await t('a save landing mid-word does not wipe the shopping item being typed', async function(){
+    // Saving re-renders, and an input rebuilt from HTML comes back empty unless
+    // the draft is held outside the DOM. Tick a row to put a save in flight,
+    // then type through it, a character at a time so the gaps are real.
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(600);
+    var ticks0=((store['state/shopping']||{}).checked||[]).length;
+    await p.evaluate(function(){ var r=document.querySelector('.shop'); if(r) r.click(); });
+    await p.click('#shop-add');
+    await p.type('#shop-add','Washing up liquid',{delay:40});
+    await p.waitForTimeout(2200);
+    var ticks1=((store['state/shopping']||{}).checked||[]).length;
+    assert.notStrictEqual(ticks1,ticks0,'no save happened, so this proves nothing');
+    assert.strictEqual(await p.inputValue('#shop-add'),'Washing up liquid',
+      'the save wiped the half-typed item');
+    await p.press('#shop-add','Enter'); await p.waitForTimeout(1800);
+    var extras=((store['state/shopping']||{}).extras||[]);
+    assert.ok(extras.some(function(x){return x.text==='Washing up liquid';}),
+      'the item did not reach the store: '+JSON.stringify(extras));
+    await toToday();
+  });
+
+  await t('a quote in the item survives that re-render too', async function(){
+    // esc() only handled & < >, so re-rendering mid-word wrote
+    // value="6" shelf..." and the attribute ended at the 6.
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(600);
+    await p.click('#shop-add');
+    await p.type('#shop-add','6" shelf brackets',{delay:30});
+    await p.evaluate(function(){ var r=document.querySelector('.shop'); if(r) r.click(); });
+    await p.waitForTimeout(2200);
+    assert.strictEqual(await p.inputValue('#shop-add'),'6" shelf brackets',
+      'the quote broke out of the value attribute');
+    await toToday();
+  });
+
   console.log('\nIT SURVIVES A RELOAD, WITH THE DOCUMENT UNCHANGED');
   var after=await waterCount();
   assert.notStrictEqual(after,before);
