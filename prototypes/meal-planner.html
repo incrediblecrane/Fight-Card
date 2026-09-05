@@ -102,6 +102,7 @@ runs out of room. Switch between them with the two buttons.</p>
 <p class="chg" id="chg"></p>
 
 <h2>The week</h2>
+<div id="weeknote"></div>
 <div class="grid" id="week"></div>
 
 <div class="cols" style="margin-top:18px">
@@ -282,11 +283,14 @@ function render(){
   document.getElementById('m-entry').className = mode==='entry'?'on':'';
   document.getElementById('chg').textContent=lastChange;
 
+  document.getElementById('weeknote').innerHTML = mode==='flag'
+    ? '<div class="note" style="margin:0 0 10px">Today’s model has no meal slots, so everything lands '+
+      'in one heap per day. Shown under “dinner” here only so it has somewhere to sit.</div>' : '';
   document.getElementById('week').innerHTML = WEEK.map(function(d,i){
     var body = SLOTS.map(function(sl){
       var ms=mealsOn(d,sl);
       if(mode==='flag' && sl!=='dinner') return '';
-      return '<div class="slot"><span class="lbl">'+sl+(mode==='flag'?' (no slots in this model)':'')+'</span>'+
+      return '<div class="slot"><span class="lbl">'+sl+'</span>'+
         (ms.length? ms.map(function(m){
           return '<div class="meal"><button onclick="rm('+JSON.stringify(JSON.stringify(m))+')">×</button>'+
             RECIPES[m.recipeId].title+'<br><span class="p">'+m.portions+' portion'+(m.portions===1?'':'s')+'</span></div>';
