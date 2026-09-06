@@ -81,7 +81,10 @@ be shared publicly.
 - **Shopping row** — one line of the shopping list, keyed so a tick survives a
   portion change. `i|<name>` is derived: every mention of an ingredient across
   the planned meals in view, each at its own portion count, added up into one
-  row. `x|<id>` is an **extra**, typed by hand and held in `state.shopExtras`. Extras carry no quantity and belong to
+  row. Countable amounts (tins, onions, cloves) always round UP: 2.4 tins is
+  three tins, because there is no such thing as 0.4 of a tin and being short
+  costs a second trip to the shop. Weights, volumes and spoons stay fractional.
+  `x|<id>` is an **extra**, typed by hand and held in `state.shopExtras`. Extras carry no quantity and belong to
   no recipe, so clearing the week leaves them behind; they sort into the same
   alphabetical list, because shopping from two lists is how the second one gets
   forgotten.
@@ -123,6 +126,9 @@ set's margins against the rig's limits while it is being authored.
 - `test-meals.js` — recipe portions and the shopping list.
 - `test-plan.js` — the meal planner in the browser: the same meal twice, slots,
   partial-week shopping.
+- `test-shopping.js` — the shopping arithmetic headless, swept over every recipe
+  and every pair. A list that is short is worse than no list, so countable
+  amounts are checked against what you have to BUY, not what the recipe needs.
 - `test-planmodel.js` — the plan model headless, including the one-way
   migration off the old `inPlan`/`day` pair.
 - `test-removal.js` — swipe-to-remove and undo.

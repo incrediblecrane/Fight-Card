@@ -507,10 +507,21 @@ function exDef(id){
   for(var i=0;i<EX.length;i++){ if(EX[i].id===id) return EX[i]; }
   return null;
 }
-function supersetMembers(ssId){
+/* A superset holds its exercises and its own round count. It used to be a bare
+   array, and rounds were inferred from how many sets the members had, which
+   counted sets logged on an exercise's OWN slide as rounds of the superset. An
+   in-flight session saved under the old shape is read here rather than
+   migrated, because it lasts hours, not days. */
+function supersetBox(ssId){
   var sess=state.activeSession;
-  return (sess && sess.supersets && sess.supersets[ssId]) || [];
+  var v=sess && sess.supersets && sess.supersets[ssId];
+  if(!v) return null;
+  if(Array.isArray(v)){ v=sess.supersets[ssId]={ex:v, rounds:0}; }
+  if(!v.ex) v.ex=[];
+  return v;
 }
+function supersetMembers(ssId){ var b=supersetBox(ssId); return b?b.ex:[]; }
+function supersetRounds(ssId){ var b=supersetBox(ssId); return b?(b.rounds||0):0; }
 /* A superset logs into its member exercises, not into itself, so its slide is
    "done" when any member has a set. Everything downstream -- history, PBs,
    volume -- then reads exactly as if the sets had been logged one at a time. */
@@ -1175,7 +1186,7 @@ function persist(){
    what makes portions editable and the shopping list add up. Anything with no
    number ("Olive oil", "Honey (drizzle)") is carried through untouched rather
    than given invented precision. */
-var IMPLIED_ONE=/^(tin|can|head|clove|slice|scoop|bunch|wedge|sprig|handful|large handful|small handful)s?$/i;
+var IMPLIED_ONE=/^(tin|can|head|clove|slice|stick|scoop|bunch|wedge|sprig|handful|large handful|small handful)s?$/i;
 function parseIng(text){
   var raw=String(text||'').trim();
   var m=raw.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
@@ -1193,7 +1204,10 @@ function parseIng(text){
     // (drizzle)" a different ingredient from "Honey (2 tbsp)".
     return {n:name, q:null, u:'', d:inside, raw:raw};
   }
-  if(unit && !/^(kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|scoop|bunch|wedge|sprig|handful)s?$/i.test(unit)) unit='';
+  // "sticks" is a counting noun, not an instruction: dropping it turned
+  // "Celery (2 sticks)" into "Celery (2)" on the shopping list, which is two
+  // heads of celery rather than two sticks.
+  if(unit && !/^(kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|stick|scoop|bunch|wedge|sprig|handful)s?$/i.test(unit)) unit='';
   // Keep whatever followed the quantity (", diced", ", optional"): it is
   // instruction, not measurement, and dropping it loses the point.
   var desc=rest.slice(unit.length).replace(/^[\s,]+/,'').trim();
@@ -1306,24 +1320,44 @@ function recipePortions(r){ return r.portions||recipeBase(r); }
 // Round to something you can actually shop for. Weight and volume tolerate a
 // decimal; you cannot buy 1.6 tins or 4.8 peppers, and a recipe does not care
 // about a third of an onion either way.
+/* How much to COOK. A recipe scaled down to one portion wanting most of an
+   onion says most of an onion; rounding that up would make the portion stepper
+   look broken, because every countable line would read the same at 1 portion as
+   at 4. */
 function roundQty(q,unit){
   if(/^(g|kg|ml|l)$/.test(unit)) return Math.round(q*10)/10;
   if(/^(tbsp|tsp)$/.test(unit)) return Math.round(q*2)/2;
   if(q<1) return Math.max(0.5, Math.round(q*2)/2);
   return Math.round(q);
 }
+/* How much to BUY, which is a different question. Countable things are sold
+   whole: this used to round to nearest, so two meal preps needing 2.4 tins
+   between them read as "2 tins", you bought two, and you found out in the
+   kitchen. There is no such thing as 0.4 of a tin. Being short costs a second
+   trip to the shop and being over costs a spare onion, so this only rounds up.
+   Weights and volumes stay as they are, and spoons come out of a jar that is
+   already in the cupboard. */
+function buyQty(q,unit){
+  if(/^(g|kg|ml|l|tbsp|tsp)$/.test(unit)) return roundQty(q,unit);
+  var whole=Math.ceil(q-0.0001);
+  return (whole<1 && q>0) ? 1 : whole;
+}
 function fmtQty(q){
   var v=Math.round(q*10)/10;
   if(Math.abs(v-Math.round(v))<0.05) return String(Math.round(v));
   return String(v);
 }
-function qtyText(q,unit){
+function qtyText(q,unit,buying){
   // 1400g is a number you have to think about; 1.4kg is one you can shop with.
   if(unit==='g' && q>=1000){ q=q/1000; unit='kg'; }
   else if(unit==='ml' && q>=1000){ q=q/1000; unit='l'; }
-  q=roundQty(q,unit);
-  // A count of things pluralises; grams and millilitres do not.
-  if(unit && !/^(kg|g|ml|l|tbsp|tsp)$/.test(unit) && q>1 && !/s$/.test(unit)) unit=unit+'s';
+  q=buying?buyQty(q,unit):roundQty(q,unit);
+  // A count of things pluralises; grams and millilitres do not. It has to
+  // singularise too, or a recipe scaled down reads "1 tins".
+  if(unit && !/^(kg|g|ml|l|tbsp|tsp)$/.test(unit)){
+    if(q>1 && !/s$/.test(unit)) unit=unit+'s';
+    else if(q<=1) unit=unit.replace(/s$/,'');
+  }
   return fmtQty(q)+(unit?(/^(kg|g|ml|l)$/.test(unit)?unit:' '+unit):'');
 }
 function scaledIng(ing,factor){
@@ -1343,7 +1377,7 @@ function scaledIng(ing,factor){
    as separate quantities, but on the SAME row: "Spinach (200g + 1 handful)".
    Nothing is invented, and nothing can hide. */
 var UNIT_SCALE={kg:{u:'g',mul:1000}, l:{u:'ml',mul:1000}};
-var COUNT_UNIT=/^(tin|can|head|clove|slice|scoop|bunch|wedge|sprig|handful)s$/;
+var COUNT_UNIT=/^(tin|can|head|clove|slice|stick|scoop|bunch|wedge|sprig|handful)s$/;
 function canonUnit(u){
   var x=String(u||'').trim().toLowerCase();
   if(UNIT_SCALE[x]) return UNIT_SCALE[x].u;
@@ -1384,7 +1418,7 @@ function shoppingList(dates){
     // A measured amount answers the unmeasured mention too, so it is absorbed
     // rather than left as a second row saying only "you also need this".
     o.order.sort(function(a,b){ return unitRank(a.u)-unitRank(b.u) || (a.u<b.u?-1:a.u>b.u?1:0); });
-    o.label=o.n+' ('+o.order.map(function(p){ return qtyText(p.q,p.u); }).join(' + ')+')';
+    o.label=o.n+' ('+o.order.map(function(p){ return qtyText(p.q,p.u,true); }).join(' + ')+')';
   });
   // Added by hand, so they carry no quantity to add up, but they belong in the
   // same list: shopping from two lists is how the second one gets forgotten.
@@ -1503,7 +1537,7 @@ function addExToSession(exId){
     });
     exId='ss'+next;
     if(!state.activeSession.supersets) state.activeSession.supersets={};
-    state.activeSession.supersets[exId]=[];
+    state.activeSession.supersets[exId]={ex:[], rounds:0};
   }
   else if(state.activeSession.exIds.indexOf(exId)>-1) return exId;
   // A cool-down that is not last is not a cool-down.
@@ -2300,10 +2334,7 @@ function bodyContent(){
       var ssTgt=sess.targets[ssId]||{sets:3,reps:'rounds'};
       var ssBar=sess.exIds.map(function(id,i){ var cls=i===slide?'now':(slideLogged(sess,id)?'done':''); return '<i class="'+cls+'"><b></b></i>'; }).join('');
       var ssTotal=0; Object.keys(sess.logs).forEach(function(k){ ssTotal+=sess.logs[k].length; });
-      // The LONGEST member, not the shortest: adding an exercise to a round you
-      // are already three sets into would otherwise reset the count to zero and
-      // leave it there. The number labels the next round, it is not a record.
-      var roundsDone=members.length?Math.max.apply(null,members.map(function(m){return (sess.logs[m]||[]).length;})):0;
+      var roundsDone=supersetRounds(ssId);
 
       var memberRows=members.map(function(m){
         var d=exDef(m); if(!d) return '';
@@ -2311,10 +2342,23 @@ function bodyContent(){
         var mPer=perImplement(m);
         var mChips=mSets.map(function(x){ return '<span class="setchip">'+setLabel(d,x)+'</span>'; }).join('');
         var mVal=d.type==='load'?'reps':d.type==='time'?'secs':d.type==='distance'?'metres':d.type==='cardio'?'mins':'reps';
+        // A cardio member needs its machine and effort pickers here too: logSet
+        // reads them by id, and without them the set is stored as a bare number
+        // of minutes with the machine and effort silently dropped.
+        var mCardio='';
+        if(d.type==='cardio'){
+          mCardio='<div class="cardio-row"><select id="log-machine-'+m+'" class="cardio-select"><option value="">Machine&hellip;</option>'+
+            MACHINES.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>';}).join('')+'</select>'+
+            (d.interval?('<select id="log-work-'+m+'" class="cardio-select"><option value="">Work effort&hellip;</option>'+
+              EFFORT_LEVELS.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>'+
+              '<select id="log-rest-'+m+'" class="cardio-select"><option value="">Rest effort&hellip;</option>'+
+              EFFORT_LEVELS.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>'):'')+
+            '</div>';
+        }
         return '<div class="ssrow">'+
           '<div class="ssrow-head"><span class="ssn">'+esc(d.name)+'</span>'+
             '<button class="ssx" data-action="ssdel" data-ss="'+ssId+'" data-ex="'+m+'" title="Take out of the superset">&times;</button></div>'+
-          (mChips?'<div class="setchips">'+mChips+'</div>':'')+
+          (mChips?'<div class="setchips">'+mChips+'</div>':'')+mCardio+
           '<div class="logrow">'+
             (d.type==='load'?('<input id="log-w-'+m+'" type="number" inputmode="decimal" placeholder="'+(mPer?'kg each':'kg')+'">'):'')+
             '<input id="log-v-'+m+'" type="number" inputmode="decimal" placeholder="'+mVal+'">'+
@@ -2327,7 +2371,8 @@ function bodyContent(){
       // steps and the superset itself are not things you put inside a round.
       var already={}; members.forEach(function(m){ already[m]=1; });
       var ssOptions=AREA_ORDER.map(function(area){
-        var inArea=EX.filter(function(e){ return e.area===area && e.type!=='prep' && e.type!=='superset' && !already[e.id]; });
+        var inArea=EX.filter(function(e){
+          return e.area===area && e.type!=='prep' && e.type!=='superset' && !e.role && !already[e.id]; });
         if(!inArea.length) return '';
         return '<optgroup label="'+esc(area)+'">'+inArea.map(function(e){
           // Sets are kept per exercise, so one that is also a slide of its own
@@ -2578,25 +2623,31 @@ function onClick(e){
     if(!chosen){ uiOnly=true; }
     else {
       if(!state.activeSession.supersets) state.activeSession.supersets={};
-      var list=state.activeSession.supersets[ssA]||(state.activeSession.supersets[ssA]=[]);
+      var box=supersetBox(ssA)||(state.activeSession.supersets[ssA]={ex:[], rounds:0});
       // Twice in one round would give two inputs the same id, and the second
       // would never be read.
-      if(list.indexOf(chosen)<0) list.push(chosen);
+      if(box.ex.indexOf(chosen)<0) box.ex.push(chosen);
     }
   }
   else if(action==='ssdel'){
     var ssD=t.getAttribute('data-ss'), gone=t.getAttribute('data-ex');
-    var l2=(state.activeSession.supersets||{})[ssD];
+    var b2=supersetBox(ssD);
     // Sets already logged stay where they are: they belong to the exercise,
     // not to the round it happened to be done in.
-    if(l2) state.activeSession.supersets[ssD]=l2.filter(function(x){ return x!==gone; });
+    if(b2) b2.ex=b2.ex.filter(function(x){ return x!==gone; });
   }
   else if(action==='loground'){
     // One round is one set of each member. A row left empty is skipped rather
     // than refused: half a round logged beats nothing logged.
-    supersetMembers(t.getAttribute('data-ss')).forEach(function(m){
-      var d=exDef(m); if(d) logSet(m,d.type);
+    var ssL=t.getAttribute('data-ss'), b3=supersetBox(ssL), any=false;
+    supersetMembers(ssL).forEach(function(m){
+      var d=exDef(m); if(!d) return;
+      var before=(state.activeSession.logs[m]||[]).length;
+      logSet(m,d.type);
+      if((state.activeSession.logs[m]||[]).length>before) any=true;
     });
+    // A round nobody filled in is not a round.
+    if(any && b3) b3.rounds=(b3.rounds||0)+1;
   }
   else if(action==='prevslide'){ if(slide>0) slide--; uiOnly=true; }
   else if(action==='nextslide'){ if(state.activeSession && slide<state.activeSession.exIds.length-1) slide++; uiOnly=true; }

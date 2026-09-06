@@ -328,6 +328,49 @@ srv.listen(0,async function(){
     await toToday();
   });
 
+  await t('a week planned under the old shape is carried over, not dropped', async function(){
+    // The migration is a one-way door over real data. If it strips inPlan
+    // without writing the plan documents, the week is gone and nothing says so.
+    var planned=[];
+    Object.keys(store).forEach(function(k){
+      if(k.indexOf('recipes/')!==0) return;
+      store[k]=JSON.parse(JSON.stringify(store[k]));
+      // Two of them are in the week, the rest are not.
+      var inPlan=planned.length<2;
+      store[k].inPlan=inPlan; store[k].day='Unassigned';
+      if(inPlan) planned.push(store[k].id||k.slice(8));
+    });
+    assert.strictEqual(planned.length,2,'could not set up two planned recipes');
+    Object.keys(store).forEach(function(k){ if(k.indexOf('plan/')===0) delete store[k]; });
+
+    await go();
+    await p.waitForTimeout(4000);
+
+    var docs=Object.keys(store).filter(function(k){ return k.indexOf('plan/')===0; })
+      .map(function(k){ return store[k]; });
+    assert.strictEqual(docs.length,2,
+      'two recipes were in the week and '+docs.length+' planned meals reached the store');
+    var got=docs.map(function(e){ return e.recipeId; }).sort();
+    assert.deepStrictEqual(got, planned.slice().sort(),
+      'the wrong recipes came across: '+got.join(', ')+' instead of '+planned.join(', '));
+    assert.ok(docs.every(function(e){ return e.date && e.slot && e.portions>0; }),
+      'a migrated meal is missing a date, slot or portions: '+JSON.stringify(docs[0]));
+
+    // And it is on screen, not just in the store.
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(600);
+    var cal=await p.evaluate(function(){
+      var c=document.querySelector('.cal'); return c?c.innerText:''; });
+    assert.ok(/dinner/i.test(cal),'the migrated week is not on the calendar: '+cal.slice(0,140));
+    await toToday();
+  });
+
+  await t('and it does not run again on the next load and double the week', async function(){
+    await go();
+    await p.waitForTimeout(3500);
+    var docs=Object.keys(store).filter(function(k){ return k.indexOf('plan/')===0; });
+    assert.strictEqual(docs.length,2,'a second load left '+docs.length+' planned meals');
+  });
+
   await t('a quote in the item survives that re-render too', async function(){
     // esc() only handled & < >, so re-rendering mid-word wrote
     // value="6" shelf..." and the attribute ended at the 6.

@@ -628,6 +628,91 @@ srv.listen(0,async function(){
       'the set logged inside the round was lost: '+chips.join(' | '));
   });
 
+  await t('sets logged on an exercise own slide are not counted as rounds', async function(){
+    // Rounds belong to the superset, not to how many sets its members happen to
+    // have. Bench logged three times on its own slide used to make a brand new
+    // superset containing bench read "3 done" and offer "Log round 4".
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','bench press',{delay:25}); await p.waitForTimeout(450);
+    await p.click('[data-action="addex"][data-id="press_bench"]'); await settle();
+    for(var k=0;k<3;k++){
+      await p.fill('#log-w-press_bench','60'); await p.fill('#log-v-press_bench','10');
+      await p.click('[data-action="logset"]'); await settle();
+    }
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','superset',{delay:25}); await p.waitForTimeout(450);
+    await p.click('[data-action="addex"][data-id="superset"]'); await settle();
+    await p.selectOption('.ssadd select','press_bench');
+    await p.click('[data-action="ssadd"]'); await settle();
+    var target=await p.evaluate(function(){
+      var d=document.querySelector('.slide .target'); return d?d.textContent:''; });
+    assert.ok(/0 done/.test(target),'a fresh superset reads "'+target+'"');
+    var label=await p.evaluate(function(){
+      var b=document.querySelector('[data-action="loground"]'); return b?b.textContent.trim():''; });
+    assert.ok(/round 1/i.test(label),'it offers "'+label+'" before any round was done');
+  });
+
+  await t('an empty round is not counted', async function(){
+    // Nothing typed in, so nothing was done.
+    await p.click('[data-action="loground"]'); await settle();
+    var target=await p.evaluate(function(){
+      var d=document.querySelector('.slide .target'); return d?d.textContent:''; });
+    assert.ok(/0 done/.test(target),'an empty round counted: "'+target+'"');
+  });
+
+  await t('a round that is actually logged counts once', async function(){
+    await p.fill('#log-w-press_bench','60'); await p.fill('#log-v-press_bench','10');
+    await p.click('[data-action="loground"]'); await settle();
+    var target=await p.evaluate(function(){
+      var d=document.querySelector('.slide .target'); return d?d.textContent:''; });
+    assert.ok(/1 done/.test(target),'after one round it reads "'+target+'"');
+  });
+
+  await t('a prep step cannot be dropped into a round', async function(){
+    // The machine warm-up is type "cardio" with role "warmup", so filtering on
+    // type alone let it through.
+    var opts=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.ssadd select option')).map(function(o){return o.value;});
+    });
+    var prep=opts.filter(function(v){ return /warmup|cooldown/.test(v); });
+    assert.deepStrictEqual(prep,[],'prep steps offered: '+prep.join(', '));
+  });
+
+  await t('a cardio exercise in a round keeps its machine and effort', async function(){
+    // logSet reads these by id. Without them rendered the set was stored as a
+    // bare number of minutes and the machine was silently dropped.
+    // The machine exercises are the type:"cardio" ones; the rowing ergo is a
+    // distance exercise and would not have exercised this at all.
+    var cardioId='cardio_gym_intervals';
+    var offered=await p.evaluate(function(i){
+      return [].slice.call(document.querySelectorAll('.ssadd select option'))
+        .some(function(o){ return o.value===i; });
+    }, cardioId);
+    assert.ok(offered,'the machine intervals are not offered');
+    await p.selectOption('.ssadd select',cardioId);
+    await p.click('[data-action="ssadd"]'); await settle();
+    assert.ok(await p.$('#log-machine-'+cardioId),'no machine picker for the cardio member');
+    assert.ok(await p.$('#log-work-'+cardioId),'no work-effort picker for an interval member');
+    await p.selectOption('#log-machine-'+cardioId,'Rower');
+    await p.selectOption('#log-work-'+cardioId,'Hard');
+    await p.fill('#log-v-'+cardioId,'20');
+    await p.click('[data-action="loground"]'); await settle();
+    var chips=await p.evaluate(function(i){
+      var rows=[].slice.call(document.querySelectorAll('.ssrow'));
+      for(var k=0;k<rows.length;k++){
+        if(rows[k].querySelector('[data-action="ssdel"][data-ex="'+i+'"]'))
+          return [].slice.call(rows[k].querySelectorAll('.setchip')).map(function(c){return c.textContent.trim();});
+      }
+      return [];
+    }, cardioId);
+    assert.ok(chips.length,'the cardio member logged nothing');
+    assert.ok(/Rower/i.test(chips[chips.length-1]),
+      'the machine was dropped: "'+chips[chips.length-1]+'"');
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });
