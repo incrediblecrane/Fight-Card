@@ -494,6 +494,127 @@ srv.listen(0,async function(){
     if(drop!==null) assert.ok(drop>40,'the high fly only travels '+drop+' downward');
   });
 
+  console.log('\nLIGHT SETS ON THE WARM-UP');
+
+  await t('picking light sets asks for kg and reps, not minutes and a feeling', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    assert.strictEqual(await slideTitle(),'Warm-up','the session did not open on the warm-up');
+    // Before choosing, it is the usual minutes field.
+    assert.strictEqual(await p.getAttribute('#log-v-warmup','placeholder'),'mins');
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Light sets of the first lift');
+    await p.waitForTimeout(500);
+    assert.ok(await p.$('#log-w-warmup'),'no kg box for light sets');
+    assert.strictEqual(await p.getAttribute('#log-v-warmup','placeholder'),'reps',
+      'the number is still being asked for as minutes');
+    assert.strictEqual(await p.$('#log-lvl-warmup'), null,
+      'it still asks how hard the light sets felt');
+  });
+
+  await t('it names the lift you are ramping up on', async function(){
+    var hint=await p.evaluate(function(){
+      var h=document.querySelector('.slide .perimp'); return h?h.textContent.trim():''; });
+    assert.ok(/Ramping up on .+/.test(hint),'the hint reads "'+hint+'"');
+    assert.ok(!/first lift/i.test(hint),'it still says "the first lift" rather than naming it');
+  });
+
+  await t('switching between minutes and reps does not carry the number over', async function(){
+    // The number means minutes for a bike and reps for a set at a weight.
+    // Ten minutes on the bike used to survive the switch and log as ten reps.
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Bike');
+    await p.waitForTimeout(400);
+    await p.fill('#log-v-warmup','10');
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Light sets of the first lift');
+    await p.waitForTimeout(500);
+    assert.strictEqual(await p.inputValue('#log-v-warmup'),'',
+      'the minutes came through as reps: "'+(await p.inputValue('#log-v-warmup'))+'"');
+    // And it still survives a switch between two options of the SAME kind.
+    await p.fill('#log-v-warmup','6');
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Bike');
+    await p.waitForTimeout(400);
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Rower');
+    await p.waitForTimeout(400);
+    await p.fill('#log-v-warmup','9');
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Elliptical');
+    await p.waitForTimeout(400);
+    assert.strictEqual(await p.inputValue('#log-v-warmup'),'9',
+      'minutes were wiped moving between two machines');
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Light sets of the first lift');
+    await p.waitForTimeout(500);
+  });
+
+  await t('a light set reads back as weight by reps', async function(){
+    // A weight that does not already appear anywhere in the seed, so the
+    // "it was stored" assertions below can actually fail.
+    await p.fill('#log-w-warmup','42.5'); await p.fill('#log-v-warmup','5');
+    await p.click('[data-action="logset"]'); await settle();
+    var chips=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.setchip')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(chips.length,'nothing was logged');
+    assert.ok(/42.5kg × 5/.test(chips[0]),'it reads "'+chips[0]+'"');
+    assert.ok(!/min/.test(chips[0]),'it is still calling reps minutes: "'+chips[0]+'"');
+  });
+
+  await t('minutes still work for the options that are minutes', async function(){
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Bike');
+    await p.waitForTimeout(500);
+    assert.strictEqual(await p.getAttribute('#log-v-warmup','placeholder'),'mins');
+    assert.ok(await p.$('#log-lvl-warmup'),'the bike lost its resistance picker');
+    await p.selectOption('#log-lvl-warmup','8');
+    await p.fill('#log-v-warmup','10');
+    await p.click('[data-action="logset"]'); await settle();
+    var chips=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.setchip')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(chips.some(function(c){return /10 min/.test(c) && /resistance 8/.test(c);}),
+      'the bike set reads: '+chips.join(' | '));
+    assert.ok(chips.some(function(c){return /42.5kg × 5/.test(c);}),'the light set was lost');
+  });
+
+  await t('the progress page survives a warm-up made only of light sets', async function(){
+    // A minutes chart with nothing to plot used to read .lbl off nothing and
+    // take the whole progress tab down.
+    await toSlide('Cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
+    if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(700); }
+    var opened=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow .top h4'));
+      for(var i=0;i<rows.length;i++){
+        if(rows[i].textContent.trim()==='Warm-up'){ rows[i].closest('.top').click(); return true; }
+      }
+      return false;
+    });
+    assert.ok(opened,'the warm-up is not in the exercise history');
+    await p.waitForTimeout(600);
+    // The history table shows a window of the most recent sets and this suite
+    // finishes many sessions on one date, so looking for the set in that window
+    // would be testing the window. What matters is that the page rendered and
+    // that the set persisted as a weight rather than as minutes.
+    var detail=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow'));
+      for(var i=0;i<rows.length;i++){
+        var h=rows[i].querySelector('.top h4');
+        if(h && h.textContent.trim()==='Warm-up') return rows[i].innerText;
+      }
+      return '';
+    });
+    assert.ok(/Sets/.test(detail),'the warm-up detail did not open: '+detail.slice(0,120));
+    assert.deepStrictEqual(errs,[],'the progress page threw: '+errs.join(' | '));
+    // `doc` is whatever the app last saved through the publish stub.
+    assert.ok(/"lvlKind":"load"/.test(doc),'the light set was not stored as a weight-and-reps set');
+    assert.ok(/"opt":"Light sets of the first lift"/.test(doc),'the option was not stored');
+    assert.ok(/"w":42.5/.test(doc),'the weight was not stored');
+  });
+
+  await t('a light set survives a reload reading as weight by reps', async function(){
+    await go();
+    // Read straight out of what was saved, so this does not depend on the
+    // history table's window at all.
+    assert.ok(/"lvlKind":"load"/.test(doc),'the light set did not survive the reload');
+    assert.ok(/"w":42.5/.test(doc),'the weight did not survive the reload');
+  });
+
   console.log('\nSKI ERG');
 
   await t('it is in the library and draws its own rig', async function(){

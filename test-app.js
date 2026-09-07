@@ -11,6 +11,28 @@ var http=require('http'), fs=require('fs'), assert=require('assert');
 var {chromium}=require('./node_modules/playwright');
 
 var doc=fs.readFileSync(process.argv[2]||'/tmp/publish.html','utf8');
+
+/* A warm-up whose ONLY entries are light sets at a weight. There is nothing to
+   plot on a minutes chart, and reading the personal best off an empty series
+   took the whole progress tab down. Seeded here because a suite that logs a
+   few minutes along the way can never reach the empty case. */
+(function seedOnlyLightSets(){
+  var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
+  var st=JSON.parse(doc.slice(i,j));
+  // Clear every existing warm-up first. Built against the repo seed the
+  // premise held by luck; built against live state, which already has warm-up
+  // minutes in it, the chart had something to plot and the empty case was
+  // never reached. The check has to construct its own world.
+  (st.workoutLogs||[]).forEach(function(l){ if(l.logs) delete l.logs.warmup; });
+  st.workoutLogs=(st.workoutLogs||[]).concat([{
+    id:'wl-lightsets', workoutId:'w6', title:'Push', tag:'Strength', date:'2026-08-28',
+    logs:{ warmup:[
+      {v:10, w:20, opt:'Light sets of the first lift', lvl:'', lvlKind:'load'},
+      {v:5,  w:40, opt:'Light sets of the first lift', lvl:'', lvlKind:'load'}
+    ]}
+  }]);
+  doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
+})();
 var SHIM='<script>(function(){var ns={publish:function(h){'+
   'return fetch("/publish",{method:"POST",body:h}).then(function(){setTimeout(function(){location.reload();},0);});}};'+
   'window.claude={use:function(n){return Promise.resolve(n==="artifact"||n==="self"?ns:null);}};})();<\/script>';
@@ -53,6 +75,37 @@ server.listen(0, async function(){
     el.value=x; el.dispatchEvent(new Event('change',{bubbles:true})); },v); await p.waitForTimeout(250); };
   var bar=function(pg){ return (pg||p).$('.backfill-bar'); };
   var tap=async function(sel){ await toToday(); await p.click(sel); await p.waitForTimeout(2300); };
+
+  console.log('\nA WARM-UP OF NOTHING BUT LIGHT SETS');
+  try{
+    await p.goto(URL); await p.waitForTimeout(700);
+    var back0=await p.$('[data-action="cancelsession"]');
+    if(back0){ await back0.click(); await p.waitForTimeout(400); }
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(700);
+    var before=errs.length;
+    var opened=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow .top h4'));
+      for(var i=0;i<rows.length;i++){
+        if(rows[i].textContent.trim()==='Warm-up'){ rows[i].closest('.top').click(); return true; }
+      }
+      return false;
+    });
+    assert.ok(opened,'the warm-up is not in the exercise history');
+    await p.waitForTimeout(700);
+    assert.strictEqual(errs.length,before,'opening it threw: '+errs.slice(before).join(' | '));
+    var detail=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow'));
+      for(var i=0;i<rows.length;i++){
+        var h=rows[i].querySelector('.top h4');
+        if(h && h.textContent.trim()==='Warm-up') return rows[i].innerText;
+      }
+      return '';
+    });
+    assert.ok(/40kg × 5/.test(detail),'the light set is not listed: '+detail.slice(0,200));
+    assert.ok(/sets at a weight/i.test(detail),
+      'no explanation of why there is no time trend: '+detail.slice(0,200));
+    ok('it opens, explains why there is no time trend, and lists the sets');
+  }catch(e){ bad('light-sets-only warm-up',e); }
 
   console.log('\nBACKFILL');
   await p.goto(URL); await p.waitForTimeout(400); await toToday();

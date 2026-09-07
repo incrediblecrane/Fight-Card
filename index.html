@@ -231,6 +231,9 @@ var PREP_OPTIONS={
    treadmill has a speed, a stretch has neither and only has how hard it felt.
    Asking for the wrong one is how a field ends up blank every session. */
 var PREP_LEVEL={
+  // Ramping up on the first lift is sets, not time: a bar for ten, sixty for
+  // five. Minutes and "how hard did that feel" describe none of it.
+  "Light sets of the first lift":'load',
   "Bike":'resistance',"Rower":'resistance',"Elliptical":'resistance',
   "Ski erg":'resistance',"Stair climber":'resistance',
   "Treadmill walk/jog":'speed',"Treadmill walk":'speed'
@@ -1446,6 +1449,9 @@ function setLabel(def,e){
   if(type==='time') return e.v+'s';
   if(type==='distance') return e.v+'m';
   if(type==='prep'){
+    if(e.lvlKind==='load'){
+      return (e.w?(e.w+'kg × '+e.v):(e.v+' reps'))+(e.opt?' · '+e.opt:'');
+    }
     var pl=e.v+' min'+(e.opt?' · '+e.opt:'');
     if(e.lvl) pl+=' · '+(e.lvlKind==='resistance'?('resistance '+e.lvl):e.lvlKind==='speed'?(e.lvl+' km/h'):e.lvl);
     return pl;
@@ -1501,8 +1507,16 @@ function logSet(exId,type){
   if(type==='load'){ var wInput=document.getElementById('log-w-'+exId); var wt=wInput?parseFloat(wInput.value):NaN; entry.w=isNaN(wt)?null:wt; }
   if(type==='prep'){
     var oEl=document.getElementById('log-opt-'+exId); entry.opt=oEl?oEl.value:'';
-    var lEl=document.getElementById('log-lvl-'+exId); entry.lvl=lEl?lEl.value:'';
     entry.lvlKind=prepLevelKind(entry.opt);
+    if(entry.lvlKind==='load'){
+      // v is reps here, not minutes, which is why the label and the trend
+      // chart both have to ask what kind of prep entry this is.
+      var pwEl=document.getElementById('log-w-'+exId);
+      var pw=pwEl?parseFloat(pwEl.value):NaN;
+      entry.w=isNaN(pw)?null:pw; entry.lvl='';
+    } else {
+      var lEl=document.getElementById('log-lvl-'+exId); entry.lvl=lEl?lEl.value:'';
+    }
     delete prepPick[exId]; delete prepMins[exId];
   }
   if(type==='cardio'){
@@ -2118,7 +2132,17 @@ function bodyContent(){
 
   // Per-exercise history, newest session first.
   var histo={};
-  logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){ if(!histo[exId]) histo[exId]=[]; l.logs[exId].forEach(function(s){ histo[exId].push({date:l.date,v:s.v,w:s.w,machine:s.machine,work:s.work,rest:s.rest}); }); }); });
+  logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){
+    if(!histo[exId]) histo[exId]=[];
+    l.logs[exId].forEach(function(s){
+      /* Copy the whole set, not a hand-written list of fields. Naming them
+         meant a prep step arrived here without its option, its level or the
+         fact that it was sets at a weight, so a warm-up read "10 min" with no
+         mention of what it was, and a 40kg x 5 ramp read as ten minutes. */
+      var h={}; Object.keys(s).forEach(function(k){ h[k]=s[k]; });
+      h.date=l.date; histo[exId].push(h);
+    });
+  }); });
   var exIds=Object.keys(histo).sort(function(a,b){ var da=histo[a][histo[a].length-1].date, db=histo[b][histo[b].length-1].date; return da<db?1:(da>db?-1:0); });
 
   var totalSets=0, totalVolume=0;
@@ -2236,14 +2260,24 @@ function bodyContent(){
       // One point per session: the best set of that day, so the line tracks
       // progress rather than jumping around within a session.
       var byDate={};
-      hist.forEach(function(h){ if(!byDate[h.date]) byDate[h.date]=[]; byDate[h.date].push(h); });
+      // A warm-up can hold two different kinds of set: minutes on a bike, and
+      // reps at a weight when it was ramping up on the first lift. Plotting
+      // both on one axis would be a line with two units on it, so the chart
+      // keeps the minutes and the table below lists everything.
+      hist.forEach(function(h){
+        if(def.type==='prep' && h.lvlKind==='load') return;
+        if(!byDate[h.date]) byDate[h.date]=[]; byDate[h.date].push(h);
+      });
       var dates=Object.keys(byDate).sort();
       var pts=dates.map(function(dt){
         var b=bestSet(def.type,byDate[dt]);
         return {k:shortDay(dt), v:bestValue(def.type,b), lbl:bestValue(def.type,b)+bestUnit(def.type),
                 tip:dt+' — best set '+setLabel(def,b)+' of '+byDate[dt].length+' set'+(byDate[dt].length===1?'':'s')};
       });
-      var pb=pts.reduce(function(a,p){return p.v>a.v?p:a;},pts[0]);
+      // Can be empty now: a warm-up whose every entry was a set at a weight
+      // leaves nothing for a minutes chart, and reading .lbl off nothing would
+      // take the whole progress tab down.
+      var pb=pts.length?pts.reduce(function(a,p){return p.v>a.v?p:a;},pts[0]):null;
       var delta=pts.length>1?pts[pts.length-1].v-pts[0].v:0;
       var deltaTxt=pts.length>1?((delta>0?'+':'')+Math.round(delta*10)/10+bestUnit(def.type)+' since '+pts[0].k):'first session';
       var pbLabel=def.type==='load'?'heaviest set':'best set';
@@ -2252,9 +2286,12 @@ function bodyContent(){
       }).join('');
       detail='<div class="exdetail">'+
         lineChart(pts,{title:pbLabel+' by session',sub:dates.length+' session'+(dates.length===1?'':'s'),
-                       empty:'Logged once so far. Log it again to see the trend.'})+
-        '<div class="pbrow"><span>Personal best <b>'+esc(pb.lbl)+'</b></span>'+
-          '<span>Change <b>'+esc(deltaTxt)+'</b></span>'+
+                       empty:(!pts.length&&hist.length)
+                         ? 'These were sets at a weight rather than minutes, so there is no time trend. They are listed below.'
+                         : 'Logged once so far. Log it again to see the trend.'})+
+        '<div class="pbrow">'+
+          (pb?('<span>Personal best <b>'+esc(pb.lbl)+'</b></span>'):'')+
+          (pts.length>1?('<span>Change <b>'+esc(deltaTxt)+'</b></span>'):'')+
           '<span>Sets <b>'+hist.length+'</b></span></div>'+
         '<table><tr><th>Date</th><th>Set</th></tr>'+rows+'</table></div>';
     }
@@ -2414,8 +2451,9 @@ function bodyContent(){
       var perImp=perImplement(exId);
       var weightInput=def2.type==='load'?('<input id="log-w-'+exId+'" type="number" inputmode="decimal" placeholder="'+(perImp?'kg each':'kg')+'">'):'';
       var perImpNote=(def2.type==='load'&&perImp)?('<div class="perimp">'+esc(perImplementNote(exId))+'</div>'):'';
-      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?'secs':def2.type==='distance'?'metres':(def2.type==='cardio'||def2.type==='prep')?'mins':'reps';
-      var prepRow='';
+      var prepIsLoad=def2.type==='prep' && prepLevelKind(prepPick[exId]||'')==='load';
+      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?'secs':def2.type==='distance'?'metres':prepIsLoad?'reps':(def2.type==='cardio'||def2.type==='prep')?'mins':'reps';
+      var prepRow='', prepHint='';
       if(def2.type==='prep'){
         var opts=PREP_OPTIONS[exId]||[];
         var picked=prepPick[exId]||'';
@@ -2423,10 +2461,29 @@ function bodyContent(){
         var lvlList=kind==='resistance'?RESISTANCE_LEVELS:kind==='speed'?[]:EFFORT_LEVELS;
         var lvlHint=kind==='resistance'?'Resistance&hellip;':kind==='speed'?'km/h':'How hard&hellip;';
         var lvlControl=!picked?''
+          : kind==='load'
+            ? ('<input id="log-w-'+exId+'" class="cardio-select" type="number" inputmode="decimal" placeholder="kg">')
           : kind==='speed'
             ? ('<input id="log-lvl-'+exId+'" class="cardio-select" type="number" inputmode="decimal" step="0.1" placeholder="'+lvlHint+'">')
             : ('<select id="log-lvl-'+exId+'" class="cardio-select"><option value="">'+lvlHint+'</option>'+
                lvlList.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>');
+        // Which lift, by name: the first thing in the session that is not a
+        // prep step. Saves guessing what "the first lift" meant afterwards.
+        if(kind==='load'){
+          // The first thing in the session you actually put weight on, looking
+          // inside a superset if one leads. Anything else is not a lift to ramp
+          // up on, and naming a stretch would be worse than naming nothing.
+          var firstLift=null;
+          sess.exIds.forEach(function(x){
+            if(firstLift) return;
+            var ids=isSuperset(x)?supersetMembers(x):[x];
+            ids.forEach(function(id){
+              if(firstLift) return;
+              var fd=exDef(id); if(fd && fd.type==='load') firstLift=fd;
+            });
+          });
+          if(firstLift) prepHint='<div class="perimp">Ramping up on '+esc(firstLift.name)+'</div>';
+        }
         prepRow='<div class="cardio-row">'+
           '<select id="log-opt-'+exId+'" class="cardio-select" data-action="prepopt" data-ex="'+exId+'">'+
             '<option value="">'+(exId==='cooldown'?'Cool-down&hellip;':'Warm-up&hellip;')+'</option>'+
@@ -2462,6 +2519,7 @@ function bodyContent(){
           '<div class="cue">'+esc((def2.type==='prep'&&w2&&w2[exId])?w2[exId]:def2.cue)+'</div>'+
           (chips?'<div class="setchips">'+chips+'</div>':'')+
           perImpNote+
+          prepHint+
           prepRow+
           cardioRow+
           '<div class="logrow">'+weightInput+
@@ -2781,7 +2839,17 @@ function onChange(e){
   if(!t) return;
   var action=t.getAttribute('data-action');
   if(action==='logdate'){ setLogDate(t.value); render(); return; }
-  else if(action==='prepopt'){ prepPick[t.getAttribute('data-ex')]=t.value; render(); return; }
+  else if(action==='prepopt'){
+    var pex=t.getAttribute('data-ex');
+    /* The number is minutes for every option but one: for light sets it is
+       reps. So the draft only has to go when that boundary is crossed. Clearing
+       on any change of kind was too much: a bike and a stretch differ in their
+       second field, not in what the number means, and minutes typed before
+       picking would be wiped. */
+    if((prepLevelKind(prepPick[pex]||'')==='load')!==(prepLevelKind(t.value)==='load'))
+      delete prepMins[pex];
+    prepPick[pex]=t.value; render(); return;
+  }
   // Same reason as onClick: state is about to be replaced by the store, so a
   // change applied now would be thrown away rather than saved.
   else if(dbState==='loading'){ render(); return; }

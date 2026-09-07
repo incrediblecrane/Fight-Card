@@ -58,6 +58,12 @@ be shared publicly.
   on the exercises themselves and history, PBs and volume need to know nothing
   about it. The grouping lives on the in-flight session only; a finished
   workout log records the sets, not the fact they were paired.
+- **Prep kind** — what second number a prep option actually has, from
+  `PREP_LEVEL`: a bike has a resistance, a treadmill a speed, a stretch only how
+  hard it felt, and "Light sets of the first lift" has a weight. That last one
+  is `load`, and it is the only prep entry whose `v` is REPS rather than
+  minutes, which is why the label and the trend chart both ask the entry what
+  kind it is. Light sets are left off the minutes chart and listed in the table.
 - **Prep step** — the warm-up and cool-down injected into every session that
   does not already have its own. `role: "warmup"|"cooldown"` marks the ones a
   plan already provides.
