@@ -12,6 +12,36 @@ EX.forEach(function(ex){
     var lowest=Math.max(s.ankN.y,s.ankF.y,s.kneeN.y,s.hip.y,s.handN.y);
     check(ex.id,'frame'+i+' stays above ground', lowest<=GROUND+2, 'lowest='+r(lowest)+' ground='+GROUND);
   });
+  /* Universal: the head must never be INSIDE a piece of equipment. A head
+     resting against a bench overlaps its edge on purpose, which is why this
+     asks about the centre rather than the whole circle: a centre inside the
+     rectangle is a head passing through the machine, and that is a drawing of
+     something that cannot happen. Checked across the whole motion, because a
+     fold that clears at both ends can still swing through the middle. */
+  if(ex.props && ex.props.length){
+    var through=null;
+    for(var pi=0;pi<=120 && through===null;pi++){
+      var hs=solve(rig.poseAt(ex,pi/120));
+      ex.props.forEach(function(pr){
+        if(through!==null) return;
+        var x0=pr[0], y0=pr[1], x1=pr[0]+pr[2], y1=pr[1]+pr[3];
+        var hx=hs.head.x, hy=hs.head.y;
+        // A prop can be drawn rotated about its own centre, so the head has to
+        // be brought into the prop's frame before the box test. Testing the
+        // unrotated box meant the one slanted bench in the set was not covered.
+        if(pr[5]){
+          var cx=(x0+x1)/2, cy=(y0+y1)/2, a=-pr[5]*Math.PI/180;
+          var dx=hx-cx, dy=hy-cy;
+          hx=cx+dx*Math.cos(a)-dy*Math.sin(a);
+          hy=cy+dx*Math.sin(a)+dy*Math.cos(a);
+        }
+        if(hx>x0+1 && hx<x1-1 && hy>y0+1 && hy<y1-1)
+          through='head ('+r(hs.head.x)+','+r(hs.head.y)+') inside prop ['+pr.slice(0,4).join(',')+
+                  (pr[5]?(' rot '+pr[5]):'')+']';
+      });
+    }
+    check(ex.id,'the head never passes through the equipment', through===null, through||'');
+  }
   // Universal: head must not be inside the torso (proportion sanity)
   S.forEach(function(s,i){
     var d=Math.hypot(s.head.x-s.sh.x,s.head.y-s.sh.y);
@@ -337,6 +367,20 @@ EX.forEach(function(ex){
     check(ex.id,'the ball ends near the floor', S[2].handN.y>GROUND-36,'hand '+r(S[2].handN.y));
     check(ex.id,'the torso folds over the slam rather than staying upright', ex.frames[2].torso>40,
       'torso '+ex.frames[2].torso);
+  }
+  if(ex.id==='skierg'){
+    check(ex.id,'it starts tall with the handles above the head',
+      S[0].handN.y<S[0].head.y-6 && S[0].sh.y<S[0].hip.y-28,
+      'hand '+r(S[0].handN.y)+' head '+r(S[0].head.y)+' shoulder '+r(S[0].sh.y));
+    check(ex.id,'the trunk hinges through the pull rather than staying upright',
+      ex.frames[2].torso-ex.frames[0].torso>30,
+      'torso '+ex.frames[0].torso+' -> '+ex.frames[2].torso);
+    check(ex.id,'the hands finish below the hips', S[2].handN.y>S[2].hip.y+6,
+      'hand '+r(S[2].handN.y)+' hip '+r(S[2].hip.y));
+    check(ex.id,'the hands travel a long way down', S[2].handN.y-S[0].handN.y>70,
+      'travel '+r(S[2].handN.y-S[0].handN.y));
+    check(ex.id,'the feet stay planted', ex.frames.every(function(f){
+      return f.ankN[0]===ex.frames[0].ankN[0] && f.ankN[1]===ex.frames[0].ankN[1]; }),'a foot moved');
   }
   if(ex.id==='situpwallthrow'){
     // The two halves that make it this exercise and not a crunch: the trunk

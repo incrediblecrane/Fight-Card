@@ -494,6 +494,40 @@ srv.listen(0,async function(){
     if(drop!==null) assert.ok(drop>40,'the high fly only travels '+drop+' downward');
   });
 
+  console.log('\nSKI ERG');
+
+  await t('it is in the library and draws its own rig', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','ski erg',{delay:35}); await p.waitForTimeout(500);
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names.indexOf('Ski erg')>-1,'search found: '+names.join(','));
+    await p.click('[data-action="toggleex"][data-id="skierg"]'); await p.waitForTimeout(400);
+    var got=await p.evaluate(function(){
+      var row=document.querySelector('[data-action="toggleex"][data-id="skierg"]').closest('.pickrow');
+      return {views: row.querySelectorAll('.pickpreview svg').length,
+              props: row.querySelectorAll('.pickpreview svg rect').length,
+              shapes: row.querySelectorAll('.pickpreview svg polygon').length};
+    });
+    assert.strictEqual(got.views,2,'expected two views, got '+got.views);
+    assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
+    assert.ok(got.props>0,'no machine drawn: the generic pose is being used instead of the rig');
+  });
+
+  await t('it logs metres like the rower does', async function(){
+    await p.click('[data-action="addex"][data-id="skierg"]'); await settle();
+    assert.strictEqual(await slideTitle(),'Ski erg','landed on "'+(await slideTitle())+'"');
+    await p.fill('#log-v-skierg','500');
+    await p.click('[data-action="logset"]'); await settle();
+    var chips=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.setchip')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(chips.some(function(c){return /500/.test(c);}),'no set chip: '+chips.join(' | '));
+  });
+
   console.log('\nSIT-UP WALL THROW');
 
   await t('it is in the library where a sit-up would be looked for', async function(){
@@ -669,6 +703,17 @@ srv.listen(0,async function(){
     var target=await p.evaluate(function(){
       var d=document.querySelector('.slide .target'); return d?d.textContent:''; });
     assert.ok(/1 done/.test(target),'after one round it reads "'+target+'"');
+  });
+
+  await t('the ski erg is in the round dropdown, like the rower', async function(){
+    // It only existed as a machine option inside a generic cardio step, so it
+    // could not be picked anywhere: not in a superset, not as its own slide.
+    var opts=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.ssadd select option'))
+        .map(function(o){ return o.value; });
+    });
+    assert.ok(opts.indexOf('skierg')>-1,'the ski erg is not offered');
+    assert.ok(opts.indexOf('rowerg')>-1,'the rower is not offered either, so this proves nothing');
   });
 
   await t('a prep step cannot be dropped into a round', async function(){

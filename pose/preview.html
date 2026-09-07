@@ -1052,6 +1052,22 @@ var EXERCISES = [
     {hip:[52,138],torso:8, ankN:[74,140],ankF:[68,142], handN:[76,124],handF:[70,126], kneeSign:-1, elbowSign:1}
   ]},
 
+{ id:"skierg", tempo:[280,300,420,420], name:"Ski erg",
+  real:"Stand tall with the handles high, hinge at the hips and drive them down past your hips, finishing with the arms straight and the torso folded. It is a hip hinge with a lat pull on the end, not an arm exercise: if your torso stays upright you are pulling with your arms and you will gas out in a minute.",
+  changed:"New. The rower had its own exercise and the ski erg did not, so it could only be logged as a machine inside a generic cardio step and could not be put in a superset at all. The trunk hinges through the pull rather than staying upright, which is the whole movement.",
+  // Two handles on cords, not a bar: a rigid bar between the hands would be a
+  // straight-arm pulldown, and at the finish it would lie across the pelvis.
+  // `active` marks the chain you watch travel, which is the arms; where the
+  // power comes from is the cue's job, and it says the hips.
+  equip:"cable", active:"arms", anchorAt:[84,32], anchorFront:[58,26,82,26],
+  props:[[94,26,8,144],[74,26,28,7]],
+  frames:[
+    {hip:[50,109],torso:6, ankN:[62,163],ankF:[53,163], handN:[78,46], handF:[72,48], kneeSign:-1, elbowSign:1},
+    {hip:[48,112],torso:26,ankN:[62,163],ankF:[53,163], handN:[82,92], handF:[76,94], kneeSign:-1, elbowSign:1},
+    {hip:[44,122],torso:48,ankN:[62,163],ankF:[53,163], handN:[58,134],handF:[52,136], kneeSign:-1, elbowSign:1},
+    {hip:[48,113],torso:22,ankN:[62,163],ankF:[53,163], handN:[80,62], handF:[74,64], kneeSign:-1, elbowSign:1}
+  ]},
+
 { id:"fly_cable", tempo:[420,420,520,520], name:"Cable fly",
   real:"Handles from pulleys at about chest height, one foot forward for balance, a slight forward lean. Elbows stay softly bent at a fixed angle and the hands sweep out wide then back together in front of the chest. The angle at the elbow does not change: the moment it opens and closes you are pressing, not flying.",
   changed:"New rig. The front view carries it, because the hands sweep across the body and a side view sees that arc almost end-on. From the side the arm is genuinely foreshortened at the stretch, which is why the hand sits close to the shoulder there rather than far behind it.",
@@ -1720,7 +1736,8 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 // the point of most of them: a hammer curl and a supinated curl are the same
 // geometry and differ only in what the implement does, which is why the
 // equipment axis matters as much as the joints.
-[{id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
+[{id:'skierg',stance:8,grip:13},
+ {id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
  {id:'chinup', stance:8, grip:12},{id:'invertedrow',stance:8,grip:18},
  {id:'platepinch',stance:8,grip:20},{id:'hangingkneeraise',stance:8,grip:19},
  {id:'sq_jump', stance:11,grip:16},{id:'boxjump',  stance:10,grip:16},
