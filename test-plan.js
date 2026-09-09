@@ -162,9 +162,15 @@ srv.listen(0,async function(){
     await plan('p3',1,'lunch');
     await plan('p2',1,'dinner');
     var cal=await calendar();
-    var slots=mealsOf(cal,1).map(function(m){return m.slot;});
+    // Only the three this check planned. The migration fixture at the top of
+    // this file lands its meal on the next Thursday, which IS day one whenever
+    // the suite runs on a Wednesday, so reading the whole day made this fail
+    // one day in seven for a reason that has nothing to do with slots.
+    var mine=[await titleOf('p1'), await titleOf('p3'), await titleOf('p2')];
+    var slots=mealsOf(cal,1).filter(function(m){ return mine.indexOf(m.title)>-1; })
+                            .map(function(m){ return m.slot; });
     assert.deepStrictEqual(slots,['Breakfast','Lunch','Dinner'],
-      'tomorrow reads '+slots.join(' / '));
+      'tomorrow reads '+mealsOf(cal,1).map(function(m){return m.slot;}).join(' / '));
   });
 
   console.log('\nSHOPPING FOR PART OF THE WEEK');

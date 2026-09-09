@@ -29,8 +29,13 @@ Follow this on every change:
    `/diagnosing-bugs` to find the root cause first. This project's repeated
    failure mode is treating symptoms: three cosmetic passes on the figures
    before finding that the rig had floating feet.
-2. **Test it.** Run `npm test`. When fixing a bug, add a check that fails first
-   and passes after, so it cannot silently return.
+2. **Test it.** Run `npm test`: `test:pose` is the rig suite and `test:app`
+   builds the document and runs every browser and headless suite over it. Use
+   `npm run test:pose` alone only for the fast loop while authoring a rig, never
+   as the gate before publishing: `npm test` used to be the rig suites only, so
+   a change to the app could ship green with none of its own checks run. When
+   fixing a bug, add a check that fails first and passes after, so it cannot
+   silently return.
 3. **Review before publishing.** Run `/code-review` on the diff. Publishing
    overwrites a live app holding real logged data, so a defect gate is cheap
    relative to the cost of shipping one.

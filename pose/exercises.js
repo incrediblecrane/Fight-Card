@@ -845,6 +845,17 @@ var EXERCISES = [
     {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], elbowSign:1}
   ]},
 
+{ id:"fly_cable_rev", tempo:[420,420,520,520], name:"Reverse cable fly",
+  real:"Pulleys at about chest height, standing between them, each hand holding the OPPOSITE side\'s handle so the cables cross in front of you. Arms almost straight with a soft fixed elbow, sweep the hands apart and back until the shoulder blades pinch, then let them come back together under control. It is the mirror of a cable fly: that one closes the arms in front, this one opens them behind.",
+  changed:"New. It is the opposite direction of travel to the two chest flys, and the front view carries it: the cords cross in front at the start and the hands finish wide. From the side the arms are almost end-on, which is why the hand sits close to the shoulder at the finish rather than far behind it.",
+  equip:"cable", active:"arms", anchorAt:[124,84], anchorFront:[122,80,18,80],
+  frames:[
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[94,88],handF:[90,90], elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[50,96],handF:[46,98], elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], elbowSign:1}
+  ]},
+
 { id:"farmerscarry", tempo:[340,340,340,340], name:"Farmer\'s carry",
   real:"Heavy in each hand, walk. Ribs down, shoulders pulled back and away from the ears, short deliberate steps. The load hangs; you do not shrug it. Grip usually gives out before anything else, which is the point.",
   changed:"It walks. The old pose was a static stand, which showed nothing about the exercise. Neutral grip means the handles run front to back, so the side view sees the whole dumbbell and the front view sees the bell faces.",
@@ -1068,6 +1079,20 @@ var FRONTS = {
     {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[64,134],handR:[76,134]},
     {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[66,152],handR:[74,152]},
     {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[64,138],handR:[76,138]}],
+
+  /* Reverse cable fly from the FRONT, which is the only view that carries it.
+     Each hand holds the opposite side's handle, so the cords cross in front at
+     the start; the anchors are deliberately swapped for that. The hands then
+     sweep apart until the shoulder blades pinch. A side view of this arc is
+     almost end-on and shows nothing. */
+  // No authored elbows: they swing a long way here, and an elbow given as a
+  // point is interpolated straight between keyframes, which stretches the upper
+  // arm past its length halfway through the sweep. Solved from the hand instead.
+  fly_cable_rev:[
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[76,92], handR:[64,92]},
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[56,90], handR:[84,90]},
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[34,88], handR:[106,88]},
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[56,90], handR:[84,90]}],
 
   // Pallof press from the front. Hands together at the sternum pressing
   // straight out, and the shoulders staying square to the camera IS the

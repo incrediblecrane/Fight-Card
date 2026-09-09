@@ -615,6 +615,83 @@ srv.listen(0,async function(){
     assert.ok(/"w":42.5/.test(doc),'the weight did not survive the reload');
   });
 
+  console.log('\nREVERSE CABLE FLY');
+
+  await t('two words that are not next to each other still find it', async function(){
+    // "Reverse cable fly" has a word in the middle, so a phrase match found
+    // nothing at all. An exercise you cannot search for may as well not exist.
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','reverse fly',{delay:35}); await p.waitForTimeout(500);
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names.indexOf('Reverse cable fly')>-1,'"reverse fly" found: '+names.join(','));
+    // Order should not matter either.
+    await p.click('#ex-search',{clickCount:3});
+    await p.type('#ex-search','fly reverse',{delay:30}); await p.waitForTimeout(500);
+    var names2=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names2.indexOf('Reverse cable fly')>-1,'"fly reverse" found: '+names2.join(','));
+  });
+
+  await t('it is in the library with its own rig, in Pull not Push', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search','reverse cable fly',{delay:35}); await p.waitForTimeout(500);
+    var names=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(names.indexOf('Reverse cable fly')>-1,'search found: '+names.join(','));
+    var area=await p.evaluate(function(){
+      var row=document.querySelector('[data-action="addex"][data-id="fly_cable_rev"]').closest('.pickgroup');
+      var t=row.querySelector('.pickgroup-title'); return t?t.textContent.trim():'';
+    });
+    assert.strictEqual(area,'Pull','it is grouped under "'+area+'": rear delts are a pull');
+    await p.click('[data-action="toggleex"][data-id="fly_cable_rev"]'); await p.waitForTimeout(400);
+    var got=await p.evaluate(function(){
+      var row=document.querySelector('[data-action="toggleex"][data-id="fly_cable_rev"]').closest('.pickrow');
+      return {views: row.querySelectorAll('.pickpreview svg').length,
+              shapes: row.querySelectorAll('.pickpreview svg polygon').length,
+              cords: row.querySelectorAll('.pickpreview svg line').length};
+    });
+    assert.strictEqual(got.views,2,'expected two views, got '+got.views);
+    assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
+    assert.ok(got.cords>0,'no cables drawn: the generic pose is being used instead of the rig');
+  });
+
+  await t('the library carries three separate flys, not one reused', async function(){
+    // Whether they DRAW different movements is asserted in the pose suite,
+    // which can reach the frames. This only checks the app offers three.
+    await p.click('#ex-search',{clickCount:3});
+    await p.type('#ex-search','fly',{delay:30}); await p.waitForTimeout(500);
+    var flys=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('[data-action="addex"]'))
+        .map(function(b){ return b.getAttribute('data-id'); })
+        .filter(function(x){ return x.indexOf('fly')>-1; });
+    });
+    assert.deepStrictEqual(flys.sort(), ['fly_cable','fly_cable_high','fly_cable_rev'],
+      'the flys in the library are: '+flys.join(', '));
+  });
+
+  await t('it logs a weight per side, like the other cable work', async function(){
+    await p.click('[data-action="addex"][data-id="fly_cable_rev"]'); await settle();
+    assert.strictEqual(await slideTitle(),'Reverse cable fly','landed on "'+(await slideTitle())+'"');
+    var note=await p.evaluate(function(){
+      var n=document.querySelector('.slide .perimp'); return n?n.textContent:''; });
+    assert.ok(/side/i.test(note),'no per-side note, it reads "'+note+'"');
+    await p.fill('#log-w-fly_cable_rev','17.5'); await p.fill('#log-v-fly_cable_rev','14');
+    await p.click('[data-action="logset"]'); await settle();
+    var chips=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.setchip')).map(function(e){return e.textContent.trim();});
+    });
+    assert.ok(chips.some(function(c){return /17.5kg ea × 14/.test(c);}),
+      'the set reads: '+chips.join(' | '));
+  });
+
   console.log('\nSKI ERG');
 
   await t('it is in the library and draws its own rig', async function(){

@@ -368,6 +368,30 @@ EX.forEach(function(ex){
     check(ex.id,'the torso folds over the slam rather than staying upright', ex.frames[2].torso>40,
       'torso '+ex.frames[2].torso);
   }
+  if(ex.id==='fly_cable_rev'){
+    // It is the mirror of the chest flys, so the two things worth proving are
+    // that the hands travel BACKWARD and that they finish wide, not together.
+    check(ex.id,'the hands start out in front of the shoulder', S[0].handN.x>S[0].sh.x+24,
+      'hand '+r(S[0].handN.x)+' shoulder '+r(S[0].sh.x));
+    check(ex.id,'they travel backward, the opposite way to a chest fly',
+      S[2].handN.x<S[0].handN.x-30,'travel '+r(S[0].handN.x-S[2].handN.x));
+    check(ex.id,'they finish behind the shoulder', S[2].handN.x<S[2].sh.x,
+      'hand '+r(S[2].handN.x)+' shoulder '+r(S[2].sh.x));
+    check(ex.id,'the elbow angle barely changes: it is a fly, not a row',
+      Math.abs(Math.hypot(S[0].handN.x-S[0].sh.x,S[0].handN.y-S[0].sh.y)
+              -Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y))<16,
+      'reach '+r(Math.hypot(S[0].handN.x-S[0].sh.x,S[0].handN.y-S[0].sh.y))+
+      ' -> '+r(Math.hypot(S[2].handN.x-S[2].sh.x,S[2].handN.y-S[2].sh.y)));
+    var F=ex.front||[];
+    check(ex.id,'the hands cross in front at the start', F.length>2 && F[0].handL[0]>F[0].handR[0],
+      F.length?('L '+F[0].handL[0]+' R '+F[0].handR[0]):'no front view');
+    check(ex.id,'and finish wide apart', F.length>2 && (F[2].handR[0]-F[2].handL[0])>60,
+      F.length>2?('spread '+(F[2].handR[0]-F[2].handL[0])):'front view has '+F.length+' frames');
+    // Each hand holds the other side's handle, which is what makes them cross.
+    check(ex.id,'the cords are anchored on the opposite sides',
+      !!ex.anchorFront && ex.anchorFront[0]>ex.anchorFront[2],
+      'anchors '+(ex.anchorFront||[]).join(','));
+  }
   if(ex.id==='skierg'){
     check(ex.id,'it starts tall with the handles above the head',
       S[0].handN.y<S[0].head.y-6 && S[0].sh.y<S[0].hip.y-28,
@@ -624,6 +648,47 @@ EX.forEach(function(ex){
       'hand='+r(jab.handN.y)+' shoulder='+r(jab.sh.y));
   }
 });
+
+/* No two exercises may draw the same thing. This guards against a new entry
+   that is really an old rig with a new label, which is the cheapest way for the
+   library to start lying about what you are doing.
+   The signature is the joints AND the implement, because sharing joint paths is
+   sometimes right: a hammer curl and a supinated curl are the same movement of
+   the same bones and differ only in how the dumbbell is held, which the rig
+   says with `equip` and `axis` rather than with different frames. */
+(function noTwins(){
+  var seen={};
+  EX.forEach(function(ex){
+    var sig=JSON.stringify([ex.frames, ex.equip||null, ex.axis||null,
+                            ex.anchorAt||null, ex.props||null]);
+    if(seen[sig]) fails.push(ex.id+': draws exactly the same movement with the same kit as '+seen[sig]);
+    else seen[sig]=ex.id;
+  });
+})();
+
+/* The three flys specifically: two close the arms in front and one opens them
+   behind, so the reverse one has to travel the OTHER way. Three labels on one
+   arc would be worse than not having it. */
+(function flysDiffer(){
+  function get(id){ return EX.filter(function(e){return e.id===id;})[0]; }
+  function span(id){
+    var ex=get(id); if(!ex) return null;
+    var S=ex.frames.map(solve);
+    return S[2].handN.x-S[0].handN.x;
+  }
+  var chest=span('fly_cable'), high=span('fly_cable_high'), rev=span('fly_cable_rev');
+  if(chest===null||high===null||rev===null) return;
+  check('fly_cable_rev','it travels the opposite way to the chest flys',
+    rev<0 && chest>0, 'reverse '+r(rev)+', cable fly '+r(chest));
+  // The high fly comes DOWN across the body; the mid fly stays level. That
+  // vertical travel is the whole reason for having both, so it is what
+  // separates them, not where they happen to finish.
+  function drop(id){ var f=get(id).frames; return f[2].handN[1]-f[0].handN[1]; }
+  check('fly_cable_high','the high fly comes down across the body',drop('fly_cable_high')>35,
+    'it drops '+r(drop('fly_cable_high')));
+  check('fly_cable','the mid fly stays roughly level, so the two are not one arc',
+    Math.abs(drop('fly_cable'))<15, 'it drops '+r(drop('fly_cable')));
+})();
 
 console.log('=== ANALYSIS ===');
 if(!fails.length) console.log('PASS: all '+EX.length+' exercises match their movement criteria.');

@@ -132,6 +132,8 @@ set's margins against the rig's limits while it is being authored.
 - `test-meals.js` — recipe portions and the shopping list.
 - `test-plan.js` — the meal planner in the browser: the same meal twice, slots,
   partial-week shopping.
+- `npm test` runs both halves: `test:pose` for the rig, `test:app` for the
+  document and every suite over it.
 - `test-shopping.js` — the shopping arithmetic headless, swept over every recipe
   and every pair. A list that is short is worse than no list, so countable
   amounts are checked against what you have to BUY, not what the recipe needs.
