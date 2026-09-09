@@ -11,15 +11,19 @@ EX.forEach(function(ex){
   for(var i=0;i<SAMPLES;i++){
     var s=rig.solve(rig.poseAt(ex,i/SAMPLES));
     // limb integrity across the WHOLE motion, not just keyframes
+    // An arm may be drawn SHORT on purpose (armScaleN/F) when it swings out of
+    // this plane, so what must hold is its scaled length, not its full one.
+    var aN=s.armScaleN===undefined?1:s.armScaleN, aF=s.armScaleF===undefined?1:s.armScaleF;
     worstStretch=Math.max(worstStretch,
       Math.abs(d(s.hip,s.kneeN)-L.THIGH), Math.abs(d(s.kneeN,s.ankN)-L.SHIN),
-      Math.abs(d(s.sh,s.elbN)-L.UPPER), Math.abs(d(s.elbN,s.handN)-L.FORE),
+      Math.abs(d(s.sh,s.elbN)-L.UPPER*aN), Math.abs(d(s.elbN,s.handN)-L.FORE*aN),
       Math.abs(d(s.hipF,s.kneeF)-L.THIGH), Math.abs(d(s.kneeF,s.ankF)-L.SHIN),
-      Math.abs(d(s.shF,s.elbF)-L.UPPER), Math.abs(d(s.elbF,s.handF)-L.FORE));
+      Math.abs(d(s.shF,s.elbF)-L.UPPER*aF), Math.abs(d(s.elbF,s.handF)-L.FORE*aF));
     // reach: a limb asked to span more than its length would be silently stretched
     var legReach=d(s.hip,s.ankN), armReach=d(s.sh,s.handN);
     ck(ex.id,'leg never asked to over-extend (sample '+i+')', legReach<=L.THIGH+L.SHIN+0.5,'reach '+r(legReach));
-    ck(ex.id,'arm never asked to over-extend (sample '+i+')', armReach<=L.UPPER+L.FORE+0.5,'reach '+r(armReach));
+    ck(ex.id,'arm never asked to over-extend (sample '+i+')', armReach<=(L.UPPER+L.FORE)*aN+0.5,
+      'reach '+r(armReach)+' of '+r((L.UPPER+L.FORE)*aN));
     var low=Math.max(s.ankN.y,s.ankF.y,s.kneeN.y,s.hip.y,s.handN.y,s.head.y+L.HEAD_R);
     if(low>GROUND+2) floorBreak++;
     if(planted) ankles.push(s.ankN.x+','+s.ankN.y);

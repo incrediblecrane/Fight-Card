@@ -110,13 +110,15 @@ be shared publicly.
   raise, ships with no front view at all: the movement is purely sagittal, so
   the frontal projection collapses onto the shoulders and carries nothing. Its
   second panel is the finish of the side view instead.
-- **armScale** (`armScaleL`/`armScaleR`) — how much of its true length an arm
-  projects in the FRONT view, 1 being square to the camera. It is the only way
-  to draw an arm pointing at the viewer, because the solver bends limbs rather
-  than shortening them: without it a face pull drew two lumps beside the head.
-  The side view has no equivalent, so a frontal-plane movement (the lateral
-  raise, the three cable flys) keeps its side arm long and low rather than
-  bending it into something that reads as a curl.
+- **armScale** — how much of its true length an arm projects in a view, 1 being
+  square to the camera. Both views have it: `armScaleL`/`armScaleR` on a front
+  frame, `armScaleN`/`armScaleF` on a side one. It is the only way to draw an
+  arm pointing at the viewer, because the solver bends limbs rather than
+  shortening them, and the one thing it can do to reach a hand nearer than
+  arm's length is fold the elbow. Without it a face pull drew two lumps beside
+  the head, a lateral raise drew a curl, and the cable flys went from a nearly
+  straight arm to a badly folded one inside a rep instead of holding the one
+  soft elbow bend they ask for.
 - **Plan view** (`frontPlan`) — looking down at someone on the floor. No
   gravity and no ground line; labelled "Above".
 - **Axis** — which way a dumbbell's handle runs: `lateral` (across the body),

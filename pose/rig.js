@@ -42,15 +42,22 @@ function solve(f){
   var kneeN=ik(hip,ankN,L.THIGH,L.SHIN,ks);
   var kneeF=ik(hipF,ankF,L.THIGH,L.SHIN,ks);
 
+  // An arm swinging out of the sagittal plane projects SHORT into this view,
+  // it does not bend. Without a scale the solver had only one way to reach a
+  // hand that is closer than arm's length, which is to fold the elbow, so a
+  // lateral raise came out as a curl. This is the same mechanism solveFront
+  // has for an arm pointing at the camera.
+  var aN=f.armScaleN===undefined?1:f.armScaleN, aF=f.armScaleF===undefined?1:f.armScaleF;
   var elbN,handN,elbF,handF;
-  if(f.handN){ handN=P(f.handN[0],f.handN[1]); elbN=ik(sh,handN,L.UPPER,L.FORE,es); }
-  else { var an=f.armN||[178,178]; elbN=add(sh,dir(an[0],L.UPPER)); handN=add(elbN,dir(an[1],L.FORE)); }
-  if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER,L.FORE,es); }
-  else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],L.UPPER)); handF=add(elbF,dir(af[1],L.FORE)); }
+  if(f.handN){ handN=P(f.handN[0],f.handN[1]); elbN=ik(sh,handN,L.UPPER*aN,L.FORE*aN,es); }
+  else { var an=f.armN||[178,178]; elbN=add(sh,dir(an[0],L.UPPER*aN)); handN=add(elbN,dir(an[1],L.FORE*aN)); }
+  if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER*aF,L.FORE*aF,es); }
+  else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],L.UPPER*aF)); handF=add(elbF,dir(af[1],L.FORE*aF)); }
 
   return {hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
     elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,
+    armScaleN:aN,armScaleF:aF,
     footRot:f.footRot||0};
 }
 
@@ -72,8 +79,9 @@ function handFromAngles(f,arm,far){
   var hip=P(f.hip[0],f.hip[1]), sh=add(hip,dir(f.torso,L.TORSO));
   if(f.shrug) sh=add(sh,{x:0,y:-f.shrug});
   if(far) sh=add(sh,{x:-5,y:0});
-  var elb=add(sh,dir(arm[0],L.UPPER));
-  var h=add(elb,dir(arm[1],L.FORE));
+  var a=(far?f.armScaleF:f.armScaleN); if(a===undefined) a=1;
+  var elb=add(sh,dir(arm[0],L.UPPER*a));
+  var h=add(elb,dir(arm[1],L.FORE*a));
   return [h.x,h.y];
 }
 // Blend two keyframes into a valid in-between pose.
@@ -82,6 +90,8 @@ function lerpFrame(A,B,t){
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
           kneeSign:A.kneeSign, elbowSign:A.elbowSign,
           shrug:lerp(A.shrug||0,B.shrug||0,t),
+          armScaleN:lerp(A.armScaleN===undefined?1:A.armScaleN,B.armScaleN===undefined?1:B.armScaleN,t),
+          armScaleF:lerp(A.armScaleF===undefined?1:A.armScaleF,B.armScaleF===undefined?1:B.armScaleF,t),
           footRot:lerp(A.footRot||0,B.footRot||0,t) };
   function arm(key,angKey,far){
     var a=A[key], b=B[key];

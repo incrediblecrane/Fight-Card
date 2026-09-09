@@ -957,6 +957,55 @@ srv.listen(0,async function(){
   });
 
 
+  await t('a finished session remembers what was supersetted', async function(){
+    // The sets land on the individual exercises, which is what makes history
+    // and PBs work without knowing about rounds. It also meant the finished log
+    // had no record that two lifts were done back to back at all.
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search'); await p.type('#ex-search','superset',{delay:30}); await p.waitForTimeout(500);
+    await p.click('[data-action="addex"][data-id="superset"]'); await settle();
+    await p.selectOption('.ssadd select','curl_bicep');
+    await p.click('[data-action="ssadd"]'); await settle();
+    await p.selectOption('.ssadd select','row_bent');
+    await p.click('[data-action="ssadd"]'); await settle();
+    await p.fill('#log-w-curl_bicep','15'); await p.fill('#log-v-curl_bicep','10');
+    await p.fill('#log-w-row_bent','40');   await p.fill('#log-v-row_bent','8');
+    await p.click('[data-action="loground"]'); await settle();
+    assert.ok(await toSlide('Cool-down'),'never reached the cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
+    if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(600); }
+    var rows=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('[data-action="dellog"]'))
+        .map(function(b){ return b.closest('.swipe').innerText.replace(/\n/g,' / '); });
+    });
+    assert.ok(rows.some(function(r){ return /Bicep curl/.test(r) && /Bent-over row/.test(r); }),
+      'no session row says what was supersetted:\n        '+rows.join('\n        '));
+    // And it has to survive the save, not just the render that made it.
+    assert.ok(/"supersets":\[\{"ex":\["curl_bicep","row_bent"\],"rounds":1\}\]/.test(doc),
+      'the superset was not written into the finished log');
+  });
+
+  await t('a session with no supersets does not claim one', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search'); await p.type('#ex-search','bicep curl',{delay:30}); await p.waitForTimeout(500);
+    await p.click('[data-action="addex"][data-id="curl_bicep"]'); await settle();
+    await p.fill('#log-w-curl_bicep','15'); await p.fill('#log-v-curl_bicep','10');
+    await p.click('[data-action="logset"]'); await settle();
+    await toSlide('Cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
+    if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(600); }
+    var note=await p.evaluate(function(){
+      var r=document.querySelector('[data-action="dellog"]');
+      return r?!!r.closest('.swipe').querySelector('.ssnote'):null;
+    });
+    assert.strictEqual(note,false,'a superset note appeared on a session that had none');
+  });
+
+
   console.log('\nSHOULDER AND ARM WORK');
 
   // Samples the live front figure right through its cycle. Reading one frame is

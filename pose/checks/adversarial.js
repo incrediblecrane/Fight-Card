@@ -12,8 +12,13 @@ EX.forEach(function(ex){
     // RIG INTEGRITY: limbs must be exactly their anatomical length (no IK stretching).
     ck(tag,'thigh length intact', Math.abs(d(s.hip,s.kneeN)-L.THIGH)<0.6,'got '+r(d(s.hip,s.kneeN)));
     ck(tag,'shin length intact', Math.abs(d(s.kneeN,s.ankN)-L.SHIN)<0.6,'got '+r(d(s.kneeN,s.ankN)));
-    ck(tag,'upper arm length intact', Math.abs(d(s.sh,s.elbN)-L.UPPER)<0.6,'got '+r(d(s.sh,s.elbN)));
-    ck(tag,'forearm length intact', Math.abs(d(s.elbN,s.handN)-L.FORE)<0.6,'got '+r(d(s.elbN,s.handN)));
+    // armScaleN is projection, not stretching: an arm swinging out of this
+    // plane is drawn short on purpose, so the length it must hold is scaled.
+    var aN=s.armScaleN===undefined?1:s.armScaleN;
+    ck(tag,'upper arm length intact', Math.abs(d(s.sh,s.elbN)-L.UPPER*aN)<0.6,
+      'got '+r(d(s.sh,s.elbN))+' of '+r(L.UPPER*aN));
+    ck(tag,'forearm length intact', Math.abs(d(s.elbN,s.handN)-L.FORE*aN)<0.6,
+      'got '+r(d(s.elbN,s.handN))+' of '+r(L.FORE*aN));
     // PROPORTION: 7.5-head canon sanity, head must be small relative to the body.
     ck(tag,'head is not oversized', L.HEAD_R*2 < L.TORSO*0.55,'head dia '+(L.HEAD_R*2)+' vs torso '+L.TORSO);
   });

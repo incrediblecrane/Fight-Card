@@ -201,14 +201,15 @@ var EXERCISES = [
   ]},
 
 { id:"press_incline", tempo:[500,500,400,400], name:"Incline dumbbell press",
-  real:"Bench set around thirty to forty degrees. Dumbbells start at chest level just outside the shoulders and press up and slightly together, following the angle of the bench rather than straight up. Feet stay planted on the floor.",
-  changed:"There is an actual inclined bench under the torso and the press follows its angle, so it no longer reads as a flat bench press. The dumbbell handles run across the body, so from the side you see one bell face and from the front the whole dumbbell.",
-  equip:"dumbbell", axis:"lateral", active:"arms", props:[[6,108,58,10,3,-34],[16,146,7,24,0]],
+  real:"Bench set around forty-five degrees. Dumbbells start at chest level just outside the shoulders and press up and slightly together, following the angle of the bench rather than straight up. Feet stay planted on the floor.",
+  changed:"The bench is now a bench you could sit on, and the body is actually lying on it. Before, the pad ran at thirty-four degrees and the torso at fifty-five, so the two crossed: the back rested against a floating plate, the hips hung in mid air past the end of it, and the only upright was under the head end. The pad and the torso now share one angle, and the bench has the three parts a real one has, a back pad, a seat under the hips and a post to the floor. The dumbbell handles run across the body, so from the side you see one bell face and from the front the whole dumbbell.",
+  equip:"dumbbell", axis:"lateral", active:"arms",
+  props:[[-4,128,60,9,3,45],[46,149,32,8,3],[56,157,8,13,0]],
   frames:[
-    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[58,86],handF:[52,88], elbowSign:1},
-    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[50,96],handF:[44,98], elbowSign:1},
-    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[43,106],handF:[37,108], elbowSign:1},
-    {hip:[50,142],torso:325,ankN:[80,163],ankF:[72,163], handN:[50,96],handF:[44,98], elbowSign:1}
+    {hip:[50,142],torso:315,ankN:[90,163],ankF:[82,163], handN:[52,90], handF:[46,92], elbowSign:1},
+    {hip:[50,142],torso:315,ankN:[90,163],ankF:[82,163], handN:[43,99], handF:[37,101],elbowSign:1},
+    {hip:[50,142],torso:315,ankN:[90,163],ankF:[82,163], handN:[35,108],handF:[29,110],elbowSign:1},
+    {hip:[50,142],torso:315,ankN:[90,163],ankF:[82,163], handN:[43,99], handF:[37,101],elbowSign:1}
   ]},
 
 { id:"triceps_ext", tempo:[480,480,420,420], name:"Triceps extension",
@@ -825,35 +826,35 @@ var EXERCISES = [
 
 { id:"fly_cable", tempo:[420,420,520,520], name:"Cable fly",
   real:"Handles from pulleys at about chest height, one foot forward for balance, a slight forward lean. Elbows stay softly bent at a fixed angle and the hands sweep out wide then back together in front of the chest. The angle at the elbow does not change: the moment it opens and closes you are pressing, not flying.",
-  changed:"New rig. The front view carries it, because the hands sweep across the body and a side view sees that arc almost end-on. From the side the arm is genuinely foreshortened at the stretch, which is why the hand sits close to the shoulder there rather than far behind it.",
+  changed:"New rig. The front view carries it, because the hands sweep across the body and a side view sees that arc almost end-on. From the side the arm is genuinely foreshortened at the stretch, which is why the hand sits close to the shoulder there rather than far behind it. The side arm is genuinely foreshortened, and armScaleN now draws that as a shorter arm rather than a folded one, so the elbow holds the one soft bend these lifts ask for instead of going from nearly straight to badly folded inside a rep.",
   equip:"cable", active:"arms", anchorAt:[8,84], anchorFront:[18,80,122,80],
   frames:[
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[36,95],handF:[32,97], elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[90,95],handF:[86,97], elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], elbowSign:1}
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[36,95],handF:[32,97], armScaleN:0.85,armScaleF:0.86, elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], armScaleN:0.64,armScaleF:0.7, elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[90,95],handF:[86,97], armScaleN:0.98,armScaleF:1, elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], armScaleN:0.64,armScaleF:0.7, elbowSign:1}
   ]},
 
 { id:"fly_cable_high", tempo:[420,420,520,520], name:"High cable fly",
   real:"Same movement from pulleys set high, so the hands travel down and in and meet low, around the belly button. Coming from above puts the line of pull across the lower chest rather than the mid chest, which is the only reason to do both. Same fixed soft elbow throughout.",
-  changed:"New rig, and it is deliberately NOT the mid-height fly with a different label: the hands start high and finish low, so the arc runs downward across the body. That difference is the whole point of having the two, and it is visible in both views.",
+  changed:"New rig, and it is deliberately NOT the mid-height fly with a different label: the hands start high and finish low, so the arc runs downward across the body. That difference is the whole point of having the two, and it is visible in both views. The side arm is genuinely foreshortened, and armScaleN now draws that as a shorter arm rather than a folded one, so the elbow holds the one soft bend these lifts ask for instead of going from nearly straight to badly folded inside a rep.",
   equip:"cable", active:"arms", anchorAt:[8,38], anchorFront:[20,36,120,36],
   frames:[
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[44,50],handF:[40,52], elbowSign:1},
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], elbowSign:1},
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[80,100],handF:[76,102], elbowSign:1},
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], elbowSign:1}
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[44,50],handF:[40,52], armScaleN:0.76,armScaleF:0.7, elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], armScaleN:0.75,armScaleF:0.75, elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[80,100],handF:[76,102], armScaleN:0.86,armScaleF:0.92, elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], armScaleN:0.75,armScaleF:0.75, elbowSign:1}
   ]},
 
 { id:"fly_cable_rev", tempo:[420,420,520,520], name:"Reverse cable fly",
   real:"Pulleys at about chest height, standing between them, each hand holding the OPPOSITE side\'s handle so the cables cross in front of you. Arms almost straight with a soft fixed elbow, sweep the hands apart and back until the shoulder blades pinch, then let them come back together under control. It is the mirror of a cable fly: that one closes the arms in front, this one opens them behind.",
-  changed:"New. It is the opposite direction of travel to the two chest flys, and the front view carries it: the cords cross in front at the start and the hands finish wide. From the side the arms are almost end-on, which is why the hand sits close to the shoulder at the finish rather than far behind it.",
+  changed:"New. It is the opposite direction of travel to the two chest flys, and the front view carries it: the cords cross in front at the start and the hands finish wide. From the side the arms are almost end-on, which is why the hand sits close to the shoulder at the finish rather than far behind it. The side arm is genuinely foreshortened, and armScaleN now draws that as a shorter arm rather than a folded one, so the elbow holds the one soft bend these lifts ask for instead of going from nearly straight to badly folded inside a rep.",
   equip:"cable", active:"arms", anchorAt:[124,84], anchorFront:[122,80,18,80],
   frames:[
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[94,88],handF:[90,90], elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[50,96],handF:[46,98], elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], elbowSign:1}
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[94,88],handF:[90,90], armScaleN:0.98,armScaleF:1, elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], armScaleN:0.73,armScaleF:0.78, elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[50,96],handF:[46,98], armScaleN:0.65,armScaleF:0.69, elbowSign:1},
+    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], armScaleN:0.73,armScaleF:0.78, elbowSign:1}
   ]},
 
 { id:"raise_front", tempo:[420,420,520,520], name:"Front dumbbell raise",
@@ -869,13 +870,17 @@ var EXERCISES = [
 
 { id:"raise_lateral", tempo:[420,420,520,520], name:"Side lateral raise",
   real:"Dumbbells at your sides, a soft bend at the elbow that does not change. Lift out to the sides to about shoulder height, leading with the elbows, and lower slowly. It is a small movement with a light weight: if you need to heave it up, it is too heavy and your traps are doing it.",
-  changed:"New. It happens in the frontal plane, so the FRONT view is the exercise and the side view deliberately shows very little: the arm swings out toward the camera, which a side-on drawing cannot show, and the rig cannot foreshorten a limb in this view. So the side arm stays long and low and drifts. Raising it to shoulder height here would draw a bent arm holding a bell in front of the chest, which is a curl, and a wrong picture gets copied literally.",
+  changed:"New. It happens in the frontal plane, so the FRONT view is the exercise and the side view is a projection of it: abduction is entirely left-to-right, so from the side the arm keeps pointing straight down and simply shortens as it rises, reaching almost nothing at shoulder height. armScaleN carries that. Drawn without it the solver had only one way to reach a hand closer than arm\'s length, which was to fold the elbow, and the result was a bent arm holding a bell at chest height: a curl.",
   equip:"dumbbell", axis:"sagittal", active:"arms",
   frames:[
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[59,110],handF:[53,109], elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[63,106],handF:[57,105], elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[68,100],handF:[62,99],  elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[63,106],handF:[57,105], elbowSign:1}
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,111],handF:[51,110],
+     armScaleN:1,   armScaleF:1,   elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,101],handF:[51,100],
+     armScaleN:0.74,armScaleF:0.74,elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,81], handF:[51,80],
+     armScaleN:0.24,armScaleF:0.24,elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,101],handF:[51,100],
+     armScaleN:0.74,armScaleF:0.74,elbowSign:1}
   ]},
 
 { id:"pulldown_straight", tempo:[420,420,520,520], name:"Standing lat pulldown",

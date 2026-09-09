@@ -5,6 +5,19 @@ var fails=[], warns=[];
 function check(id,label,cond,detail){ (cond?null:fails.push(id+': '+label+'  ['+detail+']')); }
 function soft(id,label,cond,detail){ (cond?null:warns.push(id+': '+label+'  ['+detail+']')); }
 
+// How straight the near arm stays across the WHOLE rep, as a fraction of its
+// drawn length. A movement that leaves the sagittal plane is drawn short by
+// armScaleN, so the ratio to measure is against that scaled length, not the
+// full one: a fly holds ONE soft elbow bend, and a lateral raise never bends.
+function straightThroughout(ex){
+  var worst=1;
+  for(var u=0;u<1;u+=0.01){
+    var s=rig.solve(rig.poseAt(ex,u));
+    var max=(L.UPPER+L.FORE)*(s.armScaleN===undefined?1:s.armScaleN);
+    if(max>0.5) worst=Math.min(worst, Math.hypot(s.handN.x-s.sh.x,s.handN.y-s.sh.y)/max);
+  }
+  return worst;
+}
 EX.forEach(function(ex){
   var S=ex.frames.map(solve);
   // Universal: nothing should sink through the floor.
@@ -409,17 +422,18 @@ EX.forEach(function(ex){
     // SHOULD collapse. Drawing a big sagittal arc there would be a lie.
     check(ex.id,'the side view stays put rather than swinging forward',
       Math.abs(S[2].handN.x-S[0].handN.x)<14,'side travel '+r(S[2].handN.x-S[0].handN.x));
-    // The side rig cannot foreshorten a limb, only bend it, so an attempt to
-    // draw the arm rising end-on came out as a bent arm holding a bell at
-    // chest height: a curl. The side view therefore keeps the arm long and
-    // low and lets the front view carry the exercise.
-    var LRr=S.map(function(x){ return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y); });
-    check(ex.id,'the side arm stays long, because a bent one reads as a curl',
-      Math.min.apply(null,LRr)>26,'shortest reach '+r(Math.min.apply(null,LRr)));
-    check(ex.id,'and the side hand stays well below the shoulder',
-      Math.min.apply(null,S.map(function(x){return x.handN.y-x.sh.y;}))>18,
-      'closest the hand gets to the shoulder: '+
-      r(Math.min.apply(null,S.map(function(x){return x.handN.y-x.sh.y;}))));
+    // Abduction is entirely left-to-right, so the side view is a straight arm
+    // pointing down that SHORTENS as it rises. Without armScaleN the solver
+    // could only reach a nearer hand by folding the elbow, and the result was
+    // a bent arm holding a bell at chest height: a curl.
+    check(ex.id,'the side arm shortens rather than bending',
+      ex.frames[0].armScaleN===1 && ex.frames[2].armScaleN<0.35,
+      'armScaleN '+ex.frames[0].armScaleN+' -> '+ex.frames[2].armScaleN);
+    check(ex.id,'and it stays straight the whole way, so it is never a curl',
+      straightThroughout(ex)>0.8,'most bent the elbow gets: '+r(straightThroughout(ex)*100)+'% extended');
+    check(ex.id,'the hand rises up the body without swinging out in front',
+      S[2].handN.y<S[0].handN.y-24 && Math.abs(S[2].handN.x-S[0].handN.x)<6,
+      'hand '+r(S[0].handN.x)+','+r(S[0].handN.y)+' -> '+r(S[2].handN.x)+','+r(S[2].handN.y));
     var LR=ex.front||[];
     check(ex.id,'the front view is where it happens: the hands go out and up',
       LR.length>2 && (LR[2].handR[0]-LR[2].handL[0])>(LR[0].handR[0]-LR[0].handL[0])+40
@@ -444,6 +458,43 @@ EX.forEach(function(ex){
     check(ex.id,'the front view does not bend the elbows either',
       PD.length>2 && PD[0].armScaleL!==undefined,
       PD.length?'front view is a side projection, which bends them to reach a fixed grip':'no front view');
+  }
+  // All three flys share one cue: a soft bend at the elbow that does NOT
+  // change. The side view is a projection of a sweep that mostly happens out
+  // of the sagittal plane, so without armScaleN the solver expressed all of
+  // that foreshortening as elbow bend, and the drawn arm went from nearly
+  // straight to badly folded and back inside one rep.
+  if(ex.id==='fly_cable'||ex.id==='fly_cable_high'||ex.id==='fly_cable_rev'){
+    check(ex.id,'the side view foreshortens the sweep instead of folding the elbow',
+      ex.frames.every(function(f){ return f.armScaleN!==undefined && f.armScaleN<1.001; }) &&
+      Math.min.apply(null,ex.frames.map(function(f){return f.armScaleN;}))<0.9,
+      'armScaleN '+ex.frames.map(function(f){return f.armScaleN;}).join(', '));
+    check(ex.id,'and the soft elbow bend stays roughly the same throughout',
+      straightThroughout(ex)>0.6,'most bent the elbow gets: '+r(straightThroughout(ex)*100)+'% extended');
+  }
+  /* The bench has to be a bench the figure is actually on. It used to be a pad
+     at thirty-four degrees under a torso at fifty-five, so the two crossed: the
+     back lay against a floating plate, the hips hung past the end of it in mid
+     air, and the single upright stood under the head end. */
+  if(ex.id==='press_incline'){
+    function angleMod180(deg){ var a=deg%180; return a<0?a+180:a; }
+    var t=ex.frames[0].torso;
+    var bodyAngle=angleMod180(Math.atan2(-Math.cos(t*Math.PI/180), Math.sin(t*Math.PI/180))*180/Math.PI);
+    var pad=(ex.props||[])[0]||[];
+    var padAngle=angleMod180(pad[5]||0);
+    check(ex.id,'the back pad runs along the torso rather than across it',
+      Math.abs(bodyAngle-padAngle)<6,'body '+r(bodyAngle)+'deg, pad '+r(padAngle)+'deg');
+    // The seat is whatever prop the hip sits over. Without one the figure is
+    // sitting on air, which is what it was doing.
+    var hip=ex.frames[0].hip;
+    var seat=(ex.props||[]).filter(function(p){
+      return !p[5] && hip[0]>=p[0]-2 && hip[0]<=p[0]+p[2]+2 && p[1]>hip[1] && p[1]-hip[1]<16;
+    })[0];
+    check(ex.id,'there is a seat under the hips, not just a back pad',
+      !!seat, seat?('seat top at '+seat[1]+' under a hip at '+hip[1]):'nothing under the hip');
+    check(ex.id,'and something under it reaches the floor',
+      (ex.props||[]).some(function(p){ return !p[5] && p[1]+p[3]>=GROUND-4 && p[0]>hip[0]-14; }),
+      'lowest prop bottom '+r(Math.max.apply(null,(ex.props||[]).map(function(p){return p[1]+p[3];}))));
   }
   if(ex.id==='fly_cable_rev'){
     // It is the mirror of the chest flys, so the two things worth proving are
