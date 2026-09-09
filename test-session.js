@@ -956,6 +956,162 @@ srv.listen(0,async function(){
       'the machine was dropped: "'+chips[chips.length-1]+'"');
   });
 
+
+  console.log('\nSHOULDER AND ARM WORK');
+
+  // Samples the live front figure right through its cycle. Reading one frame is
+  // not enough: what tells a real front view from one projected off the side
+  // frames is whether the hands change their separation at all, and a still
+  // cannot show that.
+  var handSpread=async function(){
+    var seen=[];
+    for(var i=0;i<26;i++){
+      var s=await p.evaluate(function(){
+        var box=document.getElementById('fig-live-front');
+        if(!box) return null;
+        // Only the two hands are drawn with a 2-wide outline.
+        var hands=[].slice.call(box.querySelectorAll('circle[stroke-width="2"]'));
+        var sh=[].slice.call(box.querySelectorAll('circle[r="6.5"]'));
+        if(hands.length!==2 || sh.length!==2) return null;
+        var x=hands.map(function(c){ return +c.getAttribute('cx'); });
+        var y=hands.map(function(c){ return +c.getAttribute('cy'); });
+        return {sep:Math.abs(x[0]-x[1]), top:Math.min(y[0],y[1]),
+                sh:Math.abs(+sh[0].getAttribute('cx') - +sh[1].getAttribute('cx'))};
+      });
+      if(s) seen.push(s);
+      await p.waitForTimeout(90);
+    }
+    assert.ok(seen.length>15,'the front figure barely drew: '+seen.length+' of 26 samples');
+    var seps=seen.map(function(s){ return s.sep; });
+    return {widest:Math.max.apply(null,seps), narrowest:Math.min.apply(null,seps),
+            range:Math.max.apply(null,seps)-Math.min.apply(null,seps),
+            highest:Math.min.apply(null,seen.map(function(s){ return s.top; })),
+            shoulders:seen[0].sh};
+  };
+
+  var openPickerOn=async function(search){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search');
+    await p.type('#ex-search',search,{delay:30}); await p.waitForTimeout(500);
+  };
+
+  // All four are the same shape of thing: a new exercise with its own rig and
+  // its own front view. Two things go wrong with that, so both are checked for
+  // every one of them. The rig can be unreachable from RIGMAP, in which case
+  // the app quietly draws the generic fallback pose (that is how a sit-up once
+  // shipped as a squat). Or the front can be missing, in which case the second
+  // panel is the side view over again.
+  // front:false is the front dumbbell raise only, and it is deliberate. The
+  // movement is purely sagittal, so a front view projects the arms to nothing;
+  // it ships with the start and finish of the side view instead.
+  var NEW_EX=[{id:'raise_front', name:'Front dumbbell raise', find:'front raise', pair:true, front:false},
+              {id:'raise_lateral', name:'Side lateral raise', find:'lateral', pair:true, front:true},
+              {id:'pulldown_straight', name:'Standing lat pulldown', find:'standing lat', pair:false, front:true, props:true},
+              {id:'curl_reverse', name:'Reverse barbell curl', find:'reverse curl', pair:false, front:true}];
+
+  for(var qi=0;qi<NEW_EX.length;qi++){
+    var E=NEW_EX[qi];
+
+    await t(E.name+' is in the library, drawn from its own rig', async function(E){
+      await openPickerOn(E.find);
+      var names=await p.evaluate(function(){
+        return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){ return e.textContent.trim(); });
+      });
+      assert.ok(names.indexOf(E.name)>-1,'searching "'+E.find+'" found: '+names.join(','));
+      await p.click('[data-action="toggleex"][data-id="'+E.id+'"]'); await p.waitForTimeout(400);
+      var got=await p.evaluate(function(i){
+        var row=document.querySelector('[data-action="toggleex"][data-id="'+i+'"]').closest('.pickrow');
+        var svgs=[].slice.call(row.querySelectorAll('.pickpreview svg'));
+        return {views:svgs.length,
+                boxes:svgs.map(function(s){ return s.getAttribute('viewBox'); }),
+                shapes:row.querySelectorAll('.pickpreview svg polygon').length,
+                props:row.querySelectorAll('.pickpreview svg rect').length,
+                arrow:(row.querySelector('.arrow')||{textContent:'?'}).textContent.trim()};
+      }, E.id);
+      assert.strictEqual(got.views,2,'expected two views, got '+got.views);
+      // The generic fallback also draws two figures, which is how a sit-up once
+      // shipped as a squat. A solved view has a viewBox of its own, and the two
+      // views have different ones.
+      assert.strictEqual(got.boxes[1], E.front?'20 18 100 168':'-20 18 175 168',
+        'the second panel is not the view it should be, its viewBox is '+got.boxes[1]);
+      assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
+      assert.strictEqual(got.arrow, E.front?'':'\u2192',
+        'the arrow says the app '+(E.front?'has no':'has a')+' front view for this');
+      if(E.props) assert.ok(got.props>0,'no pulley drawn: the machine is missing from the rig');
+    }.bind(null,E));
+
+    await t(E.name+' logs '+(E.pair?'per dumbbell':'a plain weight'), async function(E){
+      await p.click('[data-action="addex"][data-id="'+E.id+'"]'); await settle();
+      assert.strictEqual(await slideTitle(),E.name,'landed on "'+(await slideTitle())+'"');
+      var ph=await p.getAttribute('#log-w-'+E.id,'placeholder');
+      var note=await p.evaluate(function(){ var n=document.querySelector('.perimp'); return n?n.textContent:''; });
+      if(E.pair){
+        assert.strictEqual(ph,'kg each','a pair of dumbbells was labelled "'+ph+'"');
+        assert.ok(/one dumbbell, not the pair/i.test(note),'note read: '+note);
+      }else{
+        assert.strictEqual(ph,'kg','a single implement was labelled "'+ph+'"');
+        assert.strictEqual(note,'','a per-dumbbell note appeared on a bar: '+note);
+      }
+      await p.fill('#log-w-'+E.id,'12'); await p.fill('#log-v-'+E.id,'12');
+      await p.click('[data-action="logset"]'); await settle();
+      var chip=await p.evaluate(function(){ var c=document.querySelector('.setchip'); return c?c.textContent.trim():''; });
+      assert.ok(new RegExp('12kg'+(E.pair?' ea':'')+' \u00d7 12').test(chip),'the set reads: "'+chip+'"');
+      if(!E.pair) assert.ok(!/kg ea/.test(chip),'a single implement logged as a pair: "'+chip+'"');
+    }.bind(null,E));
+  }
+
+  await t('the side lateral raise takes the hands out past the shoulders', async function(){
+    // Its whole point is the lateral path. Derived off the side frames the
+    // hands would sit at one width and only rise, which is the wrong exercise.
+    await openPickerOn('lateral');
+    await p.click('[data-action="addex"][data-id="raise_lateral"]'); await settle();
+    var spread=await handSpread();
+    assert.ok(spread.widest>spread.shoulders+30,
+      'the hands reach only '+spread.widest.toFixed(1)+' apart against shoulders of '+spread.shoulders);
+    assert.ok(spread.range>20,'the hands barely move sideways (range '+spread.range.toFixed(1)+')');
+  });
+
+  console.log('\nFACE PULL, FRONT VIEW');
+
+  await t('the hands travel apart, so it is the pull and not a projection', async function(){
+    // It used to be derived from the side, where the arms point straight at the
+    // camera: they foreshortened to nothing and sat as lumps beside the head at
+    // one fixed grip width. A derived front CANNOT change its hand separation,
+    // so separation across the cycle is exactly the thing to measure.
+    await openPickerOn('face pull');
+    await p.click('[data-action="addex"][data-id="facepull"]'); await settle();
+    assert.strictEqual(await slideTitle(),'Face pull','landed on "'+(await slideTitle())+'"');
+    var spread=await handSpread();
+    assert.ok(spread.range>8,'the hands hold a fixed '+spread.widest.toFixed(1)+' apart all cycle (range '
+      +spread.range.toFixed(1)+'): this is a projected front, not the pull');
+    assert.ok(spread.widest>spread.shoulders,
+      'the hands never get wider than the shoulders ('+spread.widest.toFixed(1)+' against '+spread.shoulders+')');
+    assert.ok(spread.highest<62,'the hands never come up beside the head (highest y '+spread.highest.toFixed(1)+')');
+  });
+
+  console.log('\nFOREARM WORKOUT');
+
+  await t('it is in the Training tab and runs the five lifts in order', async function(){
+    await go(); await leaveSession();
+    await startWorkout('Forearms');
+    var titles=[await slideTitle()];
+    for(var i=0;i<14;i++){
+      var has=await p.$('[data-action="nextslide"]'); if(!has) break;
+      await next(); titles.push(await slideTitle());
+    }
+    assert.deepStrictEqual(titles,
+      ['Warm-up','Reverse barbell curl','Hammer curl','Plate pinch hold',"Farmer's carry",'Dead hang','Cool-down'],
+      'the session read: '+titles.join(' > '));
+  });
+
+  await t('its warm-up warns about cold forearms, not a generic cue', async function(){
+    await go(); await leaveSession(); await startWorkout('Forearms');
+    var cue=await p.evaluate(function(){ var c=document.querySelector('.slide .cue'); return c?c.textContent:''; });
+    assert.ok(/wrist/i.test(cue),'cue was: '+cue);
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

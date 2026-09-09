@@ -105,7 +105,18 @@ be shared publicly.
 - **Side view** — the sagittal drawing, solved from planted feet upward.
 - **Front view** — either derived from the side by `frontFromSide` (for
   symmetric sagittal movements) or hand-authored (for unilateral ones, where a
-  derived symmetric view would show both sides doing the same thing).
+  derived symmetric view would show both sides doing the same thing, and for
+  anything whose arms point at the camera). One exercise, the front dumbbell
+  raise, ships with no front view at all: the movement is purely sagittal, so
+  the frontal projection collapses onto the shoulders and carries nothing. Its
+  second panel is the finish of the side view instead.
+- **armScale** (`armScaleL`/`armScaleR`) — how much of its true length an arm
+  projects in the FRONT view, 1 being square to the camera. It is the only way
+  to draw an arm pointing at the viewer, because the solver bends limbs rather
+  than shortening them: without it a face pull drew two lumps beside the head.
+  The side view has no equivalent, so a frontal-plane movement (the lateral
+  raise, the three cable flys) keeps its side arm long and low rather than
+  bending it into something that reads as a curl.
 - **Plan view** (`frontPlan`) — looking down at someone on the floor. No
   gravity and no ground line; labelled "Above".
 - **Axis** — which way a dumbbell's handle runs: `lateral` (across the body),

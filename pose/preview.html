@@ -437,7 +437,7 @@ var EXERCISES = [
 { id:"facepull", tempo:[420,420,480,480], name:"Face pull",
   real:"Cable set at face height. Start with the arms extended forward, then pull toward the face with the elbows staying HIGH, finishing with the hands beside the ears and the rear shoulders squeezed. The elbows leading low turns it into a row.",
   changed:"The elbows now stay above the wrists through the whole pull and the hands finish beside the head, which is what separates a face pull from every other row. It used to share the generic ROW pose.",
-  equip:"cable", anchorAt:[132,62], anchorFront:[24,58,116,58], active:"arms",
+  equip:"cable", anchorAt:[132,62], anchorFront:[68,58,72,58], active:"arms",
   frames:[
     {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[94,66],handF:[88,68], elbowSign:-1},
     {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,63],handF:[76,65], elbowSign:-1},
@@ -1101,6 +1101,51 @@ var EXERCISES = [
     {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], elbowSign:1}
   ]},
 
+{ id:"raise_front", tempo:[420,420,520,520], name:"Front dumbbell raise",
+  real:"Dumbbells at the thighs, palms down. Raise them straight out in front to shoulder height and lower under control. Arms stay long: this is the front of the shoulder lifting the weight, not the whole body swinging it up. If your lower back is moving you are using momentum.",
+  changed:"New. The arm stays long through the whole lift and the hand travels forward and up to shoulder height, so it reads as a raise rather than a curl or a press. Palms down means the handle runs across the body, so the side view sees the bell face.\n\nThe only exercise here with NO front view, on purpose. The movement is purely sagittal: from the front the arms point straight at you and project to nothing, so at the top the hands land on the shoulders. Derived, that drew two full-length arms knotted up behind a pair of dumbbells; authored with armScale, it drew two dumbbells sitting on the shoulders, which reads as the start of a press. Neither is the exercise, and a wrong picture gets copied literally, so the second panel is the finish position of the side view instead.",
+  equip:"dumbbell", axis:"lateral", active:"arms",
+  frames:[
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[64,110],handF:[58,109], elbowSign:1},
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,95], handF:[76,94],  elbowSign:1},
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[95,74], handF:[89,73],  elbowSign:1},
+    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,95], handF:[76,94],  elbowSign:1}
+  ]},
+
+{ id:"raise_lateral", tempo:[420,420,520,520], name:"Side lateral raise",
+  real:"Dumbbells at your sides, a soft bend at the elbow that does not change. Lift out to the sides to about shoulder height, leading with the elbows, and lower slowly. It is a small movement with a light weight: if you need to heave it up, it is too heavy and your traps are doing it.",
+  changed:"New. It happens in the frontal plane, so the FRONT view is the exercise and the side view deliberately shows very little: the arm swings out toward the camera, which a side-on drawing cannot show, and the rig cannot foreshorten a limb in this view. So the side arm stays long and low and drifts. Raising it to shoulder height here would draw a bent arm holding a bell in front of the chest, which is a curl, and a wrong picture gets copied literally.",
+  equip:"dumbbell", axis:"sagittal", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[59,110],handF:[53,109], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[63,106],handF:[57,105], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[68,100],handF:[62,99],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[63,106],handF:[57,105], elbowSign:1}
+  ]},
+
+{ id:"pulldown_straight", tempo:[420,420,520,520], name:"Standing lat pulldown",
+  real:"Standing at a high pulley, bar at arms length in front of you, a small hinge at the hips and a long spine. Keep the arms STRAIGHT and pull the bar down in an arc to your thighs using the lats, then let it come back up without letting the elbows bend. Bending the elbows turns it into a triceps pushdown.",
+  changed:"New. The arms stay straight and the hands travel in an arc from overhead to the thighs, which is what separates it from a seated pulldown and from a pushdown. The reach from shoulder to hand barely changes through the whole movement.",
+  equip:"cable", active:"arms", anchorAt:[106,30], anchorFront:[56,26,84,26],
+  props:[[112,24,8,146],[92,24,28,7]],
+  frames:[
+    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[92,52], handF:[86,54], elbowSign:1},
+    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[94,80], handF:[88,82], elbowSign:1},
+    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[80,108],handF:[74,110],elbowSign:1},
+    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[94,80], handF:[88,82], elbowSign:1}
+  ]},
+
+{ id:"curl_reverse", tempo:[420,420,520,520], name:"Reverse barbell curl",
+  real:"A barbell curled with the hands facing DOWN. Same pinned elbows as any curl, but the pronated grip takes the biceps out of their strongest position and loads the forearm extensors and the brachioradialis instead. It will feel weak compared to a normal curl; that is the point, so go lighter.",
+  changed:"New. The joints move the way any curl does, because they do: what makes this a different exercise is the grip and the bar, which the rig says with the implement rather than by inventing a different arc.",
+  equip:"barbell", active:"arms",
+  frames:[
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[71,84], handF:[65,83],  elbowSign:1},
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
+  ]},
+
 { id:"farmerscarry", tempo:[340,340,340,340], name:"Farmer\'s carry",
   real:"Heavy in each hand, walk. Ribs down, shoulders pulled back and away from the ears, short deliberate steps. The load hangs; you do not shrug it. Grip usually gives out before anything else, which is the point.",
   changed:"It walks. The old pose was a static stand, which showed nothing about the exercise. Neutral grip means the handles run front to back, so the side view sees the whole dumbbell and the front view sees the bell faces.",
@@ -1338,6 +1383,50 @@ var FRONTS = {
     {hipY:107,footL:[60,163],footR:[80,163],handL:[56,90], handR:[84,90]},
     {hipY:107,footL:[60,163],footR:[80,163],handL:[34,88], handR:[106,88]},
     {hipY:107,footL:[60,163],footR:[80,163],handL:[56,90], handR:[84,90]}],
+
+  /* Face pull from the FRONT, authored because the derived view was wrong.
+     The arms point along the cable at the start, so a projection of the side
+     view foreshortened them to almost nothing: the front view barely moved
+     across the whole rep and the arms sat as two lumps beside the head. The
+     elbows flaring wide while the hands come to the ears IS the exercise, and
+     it is the only thing that separates a face pull from a row. armScale
+     carries the foreshortening: nearly end-on at the start, nearly square to
+     the camera at the finish. */
+  facepull:[
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.5,armScaleR:0.5,
+     handL:[62,70],handR:[78,70]},
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.75,armScaleR:0.75,
+     handL:[54,58],handR:[86,58]},
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:1,armScaleR:1,
+     handL:[52,50],handR:[88,50]},
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.75,armScaleR:0.75,
+     handL:[54,58],handR:[86,58]}],
+
+  /* Standing lat pulldown from the FRONT, authored rather than derived: the
+     derivation put the hands at a fixed width and bent the elbows to reach
+     them, which is a picture of a triceps pushdown and flatly contradicts the
+     one cue this exercise has. The arms are long throughout; halfway down they
+     point at the camera, so they project SHORT rather than bent, which is what
+     armScale is for. */
+  pulldown_straight:[
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.9,armScaleR:0.9,
+     handL:[58,40],handR:[82,40]},
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.3,armScaleR:0.3,
+     handL:[55,84],handR:[85,84]},
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:1,armScaleR:1,
+     handL:[52,110],handR:[88,110]},
+    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.3,armScaleR:0.3,
+     handL:[55,84],handR:[85,84]}],
+
+  /* Side lateral raise from the FRONT. This is the whole exercise: it happens
+     in the frontal plane, so the side view sees it end-on and shows nothing.
+     No authored elbows, because they swing far enough that interpolating them
+     as points stretches the upper arm past its length halfway up. */
+  raise_lateral:[
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[50,108],handR:[90,108]},
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[32,96], handR:[108,96]},
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[24,78], handR:[116,78]},
+    {hipY:107,footL:[60,163],footR:[80,163],handL:[32,96], handR:[108,96]}],
 
   // Pallof press from the front. Hands together at the sternum pressing
   // straight out, and the shoulders staying square to the camera IS the
@@ -1762,6 +1851,7 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 // geometry and differ only in what the implement does, which is why the
 // equipment axis matters as much as the joints.
 [{id:'skierg',stance:8,grip:13},
+ {id:'curl_reverse',stance:8,grip:18},
  {id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
  {id:'chinup', stance:8, grip:12},{id:'invertedrow',stance:8,grip:18},
  {id:'platepinch',stance:8,grip:20},{id:'hangingkneeraise',stance:8,grip:19},
@@ -1772,7 +1862,7 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
  {id:'farmerscarry',stance:8,grip:20},{id:'burpee',stance:10,grip:16},
  {id:'shrug',   stance:8, grip:20},
  {id:'deadhang',stance:8, grip:19},{id:'dip',          stance:8, grip:14},
- {id:'pulldown',stance:9, grip:24},{id:'facepull',     stance:9, grip:15},
+ {id:'pulldown',stance:9, grip:24},
  {id:'press_incline',stance:9,grip:20},{id:'triceps_ext',stance:8,grip:5},
  {id:'curl_bicep',stance:8,grip:13},{id:'curl_hammer',  stance:8, grip:13},
  {id:'curl_21s', stance:8, grip:14},{id:'curl_cable_single',stance:9,grip:16}

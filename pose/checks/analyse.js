@@ -368,6 +368,83 @@ EX.forEach(function(ex){
     check(ex.id,'the torso folds over the slam rather than staying upright', ex.frames[2].torso>40,
       'torso '+ex.frames[2].torso);
   }
+  if(ex.id==='facepull'){
+    // The front view is the exercise: elbows flaring wide while the hands come
+    // to the ears is the only thing separating a face pull from a row. It was
+    // derived from the side, which foreshortened the arms to nothing and drew
+    // a front view that barely moved across the whole rep.
+    var FP=ex.front||[];
+    check(ex.id,'the front view is authored, not projected from the side',
+      FP.length>2 && FP[0].armScaleL!==undefined,
+      FP.length?'no armScale, so it is a side projection':'no front view');
+    check(ex.id,'the hands separate as they come to the ears',
+      FP.length>2 && (FP[2].handR[0]-FP[2].handL[0])>(FP[0].handR[0]-FP[0].handL[0])+14,
+      FP.length>2?('spread '+(FP[0].handR[0]-FP[0].handL[0])+' -> '+(FP[2].handR[0]-FP[2].handL[0])):'no front view');
+    check(ex.id,'and they finish higher than they started',
+      FP.length>2 && FP[2].handL[1]<FP[0].handL[1]-12,
+      FP.length>2?('hand y '+FP[0].handL[1]+' -> '+FP[2].handL[1]):'no front view');
+    check(ex.id,'the arms are near end-on at the start and square at the finish',
+      FP.length>2 && FP[0].armScaleL<0.6 && FP[2].armScaleL>0.9,
+      FP.length>2?('armScale '+FP[0].armScaleL+' -> '+FP[2].armScaleL):'no front view');
+    // And the side view still has to keep the elbows above the wrists.
+    check(ex.id,'the hands finish beside the head, not at the chest',
+      S[2].handN.y<S[2].sh.y+4,'hand '+r(S[2].handN.y)+' shoulder '+r(S[2].sh.y));
+  }
+  if(ex.id==='raise_front'){
+    check(ex.id,'it starts at the thigh and finishes at shoulder height',
+      S[0].handN.y>S[0].hip.y-6 && Math.abs(S[2].handN.y-S[2].sh.y)<12,
+      'hand '+r(S[0].handN.y)+' -> '+r(S[2].handN.y)+', shoulder '+r(S[2].sh.y));
+    check(ex.id,'the hand travels forward, not up the body like a curl',
+      S[2].handN.x-S[0].handN.x>22,'travel '+r(S[2].handN.x-S[0].handN.x));
+    // No front view on purpose: the movement is purely sagittal, so from the
+    // front the arms project to nothing and the hands land on the shoulders.
+    check(ex.id,'it ships without a front view rather than a misleading one',
+      !ex.front, ex.front?'a front view was added back':'side view only');
+    check(ex.id,'the arm stays long: a bent one is a curl',
+      Math.min.apply(null,S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);}))>30,
+      'shortest reach '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);}))));
+  }
+  if(ex.id==='raise_lateral'){
+    // A frontal-plane movement seen from the side is end-on, so the side view
+    // SHOULD collapse. Drawing a big sagittal arc there would be a lie.
+    check(ex.id,'the side view stays put rather than swinging forward',
+      Math.abs(S[2].handN.x-S[0].handN.x)<14,'side travel '+r(S[2].handN.x-S[0].handN.x));
+    // The side rig cannot foreshorten a limb, only bend it, so an attempt to
+    // draw the arm rising end-on came out as a bent arm holding a bell at
+    // chest height: a curl. The side view therefore keeps the arm long and
+    // low and lets the front view carry the exercise.
+    var LRr=S.map(function(x){ return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y); });
+    check(ex.id,'the side arm stays long, because a bent one reads as a curl',
+      Math.min.apply(null,LRr)>26,'shortest reach '+r(Math.min.apply(null,LRr)));
+    check(ex.id,'and the side hand stays well below the shoulder',
+      Math.min.apply(null,S.map(function(x){return x.handN.y-x.sh.y;}))>18,
+      'closest the hand gets to the shoulder: '+
+      r(Math.min.apply(null,S.map(function(x){return x.handN.y-x.sh.y;}))));
+    var LR=ex.front||[];
+    check(ex.id,'the front view is where it happens: the hands go out and up',
+      LR.length>2 && (LR[2].handR[0]-LR[2].handL[0])>(LR[0].handR[0]-LR[0].handL[0])+40
+        && LR[2].handL[1]<LR[0].handL[1]-20,
+      LR.length>2?('spread '+(LR[0].handR[0]-LR[0].handL[0])+' -> '+(LR[2].handR[0]-LR[2].handL[0])):'no front view');
+  }
+  if(ex.id==='pulldown_straight'){
+    check(ex.id,'the hands travel from overhead to the thighs',
+      S[0].handN.y<S[0].sh.y-14 && S[2].handN.y>S[2].hip.y-4,
+      'hand '+r(S[0].handN.y)+' -> '+r(S[2].handN.y)+', shoulder '+r(S[0].sh.y)+', hip '+r(S[2].hip.y));
+    // The one cue this exercise has. A bending elbow is a triceps pushdown.
+    var reach=S.map(function(x){ return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y); });
+    check(ex.id,'the arms stay straight the whole way',
+      Math.max.apply(null,reach)-Math.min.apply(null,reach)<8,
+      'reach ranges '+r(Math.min.apply(null,reach))+' to '+r(Math.max.apply(null,reach)));
+    // Without a front anchor the front view drew a person standing empty
+    // handed, which is not a pulldown at all.
+    check(ex.id,'the front view has the pulley overhead, so a cable is drawn',
+      !!ex.anchorFront && ex.anchorFront[1]<40 && ex.anchorFront[3]<40,
+      ex.anchorFront?('anchor y '+ex.anchorFront[1]+' and '+ex.anchorFront[3]):'no front anchor');
+    var PD=ex.front||[];
+    check(ex.id,'the front view does not bend the elbows either',
+      PD.length>2 && PD[0].armScaleL!==undefined,
+      PD.length?'front view is a side projection, which bends them to reach a fixed grip':'no front view');
+  }
   if(ex.id==='fly_cable_rev'){
     // It is the mirror of the chest flys, so the two things worth proving are
     // that the hands travel BACKWARD and that they finish wide, not together.
