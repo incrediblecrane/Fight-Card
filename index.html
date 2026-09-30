@@ -112,6 +112,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .addshop button{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:9px;padding:9px 15px;cursor:pointer;}\
 .clearbtn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;margin-top:10px;}\
 .banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}\
+.banner button{font:inherit;color:inherit;background:none;border:1px solid currentColor;border-radius:999px;padding:2px 10px;margin-left:6px;cursor:pointer;}\
 .resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}\
 .resume-banner .btns{display:flex;gap:8px;flex-shrink:0;}\
 .resume-banner button.go{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:8px 12px;cursor:pointer;}\
@@ -1087,8 +1088,10 @@ function applyUndo(){
 function addXp(n){ state.totalXp+=n; if(state.totalXp<0) state.totalXp=0; }
 function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(persist,1000); }
 // A page being hidden or closed may never run its timer, so a save still
-// waiting on one goes now. Nothing pending, nothing to write.
-function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); persist(); }
+// waiting on one goes now. Nothing pending, nothing to write. It may be frozen
+// or killed within moments, so it writes straight away and skips the re-read
+// that normally goes first; the next save, on being looked at again, merges.
+function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=null; saveNow=dbState==='db'; persist(); }
 
 var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
@@ -1176,7 +1179,8 @@ function dbBoot(){
   }).catch(function(e){
     if(!dbApi){ dbState='local'; render(); return; }
     dbErr=(e&&e.code)||'unavailable'; dbState='error'; render();
-    if(!bootRetried){ bootRetried=true; setTimeout(dbBoot,1000+Math.random()*500); }
+    if(!bootRetried){ bootRetried=true; setTimeout(function(){
+      if(dbState!=='error') return; dbState='loading'; render(); dbBoot(); },1000+Math.random()*500); }
   }).then(function(){ booting=false; });
 }
 
@@ -1247,7 +1251,7 @@ function dbRefresh(){
    because the document it had to remove was still being created. A save
    asked for meanwhile runs when this one is done, and lastSaved moves one
    document at a time, as each write lands. */
-var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false;
+var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, saveNow=false;
 // Retrying cannot fix these; anything else, unknown codes included, is
 // treated as transient, as the store's contract says to.
 var DB_HARD={invalid_argument:1, quota_exceeded:1, revoked:1, not_granted:1,
@@ -1256,8 +1260,8 @@ function dbSave(){
   if(!dbApi) return;
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
-  var retrying=false;
-  dbRefresh().then(function(moved){
+  var retrying=false, now=saveNow; saveNow=false;
+  (now?Promise.resolve(false):dbRefresh()).then(function(moved){
     var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[];
     Object.keys(next).forEach(function(path){
       if(lastSaved[path]!==next[path]) jobs.push(function(){
@@ -1293,10 +1297,12 @@ function dbSave(){
       saveTimer=setTimeout(persist, Math.min(30000,2000*Math.pow(2,saveAttempt++))+Math.random()*500);
     }
     render();
-  }).then(function(){
+  }).then(done,done);
+  // Either way, even if a render above threw: left busy, nothing saves again.
+  function done(){
     saveBusy=false;
     if(saveAgain){ saveAgain=false; if(!retrying) dbSave(); }
-  });
+  }
 }
 function persist(){
   saveTimer=null;

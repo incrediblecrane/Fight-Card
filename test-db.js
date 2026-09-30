@@ -586,6 +586,32 @@ srv.listen(0,async function(){
     await p.waitForTimeout(800);
   });
 
+  // A closing page may be killed within moments, so the write that flushes a
+  // pending tap cannot wait behind a round of reads first.
+  await t('a page closed while the store is slow to answer reads still sends its tap at once', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    await p.click(W); await p.waitForTimeout(300);
+    slowGetMs=3000;
+    try{
+      await hide('pagehide'); await p.waitForTimeout(500);
+      assert.strictEqual(dayWater(day),w0+1,'the write waited on a read of the store before it was sent');
+    }finally{ slowGetMs=0; }
+    await p.waitForTimeout(3200);
+  });
+
+  await t('one render that throws during a save does not stop every later save', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    await p.click(W); await p.waitForTimeout(200);
+    await p.evaluate(function(){ var g=document.getElementById; window.__boom=true;
+      document.getElementById=function(id){ if(window.__boom && id==='app') throw new Error('render broke'); return g.apply(document,arguments); }; });
+    await p.waitForTimeout(1500);
+    await p.evaluate(function(){ window.__boom=false; });
+    await p.click(W); await p.waitForTimeout(4500);
+    // The throw was this check's own doing, not a page error.
+    for(var i=errs.length-1;i>=0;i--) if(/render broke/.test(errs[i])) errs.splice(i,1);
+    assert.strictEqual(dayWater(day),w0+2,'saving stopped for good after one render threw: '+dayWater(day));
+  });
+
   console.log('\nA STORE THAT FAILS TO ANSWER IS NOT MISTAKEN FOR NO STORE');
   await t('a failed read at load offers Retry, takes no taps and never republishes', async function(){
     await go(); var day=await today();
@@ -612,6 +638,36 @@ srv.listen(0,async function(){
     await go();
     assert.strictEqual(loaded,await waterCount(),'after Retry the page does not show what the store holds');
     assert.strictEqual(dayWater(day),4,'the store changed');
+  });
+
+  var failLoad=async function(){
+    failNext.length=0; setDelays.length=0;
+    failNext.push({op:'coll',match:'days',code:'unavailable'});
+    await p.goto(url);
+    await p.waitForSelector('[data-action="retryload"]');
+  };
+  await t('Retry looks like part of the banner, not a bare browser control', async function(){
+    await failLoad();
+    var look=await p.evaluate(function(){
+      var b=document.querySelector('[data-action="retryload"]'), cs=getComputedStyle(b), bs=getComputedStyle(b.parentNode);
+      return {font:cs.fontFamily, color:cs.color, banner:bs.color, bg:cs.backgroundColor}; });
+    assert.ok(/Plex Mono/.test(look.font),'Retry is in the browser default font: '+look.font);
+    assert.strictEqual(look.color,look.banner,'Retry is not in the banner colour');
+    assert.strictEqual(look.bg,'rgba(0, 0, 0, 0)','Retry has the browser default fill');
+    await settle();
+  });
+
+  await t('while the page retries a failed load on its own it says so, not Retry', async function(){
+    await failLoad();
+    slowGetMs=2500;
+    try{
+      var said=await p.waitForFunction(function(){ return /loading your data/.test(document.body.innerText); },null,{timeout:4000})
+        .then(function(){ return true; },function(){ return false; });
+      assert.ok(said,'the banner still said it could not load while it was retrying');
+      assert.ok(!(await p.locator('[data-action="retryload"]').count()),'Retry was offered while a retry was already running');
+    }finally{ slowGetMs=0; }
+    await settle();
+    assert.ok(!(await p.locator('[data-action="retryload"]').count()),'Retry is still up after the retry loaded');
   });
 
   console.log("\nWHERE YOU ARE IN THE APP BELONGS TO THIS DEVICE, NOT THE RECORD");
