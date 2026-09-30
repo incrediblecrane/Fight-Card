@@ -1,6 +1,6 @@
 var http=require('http'),fs=require('fs'),assert=require('assert');
-var {chromium}=require('/home/user/Fight-Card/node_modules/playwright');
-var doc=fs.readFileSync('/tmp/publish.html','utf8');
+var env=require('./test-env.js');
+var doc=env.readDoc();
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'
  +'.then(function(){setTimeout(function(){location.reload();},0);});}};'
  +'window.claude={use:function(n){return Promise.resolve(n==="artifact"?ns:null);}};})();<\/script>';
@@ -10,7 +10,7 @@ var srv=http.createServer(function(q,r){
   r.setHeader('content-type','text/html; charset=utf-8');r.setHeader('content-length',Buffer.byteLength(out));r.end(out);
 });
 srv.listen(0,async function(){
-  var b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  var b=await env.launch();
   var p=await b.newPage({viewport:{width:420,height:900}});
   p.setDefaultTimeout(9000);
   var errs=[]; p.on('pageerror',e=>errs.push(e.message));

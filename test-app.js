@@ -6,11 +6,11 @@
 // Testing on file:// hides that entirely, because persist() returns early at
 // `if(!window.claude)`. This harness stubs the capability faithfully instead.
 //
-// Usage: node test-app.js   (expects /tmp/publish.html from build-publish.js)
+// Usage: node test-app.js   (expects the published document from build-publish.js)
 var http=require('http'), fs=require('fs'), assert=require('assert');
-var {chromium}=require('./node_modules/playwright');
+var env=require('./test-env.js');
 
-var doc=fs.readFileSync(process.argv[2]||'/tmp/publish.html','utf8');
+var doc=(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
 
 /* A warm-up whose ONLY entries are light sets at a weight. There is nothing to
    plot on a minutes chart, and reading the personal best off an empty series
@@ -58,7 +58,7 @@ function bad(label,e){ fails++; console.log('  FAIL  '+label+'\n        '+e.mess
 
 server.listen(0, async function(){
   var URL='http://127.0.0.1:'+server.address().port+'/';
-  var b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  var b=await env.launch();
   var ctx=await b.newContext({viewport:{width:420,height:900}});
   var p=await ctx.newPage(), errs=[];
   ctx.setDefaultTimeout(8000);

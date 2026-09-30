@@ -4,8 +4,8 @@
 // document itself does not change. That last part is the whole point: code and
 // data are no longer the same file.
 var http=require('http'),fs=require('fs'),assert=require('assert');
-var {chromium}=require('/home/user/Fight-Card/node_modules/playwright');
-var doc=fs.readFileSync('/tmp/publish.html','utf8');
+var env=require('./test-env.js');
+var doc=env.readDoc();
 
 // The stub store lives in the harness, not the page, so it outlives reloads.
 var store={};
@@ -113,8 +113,15 @@ var srv=http.createServer(function(q,r){
 });
 
 srv.listen(0,async function(){
-  var b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
-  var p=await b.newPage({viewport:{width:420,height:900},hasTouch:true});
+  var b=await env.launch();
+  // The page runs well east of UTC by default, so for half of every day its
+  // date is not the UTC date; a harness that confuses the two fails here.
+  var p=await b.newPage({viewport:{width:420,height:900},hasTouch:true,
+    timezoneId:process.env.FC_TZ||'Pacific/Kiritimati'});
+  // FC_THROTTLE=4 runs the page on a quarter of the CPU, which is how the
+  // stale-handle flake showed up on a slower machine.
+  if(process.env.FC_THROTTLE){ var cdp=await p.context().newCDPSession(p);
+    await cdp.send('Emulation.setCPUThrottlingRate',{rate:+process.env.FC_THROTTLE}); }
   var errs=[]; p.on('pageerror',function(e){errs.push(e.message);});
   p.setDefaultTimeout(8000);
   var fails=0, ok=function(m){console.log('  PASS  '+m);},
@@ -123,13 +130,30 @@ srv.listen(0,async function(){
   var url='http://127.0.0.1:'+srv.address().port+'/';
   // A seed can carry an in-flight session, which opens on the session view
   // rather than the tabs. Get to Today before touching the water card.
-  var toToday=async function(){
-    var back=await p.$('[data-action="cancelsession"]');
-    if(back){ await back.click(); await p.waitForTimeout(400); }
-    var tab=await p.$('[data-action="tab"][data-tab="today"]');
-    if(tab){ await tab.click(); await p.waitForTimeout(400); }
+  // Locators, not element handles: a handle taken while the migration save is
+  // re-rendering points at a node that is gone by the time it is clicked.
+  var tap=async function(sel){
+    var l=p.locator(sel).first(); if(!(await l.count())) return false;
+    await l.click(); return true;
   };
-  var go=async function(){ await p.goto(url); await p.waitForTimeout(900); await toToday(); };
+  var toToday=async function(){
+    if(await tap('[data-action="cancelsession"]')) await p.waitForTimeout(400);
+    if(await tap('[data-action="tab"][data-tab="today"]')) await p.waitForTimeout(400);
+  };
+  // Loaded means the store has answered and the writes that follow a load
+  // (seeding, a migration) have stopped, not that a fixed time has passed.
+  var settle=async function(){
+    await p.waitForFunction(function(){
+      return !/loading your data/.test(document.body.innerText) && !(window.__db && window.__db.inflight);
+    });
+    for(var n=-1,k=0; k<40 && n!==calls.set+calls.del; k++){ n=calls.set+calls.del; await p.waitForTimeout(250); }
+  };
+  var go=async function(){ await p.goto(url); await settle(); await toToday(); };
+  // The day the APP is on: local to the page, which runs in a timezone of its
+  // own, so never the harness's UTC date.
+  var today=function(){ return p.evaluate(function(){
+    var d=new Date(), z=function(n){ return (n<10?'0':'')+n; };
+    return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }); };
   var text=function(){ return p.evaluate(function(){ return document.body.innerText; }); };
   var water=async function(n){
     for(var i=0;i<n;i++){
@@ -203,7 +227,7 @@ srv.listen(0,async function(){
     // The store hands back frozen bodies. If the app keeps one as its own
     // state, `today.water = n` is a silent no-op and the tap does nothing.
     await go();
-    var day=(new Date()).toISOString().slice(0,10);
+    var day=await today();
     calls.set=0;
     var moved=await p.evaluate(function(){
       var c=document.querySelectorAll('.card');
@@ -233,15 +257,14 @@ srv.listen(0,async function(){
     // State is not reachable from outside the app, so assert the observable
     // consequence instead: every kind of it can still be changed after a load.
     await go();
-    var day=(new Date()).toISOString().slice(0,10);
+    var day=await today();
     calls.set=0;
     await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1700);
     assert.ok(store['days/'+day] && store['days/'+day].water>0,'a day could not be changed');
     await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(500);
-    var add=await p.$('[data-action="addmeal"]');
-    if(add){
+    if(await p.locator('[data-action="addmeal"]').count()){
       var planBefore=Object.keys(store).filter(function(k){return k.indexOf('plan/')===0;}).length;
-      await add.click(); await p.waitForTimeout(1700);
+      await tap('[data-action="addmeal"]'); await p.waitForTimeout(1700);
       var planAfter=Object.keys(store).filter(function(k){return k.indexOf('plan/')===0;}).length;
       assert.strictEqual(planAfter,planBefore+1,'a meal could not be planned');
     }
@@ -434,9 +457,8 @@ srv.listen(0,async function(){
   });
 
   await t('undo puts the document back', async function(){
-    var undo=await p.$('[data-action="undo"]');
-    assert.ok(undo,'no undo offer');
-    await undo.click(); await p.waitForTimeout(1800);
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer');
+    await p.waitForTimeout(1800);
     var n=Object.keys(store).filter(function(k){return k.indexOf('sauna/')===0;}).length;
     assert.ok(n>0,'undo did not restore a document');
   });
@@ -448,7 +470,7 @@ srv.listen(0,async function(){
     assert.ok(live,'could not read the water card before shipping');
     // Simulate shipping a code change: the document is replaced with one whose
     // embedded seed is the ORIGINAL data, exactly as a publish from the repo is.
-    doc=fs.readFileSync('/tmp/publish.html','utf8');
+    doc=env.readDoc();
     await go();
     var afterShip=await waterCount();
     assert.strictEqual(afterShip,live,'the stale seed overwrote the store: '+live+' became '+afterShip);
@@ -462,8 +484,7 @@ srv.listen(0,async function(){
     var body=await text();
     assert.ok(/loading your data/.test(body),'no loading state was shown:\n'+body.slice(0,200));
     var wasSet=calls.set;
-    var btn=await p.$('[data-action="water"][data-d="1"]');
-    if(btn){ await btn.click(); await p.waitForTimeout(300); }
+    if(await tap('[data-action="water"][data-d="1"]')) await p.waitForTimeout(300);
     assert.strictEqual(calls.set,wasSet,'a tap during the load reached the store anyway');
     await p.evaluate(function(){ return fetch('/db/slow',{method:'POST',body:JSON.stringify({ms:0})}); });
     await p.waitForTimeout(2400);

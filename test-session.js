@@ -1,11 +1,11 @@
 // Covers the four things a session now has to get right: the warm-up and
 // cool-down steps, the per-dumbbell stipulation on the weight a set records,
 // multi-stint sauna sessions, and the shrug's new rig.
-// Run against /tmp/publish.html, with a faithful artifact stub: publish saves
+// Run against the published document, with a faithful artifact stub: publish saves
 // AND reloads, which is the thing that used to lose state silently.
 var http=require('http'),fs=require('fs'),assert=require('assert');
-var {chromium}=require('/home/user/Fight-Card/node_modules/playwright');
-var doc=fs.readFileSync('/tmp/publish.html','utf8');
+var env=require('./test-env.js');
+var doc=env.readDoc();
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'
  +'.then(function(){setTimeout(function(){location.reload();},0);});}};'
  +'window.claude={use:function(n){return Promise.resolve(n==="artifact"?ns:null);}};})();<\/script>';
@@ -16,7 +16,7 @@ var srv=http.createServer(function(q,r){
 });
 
 srv.listen(0,async function(){
-  var b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+  var b=await env.launch();
   var p=await b.newPage({viewport:{width:420,height:900},hasTouch:true});
   var errs=[]; p.on('pageerror',e=>errs.push(e.message));
   p.setDefaultTimeout(8000);
