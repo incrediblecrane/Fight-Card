@@ -702,6 +702,105 @@ srv.listen(0,async function(){
     await toToday();
   });
 
+  console.log('\nA RENDER DOES NOT UNDO WHAT IS ON SCREEN');
+  // Open a session on a lift that has kg, reps and a rig to animate.
+  var toLift=async function(){
+    await toToday();
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(300);
+    await p.locator('[data-action="startworkout"]').first().click(); await p.waitForTimeout(600);
+    for(var k=0;k<12;k++){
+      var here=await p.evaluate(function(){
+        var f=document.getElementById('fig-live');
+        return !!(f && f.getAttribute('data-rig') && document.querySelector('input[id^="log-w-"]'));
+      });
+      if(here) break;
+      await p.click('[data-action="nextslide"]'); await p.waitForTimeout(250);
+    }
+    return p.evaluate(function(){ var w=document.querySelector('input[id^="log-w-"]'); return w?w.id.slice(6):null; });
+  };
+  var leave=async function(){
+    if(await tap('[data-action="cancelsession"]')) await p.waitForTimeout(300);
+    if(await tap('[data-action="discardsession"]')) await p.waitForTimeout(300);
+    await settle(); await toToday();
+  };
+
+  await t('half-typed fields on Today survive a tap that re-renders the page', async function(){
+    await go();
+    await p.fill('#sauna-mins','12');
+    await p.selectOption('#sauna-pos','Bottom');
+    await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1600);
+    var got=await p.evaluate(function(){ return [document.getElementById('sauna-mins').value, document.getElementById('sauna-pos').value]; });
+    assert.deepStrictEqual(got,['12','Bottom'],'a render wiped them: '+JSON.stringify(got));
+    await p.click('[data-action="water"][data-d="-1"]'); await p.waitForTimeout(1600);
+  });
+
+  await t('a field whose change the app already acted on is drawn from state, not put back', async function(){
+    await go(); var day=await today();
+    // A date past today is refused and the page goes back to today; putting
+    // the typed value back would show a day that is not the one being logged.
+    await p.evaluate(function(){ var el=document.getElementById('logdate'); el.value='2099-01-01';
+      el.dispatchEvent(new Event('change',{bubbles:true})); });
+    await p.waitForTimeout(200);
+    assert.strictEqual(await p.inputValue('#logdate'),day,'the refused date stayed in the field');
+  });
+
+  await t('kg and reps typed for the next set survive the save that follows a logged set', async function(){
+    await go(); var ex=await toLift();
+    assert.ok(ex,'no lift slide with a kg field');
+    await p.fill('#log-w-'+ex,'60'); await p.fill('#log-v-'+ex,'8');
+    await p.click('[data-action="logset"][data-ex="'+ex+'"]'); await p.waitForTimeout(200);
+    var cleared=await p.evaluate(function(ex){ return [document.getElementById('log-w-'+ex).value, document.getElementById('log-v-'+ex).value]; },ex);
+    assert.deepStrictEqual(cleared,['',''],'the fields a logged set used were kept: '+JSON.stringify(cleared));
+    await p.fill('#log-w-'+ex,'62.5'); await p.fill('#log-v-'+ex,'6');
+    await p.waitForTimeout(2500);
+    var st=await p.evaluate(function(ex){ var a=document.activeElement;
+      return [document.getElementById('log-w-'+ex).value, document.getElementById('log-v-'+ex).value, a&&a.id]; },ex);
+    assert.deepStrictEqual(st,['62.5','6','log-v-'+ex],'the save wiped the next set: '+JSON.stringify(st));
+    // A set refused for want of reps keeps the kg that was typed.
+    await p.fill('#log-v-'+ex,'');
+    await p.click('[data-action="logset"][data-ex="'+ex+'"]'); await p.waitForTimeout(200);
+    assert.strictEqual(await p.inputValue('#log-w-'+ex),'62.5','a refused set cleared the kg');
+    await leave();
+  });
+
+  await t('the saving note is a fixed pill that never moves the page', async function(){
+    await go(); var day=await today();
+    setDelays.push({op:'set',match:'days/'+day,ms:1500});
+    var tops=await p.evaluate(function(){
+      var hud=document.querySelector('.hud'), out=[hud.getBoundingClientRect().top];
+      document.querySelector('[data-action="water"][data-d="1"]').click();
+      return new Promise(function(res){ var n=0, iv=setInterval(function(){
+        var h=document.querySelector('.hud'); out.push(h?h.getBoundingClientRect().top:-1);
+        var pill=document.querySelector('.savepill.on');
+        if(pill) out.pill=getComputedStyle(pill).position;
+        if(++n>=60){ clearInterval(iv); res({tops:out, pill:out.pill||null}); } },50); }); });
+    assert.ok(tops.tops.every(function(x){ return x===tops.tops[0]; }),'the page moved: '+tops.tops.join(','));
+    assert.strictEqual(tops.pill,'fixed','no fixed saving pill was shown during a slow save');
+    await settle();
+    assert.ok(!(await p.$('.savepill.on')),'the pill stayed up after the save landed');
+    await p.click('[data-action="water"][data-d="-1"]'); await settle();
+  });
+
+  await t('the rig keeps its place in the rep across a render, at about 30fps', async function(){
+    await go(); var ex=await toLift();
+    assert.ok(ex,'no rigged lift slide');
+    await p.waitForTimeout(1300);
+    var r=await p.evaluate(function(ex){
+      var u0=parseFloat(document.getElementById('fig-live').getAttribute('data-u'));
+      document.querySelector('[data-action="logset"][data-ex="'+ex+'"]').click();   // empty: renders, logs nothing
+      return new Promise(function(res){ setTimeout(function(){
+        var u1=parseFloat(document.getElementById('fig-live').getAttribute('data-u'));
+        var n=0, ob=new MutationObserver(function(){ n++; });
+        ob.observe(document.getElementById('fig-live'),{childList:true});
+        setTimeout(function(){ ob.disconnect(); res({u0:u0,u1:u1,paints:n}); },1000);
+      },80); });
+    },ex);
+    assert.ok(r.u0>0.3,'the phase never advanced: '+r.u0);
+    assert.ok(r.u1>=r.u0 && r.u1-r.u0<0.15,'a render moved the rep from '+r.u0+' to '+r.u1);
+    assert.ok(r.paints>=15 && r.paints<=36,r.paints+' redraws in a second');
+    await leave();
+  });
+
   console.log('\nTWO VIEWS OPEN AT ONCE');
   await t('water tapped in one view and smoking in another both survive', async function(){
     await go(); var day=await today();

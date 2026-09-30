@@ -112,6 +112,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .addshop button{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:9px;padding:9px 15px;cursor:pointer;}\
 .clearbtn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;margin-top:10px;}\
 .banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}\
+.savepill{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:20;pointer-events:none;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);background:var(--surface-raised);border:1px solid var(--line);border-radius:999px;padding:4px 12px;opacity:0;transition:opacity .2s;}\
+.savepill.on{opacity:1;}\
 .banner button{font:inherit;color:inherit;background:none;border:1px solid currentColor;border-radius:999px;padding:2px 10px;margin-left:6px;cursor:pointer;}\
 .resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}\
 .resume-banner .btns{display:flex;gap:8px;flex-shrink:0;}\
@@ -660,6 +662,7 @@ function readStint(){
   var mins=parseFloat(minsEl?minsEl.value:'');
   if(isNaN(mins)||mins<=0) return false;
   saunaDraft.push({mins:mins, position:posEl?posEl.value:'Top'});
+  consumed(['sauna-mins','sauna-pos']);
   return true;
 }
 function saunaStintText(x){
@@ -820,7 +823,21 @@ var poseFlip=false;
 var poseTimer=null;
 var saveTimer=null;
 var artifactApi=null;
-var saving=false;
+// A save in flight shows as a pill fixed to the bottom of the screen, and only
+// once it has taken more than half a second: a note in the page flow pushed
+// everything down and back up after every tap. The pill is updated in place,
+// so saving never costs a render.
+var savingShown=false, savingTimer=null;
+function setSaving(on){
+  if(savingTimer){ clearTimeout(savingTimer); savingTimer=null; }
+  if(on) savingTimer=setTimeout(function(){ savingTimer=null; savingShown=true; paintSaving(); },500);
+  else { savingShown=false; paintSaving(); }
+}
+function paintSaving(){ var el=document.getElementById('savepill'); if(el) el.className='savepill'+(savingShown?' on':''); }
+// Ids of fields a tap has just read and acted on, which the next render draws
+// afresh instead of putting back what was typed in them.
+var clearOnRender={};
+function consumed(ids){ ids.forEach(function(id){ clearOnRender[id]=1; }); }
 var touchX=null;
 
 /* ---------- storage ------------------------------------------------------
@@ -1272,7 +1289,7 @@ function dbSave(){
         return dbDel(path).then(function(){ delete lastSaved[path]; }); });
     });
     if(!jobs.length){ if(moved) render(); return; }
-    saving=true; render();
+    setSaving(true); if(moved) render();
     // Almost every save is one or two documents, but a migration dirties every
     // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
     // avoid, and a save has no more right to that burst than seeding does.
@@ -1281,7 +1298,7 @@ function dbSave(){
       return Promise.all(jobs.slice(i,i+DB_SEED_BATCH).map(function(run){ return run(); }))
         .then(function(){ return batch(i+DB_SEED_BATCH); });
     }
-    return batch(0).then(function(){ saving=false; render(); });
+    return batch(0).then(function(){ setSaving(false); });
   }).then(function(){
     saveAttempt=0;
     if(dbErr){ dbErr=null; dbErrHard=false; render(); }
@@ -1290,7 +1307,7 @@ function dbSave(){
     // save carries it. A transient refusal gets that next save on its own,
     // backing off 2s, 4s, 8s up to 30s; one that retrying cannot fix waits
     // for the next change and says so.
-    saving=false; dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr];
+    setSaving(false); dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr];
     if(!dbErrHard){
       retrying=true;
       if(saveTimer) clearTimeout(saveTimer);
@@ -1313,12 +1330,12 @@ function persist(){
   // and it holds the truth, so publishing the seed would be the worst answer.
   if(dbState==='loading'||dbState==='error') return;
   if(!window.claude || !window.claude.use){ render(); return; }
-  saving=true; render();
+  setSaving(true);
   claude.use('artifact').then(function(ns){
     artifactApi=ns;
-    if(!ns){ saving=false; render(); return; }
-    return ns.publish(fullDocument(state)).then(function(){ saving=false; }).catch(function(err){
-      saving=false;
+    if(!ns){ setSaving(false); render(); return; }
+    return ns.publish(fullDocument(state)).then(function(){ setSaving(false); }).catch(function(err){
+      setSaving(false);
       if(err && err.code==='conflict'){ return; }
       render();
     });
@@ -1666,6 +1683,7 @@ function logSet(exId,type){
   }
   if(!state.activeSession.logs[exId]) state.activeSession.logs[exId]=[];
   state.activeSession.logs[exId].push(entry);
+  consumed(['log-v-','log-w-','log-opt-','log-lvl-','log-machine-','log-work-','log-rest-'].map(function(k){ return k+exId; }));
 }
 function undoSet(exId){ var arr=state.activeSession && state.activeSession.logs[exId]; if(arr&&arr.length) arr.pop(); }
 /* What was supersetted, kept for the finished log. The sets themselves already
@@ -2096,7 +2114,10 @@ function figureSVG(poseKey,phase,equip){
     '<circle cx="'+s.headC.x+'" cy="'+s.headC.y+'" r="11" fill="var(--text)"/>'+
   '</svg>';
 }
-var rigRaf=null;
+// Where in the rep the figure is. It belongs to the rig, not to the DOM node
+// drawing it, so a render (a save, a tap) carries on mid-rep instead of
+// snapping back to the start. Only moving to another rig starts it over.
+var rigRaf=null, rigT0=0, rigLastId=null;
 function startPoseLoop(){
   stopPoseLoop();
   var w=document.getElementById('fig-live');
@@ -2105,17 +2126,23 @@ function startPoseLoop(){
     // A rigged exercise animates continuously through the whole rep rather than
     // flipping between two stills, because the path between the positions is
     // most of what a form reminder is for.
-    var t0=performance.now();
+    if(rigId!==rigLastId){ rigT0=performance.now(); rigLastId=rigId; }
+    // About 30fps: the motion reads the same and it is half the work on a phone.
+    var last=-1e9;
     var step=function(now){
       var el=document.getElementById('fig-live');
       if(!el || el.getAttribute('data-rig')!==rigId){ rigRaf=null; return; }
-      var u=((now-t0)/2400)%1;
-      el.innerHTML=rigSVG(rigId,u);
-      var fr=document.getElementById('fig-live-front');
-      if(fr) fr.innerHTML=rigFrontSVG(rigId,u);
+      if(now-last>=30){
+        last=now;
+        var u=(Math.max(0,now-rigT0)/2400)%1;
+        el.innerHTML=rigSVG(rigId,u); el.setAttribute('data-u',u.toFixed(3));
+        var fr=document.getElementById('fig-live-front');
+        if(fr) fr.innerHTML=rigFrontSVG(rigId,u);
+      }
       rigRaf=requestAnimationFrame(step);
     };
-    rigRaf=requestAnimationFrame(step);
+    // Straight away, at the phase it was at, not a frame later from u=0.
+    step(performance.now());
     return;
   }
   poseTimer=setInterval(function(){
@@ -2738,7 +2765,7 @@ function bodyContent(){
   return '<div class="wrap'+(backfilling()?' backfilling':'')+'">'+
       (dbState==='loading'?'<div class="banner">loading your data&hellip;</div>':'')+
       (dbState==='error'?'<div class="banner">Could not load your saved data ('+esc(dbErr||'unavailable')+'). Changes are paused until it loads. <button data-action="retryload">Retry</button></div>':'')+
-      (saving?'<div class="banner">saving&hellip;</div>':'')+
+      '<div id="savepill" class="savepill'+(savingShown?' on':'')+'" role="status">saving&hellip;</div>'+
       (dbErr&&dbState==='db'?'<div class="banner">'+(dbErrHard?
         'Your last change could not be saved ('+esc(dbErr)+').':
         'Trouble reaching your saved data ('+esc(dbErr)+'). Trying again.')+'</div>':'')+
@@ -2822,7 +2849,25 @@ function render(){
     keep={id:act.id, start:null, end:null};
     try{ keep.start=act.selectionStart; keep.end=act.selectionEnd; }catch(err){}
   }
+  // Nor must it throw away what was typed but not yet read: a field whose value
+  // is not the one it was drawn with is put back, unless a tap just used it.
+  var typed={};
+  [].forEach.call(app.querySelectorAll('input[id],textarea[id],select[id]'),function(el){
+    if(clearOnRender[el.id]) return;
+    // A select drawn with no option marked shows its first one.
+    var dflt=-1; [].forEach.call(el.options||[],function(o,i){ if(o.defaultSelected) dflt=i; });
+    var dirty=el.tagName==='SELECT'?el.selectedIndex!==(dflt<0&&el.options.length?0:dflt)
+      :(el.type==='checkbox'||el.type==='radio')?el.checked!==el.defaultChecked:el.value!==el.defaultValue;
+    if(dirty) typed[el.id]={tag:el.tagName, type:el.type, value:el.value, checked:el.checked};
+  });
+  clearOnRender={};
   app.innerHTML=bodyContent();
+  Object.keys(typed).forEach(function(id){
+    var el=document.getElementById(id), was=typed[id];
+    if(!el || el.tagName!==was.tag || el.type!==was.type) return;
+    if(el.type==='checkbox'||el.type==='radio') el.checked=was.checked;
+    else if(el.tagName!=='SELECT' || [].some.call(el.options,function(o){ return o.value===was.value; })) el.value=was.value;
+  });
   if(keep){
     var back=document.getElementById(keep.id);
     if(back){
@@ -2881,6 +2926,7 @@ function onClick(e){
       // Twice in one round would give two inputs the same id, and the second
       // would never be read.
       if(box.ex.indexOf(chosen)<0) box.ex.push(chosen);
+      consumed(['ss-pick-'+ssA]);
     }
   }
   else if(action==='ssdel'){
@@ -2942,7 +2988,7 @@ function onClick(e){
       mins:stints.reduce(function(a,st){return a+st.mins;},0),
       temp:saunaTemp===''?null:parseFloat(saunaTemp),
       position:stints[0].position, stints:stints});
-    saunaDraft=[]; saunaTemp='';
+    saunaDraft=[]; saunaTemp=''; consumed(['sauna-temp']);
     today.touched=true; addXp(XP_SAUNA);   // XP is per session, not per stint
   }
   else if(action==='workout'){
@@ -2963,6 +3009,7 @@ function onClick(e){
     var titleEl=document.getElementById('lib-title'); var tagEl=document.getElementById('lib-tag'); var notesEl=document.getElementById('lib-notes');
     var title=(titleEl.value||'').trim(); if(!title) return;
     state.library.push({id:'l'+Date.now(),title:title,tag:tagEl.value,notes:(notesEl.value||'').trim()});
+    consumed(['lib-title','lib-tag','lib-notes']);
   }
   else if(action==='dellib'){ var libid=t.getAttribute('data-id'); state.library=state.library.filter(function(x){return x.id!==libid;}); }
   else if(action==='addrecipe'){
@@ -2973,6 +3020,7 @@ function onClick(e){
     if(!(rp>0)) rp=1;
     state.recipes.push({id:'r'+Date.now(),title:title2,tag:'Recipe',ingredients:ings,base:rp,portions:rp,
       instructions:(rn.value||'').trim()});
+    consumed(['rec-title','rec-ing','rec-inst','rec-portions']);
   }
   else if(action==='portions'){
     var pid=t.getAttribute('data-id'), pd=parseInt(t.getAttribute('data-d'),10);
@@ -2992,7 +3040,7 @@ function onClick(e){
     var txt=((box?box.value:shopDraft)||'').trim();
     if(!txt) return;
     state.shopExtras.push({id:'x'+Date.now(), text:txt});
-    shopDraft='';
+    shopDraft=''; consumed(['shop-add']);
   }
   else if(action==='delextra'){
     var xid=t.getAttribute('data-id');
@@ -3033,6 +3081,8 @@ function onChange(e){
   var t=e.target.closest('[data-action]');
   if(!t) return;
   var action=t.getAttribute('data-action');
+  // Its value is in state now, and the render draws it from there.
+  if(t.id) consumed([t.id]);
   if(action==='logdate'){ setLogDate(t.value); render(); return; }
   else if(action==='prepopt'){
     var pex=t.getAttribute('data-ex');
@@ -3042,7 +3092,7 @@ function onChange(e){
        second field, not in what the number means, and minutes typed before
        picking would be wiped. */
     if((prepLevelKind(prepPick[pex]||'')==='load')!==(prepLevelKind(t.value)==='load'))
-      delete prepMins[pex];
+      { delete prepMins[pex]; consumed(['log-v-'+pex]); }
     prepPick[pex]=t.value; render(); return;
   }
   // Same reason as onClick: state is about to be replaced by the store, so a
