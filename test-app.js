@@ -38,6 +38,14 @@ var SHIM='<script>(function(){var ns={publish:function(h){'+
   'window.claude={use:function(n){return Promise.resolve(n==="artifact"||n==="self"?ns:null);}};})();<\/script>';
 
 var server=http.createServer(function(req,res){
+  // /capture: publish only records the document, so a page with a fake clock
+  // is never reloaded out from under it.
+  if(req.url==='/capture'){
+    var cap=doc.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis[^>]*>/,'')
+      .replace('<body>','<body><script>window.claude={use:function(n){return Promise.resolve(n==="artifact"?'+
+        '{publish:function(h){window.__pub=h;return Promise.resolve();}}:null);}};<\/script>');
+    res.setHeader('content-type','text/html; charset=utf-8'); res.end(cap); return;
+  }
   if(req.url==='/publish'&&req.method==='POST'){
     var c=[]; req.on('data',function(x){c.push(x);});
     req.on('end',function(){ doc=Buffer.concat(c).toString('utf8'); res.end('ok'); });
@@ -211,6 +219,38 @@ server.listen(0, async function(){
       'a session must carry its START date '+start+', got: '+rows.slice(0,4).join(' / '));
     ok('a session is logged against the day it STARTED, not the day it finished');
   }catch(e){ bad('session start date',e); }
+
+  console.log('\nA TAB LEFT OPEN PAST MIDNIGHT');
+  var mctx=null, mp=null, seedOf=null, day0=null;
+  // Today mode used to hold the date string read at load, so after midnight a
+  // tap still went to yesterday, with the backfill bar claiming it was chosen.
+  try{
+    seedOf=function(d){ return JSON.parse(d.slice(d.lastIndexOf(')({')+2, d.lastIndexOf(');</'+'script>'))); };
+    day0=JSON.stringify(seedOf(doc).days['2026-09-30']||null);
+    mctx=await b.newContext({viewport:{width:420,height:900},timezoneId:'UTC'});
+    mctx.setDefaultTimeout(8000);
+    mp=await mctx.newPage(); mp.on('pageerror',function(e){errs.push(e.message);});
+    await mp.clock.install({time:new Date('2026-09-30T23:58:00Z')});
+    await mp.goto(URL+'capture'); await mp.waitForSelector('#app *');
+    var mb=await mp.$('[data-action="cancelsession"]'); if(mb){ await mb.click(); }
+    await mp.click('[data-action="tab"][data-tab="today"]');
+    assert.strictEqual(await mp.$eval('#logdate',function(e){return e.value;}),'2026-09-30');
+    await mp.clock.fastForward('05:00');
+    await mp.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); });
+    assert.strictEqual(await mp.$eval('#logdate',function(e){return e.value;}),'2026-10-01',
+      'looking at the tab again after midnight did not move the cards to the new day');
+    ok('looking at the tab again after midnight moves the cards to the new day');
+  }catch(e){ bad('past midnight, on looking again',e); }
+  try{
+    await mp.click('[data-action="water"][data-d="1"]');
+    await mp.waitForFunction(function(){ return !!window.__pub; });
+    var got=seedOf(await mp.evaluate(function(){ return window.__pub; })).days;
+    assert.ok(!(await mp.$('.backfill-bar')),'the backfill bar is up though nobody picked a day');
+    assert.strictEqual((got['2026-10-01']||{}).water,1,'the tap did not land on 2026-10-01');
+    assert.strictEqual(JSON.stringify(got['2026-09-30']||null),day0,'yesterday was written to');
+    ok('after midnight a tap lands on the new day, not yesterday');
+  }catch(e){ bad('past midnight, on the next tap',e); }
+  if(mctx) await mctx.close();
 
   if(errs.length){ fails++; console.log('\n  FAIL  page errors: '+errs.join(' | ')); }
   else console.log('\n  PASS  no page errors throughout');

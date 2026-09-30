@@ -38,6 +38,15 @@ if(data.recipes) data.recipes=data.recipes.map(function(r){
   return o;
 });
 var src=App.toString();
+// The same escaping the app applies when it saves itself, read out of App so
+// the two cannot drift: user text holding a closing script tag or a comment
+// opener must not end the inline script early.
+function helper(name){
+  var hm=src.match(new RegExp('function '+name+'\\(s\\)\\{[^\\n]*\\}'));
+  if(!hm) throw new Error('could not locate '+name+' in App');
+  return eval('('+hm[0]+')');
+}
+var scriptSafe=helper('scriptSafe'), codeSafe=helper('codeSafe');
 
 var m=src.match(/var CSS = "([\s\S]*?)";\r?\n/);
 if(!m) throw new Error('could not locate the CSS string');
@@ -65,7 +74,7 @@ var doc='<!doctype html><html><head><meta charset="utf-8">'+
   '<title>Fight Card</title>'+
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">'+
   '</head><body><div id="app"></div>'+
-  '<script>('+src+')('+JSON.stringify(data)+');<\/script></body></html>';
+  '<script>('+codeSafe(src)+')('+scriptSafe(JSON.stringify(data))+');<\/script></body></html>';
 // First positional that is neither a flag nor a flag's value.
 var out=require('./test-env.js').PUBLISH;
 for(var ai=2;ai<process.argv.length;ai++){

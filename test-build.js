@@ -63,6 +63,45 @@ async function t(name,fn){
     await load(doc); await one('the self-saved document');
   });
   await t('no page errors', function(){ assert.deepStrictEqual(errs,[],errs.join(' | ')); });
+
+  console.log('\nUSER TEXT CANNOT END THE SCRIPT');
+  // The state is inlined in a <script>. A note holding `</script` ended it
+  // early, and `<!--` then `<script` made the parser swallow the real closing
+  // tag: either way the regenerated page came up blank.
+  var NOTES=['End </script> x','<!-- a <script> b'];
+  var notesShown=async function(where){
+    await p.click('[data-action="tab"][data-tab="training"]');
+    var txt=await p.evaluate(function(){ return document.body.innerText; });
+    NOTES.forEach(function(n){ assert.ok(txt.indexOf(n)>-1,where+' lost the note '+JSON.stringify(n)); });
+  };
+  var loadQuick=async function(doc){
+    errs=[];
+    await p.setContent(doc.replace(/<link rel="stylesheet"[^>]*>/,'').replace('<body>','<body>'+STUB));
+    await p.waitForTimeout(300);
+    var n=await p.evaluate(function(){ var a=document.getElementById('app'); return a?a.children.length:-1; });
+    assert.ok(n>0,'#app is empty; page errors: '+errs.join(' | '));
+    assert.deepStrictEqual(errs,[],errs.join(' | '));
+  };
+  var built=tmp+'/notes.html';
+  await t('a build --state whose notes hold </script and <!-- loads with the notes intact', async function(){
+    var seed=JSON.parse(h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>')));
+    seed.library=[{id:'n1',title:'Close',tag:'Note',notes:NOTES[0]},{id:'n2',title:'Open',tag:'Note',notes:NOTES[1]}];
+    fs.writeFileSync(tmp+'/notes.json',JSON.stringify(seed));
+    build([built,'--state',tmp+'/notes.json']);
+    await loadQuick(fs.readFileSync(built,'utf8')); await notesShown('the build');
+  });
+  await t('the document the app writes for itself keeps them too', async function(){
+    // Typed in on a clean page, so only the app's own fullDocument writes them.
+    await loadQuick(env.readDoc());
+    await p.click('[data-action="tab"][data-tab="training"]');
+    for(var ni=0;ni<NOTES.length;ni++){
+      await p.fill('#lib-title','Note '+ni); await p.fill('#lib-notes',NOTES[ni]);
+      await p.click('[data-action="addlib"]');
+      await p.waitForFunction(function(k){ return (window.__pub||'').indexOf('Note '+k)>-1; },ni,{timeout:8000});
+    }
+    var doc=await p.evaluate(function(){ return window.__pub; });
+    await loadQuick(doc); await notesShown('the self-saved document');
+  });
   await b.close();
   fs.rmSync(tmp,{recursive:true,force:true});
   console.log(fails?('\n'+fails+' FAILING'):'\nAll build checks pass.');

@@ -124,6 +124,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .wcard h4{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
 .wcard .meta{font-size:0.78rem;color:var(--text-faint);}\
 .wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;}\
+.wcard .start:disabled{background:var(--surface-raised);color:var(--text-faint);border:1px solid var(--line);cursor:default;}\
 .story{max-width:420px;margin:0 auto;}\
 .story-bar{display:flex;gap:4px;margin-bottom:12px;}\
 .story-bar i{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;position:relative;}\
@@ -623,17 +624,19 @@ function minLogDate(){ var d=new Date(); d.setDate(d.getDate()-(BACKFILL_DAYS-1)
 var LOGDATE_KEY='fc.logDate';
 function readStoredDate(){ try{ return sessionStorage.getItem(LOGDATE_KEY); }catch(e){ return null; } }
 function writeStoredDate(v){ try{ if(v) sessionStorage.setItem(LOGDATE_KEY,v); else sessionStorage.removeItem(LOGDATE_KEY); }catch(e){} }
+// '' means today mode: follow the clock. It must not hold today's date as a
+// string, or a tab left open past midnight keeps logging to yesterday.
 function setLogDate(v){
-  logDate=(v && v>=minLogDate() && v<=realToday()) ? v : realToday();
-  writeStoredDate(logDate===realToday()?null:logDate);
-  return logDate;
+  logDate=(v && v>=minLogDate() && v<realToday()) ? v : '';
+  writeStoredDate(logDate||null);
+  return activeDate();
 }
 function activeDate(){
-  if(logDate===null) logDate=readStoredDate();
+  if(logDate===undefined) logDate=readStoredDate()||'';
   // Re-check the bounds every time: a tab left open for weeks must not keep
   // writing to a day that has fallen outside the backfill window.
-  if(!logDate || logDate>realToday() || logDate<minLogDate()) setLogDate(null);
-  return logDate;
+  if(logDate && (logDate>=realToday() || logDate<minLogDate())) setLogDate('');
+  return logDate||realToday();
 }
 function backfilling(){ return activeDate()!==realToday(); }
 // Card copy has to name the day it is actually writing to.
@@ -795,7 +798,7 @@ var viewingSession=!!ui0.viewingSession;
 var expanded={};
 var slide=ui0.slide||0;
 var progRange=ui0.progRange||14;
-var logDate=null; // null means 'not read yet'; the value lives in sessionStorage
+var logDate; // undefined means 'not read yet'; the value lives in sessionStorage
 var swipeOpen=null; // id of the row currently swiped open
 var addingExercise=false;
 var exSearch='';
@@ -1645,9 +1648,15 @@ function ensurePrep(sess){
     sess.targets.cooldown={sets:1,reps:'5-10 min'};
   }
 }
+// True when a session holding logged sets is in progress for a workout other
+// than id, which starting id would throw away.
+function sessionBusy(id){
+  var s=state.activeSession; if(!s || s.workoutId===id) return false;
+  return Object.keys(s.logs||{}).some(function(k){ return s.logs[k].length>0; });
+}
 function startWorkout(id){
   var w=WORKOUTS.filter(function(x){return x.id===id;})[0];
-  if(!w) return;
+  if(!w || sessionBusy(id)) return;
   if(!state.activeSession || state.activeSession.workoutId!==id){
     state.activeSession={workoutId:id,startedAt:activeDate(),exIds:w.plan.map(function(p){return p.ex;}),targets:{},logs:{}};
     w.plan.forEach(function(p){ state.activeSession.targets[p.ex]={sets:p.sets,reps:p.reps}; });
@@ -2220,8 +2229,12 @@ function bodyContent(){
   }
   var workoutCards=WORKOUTS.map(function(w){
     var meta=w.plan.length?(w.plan.length+' exercises'):'Build it as you go';
+    // Logged sets are never swapped out silently: finish or discard them first.
+    var busy=sessionBusy(w.id);
+    var start='<button class="start" data-action="startworkout" data-id="'+w.id+'"'+
+      (busy?' disabled title="Finish or discard the session in progress first">Finish current first':'>Start')+'</button>';
     return '<div class="wcard"><div class="row"><div><h4>'+esc(w.title)+'</h4><div class="meta">'+meta+' &middot; '+esc(w.tag)+'</div></div>'+
-      '<button class="start" data-action="startworkout" data-id="'+w.id+'">Start</button></div></div>';
+      start+'</div></div>';
   }).join('');
   var trainingView =
     '<div class="sectiontitle">Overview</div>'+trainingItems+
@@ -3158,6 +3171,15 @@ function onTouchEnd(e){
   else if(dx>0 && slide>0){ slide--; render(); }
 }
 
+// Inline script text ends at the first closing script tag, and an HTML comment
+// opener followed later by an opening script tag makes the parser swallow the
+// real closing tag. User text in the JSON can hold either, so every < in it
+// goes out as \u003c, which parses back to the same string. The code gets the
+// same two sequences with the < written as \x3C, which JS strings and regexes
+// read as the same text.
+// build-publish.js reads both helpers out of here, so the two never drift.
+function scriptSafe(s){ return s.replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029'); }
+function codeSafe(s){ return s.replace(/<(!--|\/script)/gi,'\\x3C$1'); }
 function fullDocument(data){
   // The parse cache is derived, so it does not belong in saved state on this
   // path either: storing it froze one version of the parser into the data.
@@ -3169,7 +3191,7 @@ function fullDocument(data){
   '<title>Fight Card</title>'+
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">'+
   '</head><body><div id="app"></div>'+
-  '<script>('+App.toString()+')('+JSON.stringify(data)+');<\/script>'+
+  '<script>('+codeSafe(App.toString())+')('+scriptSafe(JSON.stringify(data))+');<\/script>'+
   '</body></html>';
 }
 
@@ -3188,7 +3210,8 @@ function boot(){
   // the meantime, so re-read and merge.
   document.addEventListener('visibilitychange',function(){
     if(document.visibilityState==='hidden') flushSave();
-    else if(dbState==='db') dbSave();
+    // The day may have turned while nobody was looking, so draw it again.
+    else { render(); if(dbState==='db') dbSave(); }
   });
   window.addEventListener('pagehide',flushSave);
   // A session already in flight when this shipped has no prep steps; give it

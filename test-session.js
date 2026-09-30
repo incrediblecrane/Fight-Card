@@ -1161,6 +1161,33 @@ srv.listen(0,async function(){
     await leaveSession();
   });
 
+  console.log('\nA SESSION IN PROGRESS');
+
+  await t('starting another workout does not throw away logged sets', async function(){
+    // Start used to replace the in-flight session outright, with no undo.
+    await go(); await leaveSession(); await startWorkout('Pull');
+    assert.ok(await toSlide('Bicep curl'),'never reached the bicep curl');
+    await p.fill('#log-w-curl_bicep','20'); await p.fill('#log-v-curl_bicep','10');
+    await p.click('[data-action="logset"]'); await settle();
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
+    var push=function(){ return p.evaluateHandle(function(){
+      var cards=[].slice.call(document.querySelectorAll('.wcard'));
+      for(var i=0;i<cards.length;i++){ var h=cards[i].querySelector('h4');
+        if(h && h.textContent.trim()==='Push') return cards[i].querySelector('button'); }
+    }); };
+    assert.ok(await p.evaluate(function(b){ return b.disabled; },await push()),
+      'the other workouts can still be started over the one in progress');
+    // Even if the button is forced, the handler must not replace the session.
+    await p.evaluate(function(b){ b.disabled=false; b.click(); },await push());
+    await settle();
+    var back=await p.$('[data-action="cancelsession"]'); if(back){ await back.click(); await p.waitForTimeout(400); }
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
+    var banner=await p.evaluate(function(){ var b=document.querySelector('.resume-banner'); return b?b.textContent:''; });
+    assert.ok(/Pull/.test(banner) && /1 sets logged/.test(banner),'the session in progress became: '+banner);
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });
