@@ -31,6 +31,7 @@ var cases=[['the repo seed', JSON.parse(seedRaw)]];
   var st=JSON.parse(seedRaw);
   st.shopExtras=[{id:'x1',text:'Bin bags'},{id:'x2',text:'Coffee'}];
   st.shoppingChecked=['x|x2'];
+  st.deletedRecipes=['p3'];
   // Same reasoning for the plan: an empty one round-trips trivially. Two
   // meals of the SAME recipe on different days, because that pair is the whole
   // reason the model changed and is the pair a careless save would collapse.
@@ -92,6 +93,7 @@ cases.forEach(function(pair){
   cmp('an in-flight session survives', st.activeSession||null, back.activeSession);
   cmp('xp survives', st.totalXp||0, back.totalXp);
   cmp('the water target survives', st.waterTarget||8, back.waterTarget);
+  cmp('deleted meal-prep recipes stay deleted', st.deletedRecipes||[], back.deletedRecipes);
   // Which tab and slide a view is on belongs to that device. Stored in the
   // profile, every tab change dirtied the document that holds the xp, so the
   // next save of anything wrote this view's stale xp over another view's.
@@ -102,7 +104,7 @@ cases.forEach(function(pair){
 
   // Nothing in state may be silently unmapped.
   var mapped={days:1,workoutLogs:1,saunaSessions:1,recipes:1,library:1,shoppingChecked:1,
-              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,
+              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,deletedRecipes:1,
               // Device-only, kept in localStorage: an old seed may still carry them.
               uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
   var unmapped=Object.keys(st).filter(function(k){ return !mapped[k]; });

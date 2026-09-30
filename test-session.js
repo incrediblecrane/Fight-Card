@@ -1303,6 +1303,80 @@ srv.listen(0,async function(){
     await leaveSession();
   });
 
+  console.log('\nCOMMA DECIMALS AND BAD INPUT');
+  var chipsNow=function(){ return p.evaluate(function(){
+    return [].slice.call(document.querySelectorAll('.slide .setchip')).map(function(c){ return c.textContent; }); }); };
+  var invalid=function(sel){ return p.getAttribute(sel,'aria-invalid'); };
+
+  await t('a comma decimal logs as a decimal, not ten times over', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    assert.ok(await toSlide('Bench press'),'never reached the bench press');
+    // Typed a key at a time, as a phone keyboard does: a number box used to
+    // drop the comma, so "22,5" was read as 225.
+    await p.click('#log-w-press_bench'); await p.keyboard.type('22,5');
+    await p.click('#log-v-press_bench'); await p.keyboard.type('8');
+    await p.click('[data-action="logset"]'); await settle();
+    var c=await chipsNow();
+    assert.deepStrictEqual(c,['22.5kg × 8'],'chips: '+c.join(' | '));
+  });
+
+  await t('a weight that is not a number logs nothing and is marked', async function(){
+    await p.click('#log-w-press_bench'); await p.keyboard.type('abc');
+    await p.click('#log-v-press_bench'); await p.keyboard.type('8');
+    await p.click('[data-action="logset"]'); await settle();
+    assert.strictEqual((await chipsNow()).length,1,'a set was logged from "abc"');
+    assert.strictEqual(await invalid('#log-w-press_bench'),'true','the bad field is not marked');
+    assert.strictEqual(await p.inputValue('#log-w-press_bench'),'abc','what was typed was thrown away');
+  });
+
+  await t('typing into a marked field clears the mark', async function(){
+    await p.fill('#log-w-press_bench','25');
+    assert.strictEqual(await invalid('#log-w-press_bench'),null,'still marked after a fix');
+    await p.click('[data-action="logset"]'); await settle();
+    assert.strictEqual((await chipsNow()).length,2,'the fixed set did not log');
+  });
+
+  await t('Log set with nothing typed says so rather than doing nothing', async function(){
+    await p.click('[data-action="logset"]'); await p.waitForTimeout(300);
+    assert.strictEqual(await invalid('#log-v-press_bench'),'true','the empty reps box is not marked');
+    var focus=await p.evaluate(function(){ return document.activeElement&&document.activeElement.id; });
+    assert.strictEqual(focus,'log-v-press_bench','focus went to '+focus);
+    await settle();
+    assert.strictEqual(await invalid('#log-v-press_bench'),'true','the mark did not survive a render');
+    await p.keyboard.type('6');
+    assert.strictEqual(await invalid('#log-v-press_bench'),null,'still marked after typing');
+    await leaveSession();
+  });
+
+  var lastSauna=function(){ var s=seedOf().saunaSessions; return s[s.length-1]; };
+  await t('a sauna temperature and minutes take a comma decimal too', async function(){
+    await go(); await leaveSession();
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    var n=seedOf().saunaSessions.length;
+    await p.click('#sauna-mins'); await p.keyboard.type('12,5');
+    await p.click('#sauna-temp'); await p.keyboard.type('80,5');
+    await p.click('[data-action="logsauna"]'); await settle();
+    assert.strictEqual(seedOf().saunaSessions.length,n+1,'nothing was logged');
+    assert.strictEqual(lastSauna().mins,12.5); assert.strictEqual(lastSauna().temp,80.5);
+  });
+
+  await t('a sauna temperature cleared after another stint is cleared', async function(){
+    await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','80');
+    await p.click('[data-action="addstint"]'); await p.waitForTimeout(300);
+    await p.fill('#sauna-temp',''); await p.fill('#sauna-mins','10');
+    await p.click('[data-action="logsauna"]'); await settle();
+    assert.strictEqual(lastSauna().mins,25,'stints: '+JSON.stringify(lastSauna().stints));
+    assert.strictEqual(lastSauna().temp,null,'the old temperature came back');
+  });
+
+  await t('a sauna temperature that is not a number refuses the log', async function(){
+    var n=seedOf().saunaSessions.length;
+    await p.fill('#sauna-mins','10'); await p.fill('#sauna-temp','hot');
+    await p.click('[data-action="logsauna"]'); await settle();
+    assert.strictEqual(seedOf().saunaSessions.length,n,'it logged anyway');
+    assert.strictEqual(await invalid('#sauna-temp'),'true','the bad temperature is not marked');
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

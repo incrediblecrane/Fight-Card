@@ -244,6 +244,21 @@ srv.listen(0,async function(){
       'it did not survive a reload: '+labels.join(' | '));
   });
 
+  await t('a deleted meal-prep recipe stays deleted after the save reloads the page', async function(){
+    // The built-in batch recipes are topped up at load for anything missing,
+    // which is also what a deleted one looks like.
+    await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
+    await p.waitForTimeout(300);
+    assert.ok(await p.$('[data-action="delrecipe"][data-id="p3"]'),'p3 is not there to delete');
+    await p.click('[data-action="delrecipe"][data-id="p3"]');
+    await p.waitForTimeout(2600);
+    await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
+    await p.waitForTimeout(400);
+    assert.ok(!(await p.$('[data-action="delrecipe"][data-id="p3"]')),'p3 came back');
+    var seed=JSON.parse(published().slice(published().lastIndexOf(')({')+2, published().lastIndexOf(');</'+'script>')));
+    assert.ok(!seed.recipes.some(function(r){ return r.id==='p3'; }),'p3 is in the saved recipes');
+  });
+
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');
   await b.close(); srv.close();
   console.log(fails||errs.length?'\nFAILING\n':'\nAll meal checks pass.\n');

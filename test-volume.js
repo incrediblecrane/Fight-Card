@@ -82,6 +82,14 @@ t('reps with no weight are not weight', function(){
   assert.strictEqual(box.movesWeight('pullup',{v:8, w:null}), false);
 });
 
+t('a single-arm kettlebell lift counts per side, like a single-arm row', function(){
+  // Logged per bell and done on both sides, so 16kg x 8 each side moved what
+  // 16kg x 8 on a single-arm row moved, not half of it.
+  ['kb_clean','kb_snatch','kb_press'].forEach(function(id){
+    assert.strictEqual(box.volumeOf(id,{w:16,v:8}), box.volumeOf('row_single',{w:16,v:8}), id+' counted half');
+  });
+});
+
 t('an unknown exercise id is refused rather than counted blind', function(){
   assert.strictEqual(box.movesWeight('nope',{w:100,v:5}), false);
 });

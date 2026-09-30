@@ -33,6 +33,33 @@ var doc=(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
   }]);
   doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
 })();
+/* A world of its own for the exercise history: every log replaced, so what the
+   progress page counts is exactly what is below. A bench session with three
+   working sets between a warm-up and a cool-down, goblet squats with no
+   weight, and a plank session saved out of date order, the way a backfilled
+   log lands on the end of the list. */
+function localKey(o){ var d=new Date(); d.setDate(d.getDate()-o);
+  var q=function(n){return String(n).padStart(2,'0');};
+  return d.getFullYear()+'-'+q(d.getMonth()+1)+'-'+q(d.getDate()); }
+var progDoc=(function(){
+  var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
+  var st=JSON.parse(doc.slice(i,j));
+  st.activeSession=null;
+  st.workoutLogs=[
+    {id:'wl-a', workoutId:'w6', title:'Push', tag:'Strength', date:localKey(2), logs:{
+      warmup:[{v:8, w:null, opt:'Bike', lvl:'6', lvlKind:'resistance'}],
+      press_bench:[{v:5,w:20},{v:5,w:22.5},{v:5,w:25}],
+      sq_goblet:[{v:10,w:null},{v:12,w:null}],
+      cooldown:[{v:5, w:null, opt:'Walk', lvl:'', lvlKind:'effort'}]}},
+    {id:'wl-b', workoutId:'w1', title:'Strength', tag:'Strength', date:localKey(5), logs:{
+      pullup:[{v:8,w:null}]}},
+    {id:'wl-c', workoutId:'w1', title:'Strength', tag:'Strength', date:localKey(1), logs:{
+      plank:[{v:40,w:null}]}},
+    {id:'wl-d', workoutId:'w1', title:'Strength', tag:'Strength', date:localKey(9), logs:{
+      plank:[{v:30,w:null}]}}
+  ];
+  return doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
+})();
 var SHIM='<script>(function(){var ns={publish:function(h){'+
   'return fetch("/publish",{method:"POST",body:h}).then(function(){setTimeout(function(){location.reload();},0);});}};'+
   'window.claude={use:function(n){return Promise.resolve(n==="artifact"||n==="self"?ns:null);}};})();<\/script>';
@@ -45,6 +72,12 @@ var server=http.createServer(function(req,res){
       .replace('<body>','<body><script>window.claude={use:function(n){return Promise.resolve(n==="artifact"?'+
         '{publish:function(h){window.__pub=h;return Promise.resolve();}}:null);}};<\/script>');
     res.setHeader('content-type','text/html; charset=utf-8'); res.end(cap); return;
+  }
+  if(req.url==='/prog'){
+    var pd=progDoc.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis[^>]*>/,'')
+      .replace('<body>','<body><script>window.claude={use:function(n){return Promise.resolve(n==="artifact"?'+
+        '{publish:function(h){return Promise.resolve();}}:null);}};<\/script>');
+    res.setHeader('content-type','text/html; charset=utf-8'); res.end(pd); return;
   }
   if(req.url==='/publish'&&req.method==='POST'){
     var c=[]; req.on('data',function(x){c.push(x);});
@@ -114,6 +147,61 @@ server.listen(0, async function(){
       'no explanation of why there is no time trend: '+detail.slice(0,200));
     ok('it opens, explains why there is no time trend, and lists the sets');
   }catch(e){ bad('light-sets-only warm-up',e); }
+
+  console.log('\nEXERCISE HISTORY');
+  var pctx=await b.newContext({viewport:{width:420,height:900}}), pp=await pctx.newPage();
+  pctx.setDefaultTimeout(8000); pp.on('pageerror',function(e){errs.push(e.message);});
+  var exRow=function(name){ return pp.evaluate(function(n){
+    var rows=[].slice.call(document.querySelectorAll('.exrow'));
+    for(var i=0;i<rows.length;i++){ var h=rows[i].querySelector('.top h4');
+      if(h && h.textContent.trim()===n) return {last:rows[i].querySelector('.last').textContent, text:rows[i].innerText}; }
+    return null; },name); };
+  var openEx=async function(name){ await pp.evaluate(function(n){
+    [].slice.call(document.querySelectorAll('.exrow .top')).forEach(function(t){
+      if(t.querySelector('h4').textContent.trim()===n) t.click(); }); },name); await pp.waitForTimeout(300); };
+  try{
+    await pp.goto(URL+'prog'); await pp.waitForSelector('#app *');
+    await pp.click('[data-action="tab"][data-tab="progress"]'); await pp.waitForTimeout(400);
+  }catch(e){ bad('the progress page opens',e); }
+  try{
+    var bench=await exRow('Bench press');
+    assert.ok(bench,'no bench press row');
+    assert.ok(/^25kg × 5/.test(bench.last),'the row leads with '+bench.last);
+    ok('an exercise row leads with the last set logged, not the first');
+  }catch(e){ bad('latest set on the row',e); }
+  try{
+    await openEx('Goblet squat');
+    var gob=await exRow('Goblet squat');
+    assert.ok(/Personal best\s*12 reps/.test(gob.text),'goblet squat read: '+gob.text.replace(/\s+/g,' ').slice(0,200));
+    assert.ok(!/0kg/.test(gob.text),'a weightless lift reads as 0kg');
+    ok('a lift never logged with a weight charts its reps, not 0kg');
+  }catch(e){ bad('best set with no weight',e); }
+  try{
+    var order=await pp.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.exrow .top h4')).map(function(h){ return h.textContent.trim(); }); });
+    assert.ok(order.indexOf('Plank')>-1 && order.indexOf('Pull-up')>-1,'order: '+order.join(', '));
+    assert.ok(order.indexOf('Plank')<order.indexOf('Pull-up'),
+      'a log saved out of date order sank the plank below an older pull-up: '+order.join(', '));
+    ok('the exercise list is ordered by the newest date, whatever order the logs were saved in');
+  }catch(e){ bad('exercise list order',e); }
+  try{
+    var tile=await pp.evaluate(function(){
+      var tiles=[].slice.call(document.querySelectorAll('.stat-tile'));
+      for(var i=0;i<tiles.length;i++){ var l=tiles[i].querySelector('.l');
+        if(l && l.textContent.trim()==='sets logged') return tiles[i].querySelector('.n').textContent.trim(); }
+      return null; });
+    // 3 bench + 2 goblet + 1 pull-up + 2 planks; the warm-up and cool-down are not sets.
+    assert.strictEqual(tile,'8','the sets tile read '+tile);
+    var recent=await pp.evaluate(function(){ return document.body.innerText; });
+    assert.ok(/Push[\s\S]{0,40}5 sets/.test(recent),'the recent row did not say 5 sets');
+    ok('the sets tile and the recent row leave out the warm-up and cool-down');
+  }catch(e){ bad('prep steps are not sets',e); }
+  try{
+    var body=await pp.evaluate(function(){ return document.body.innerText; });
+    assert.ok(/Day streak/.test(body) && !/Days tracked/.test(body),'the streak is still labelled "Days tracked"');
+    ok('the streak is labelled a streak');
+  }catch(e){ bad('streak label',e); }
+  await pctx.close();
 
   console.log('\nBACKFILL');
   await p.goto(URL); await p.waitForTimeout(400); await toToday();

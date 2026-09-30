@@ -16,7 +16,7 @@ documents:
 
 | path | what |
 |---|---|
-| `state/profile` | XP and the water target |
+| `state/profile` | XP, the water target, and any built-in meal-prep recipes deleted (`deletedRecipes`, so they are not topped up again) |
 | `state/shopping` | which shopping items are ticked, plus the hand-added ones |
 | `state/session` | the in-flight workout, or null |
 | `state/meta` | the seeded marker; its presence means the store is the truth |
@@ -69,6 +69,11 @@ timer goes at once when the page is hidden or closed.
 - **Set** — one logged effort. Its shape follows the exercise's `type`:
   `load` (weight and reps), `time`, `distance`, `reps`, `cardio` (minutes,
   machine, work/rest effort), `prep` (minutes, option, level).
+  A `time` exercise marked `unit: 'min'` (the drilling block, the brisk
+  walk) is logged in minutes, and its sets carry `u: 'min'` so the one-off
+  conversion of older sets typed as seconds runs once. Numbers are typed
+  into text boxes and read with `parseNum`, which takes a comma decimal;
+  anything else is refused and the box marked.
 - **Superset** — several exercises done back to back as one round. It is a
   slide in a session, not a movement: `ss1`, `ss2` are instances, and
   `activeSession.supersets[ssId]` holds the exercise ids in the round. Logging

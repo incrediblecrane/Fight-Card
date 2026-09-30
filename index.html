@@ -156,6 +156,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .sauna-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}\
 .sauna-row input{width:64px;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}\
 .sauna-row select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}\
 .logbtn{display:block;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;}\
 .storynav{display:flex;gap:10px;margin-top:16px;}\
 .storynav button{flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;text-transform:uppercase;border-radius:10px;padding:13px;cursor:pointer;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
@@ -359,6 +360,7 @@ var PER_IMPLEMENT={
   splitsq_bulg:'dumbbell', press_incline:'dumbbell', press_push:'dumbbell',
   curl_bicep:'dumbbell', curl_hammer:'dumbbell', shrug:'dumbbell',
   row_single:'side', curl_cable_single:'side',
+  kb_clean:'side', kb_snatch:'side', kb_press:'side',
   fly_cable:'side', fly_cable_high:'side', fly_cable_rev:'side',
   raise_front:'dumbbell', raise_lateral:'dumbbell'
 };
@@ -494,11 +496,11 @@ var EX=[
 {id:"rowerg",name:"Rowing machine",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:4,reps:"250m",pose:"ROW",cue:"Legs, then back, then arms on the drive, reverse the order on the recovery, keep a steady strong pace."},
 {id:"skierg",name:"Ski erg",cat:"Conditioning",area:"Conditioning & cardio",type:"distance",sets:4,reps:"250m",pose:"ROW",cue:"Handles high, then hinge at the hips and drive them down past your hips with the arms finishing straight. It is a hip hinge with a lat pull on the end. If your torso stays upright you are pulling with your arms and you will be blown in a minute."},
 {id:"skipping",name:"Skipping",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JUMP",cue:"Light on your feet, steady rhythm, small jumps rather than big bounces."},
-{id:"shadowbox",name:"Shadowboxing",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:6,reps:"2min",pose:"GUARD",cue:"Move and throw combinations at pace, keep your guard up between combos, work your footwork."},
+{id:"shadowbox",name:"Shadowboxing",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:6,reps:"120s",pose:"GUARD",cue:"Move and throw combinations at pace, keep your guard up between combos, work your footwork."},
 {id:"burpee",name:"Burpee",cat:"Conditioning",area:"Conditioning & cardio",type:"reps",sets:4,reps:"10",pose:"JUMP",cue:"Chest to the floor, jump your feet back in, jump up to finish. Keep it smooth rather than rushed."},
-{id:"technique",name:"Technique / drilling block",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:1,reps:"20-30 min",pose:"GUARD",cue:"Coach-led, or your own focus if training solo. Quality of movement over speed."},
+{id:"technique",name:"Technique / drilling block",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",unit:"min",sets:1,reps:"20-30 min",pose:"GUARD",cue:"Coach-led, or your own focus if training solo. Quality of movement over speed."},
 {id:"rounds",name:"Rounds (pad/drill/spar)",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"reps",sets:1,reps:"3-6 rounds",pose:"GUARD",cue:"Set intensity by the session's goal, technical or live, one minute rest between rounds."},
-{id:"jabcross",name:"Jab-cross combo drill",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:6,reps:"1min",pose:"JAB",cue:"Sharp jab-cross combinations at pace, reset your guard between every combo."},
+{id:"jabcross",name:"Jab-cross combo drill",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:6,reps:"60s",pose:"JAB",cue:"Sharp jab-cross combinations at pace, reset your guard between every combo."},
 {id:"kb_clean",name:"Kettlebell clean",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"8 each side",pose:"HINGE",cue:"Hike the bell back, drive your hips forward and pull it up close to your body, catching it softly at your shoulder."},
 {id:"kb_snatch",name:"Kettlebell snatch",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"6 each side",pose:"HINGE",cue:"One explosive hip drive takes the bell from between your legs straight overhead, punching your hand through at the top."},
 {id:"kb_press",name:"Kettlebell single-arm press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8 each side",pose:"PRESS",cue:"Bell racked at your shoulder, press straight overhead without leaning away from it, lower under control."},
@@ -516,7 +518,7 @@ var EX=[
 {id:"cardio_gym_steady",name:"Steady-state finisher",cat:"Conditioning",area:"Conditioning & cardio",type:"cardio",sets:1,reps:"10-15min",pose:"MACHINE",cue:"One steady pace you could hold a conversation at, no intervals, just time on the machine."},
 {id:"jumpingjack",name:"Jumping jacks",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JJACK",cue:"Feet and arms out together, back in together, steady rhythm, no equipment needed."},
 {id:"highknees",name:"High knees",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"30s",pose:"HIGHKNEE",cue:"Drive your knees up toward your chest quickly on the spot, stay light on your feet."},
-{id:"briskwalkjog",name:"Brisk walk or jog",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:1,reps:"10-15min",pose:"CARRY",cue:"Outside, a corridor, wherever you've got, steady pace you could just about hold a conversation at."},
+{id:"briskwalkjog",name:"Brisk walk or jog",cat:"Conditioning",area:"Conditioning & cardio",type:"time",unit:"min",sets:1,reps:"10-15min",pose:"CARRY",cue:"Outside, a corridor, wherever you've got, steady pace you could just about hold a conversation at."},
 {id:"woodchopper",name:"Cable or band woodchopper",cat:"Power",area:"Core & rotation",type:"load",sets:3,reps:"10 each side",pose:"TWIST",cue:"Rotate diagonally from high to low (or low to high) through your torso, arms follow, control the return, don't let momentum do the work."},
 {id:"russiantwist",name:"Russian twist",cat:"Strength",area:"Core & rotation",type:"load",sets:3,reps:"16 each side",pose:"TWIST",cue:"Seated, leaning back slightly, feet up or down, rotate a weight or your hands side to side, keep the movement in your torso not your arms."},
 {id:"palloffpress",name:"Pallof press",cat:"Strength",area:"Core & rotation",type:"load",sets:3,reps:"10 each side",pose:"PRESS",cue:"Band or cable at your chest, press straight out and resist it pulling you round, that resistance to rotation is the whole point."},
@@ -565,7 +567,7 @@ var WORKOUTS=[
   {id:"w3",tag:"Flexibility",title:"Flexibility & mobility",warmup:"5 min dynamic: leg swings, arm circles, walking lunge with a twist, hip circles.",cooldown:"5 min slow breathing.",
     plan:[{ex:"shoulderdisloc",sets:2,reps:"10"},{ex:"thoracic",sets:2,reps:"8-10 each side"},{ex:"hipflexor",sets:2,reps:"30-45s each side"},{ex:"couchstretch",sets:2,reps:"30-45s each side"},{ex:"nine0",sets:2,reps:"8-10 each side"},{ex:"pigeon",sets:2,reps:"30-45s each side"},{ex:"ankle_mob",sets:2,reps:"10 each side"}]},
   {id:"w4",tag:"Conditioning",title:"Conditioning circuit",warmup:"5 min easy.",cooldown:"Walk it down, stretch.",
-    plan:[{ex:"kb_swing",sets:4,reps:"40s"},{ex:"mtnclimb",sets:4,reps:"40s"},{ex:"shadowbox",sets:4,reps:"40s"},{ex:"burpee",sets:4,reps:"40s"},{ex:"rowerg",sets:4,reps:"250m"}]},
+    plan:[{ex:"kb_swing",sets:4,reps:"15"},{ex:"mtnclimb",sets:4,reps:"40s"},{ex:"shadowbox",sets:4,reps:"40s"},{ex:"burpee",sets:4,reps:"10"},{ex:"rowerg",sets:4,reps:"250m"}]},
   {id:"w5",tag:"Boxing/MMA",title:"Boxing/MMA technical",warmup:"10 min: skip, shadowbox, mobility.",cooldown:"Light stretch.",
     plan:[{ex:"technique",sets:1,reps:"20-30 min"},{ex:"rounds",sets:1,reps:"3-6 rounds"}]},
   {id:"w6",tag:"Strength",title:"Push",warmup:"5 min easy cardio, arm circles, band pull-aparts, a few light push-ups.",cooldown:"Chest and shoulder stretch, 5 min.",
@@ -655,15 +657,32 @@ function saunaTotal(x){
 }
 /* "15 min Top + 10 min Bottom", or just "15 min Top" when there is one stint,
    so a simple session does not read like a compound one. */
-/* Pulls the mins/temp/position row into the draft. Returns false when there is
-   no usable minutes value, so Add and Log can both just ask. */
+/* Number boxes are plain text boxes read here. A number input drops a comma
+   decimal, so "22,5" was logged as 225; anything that is not a number now is
+   refused and the box marked, rather than guessed at. */
+function parseNum(s){ s=String(s==null?'':s).trim().replace(',','.');
+  return /^(\d+\.?\d*|\.\d+)$/.test(s)?+s:NaN; }
+// Ids of boxes holding something that is not a number, marked until retyped.
+var badFields={};
+function markBad(el){ if(!el) return; badFields[el.id]=1; el.setAttribute('aria-invalid','true'); }
+// null when empty, NaN (and marked) when not a number, else the number.
+function readNum(el){
+  if(!el || String(el.value).trim()==='') return null;
+  var n=parseNum(el.value); if(isNaN(n)) markBad(el);
+  return n;
+}
+/* Pulls the mins/temp/position row into the draft. Returns true when a stint
+   was added, 'bad' when a box holds something that is not a number, and false
+   when there is no minutes value, so Add and Log can both just ask. */
 function readStint(){
   var minsEl=document.getElementById('sauna-mins');
   var tempEl=document.getElementById('sauna-temp');
   var posEl=document.getElementById('sauna-pos');
-  if(tempEl && tempEl.value!=='') saunaTemp=tempEl.value;
-  var mins=parseFloat(minsEl?minsEl.value:'');
-  if(isNaN(mins)||mins<=0) return false;
+  var temp=readNum(tempEl), mins=readNum(minsEl);
+  if(isNaN(temp)||isNaN(mins)) return 'bad';
+  // An emptied box means no temperature, not the last one typed.
+  if(tempEl) saunaTemp=temp===null?'':String(temp);
+  if(mins===null||mins<=0) return false;
   saunaDraft.push({mins:mins, position:posEl?posEl.value:'Top'});
   consumed(['sauna-mins','sauna-pos']);
   return true;
@@ -678,6 +697,8 @@ if(!state.days) state.days={};
 if(!state.library) state.library=[];
 if(!state.recipes) state.recipes=[];
 if(!state.shoppingChecked) state.shoppingChecked=[];
+// Built-in meal-prep recipes that were deleted, so they are not topped up again.
+if(!state.deletedRecipes) state.deletedRecipes=[];
 // Things to buy that no recipe knows about: bin bags, coffee, whatever.
 if(!state.shopExtras) state.shopExtras=[];
 // Planned meals. migratePlan() converts anything still carrying the old
@@ -774,7 +795,10 @@ var PREP_RECIPES=[
     if(!r.base) r.base=1;
     if(!r.portions) r.portions=r.base;
   });
+  // Missing is also what a deleted one looks like, so those are remembered and
+  // not put back: without that a saved page reloaded with the recipe returned.
   var have={}; state.recipes.forEach(function(r){ have[r.id]=true; });
+  state.deletedRecipes.forEach(function(id){ have[id]=true; });
   PREP_RECIPES.forEach(function(p){
     if(have[p.id]) return;
     var c=JSON.parse(JSON.stringify(p));
@@ -868,6 +892,7 @@ var lastSaved={};   // path -> JSON of what the store already holds
 function dbDocs(st){
   var out={};
   out['state/profile']={waterTarget:st.waterTarget, totalXp:st.totalXp};
+  if((st.deletedRecipes||[]).length) out['state/profile'].deletedRecipes=st.deletedRecipes.slice();
   // A document body is an object, so a list or a nullable session is wrapped.
   out['state/shopping']={checked:(st.shoppingChecked||[]).slice(), extras:(st.shopExtras||[]).slice()};
   out['state/session']={active:st.activeSession||null};
@@ -903,6 +928,7 @@ function dbApply(map){
           shoppingChecked:[], shopExtras:[], activeSession:null};
   var prof=map['state/profile']||{};
   st.waterTarget=prof.waterTarget||8; st.totalXp=prof.totalXp||0;
+  st.deletedRecipes=dbClone(prof.deletedRecipes)||[];
   if(map['state/shopping']){
     st.shoppingChecked=dbClone(map['state/shopping'].checked)||[];
     st.shopExtras=dbClone(map['state/shopping'].extras)||[];
@@ -1036,7 +1062,9 @@ function bestSet(type,sets){
   return best;
 }
 function bestValue(type,s){ return type==='load'?(s.w||0):s.v; }
-function bestUnit(type){ return type==='load'?'kg':type==='time'?'s':type==='distance'?'m':(type==='cardio'||type==='prep')?'min':'reps'; }
+// A time block can be logged in minutes (`unit:'min'` on the exercise): a
+// drilling block of 25 is 25 minutes, not 25 seconds.
+function bestUnit(type,def){ return type==='load'?'kg':type==='time'?(def&&def.unit==='min'?'min':'s'):type==='distance'?'m':(type==='cardio'||type==='prep')?'min':'reps'; }
 function computeStreaks(){
   var d=new Date();
   var todayEntry=state.days[dateKey(d)];
@@ -1128,7 +1156,8 @@ function applyUndo(){
     if(!d.workout.done){ if(d.rest) addXp(-XP_REST); d.workout.done=true; d.workout.type=u.item.tag; d.rest=false; addXp(u.xp); }
     d.touched=true;
   }
-  else if(u.kind==='recipe'){ putBack(state.recipes,u.item,u.pos); planBack(u.plan); }
+  else if(u.kind==='recipe'){ putBack(state.recipes,u.item,u.pos); planBack(u.plan);
+    state.deletedRecipes=(state.deletedRecipes||[]).filter(function(id){ return id!==u.item.id; }); }
   else if(u.kind==='lib') putBack(state.library,u.item,u.pos);
   else if(u.kind==='meal') planBack([u.item]);
   else if(u.kind==='week'){
@@ -1230,6 +1259,7 @@ function dbBoot(){
         // stripped recipes, so the store ends up in the new shape too.
         // Both write, so either one changing anything has to be saved.
         var moved=migratePlan(); if(prunePlan()) moved=true;
+        if(migrateMinutes()) moved=true;
         if(moved) scheduleSave();
       });
       // First run on this store: the document's own seed is the truth.
@@ -1522,6 +1552,24 @@ function migratePlan(){
   if(changed) state.plan.sort(planOrder);
   return changed;
 }
+/* The drilling block and the brisk walk used to ask for seconds, which nobody
+   times them in. They are logged in minutes now, and a set says so (`u`), so
+   this runs once per set. An older one under 120 was already minutes, since
+   nobody drills for under two; anything bigger was seconds and is converted. */
+function migrateMinutes(){
+  var changed=false;
+  function fix(logs){ Object.keys(logs||{}).forEach(function(id){
+    var d=exDef(id); if(!d || d.unit!=='min') return;
+    (logs[id]||[]).forEach(function(e){
+      if(!e || e.u) return;
+      if(e.v>=120) e.v=Math.round(e.v/6)/10;
+      e.u='min'; changed=true;
+    });
+  }); }
+  (state.workoutLogs||[]).forEach(function(l){ if(l) fix(l.logs); });
+  if(state.activeSession) fix(state.activeSession.logs);
+  return changed;
+}
 function recipeBase(r){ return r.base||1; }
 function recipePortions(r){ return r.portions||recipeBase(r); }
 // Round to something you can actually shop for. Weight and volume tolerate a
@@ -1649,7 +1697,7 @@ function setLabel(def,e){
     // "ea" so a 20kg pair never reads back as a 20kg total.
     return e.w+'kg'+(perImplement(def.id)?' ea':'')+' × '+e.v;
   }
-  if(type==='time') return e.v+'s';
+  if(type==='time') return e.v+(def.unit==='min'?' min':'s');
   if(type==='distance') return e.v+'m';
   if(type==='prep'){
     if(e.lvlKind==='load'){
@@ -1707,24 +1755,31 @@ function startWorkout(id){
   ensurePrep(state.activeSession);
   slide=0; addingExercise=false; viewingSession=true;
 }
-function logSet(exId,type){
+/* Returns whether a set was logged. A box holding something that is not a
+   number refuses the set and is marked; so is an empty value box, unless
+   `quiet` (a superset round skips a row left empty). */
+function logSet(exId,type,quiet){
   var valInput=document.getElementById('log-v-'+exId);
-  if(!valInput) return;
-  var v=parseFloat(valInput.value);
-  if(isNaN(v)||v<=0) return;
+  if(!valInput) return false;
+  var v=readNum(valInput), def=exDef(exId);
+  var wEl=document.getElementById('log-w-'+exId), wt=(type==='load'||type==='prep')?readNum(wEl):null;
+  var lEl=document.getElementById('log-lvl-'+exId);
+  // Only a speed is typed; a resistance or an effort is picked from a list.
+  var lv=(lEl && lEl.tagName==='INPUT')?readNum(lEl):null;
+  if(isNaN(wt)||isNaN(lv)||isNaN(v)) return false;
+  if(v===null||v<=0){ if(!quiet) markBad(valInput); return false; }
   var entry={v:v,w:null};
-  if(type==='load'){ var wInput=document.getElementById('log-w-'+exId); var wt=wInput?parseFloat(wInput.value):NaN; entry.w=isNaN(wt)?null:wt; }
+  if(def && def.unit) entry.u=def.unit;
+  if(type==='load') entry.w=wt;
   if(type==='prep'){
     var oEl=document.getElementById('log-opt-'+exId); entry.opt=oEl?oEl.value:'';
     entry.lvlKind=prepLevelKind(entry.opt);
     if(entry.lvlKind==='load'){
       // v is reps here, not minutes, which is why the label and the trend
       // chart both have to ask what kind of prep entry this is.
-      var pwEl=document.getElementById('log-w-'+exId);
-      var pw=pwEl?parseFloat(pwEl.value):NaN;
-      entry.w=isNaN(pw)?null:pw; entry.lvl='';
+      entry.w=wt; entry.lvl='';
     } else {
-      var lEl=document.getElementById('log-lvl-'+exId); entry.lvl=lEl?lEl.value:'';
+      entry.lvl=!lEl?'':lv!==null?String(lv):lEl.value;
     }
     delete prepPick[exId]; delete prepMins[exId];
   }
@@ -1736,6 +1791,7 @@ function logSet(exId,type){
   if(!state.activeSession.logs[exId]) state.activeSession.logs[exId]=[];
   state.activeSession.logs[exId].push(entry);
   consumed(['log-v-','log-w-','log-opt-','log-lvl-','log-machine-','log-work-','log-rest-'].map(function(k){ return k+exId; }));
+  return true;
 }
 function undoSet(exId){ var arr=state.activeSession && state.activeSession.logs[exId]; if(arr&&arr.length) arr.pop(); }
 /* Which members each round actually logged, so a round can be taken back as a
@@ -2280,8 +2336,8 @@ function bodyContent(){
         (saunaDraft.length?('<div class="setchips" style="justify-content:flex-start;">'+
           saunaDraft.map(function(st,i){ return '<span class="setchip">'+st.mins+' min &middot; '+esc(st.position)+
             ' <button class="chipx" data-action="delstint" data-i="'+i+'">&times;</button></span>'; }).join('')+'</div>'):'')+
-        '<div class="sauna-row"><input id="sauna-mins" type="number" inputmode="decimal" placeholder="mins">'+
-          '<input id="sauna-temp" type="number" inputmode="decimal" placeholder="&deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
+        '<div class="sauna-row"><input id="sauna-mins" type="text" inputmode="decimal" placeholder="mins">'+
+          '<input id="sauna-temp" type="text" inputmode="decimal" placeholder="&deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
           '<select id="sauna-pos"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
         '<button class="linklike" data-action="addstint">+ Another stint at a different height</button>'+
         '<button class="logbtn" data-action="logsauna">'+(saunaDraft.length?'Log session':'Log sauna')+'</button></div>'+
@@ -2424,7 +2480,7 @@ function bodyContent(){
   var inRange=function(d){ return rangeKeys.indexOf(d)>-1; };
 
   // Per-exercise history, newest session first.
-  var histo={};
+  var histo={}, seq=0;
   logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){
     if(!histo[exId]) histo[exId]=[];
     l.logs[exId].forEach(function(s){
@@ -2433,14 +2489,21 @@ function bodyContent(){
          fact that it was sets at a weight, so a warm-up read "10 min" with no
          mention of what it was, and a 40kg x 5 ramp read as ten minutes. */
       var h={}; Object.keys(s).forEach(function(k){ h[k]=s[k]; });
-      h.date=l.date; histo[exId].push(h);
+      // _seq keeps the order sets were logged in, so "newest" is the last
+      // set of the newest day rather than the first.
+      h.date=l.date; h._seq=seq++; histo[exId].push(h);
     });
   }); });
-  var exIds=Object.keys(histo).sort(function(a,b){ var da=histo[a][histo[a].length-1].date, db=histo[b][histo[b].length-1].date; return da<db?1:(da>db?-1:0); });
+  // Newest date, not the date of whichever log was saved last: a backfilled
+  // log lands on the end of the list with an older date.
+  var newest=function(id){ return histo[id].reduce(function(a,h){ return h.date>a?h.date:a; },''); };
+  var exIds=Object.keys(histo).sort(function(a,b){ var da=newest(a), db=newest(b); return da<db?1:(da>db?-1:0); });
 
+  // A warm-up or cool-down is not a set, unless it was light sets at a weight.
+  var isSet=function(k,st){ var d=exDef(k); return !(d && d.type==='prep') || st.lvlKind==='load'; };
   var totalSets=0, totalVolume=0;
   logs.forEach(function(l){ Object.keys(l.logs).forEach(function(k){
-    l.logs[k].forEach(function(st){ totalSets++; if(movesWeight(k,st)) totalVolume+=volumeOf(k,st); });
+    l.logs[k].forEach(function(st){ if(isSet(k,st)) totalSets++; if(movesWeight(k,st)) totalVolume+=volumeOf(k,st); });
   }); });
 
   // Sessions and sets per day across the chosen range.
@@ -2450,7 +2513,7 @@ function bodyContent(){
     sessionsByDay[l.date]=(sessionsByDay[l.date]||0)+1;
     Object.keys(l.logs).forEach(function(k){
         l.logs[k].forEach(function(st){
-        setsByDay[l.date]=(setsByDay[l.date]||0)+1;
+        if(isSet(k,st)) setsByDay[l.date]=(setsByDay[l.date]||0)+1;
         if(movesWeight(k,st)) volumeByDay[l.date]=(volumeByDay[l.date]||0)+volumeOf(k,st);
       });
     });
@@ -2537,7 +2600,7 @@ function bodyContent(){
 
   var recent=logs.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);}).slice(0,6);
   var recentHtml=recent.map(function(l){
-    var setCount=0; Object.keys(l.logs).forEach(function(k){setCount+=l.logs[k].length;});
+    var setCount=0; Object.keys(l.logs).forEach(function(k){ l.logs[k].forEach(function(st){ if(isSet(k,st)) setCount++; }); });
     var ss=supersetSummary(l);
     return swipeRow(l.id,'dellog',
       '<span>'+esc(l.title)+(ss?('<span class="ssnote">'+ss+'</span>'):'')+'</span>'+
@@ -2546,7 +2609,7 @@ function bodyContent(){
 
   var exList=exIds.map(function(exId){
     var def=exDef(exId)||{name:exId,type:'reps'};
-    var hist=histo[exId].slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
+    var hist=histo[exId].slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:(b._seq-a._seq));});
     var last=hist[0]; var isOpen=!!expanded[exId];
     var detail='';
     if(isOpen){
@@ -2562,9 +2625,13 @@ function bodyContent(){
         if(!byDate[h.date]) byDate[h.date]=[]; byDate[h.date].push(h);
       });
       var dates=Object.keys(byDate).sort();
+      // A lift never logged with a weight has nothing to chart in kg, so its
+      // reps are the measure instead of a flat line of 0kg.
+      var byReps=def.type==='load' && !hist.some(function(h){ return h.w>0; });
+      var kind=byReps?'reps':def.type, unit=byReps?' reps':bestUnit(def.type,def);
       var pts=dates.map(function(dt){
-        var b=bestSet(def.type,byDate[dt]);
-        return {k:shortDay(dt), v:bestValue(def.type,b), lbl:bestValue(def.type,b)+bestUnit(def.type),
+        var b=bestSet(kind,byDate[dt]);
+        return {k:shortDay(dt), v:bestValue(kind,b), lbl:bestValue(kind,b)+unit,
                 tip:dt+' — best set '+setLabel(def,b)+' of '+byDate[dt].length+' set'+(byDate[dt].length===1?'':'s')};
       });
       // Can be empty now: a warm-up whose every entry was a set at a weight
@@ -2572,8 +2639,8 @@ function bodyContent(){
       // take the whole progress tab down.
       var pb=pts.length?pts.reduce(function(a,p){return p.v>a.v?p:a;},pts[0]):null;
       var delta=pts.length>1?pts[pts.length-1].v-pts[0].v:0;
-      var deltaTxt=pts.length>1?((delta>0?'+':'')+Math.round(delta*10)/10+bestUnit(def.type)+' since '+pts[0].k):'first session';
-      var pbLabel=def.type==='load'?'heaviest set':'best set';
+      var deltaTxt=pts.length>1?((delta>0?'+':'')+Math.round(delta*10)/10+unit+' since '+pts[0].k):'first session';
+      var pbLabel=kind==='load'?'heaviest set':'best set';
       var rows=hist.slice(0,15).map(function(h){
         return '<tr><td>'+h.date+'</td><td>'+setLabel(def,h)+'</td></tr>';
       }).join('');
@@ -2626,7 +2693,7 @@ function bodyContent(){
       '<div class="daystrip">'+cleanStrip+'</div>'+
       '<div class="legend"><span><i class="clean"></i>clean</span><span><i class="flagged"></i>flagged</span><span><i></i>not logged</span></div>'+
       '<div class="pbrow"><span>Current streak <b>'+pStreaks.cleanStreak+' day'+(pStreaks.cleanStreak===1?'':'s')+'</b></span>'+
-        '<span>Days tracked <b>'+pStreaks.dayStreak+'</b></span></div></div>'+
+        '<span>Day streak <b>'+pStreaks.dayStreak+'</b></span></div></div>'+
     '<div class="sectiontitle">Sauna</div>'+
     (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaAll.length+' sessions \u00b7 '+saunaMins+' min total',
       aria:'Sauna minutes per session'}):'')+saunaHtml+
@@ -2666,7 +2733,7 @@ function bodyContent(){
         var mSets=sess.logs[m]||[];
         var mPer=perImplement(m);
         var mChips=mSets.map(function(x){ return '<span class="setchip">'+setLabel(d,x)+'</span>'; }).join('');
-        var mVal=d.type==='load'?'reps':d.type==='time'?'secs':d.type==='distance'?'metres':d.type==='cardio'?'mins':'reps';
+        var mVal=d.type==='load'?'reps':d.type==='time'?(d.unit==='min'?'mins':'secs'):d.type==='distance'?'metres':d.type==='cardio'?'mins':'reps';
         // A cardio member needs its machine and effort pickers here too: logSet
         // reads them by id, and without them the set is stored as a bare number
         // of minutes with the machine and effort silently dropped.
@@ -2685,8 +2752,8 @@ function bodyContent(){
             '<button class="ssx" data-action="ssdel" data-ss="'+ssId+'" data-ex="'+m+'" title="Take out of the superset">&times;</button></div>'+
           (mChips?'<div class="setchips">'+mChips+'</div>':'')+mCardio+
           '<div class="logrow">'+
-            (d.type==='load'?('<input id="log-w-'+m+'" type="number" inputmode="decimal" placeholder="'+(mPer?'kg each':'kg')+'">'):'')+
-            '<input id="log-v-'+m+'" type="number" inputmode="decimal" placeholder="'+mVal+'">'+
+            (d.type==='load'?('<input id="log-w-'+m+'" type="text" inputmode="decimal" placeholder="'+(mPer?'kg each':'kg')+'">'):'')+
+            '<input id="log-v-'+m+'" type="text" inputmode="decimal" placeholder="'+mVal+'">'+
             (mSets.length?'<button class="undo" data-action="undoset" data-ex="'+m+'" data-ss="'+ssId+'">Undo</button>':'')+
           '</div>'+
         '</div>';
@@ -2737,10 +2804,10 @@ function bodyContent(){
       var tgt=sess.targets[exId]||{sets:def2.sets,reps:def2.reps};
       var chips=sets.map(function(s){ return '<span class="setchip">'+setLabel(def2,s)+'</span>'; }).join('');
       var perImp=perImplement(exId);
-      var weightInput=def2.type==='load'?('<input id="log-w-'+exId+'" type="number" inputmode="decimal" placeholder="'+(perImp?'kg each':'kg')+'">'):'';
+      var weightInput=def2.type==='load'?('<input id="log-w-'+exId+'" type="text" inputmode="decimal" placeholder="'+(perImp?'kg each':'kg')+'">'):'';
       var perImpNote=(def2.type==='load'&&perImp)?('<div class="perimp">'+esc(perImplementNote(exId))+'</div>'):'';
       var prepIsLoad=def2.type==='prep' && prepLevelKind(prepPick[exId]||'')==='load';
-      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?'secs':def2.type==='distance'?'metres':prepIsLoad?'reps':(def2.type==='cardio'||def2.type==='prep')?'mins':'reps';
+      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?(def2.unit==='min'?'mins':'secs'):def2.type==='distance'?'metres':prepIsLoad?'reps':(def2.type==='cardio'||def2.type==='prep')?'mins':'reps';
       var prepRow='', prepHint='';
       if(def2.type==='prep'){
         var opts=PREP_OPTIONS[exId]||[];
@@ -2750,9 +2817,9 @@ function bodyContent(){
         var lvlHint=kind==='resistance'?'Resistance&hellip;':kind==='speed'?'km/h':'How hard&hellip;';
         var lvlControl=!picked?''
           : kind==='load'
-            ? ('<input id="log-w-'+exId+'" class="cardio-select" type="number" inputmode="decimal" placeholder="kg">')
+            ? ('<input id="log-w-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="kg">')
           : kind==='speed'
-            ? ('<input id="log-lvl-'+exId+'" class="cardio-select" type="number" inputmode="decimal" step="0.1" placeholder="'+lvlHint+'">')
+            ? ('<input id="log-lvl-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="'+lvlHint+'">')
             : ('<select id="log-lvl-'+exId+'" class="cardio-select"><option value="">'+lvlHint+'</option>'+
                lvlList.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>');
         // Which lift, by name: the first thing in the session that is not a
@@ -2811,7 +2878,7 @@ function bodyContent(){
           prepRow+
           cardioRow+
           '<div class="logrow">'+weightInput+
-            '<input id="log-v-'+exId+'" type="number" inputmode="decimal" placeholder="'+valPlaceholder+'"'+
+            '<input id="log-v-'+exId+'" type="text" inputmode="decimal" placeholder="'+valPlaceholder+'"'+
               (def2.type==='prep'?(' data-prepmins="'+exId+'" value="'+esc(prepMins[exId]||'')+'"'):'')+'>'+
             '<button data-action="logset" data-ex="'+exId+'" data-type="'+def2.type+'">Log set</button>'+
             (sets.length?'<button class="undo" data-action="undoset" data-ex="'+exId+'">Undo</button>':'')+
@@ -2963,6 +3030,13 @@ function render(){
     if(el.type==='checkbox'||el.type==='radio') el.checked=was.checked;
     else if(el.tagName!=='SELECT' || [].some.call(el.options,function(o){ return o.value===was.value; })) el.value=was.value;
   });
+  // A box marked as not a number stays marked until it is typed into again.
+  var bad={};
+  Object.keys(badFields).forEach(function(id){
+    var el=document.getElementById(id); if(!el) return;
+    el.setAttribute('aria-invalid','true'); bad[id]=1;
+  });
+  badFields=bad;
   if(keep){
     var back=document.getElementById(keep.id);
     if(back){
@@ -3009,7 +3083,13 @@ function onClick(e){
   else if(action==='startworkout'){ startWorkout(t.getAttribute('data-id')); }
   else if(action==='discardsession'){ discardSession(); }
   else if(action==='finishworkout'){ finishWorkout(); }
-  else if(action==='logset'){ logSet(t.getAttribute('data-ex'), t.getAttribute('data-type')); }
+  else if(action==='logset'){
+    // Refused: say so where it was, and draw nothing, so the focus stays put.
+    if(!logSet(t.getAttribute('data-ex'), t.getAttribute('data-type'))){
+      var badEl=document.querySelector('#app [aria-invalid="true"]'); if(badEl) badEl.focus();
+      return;
+    }
+  }
   else if(action==='undoset'){
     var exU=t.getAttribute('data-ex'), bU=supersetBox(t.getAttribute('data-ss')||'');
     undoSet(exU);
@@ -3055,7 +3135,7 @@ function onClick(e){
     supersetMembers(ssL).forEach(function(m){
       var d=exDef(m); if(!d) return;
       var before=(state.activeSession.logs[m]||[]).length;
-      logSet(m,d.type);
+      logSet(m,d.type,true);
       if((state.activeSession.logs[m]||[]).length>before) got.push(m);
     });
     // A round nobody filled in is not a round.
@@ -3086,7 +3166,7 @@ function onClick(e){
     if(d<0 && prev<=state.waterTarget && prev>0) addXp(-XP_PER_WATER);
   }
   else if(action==='addstint'){
-    if(!readStint()) return;   // nothing typed, nothing to add
+    if(readStint()!==true) return;   // nothing typed, nothing to add
     uiOnly=true;
   }
   else if(action==='delstint'){
@@ -3095,8 +3175,7 @@ function onClick(e){
   else if(action==='logsauna'){
     // Whatever is still in the row counts as the last stint, so a single-stint
     // session is one tap and never needs Add first.
-    readStint();
-    if(!saunaDraft.length) return;
+    if(readStint()==='bad' || !saunaDraft.length) return;
     var stints=saunaDraft.slice();
     state.saunaSessions.push({id:'sa'+Date.now(),date:activeDate(),
       mins:stints.reduce(function(a,st){return a+st.mins;},0),
@@ -3165,6 +3244,7 @@ function onClick(e){
     // shopping list silently stops counting them while they still look planned.
     var planGone=state.plan.filter(function(e){ return e.recipeId===rid; });
     state.plan=state.plan.filter(function(e){ return e.recipeId!==rid; });
+    if(PREP_RECIPES.some(function(x){ return x.id===rid; }) && state.deletedRecipes.indexOf(rid)<0) state.deletedRecipes.push(rid);
     parkUndo({kind:'recipe',item:recGone,pos:ri2,plan:planGone,label:recGone.title});
   }
   else if(action==='shopcheck'){ var item=t.getAttribute('data-item'); var sidx=state.shoppingChecked.indexOf(item); if(sidx>-1) state.shoppingChecked.splice(sidx,1); else state.shoppingChecked.push(item); }
@@ -3250,6 +3330,7 @@ function onChange(e){
 }
 
 function onInput(e){
+  if(e.target && badFields[e.target.id]){ delete badFields[e.target.id]; e.target.removeAttribute('aria-invalid'); }
   if(e.target && e.target.id==='ex-search'){
     exSearch=e.target.value;
     // Swap the results only. A full render would replace the box being typed
@@ -3349,7 +3430,7 @@ function boot(){
   ensurePrep(state.activeSession);
   // Everything this file declares has been assigned by now, which is why the
   // plan migration is here rather than beside the other state fix-ups.
-  migratePlan(); prunePlan();
+  migratePlan(); prunePlan(); migrateMinutes();
   render();
   dbBoot();
   if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); }); }
