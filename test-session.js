@@ -1188,6 +1188,121 @@ srv.listen(0,async function(){
     await leaveSession();
   });
 
+  console.log('\nSKIP, FINISH AND RESUME');
+  var seedOf=function(){ return JSON.parse(doc.slice(doc.lastIndexOf(')({')+2, doc.lastIndexOf(');</'+'script>'))); };
+  var tapIf=function(sel){ return p.evaluate(function(s){ var e=document.querySelector(s); if(!e) return false; e.click(); return true; },sel); };
+  var storyPos=function(){ return p.evaluate(function(){ var h=document.querySelector('.story-title'); var m=h&&/(\d+)\/(\d+)\s*$/.exec(h.textContent); return m?[+m[1],+m[2]]:null; }); };
+
+  await t('skipping through every slide does not finish the session', async function(){
+    await go(); await leaveSession(); await startWorkout('Pull');
+    var st0=seedOf();
+    for(var k=0;k<30;k++){ if(!(await tapIf('[data-action="skipex"]'))) break; await p.waitForTimeout(120); }
+    await settle();
+    var st1=seedOf();
+    assert.strictEqual(st1.workoutLogs.length,st0.workoutLogs.length,'skipping logged a session');
+    assert.strictEqual(st1.totalXp,st0.totalXp,'skipping paid XP');
+    assert.ok(st1.activeSession,'skipping ended the session');
+    var pos=await storyPos();
+    assert.ok(pos && pos[0]===pos[1],'did not end up on the last slide: '+JSON.stringify(pos));
+    assert.strictEqual(await p.$('[data-action="skipex"]'),null,'the last slide still offers Skip');
+  });
+
+  await t('finishing a session with nothing logged records nothing, and can be undone', async function(){
+    var st0=seedOf();
+    assert.ok(await tapIf('[data-action="finishworkout"]'),'no Finish on the last slide'); await settle();
+    var st1=seedOf();
+    assert.strictEqual(st1.workoutLogs.length,st0.workoutLogs.length,'an empty session was logged');
+    assert.strictEqual(st1.totalXp,st0.totalXp,'an empty session paid XP');
+    assert.strictEqual(st1.activeSession,null,'the empty session is still open');
+    var d0=st0.days[st0.activeSession.startedAt]||null, d1=st1.days[st0.activeSession.startedAt]||null;
+    assert.deepStrictEqual(d1,d0,'the day changed');
+    assert.ok(await tapIf('[data-action="undo"]'),'no undo offer'); await settle();
+    assert.deepStrictEqual(seedOf().activeSession,st0.activeSession,'the undo did not bring the session back');
+  });
+
+  await t('Back and Resume come back to the same slide', async function(){
+    await go(); await leaveSession(); await startWorkout('Pull');
+    for(var k=0;k<3;k++) await next();
+    var at=await storyPos();
+    assert.strictEqual(at[0],4,'could not get to slide 4');
+    var v=await p.$('input[id^="log-v-"]'); await v.fill('8');
+    var w=await p.$('input[id^="log-w-"]'); if(w) await w.fill('20');
+    await p.click('[data-action="logset"]'); await settle();
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="resumesession"]'); await p.waitForTimeout(400);
+    var back=await storyPos();
+    assert.strictEqual(back[0],4,'Resume opened slide '+back[0]);
+    await leaveSession();
+  });
+
+  console.log('\nUNDOING A ROUND');
+  var ssState=function(){ return p.evaluate(function(){
+    var d=document.querySelector('.slide .target'), b=document.querySelector('[data-action="loground"]');
+    return {target:d?d.textContent:'', button:b?b.textContent.trim():'', chips:document.querySelectorAll('.ssrow .setchip').length}; }); };
+  var ssSetup=async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search'); await p.type('#ex-search','superset',{delay:25}); await p.waitForTimeout(450);
+    await p.click('[data-action="addex"][data-id="superset"]'); await settle();
+    await p.selectOption('.ssadd select','curl_bicep'); await p.click('[data-action="ssadd"]'); await settle();
+    await p.selectOption('.ssadd select','row_bent'); await p.click('[data-action="ssadd"]'); await settle();
+    await p.fill('#log-w-curl_bicep','15'); await p.fill('#log-v-curl_bicep','10');
+    await p.fill('#log-w-row_bent','40'); await p.fill('#log-v-row_bent','8');
+    await p.click('[data-action="loground"]'); await settle();
+    var s=await ssState();
+    assert.ok(/1 done/.test(s.target) && s.chips===2,'the round did not log: '+JSON.stringify(s));
+  };
+
+  await t('Undo round takes the whole round back', async function(){
+    await ssSetup();
+    assert.ok(await tapIf('[data-action="undoround"]'),'no Undo round button'); await settle();
+    var s=await ssState();
+    assert.ok(/0 done/.test(s.target),'after undo it reads "'+s.target+'"');
+    assert.ok(/round 1/i.test(s.button),'the button offers "'+s.button+'"');
+    assert.strictEqual(s.chips,0,'sets were left behind');
+  });
+
+  await t('undoing each member of a round one by one takes the round back too', async function(){
+    await ssSetup();
+    await p.click('[data-action="undoset"][data-ex="curl_bicep"]'); await settle();
+    var s=await ssState();
+    assert.ok(/1 done/.test(s.target),'half a round undone reads "'+s.target+'"');
+    await p.click('[data-action="undoset"][data-ex="row_bent"]'); await settle();
+    s=await ssState();
+    assert.ok(/0 done/.test(s.target),'the whole round undone still reads "'+s.target+'"');
+    assert.ok(/round 1/i.test(s.button),'the button offers "'+s.button+'"');
+    await leaveSession();
+  });
+
+  console.log('\nADDING BY ROLE');
+  var allTitles=async function(){
+    for(var r=0;r<20;r++){ if(!(await tapIf('[data-action="prevslide"]:not([disabled])'))) break; await p.waitForTimeout(120); }
+    var ts=[await slideTitle()];
+    for(var i=0;i<20;i++){ if(!(await p.$('[data-action="nextslide"]'))) break; await next(); ts.push(await slideTitle()); }
+    return ts;
+  };
+  await t('an exercise added to Swim goes before its own cool-down', async function(){
+    await go(); await leaveSession(); await startWorkout('Swim');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','plank'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="plank"]'); await settle();
+    var ts=await allTitles();
+    assert.deepStrictEqual(ts.slice(-2),['Plank','Cool-down swim'],'order: '+ts.join(' > '));
+    await leaveSession();
+  });
+  await t('a warm-up added back goes first, not before the cool-down', async function(){
+    await go(); await leaveSession(); await startWorkout('Pull');
+    await p.click('[data-action="removeex"][data-id="warmup"]'); await settle();
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','warm'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="warmup"]'); await settle();
+    assert.strictEqual(await slideTitle(),'Warm-up','it did not land on the warm-up');
+    var ts=await allTitles();
+    assert.strictEqual(ts[0],'Warm-up','order: '+ts.join(' > '));
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

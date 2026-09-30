@@ -77,6 +77,225 @@ srv.listen(0,async function(){
     ok('Undo puts the entry back and clears the offer');
   }catch(e){ bad('undo restores',e); }
 
+
+  // The rest of this suite reads what was saved straight out of the published
+  // document, and can edit the seed before a load, because XP and the undo slot
+  // are bookkeeping that a list of rows on screen cannot show.
+  var url='http://127.0.0.1:'+srv.address().port+'/';
+  var seedOf=function(){ return JSON.parse(doc.slice(doc.lastIndexOf(')({')+2, doc.lastIndexOf(');</'+'script>'))); };
+  var setSeed=function(fn){ var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
+    var st=JSON.parse(doc.slice(i,j)); fn(st); doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j); };
+  var settle=function(){ return p.waitForTimeout(1800); };
+  var go=async function(){ await p.goto(url); await p.waitForTimeout(600);
+    var bk=await p.$('[data-action="cancelsession"]'); if(bk){ await bk.click(); await p.waitForTimeout(300); } };
+  var tabTo=async function(n){ await p.click('[data-action="tab"][data-tab="'+n+'"]'); await p.waitForTimeout(400); };
+  var hudXp=function(){ return p.evaluate(function(){
+    var n=document.querySelectorAll('.streaks .streak .n'); return n.length?+n[n.length-1].textContent:NaN; }); };
+  var tap=function(sel){ return p.evaluate(function(s){ var e=document.querySelector(s); if(!e) return false; e.click(); return true; },sel); };
+  var t=async function(name,fn){ try{ await fn(); ok(name); }catch(e){ bad(name,e); } };
+  var dayKey=function(){ return p.evaluate(function(){ var a=document.querySelector('.week .dot.active'); return a?a.getAttribute('data-k'):''; }); };
+  // A session with one set in it, finished. The warm-up is the first slide.
+  var finishOne=async function(){
+    await tabTo('training');
+    await p.locator('[data-action="startworkout"]').first().click(); await p.waitForTimeout(500);
+    await p.fill('input[id^="log-v-"]','5');
+    await p.locator('[data-action="logset"]').first().click(); await p.waitForTimeout(300);
+    for(var k=0;k<30;k++){ if(!(await tap('[data-action="nextslide"]'))) break; await p.waitForTimeout(60); }
+    assert.ok(await tap('[data-action="finishworkout"]'),'never reached Finish');
+    await settle();
+  };
+  var toFirst=async function(){ for(var k=0;k<30;k++){ if(!(await tap('[data-action="prevslide"]:not([disabled])'))) break; await p.waitForTimeout(60); } };
+  var logIdsOn=function(k){ return seedOf().workoutLogs.filter(function(l){ return l.date===k; }).map(function(l){ return l.id; }); };
+  var delLog=async function(id){
+    assert.ok(await tap('.swipe-del[data-action="dellog"][data-id="'+id+'"]'),'no Remove for log '+id); await settle(); };
+
+  console.log('\nXP COMES BACK OFF WHEN WHAT EARNED IT IS UNDONE');
+  var todayK='';
+  await t('switching between Rest and a workout pill is not a way to farm XP', async function(){
+    await go(); await tabTo('today'); todayK=await dayKey();
+    assert.ok(todayK,'could not tell which day is being logged');
+    await tap('[data-action="rest"]'); await p.waitForTimeout(150);
+    await tap('[data-action="workout"][data-type="Strength"]'); await settle();
+    var x1=await hudXp();
+    await tap('[data-action="rest"]'); await p.waitForTimeout(150);
+    await tap('[data-action="workout"][data-type="Strength"]'); await settle();
+    var x2=await hudXp();
+    assert.strictEqual(x2,x1,'one Rest and back cycle moved XP from '+x1+' to '+x2);
+    // Leave the day unlogged for what follows.
+    await tap('[data-action="workout"][data-type="Strength"]'); await settle();
+  });
+
+  await t('two sessions on one day, both removed, put XP back where it started', async function(){
+    await go(); var x0=await hudXp();
+    await finishOne(); await finishOne();
+    var ids=logIdsOn(todayK);
+    assert.strictEqual(ids.length,2,'expected two logs on '+todayK+', found '+ids.length);
+    await go(); await tabTo('progress');
+    await delLog(ids[0]); await delLog(ids[1]);
+    var x=await hudXp();
+    assert.strictEqual(x,x0,'XP went from '+x0+' to '+x+' across two sessions and their removal');
+  });
+
+  await t('while a session is logged for the day, its pill cannot be turned off', async function(){
+    await go(); await finishOne(); await go(); await tabTo('today');
+    var x0=await hudXp();
+    await tap('[data-action="workout"][data-type="Strength"].on,[data-action="workout"].on'); await settle();
+    var on=await p.evaluate(function(){ return !!document.querySelector('[data-action="workout"].on'); });
+    assert.ok(on,'the day reads untrained while a session is logged for it');
+    await tap('[data-action="rest"]'); await settle();
+    on=await p.evaluate(function(){ return !!document.querySelector('[data-action="workout"].on'); });
+    assert.ok(on,'Rest day wiped a logged session off the day');
+    assert.strictEqual(await hudXp(),x0,'XP moved');
+    var ids=logIdsOn(todayK); await tabTo('progress');
+    for(var i=0;i<ids.length;i++) await delLog(ids[i]);
+    await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300);
+  });
+
+  await t('removing a log near zero XP and undoing it returns exactly what was there', async function(){
+    // The clamp at zero took less than the full 15, and the undo gave back 15.
+    setSeed(function(st){ st.totalXp=5; });
+    await go(); await tabTo('progress');
+    assert.strictEqual(await hudXp(),5,'the seed edit did not take');
+    var only=seedOf().workoutLogs.filter(function(l){ return l.date==='2026-09-01'; })[0];
+    assert.ok(only,'no log on 2026-09-01 in the seed');
+    await delLog(only.id);
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
+    assert.strictEqual(await hudXp(),5,'XP after remove and undo');
+  });
+
+  console.log('\nAN UNDO THAT WOULD PUT BACK SOMETHING ALREADY THERE');
+  await t('an undo whose item is already back is not offered, and cannot duplicate it', async function(){
+    await go(); await tabTo('progress');
+    var id=seedOf().workoutLogs[0].id, x0=await hudXp();
+    await delLog(id);
+    var parked=await p.evaluate(function(){ return sessionStorage.getItem('fc.undo'); });
+    assert.ok(parked,'nothing was parked');
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
+    // The same slot again, as a reload that restored the item leaves it.
+    await p.evaluate(function(v){ sessionStorage.setItem('fc.undo',v); },parked);
+    await go(); await tabTo('progress');
+    var shown=!!(await p.$('.undo-bar'));
+    if(await tap('[data-action="undo"]')) await settle();
+    var n=seedOf().workoutLogs.filter(function(l){ return l.id===id; }).length;
+    assert.strictEqual(n,1,'the log is there '+n+' times');
+    assert.strictEqual(await hudXp(),x0,'XP was paid twice');
+    assert.ok(!shown,'the undo bar offered to put back something already there');
+  });
+
+
+  console.log('\nEVERY ONE-TAP REMOVAL CAN BE UNDONE');
+  var undoBack=async function(){
+    assert.ok(await p.$('.undo-bar'),'no undo offer after the removal');
+    assert.ok(await tap('[data-action="undo"]'),'no Undo button'); await settle();
+    assert.strictEqual(await p.$('.undo-bar'),null,'the offer outlived its undo');
+  };
+  await t('the undo offer is a fixed toast, shown on the tab where the removal happened', async function(){
+    await go(); await tabTo('training');
+    var before=seedOf().library;
+    assert.ok(before.length,'the seed has no library note to remove');
+    await tap('[data-action="dellib"][data-id="'+before[0].id+'"]'); await settle();
+    var pos=await p.evaluate(function(){ var b=document.querySelector('.undo-bar'); return b?getComputedStyle(b).position:''; });
+    assert.strictEqual(pos,'fixed','the undo offer is '+(pos||'missing')+' on the Training tab');
+    assert.strictEqual(seedOf().library.length,before.length-1,'the note was not removed');
+    await undoBack();
+    assert.deepStrictEqual(seedOf().library,before,'the library came back different');
+  });
+
+  var planSeed=function(){ setSeed(function(st){
+    var r0=st.recipes[0].id, r1=st.recipes[1].id;
+    st.plan=[{id:'pl1',recipeId:r0,date:todayK,slot:'lunch',portions:2},
+             {id:'pl2',recipeId:r1,date:todayK,slot:'dinner',portions:1},
+             {id:'pl3',recipeId:r0,date:todayK,slot:'dinner',portions:3}];
+    st.shoppingChecked=[];
+  }); };
+  await t('deleting a recipe, and the meals planned from it, can be undone', async function(){
+    planSeed(); await go(); await tabTo('meals');
+    var st0=seedOf(), rid=st0.recipes[0].id;
+    await tap('[data-action="delrecipe"][data-id="'+rid+'"]'); await settle();
+    var st1=seedOf();
+    assert.ok(!st1.recipes.some(function(r){return r.id===rid;}),'the recipe was not deleted');
+    assert.strictEqual(st1.plan.length,1,'its planned meals were not taken with it');
+    await undoBack();
+    var st2=seedOf();
+    assert.deepStrictEqual(st2.recipes,st0.recipes,'the recipes came back different');
+    assert.deepStrictEqual(st2.plan,st0.plan,'the planned meals came back different');
+  });
+  await t('removing one planned meal can be undone', async function(){
+    planSeed(); await go(); await tabTo('meals');
+    var st0=seedOf();
+    await tap('[data-action="delmeal"][data-id="pl2"]'); await settle();
+    assert.strictEqual(seedOf().plan.length,2,'the meal was not removed');
+    await undoBack();
+    assert.deepStrictEqual(seedOf().plan,st0.plan,'the plan came back different');
+  });
+  await t('clearing the week, ticks and all, can be undone', async function(){
+    planSeed(); await go(); await tabTo('meals');
+    var box=await p.evaluate(function(){ var b=document.querySelector('[data-action="shopcheck"]'); return b?b.getAttribute('data-item'):null; });
+    assert.ok(box,'no shopping row to tick');
+    await tap('[data-action="shopcheck"][data-item="'+box.replace(/"/g,'\\"')+'"]'); await settle();
+    var st0=seedOf();
+    assert.ok(st0.shoppingChecked.length,'the tick did not save');
+    await tap('[data-action="clearweek"]'); await settle();
+    var st1=seedOf();
+    assert.strictEqual(st1.plan.length,0,'the week was not cleared');
+    assert.strictEqual(st1.shoppingChecked.length,0,'the ticks were not cleared');
+    await undoBack();
+    var st2=seedOf();
+    assert.deepStrictEqual(st2.plan,st0.plan,'the plan came back different');
+    assert.deepStrictEqual(st2.shoppingChecked,st0.shoppingChecked,'the ticks came back different');
+  });
+
+  var startLogged=async function(){
+    await go(); await tabTo('training');
+    await p.locator('[data-action="startworkout"]').first().click(); await p.waitForTimeout(500);
+    await p.fill('input[id^="log-v-"]','5');
+    await p.locator('[data-action="logset"]').first().click(); await settle();
+  };
+  await t('discarding a session in progress can be undone', async function(){
+    await startLogged();
+    var s0=seedOf().activeSession;
+    assert.ok(s0,'no session in progress');
+    await tap('[data-action="cancelsession"]'); await p.waitForTimeout(300);
+    await tabTo('training');
+    await tap('[data-action="discardsession"]'); await settle();
+    assert.strictEqual(seedOf().activeSession,null,'the session was not discarded');
+    await undoBack();
+    assert.deepStrictEqual(seedOf().activeSession,s0,'the session came back different');
+  });
+  await t('removing an exercise, and its sets, from a session can be undone', async function(){
+    var s0=seedOf().activeSession, first=s0.exIds[0];
+    assert.ok((s0.logs[first]||[]).length,'the first slide has no set to lose');
+    await go(); await tabTo('training'); await tap('[data-action="resumesession"]'); await p.waitForTimeout(400);
+    await toFirst();
+    await tap('[data-action="removeex"][data-id="'+first+'"]'); await settle();
+    var s1=seedOf().activeSession;
+    assert.ok(s1.exIds.indexOf(first)<0,'the exercise was not removed');
+    await undoBack();
+    assert.deepStrictEqual(seedOf().activeSession,s0,'the session came back different');
+    await tap('[data-action="cancelsession"]'); await p.waitForTimeout(300);
+    await tabTo('training'); await tap('[data-action="discardsession"]'); await settle();
+    await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300);
+  });
+  await t('removing a slide keeps the sets its exercise logged inside a superset', async function(){
+    setSeed(function(st){
+      st.activeSession={workoutId:'w_custom',startedAt:todayK,prep:1,
+        exIds:['warmup','press_bench','ss1','cooldown'],
+        supersets:{ss1:{ex:['press_bench'],rounds:2}},
+        targets:{warmup:{sets:1,reps:'5-10 min'},press_bench:{sets:3,reps:'8'},ss1:{sets:3,reps:'rounds'},cooldown:{sets:1,reps:'5-10 min'}},
+        logs:{press_bench:[{v:10,w:60},{v:9,w:60}]}};
+    });
+    await go(); await tabTo('training');
+    await tap('[data-action="resumesession"]'); await p.waitForTimeout(400);
+    await toFirst(); await tap('[data-action="nextslide"]'); await p.waitForTimeout(200);
+    await tap('[data-action="removeex"][data-id="press_bench"]'); await settle();
+    var s=seedOf().activeSession;
+    assert.ok(s.exIds.indexOf('press_bench')<0,'the slide was not removed');
+    assert.strictEqual((s.logs.press_bench||[]).length,2,'the superset rounds lost their bench sets');
+    await tap('[data-action="cancelsession"]'); await p.waitForTimeout(300);
+    await tabTo('training'); await tap('[data-action="discardsession"]'); await settle();
+    await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300);
+  });
+
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');
   await b.close(); srv.close();
   console.log(fails||errs.length?'\nFAILING\n':'\nAll removal checks pass.\n');

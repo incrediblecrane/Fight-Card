@@ -88,6 +88,15 @@ timer goes at once when the page is hidden or closed.
 - **Per implement** — a logged weight is one dumbbell, not the pair. Declared
   in `PER_IMPLEMENT`; drives the "kg each" input, the note, the "ea" in a set
   label, and doubling in total volume.
+- **Undo**: one slot, in `sessionStorage` so it survives the reload a save can
+  cause and ends with the tab. Every one-tap removal parks what it took there:
+  a sauna visit or finished session, a note, a recipe with its planned meals, a
+  planned meal, a cleared week with its ticks, a discarded session, or one
+  exercise taken out of a session. It is offered as a toast fixed to the bottom
+  of every view, and not offered once the item is back by some other route, so
+  it can never put back a second copy.
+- **Round log**: `roundLog` on a superset box: the members each logged round
+  actually recorded a set for, so Undo round takes back exactly that round.
 - **Stint** — one continuous spell at one bench height inside a sauna visit.
   A visit has many; its `mins` is their total.
 - **Backfill date** — the day being logged to, when it is not today. Lives in
