@@ -9,8 +9,18 @@ var doc=env.readDoc();
 
 // The stub store lives in the harness, not the page, so it outlives reloads.
 var store={};
-var calls={set:0,del:0,get:0,collGet:0};
+var calls={set:0,del:0,get:0,collGet:0,publish:0};
 var inflight=0, peak=0, slowGetMs=0;
+// Scripted trouble. failNext: the next request of that op whose path contains
+// `match` is refused with `code`, the way the store refuses one. setDelays: the
+// next set whose path contains `match` is held for `ms` and only lands in the
+// store when it completes, which is what makes an overlapping save observable.
+var failNext=[], setDelays=[];
+function take(list,op,path){
+  for(var i=0;i<list.length;i++){ var f=list[i];
+    if((!f.op||f.op===op) && String(path||'').indexOf(f.match||'')>-1){ list.splice(i,1); return f; } }
+  return null;
+}
 function srvJson(r,body){ var b=JSON.stringify(body); r.setHeader('content-type','application/json'); r.setHeader('content-length',Buffer.byteLength(b)); r.end(b); }
 
 var SHIM=`<script>(function(){
@@ -33,7 +43,8 @@ var SHIM=`<script>(function(){
       window.__db.peak=Math.max(window.__db.peak, window.__db.inflight);
     }
     return fetch('/db/'+op,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
-      .then(function(r){ if(op==='set'||op==='del') window.__db.inflight--; return r.json(); });
+      .then(function(r){ if(op==='set'||op==='del') window.__db.inflight--; return r.json(); })
+      .then(function(j){ if(j && j.err) throw {code:j.err, message:'stub refused '+op}; return j; });
   }
   function docRef(path){
     var segs=path.split('/');
@@ -77,8 +88,10 @@ var srv=http.createServer(function(q,r){
     var c=[]; q.on('data',function(x){c.push(x);});
     q.on('end',function(){
       var raw=Buffer.concat(c).toString();
-      if(q.url==='/publish'){ doc=raw; return r.end('ok'); }
+      if(q.url==='/publish'){ calls.publish++; doc=raw; return r.end('ok'); }
       var body=JSON.parse(raw||'{}'), op=q.url.slice(4);
+      var f=take(failNext,op,body.path);
+      if(f){ if(op==='set'||op==='update') calls.set++; return srvJson(r,{err:f.code}); }
       // The real store hands documents back with their keys in alphabetical
       // order, observed directly against it. A stub that echoed insertion
       // order would make the diff look correct when it is not.
@@ -94,6 +107,8 @@ var srv=http.createServer(function(q,r){
         return send(); }
       if(op==='slow'){ slowGetMs=body.ms||0; return srvJson(r,{ok:1}); }
       if(op==='set'){ calls.set++; inflight++; peak=Math.max(peak,inflight);
+        var held=take(setDelays,op,body.path);
+        if(held){ return setTimeout(function(){ store[body.path]=body.data; inflight--; srvJson(r,{ok:1}); },held.ms); }
         store[body.path]=body.data;
         setTimeout(function(){ inflight--; srvJson(r,{ok:1}); },12); return; }
       if(op==='update'){ calls.set++; store[body.path]=Object.assign({},store[body.path]||{},body.data); return srvJson(r,{ok:1}); }
@@ -148,7 +163,8 @@ srv.listen(0,async function(){
     });
     for(var n=-1,k=0; k<40 && n!==calls.set+calls.del; k++){ n=calls.set+calls.del; await p.waitForTimeout(250); }
   };
-  var go=async function(){ await p.goto(url); await settle(); await toToday(); };
+  // Scripted trouble never outlives the check that set it up.
+  var go=async function(){ failNext.length=0; setDelays.length=0; await p.goto(url); await settle(); await toToday(); };
   // The day the APP is on: local to the page, which runs in a timezone of its
   // own, so never the harness's UTC date.
   var today=function(){ return p.evaluate(function(){
@@ -490,6 +506,178 @@ srv.listen(0,async function(){
     await p.waitForTimeout(2400);
     var after=await text();
     assert.ok(!/loading your data/.test(after),'it never left the loading state');
+  });
+
+  var W='[data-action="water"][data-d="1"]';
+  var dayWater=function(day){ return (store['days/'+day]||{}).water||0; };
+
+  console.log('\nSAVES GO ONE AT A TIME');
+  await t('a slow save cannot land after a newer one and undo it', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    setDelays.push({match:'days/',ms:2500});
+    await p.click(W); await p.waitForTimeout(1300);
+    assert.strictEqual(setDelays.length,0,'the first save never started, so this proves nothing');
+    await p.click(W); await p.waitForTimeout(5000);
+    assert.strictEqual(dayWater(day),w0+2,'two taps, but the store reads '+dayWater(day)+' from '+w0+
+      ': the older save landed last');
+  });
+
+  await t('an entry removed while its first save is in flight leaves no document behind', async function(){
+    await go();
+    setDelays.push({match:'sauna/',ms:2500});
+    await p.fill('#sauna-mins','9'); await p.selectOption('#sauna-pos','Top');
+    await p.click('[data-action="logsauna"]'); await p.waitForTimeout(1300);
+    assert.strictEqual(setDelays.length,0,'the sauna save never started, so this proves nothing');
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
+    var id=await p.evaluate(function(known){
+      var bs=[].slice.call(document.querySelectorAll('[data-action="delsauna"]'));
+      for(var i=0;i<bs.length;i++){ var x=bs[i].getAttribute('data-id');
+        if(known.indexOf('sauna/'+x)<0){ bs[i].click(); return x; } }
+      return null; }, Object.keys(store));
+    assert.ok(id,'the new sauna row is not on Progress');
+    await p.waitForTimeout(5000);
+    assert.ok(!store['sauna/'+id],'the entry was removed but its document is in the store');
+    await toToday();
+  });
+
+  console.log('\nA FAILED SAVE IS RETRIED, AND A HIDDEN PAGE SAVES AT ONCE');
+  await t('a save refused as transient is retried without another tap', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    failNext.push({op:'set',match:'days/',code:'resource_exhausted'});
+    await p.click(W); await p.waitForTimeout(6500);
+    assert.strictEqual(failNext.length,0,'the save was never refused, so this proves nothing');
+    assert.strictEqual(dayWater(day),w0+1,'the refused save was never retried');
+  });
+
+  await t('a save refused for good is not retried in a loop, and says so', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    failNext.push({op:'set',match:'days/',code:'invalid_argument'});
+    await p.click(W); await p.waitForTimeout(6500);
+    assert.strictEqual(failNext.length,0,'the save was never refused, so this proves nothing');
+    assert.strictEqual(dayWater(day),w0,'a refusal that cannot succeed was retried anyway');
+    assert.ok(/could not be saved/i.test(await text()),'nothing on screen says the change was not saved');
+    // The next change still gets its chance, and carries the first with it.
+    await p.click(W); await p.waitForTimeout(1800);
+    assert.strictEqual(dayWater(day),w0+2,'the next tap did not save');
+    assert.ok(!/could not be saved/i.test(await text()),'the error stayed up after a good save');
+  });
+
+  var hide=function(kind){ return p.evaluate(function(kind){
+    if(kind==='pagehide'){ window.dispatchEvent(new Event('pagehide')); return; }
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:function(){ return 'hidden'; }});
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, kind); };
+  var unhide=function(){ return p.evaluate(function(){
+    delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); }); };
+  await t('a tap is saved at once when the page is hidden, not a second later', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    await p.click(W); await p.waitForTimeout(300);
+    await hide('visibilitychange'); await p.waitForTimeout(500);
+    var got=dayWater(day);
+    await unhide(); await p.waitForTimeout(600);
+    assert.strictEqual(got,w0+1,'the tap was still waiting on its timer when the page went away');
+  });
+
+  await t('and when the page is being closed', async function(){
+    await go(); var day=await today(), w0=dayWater(day);
+    await p.click(W); await p.waitForTimeout(300);
+    await hide('pagehide'); await p.waitForTimeout(500);
+    assert.strictEqual(dayWater(day),w0+1,'the tap was still waiting on its timer when the page closed');
+    await p.waitForTimeout(800);
+  });
+
+  console.log('\nA STORE THAT FAILS TO ANSWER IS NOT MISTAKEN FOR NO STORE');
+  await t('a failed read at load offers Retry, takes no taps and never republishes', async function(){
+    await go(); var day=await today();
+    store['days/'+day]=Object.assign({water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0},
+      store['days/'+day]||{}, {water:4, touched:true});
+    var docBefore=doc, pubs=calls.publish;
+    // Twice: the first load and the one automatic retry both fail.
+    failNext.push({op:'coll',match:'days',code:'unavailable'},{op:'coll',match:'days',code:'unavailable'});
+    await p.goto(url);
+    await p.waitForSelector('[data-action="retryload"]');
+    for(var k=0;k<50 && failNext.length;k++) await p.waitForTimeout(100);
+    assert.strictEqual(failNext.length,0,'the page did not retry once on its own');
+    await p.waitForTimeout(400);
+    assert.ok(await p.locator('[data-action="retryload"]').count(),'Retry went away while the store is still failing');
+    var shown=await waterCount();
+    await tap(W); await p.waitForTimeout(2200);
+    assert.strictEqual(calls.publish,pubs,'the page republished itself over the store');
+    assert.strictEqual(doc,docBefore,'the document was rewritten');
+    assert.strictEqual(await waterCount(),shown,'a tap was taken while the data had not loaded');
+    assert.strictEqual(dayWater(day),4,'the store changed');
+    await p.click('[data-action="retryload"]'); await settle();
+    assert.ok(!(await p.locator('[data-action="retryload"]').count()),'Retry is still up after the store answered');
+    var loaded=await waterCount();
+    await go();
+    assert.strictEqual(loaded,await waterCount(),'after Retry the page does not show what the store holds');
+    assert.strictEqual(dayWater(day),4,'the store changed');
+  });
+
+  console.log("\nWHERE YOU ARE IN THE APP BELONGS TO THIS DEVICE, NOT THE RECORD");
+  await t('moving between tabs does not write the profile, so it cannot carry stale xp back', async function(){
+    await go();
+    var xp=store['state/profile'].totalXp;
+    // Another view earned xp since this one loaded.
+    store['state/profile']=Object.assign({},store['state/profile'],{totalXp:xp+100});
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(400);
+    assert.ok(await tap('[data-action="portions"][data-d="1"]'),'no portions control on Meals');
+    await p.waitForTimeout(1800);
+    var ui=await p.evaluate(function(){ try{ return JSON.parse(localStorage.getItem('fc.ui')); }catch(e){ return null; } });
+    // Back to Today and a tap there, so whichever tab the store last heard of,
+    // one of the two saves happens on a different one.
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(400);
+    var day=await today(), a0=(store['days/'+day]||{}).alcohol||0;
+    await p.click('[data-action="alcohol"][data-d="1"]'); await p.waitForTimeout(1800);
+    assert.strictEqual((store['days/'+day]||{}).alcohol,a0+1,'the tap on Today was not saved, so this proves nothing');
+    assert.strictEqual(store['state/profile'].totalXp,xp+100,'moving between tabs wrote stale xp back: '+store['state/profile'].totalXp);
+    assert.ok(ui && ui.tab==='meals','the tab is not remembered on this device: '+JSON.stringify(ui));
+    await p.click('[data-action="alcohol"][data-d="-1"]'); await p.waitForTimeout(1800);
+  });
+
+  await t('a tab picked while the store is loading is not undone when it answers', async function(){
+    await go();
+    slowGetMs=1500;
+    await p.goto(url); await p.waitForTimeout(250);
+    await tap('[data-action="tab"][data-tab="progress"]');
+    slowGetMs=0; await settle();
+    var on=await p.evaluate(function(){ var a=document.querySelector('.tab.active'); return a&&a.getAttribute('data-tab'); });
+    assert.strictEqual(on,'progress','the store answering moved the page back to '+on);
+    await toToday();
+  });
+
+  console.log('\nTWO VIEWS OPEN AT ONCE');
+  await t('water tapped in one view and smoking in another both survive', async function(){
+    await go(); var day=await today();
+    store['days/'+day]={water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true};
+    var ctx2=await b.newContext({viewport:{width:420,height:900},hasTouch:true,
+      timezoneId:process.env.FC_TZ||'Pacific/Kiritimati'});
+    var q=await ctx2.newPage(); q.setDefaultTimeout(8000);
+    q.on('pageerror',function(e){errs.push('view B: '+e.message);});
+    try{
+      await q.goto(url); await go();
+      await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); });
+      if(await q.locator('[data-action="cancelsession"]').count()) await q.click('[data-action="cancelsession"]');
+      if(await q.locator('[data-action="tab"][data-tab="today"]').count()) await q.click('[data-action="tab"][data-tab="today"]');
+      await q.waitForTimeout(1500);
+      var xp0=store['state/profile'].totalXp;
+      await water(3);
+      assert.strictEqual(dayWater(day),3,'view A did not save its water');
+      var xpA=store['state/profile'].totalXp;
+      assert.ok(xpA>xp0,'the water earned no xp, so the xp check proves nothing');
+      // View B loaded before any of that and has not looked since.
+      await q.click('[data-action="smoking"][data-d="1"]'); await q.waitForTimeout(1800);
+      var d=store['days/'+day];
+      assert.strictEqual(d.smoking,1,'view B did not save its smoking');
+      assert.strictEqual(d.water,3,'view B wrote its stale water over view A\'s: water is '+d.water);
+      assert.strictEqual(store['state/profile'].totalXp,xpA,'view B wrote its stale xp over view A\'s');
+      // And view A picks up view B's change when it is looked at again.
+      await p.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); });
+      await p.waitForTimeout(700);
+      var seen=await p.evaluate(function(){
+        var b=document.querySelector('[data-action="smoking"]'); return b?b.parentNode.querySelector('.count').textContent.trim():null; });
+      assert.strictEqual(seen,'1','view A still shows smoking '+seen+' after being looked at again');
+    } finally { await ctx2.close(); }
   });
 
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');

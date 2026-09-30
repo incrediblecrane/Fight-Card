@@ -16,7 +16,7 @@ documents:
 
 | path | what |
 |---|---|
-| `state/profile` | XP, water target, which tab and slide the app was on |
+| `state/profile` | XP and the water target |
 | `state/shopping` | which shopping items are ticked, plus the hand-added ones |
 | `state/session` | the in-flight workout, or null |
 | `state/meta` | the seeded marker; its presence means the store is the truth |
@@ -39,7 +39,25 @@ migration is retried rather than believed.
 
 A view that cannot run `db` falls back to the old publish-to-save path, which
 still works. Declaring `db` makes the artifact organization-internal: it cannot
-be shared publicly.
+be shared publicly. The fallback is only for a view with no store at all (`use('db')` is
+missing or answers null). A store that is there but fails to answer at load is
+`dbState='error'`: nothing can be changed, nothing is published, and the load is
+retried once on its own and then from a Retry button, because editing the
+embedded seed would be thrown away by the next load, which reads the store.
+
+Which tab, slide and chart range a view is on is that device's, not the
+record's: it lives in `localStorage` under `fc.ui`, not in the store.
+
+Saving goes one save at a time through `dbSave`, and all store access through
+`dbGet`, `dbPut`, `dbDel` and `dbReadAll`. Before each save, and whenever the
+page is looked at again, the documents two open views are likely both to touch
+(`state/*` and the day being logged) are re-read and merged field by field
+against what this view last heard from the store: a field changed here keeps
+this view's value, every other field takes the store's, and XP merges as the
+sum of both views' changes. A transient refusal (`unavailable`,
+`resource_exhausted`, anything unknown) is retried with backoff; one retrying
+cannot fix is shown and waits for the next change. A save still waiting on its
+timer goes at once when the page is hidden or closed.
 
 ## Vocabulary
 

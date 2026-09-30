@@ -92,12 +92,19 @@ cases.forEach(function(pair){
   cmp('an in-flight session survives', st.activeSession||null, back.activeSession);
   cmp('xp survives', st.totalXp||0, back.totalXp);
   cmp('the water target survives', st.waterTarget||8, back.waterTarget);
-  cmp('the ui position survives', [st.uiTab||'today',st.uiSlide||0,st.uiProgRange||14,!!st.uiViewingSession],
-      [back.uiTab,back.uiSlide,back.uiProgRange,back.uiViewingSession]);
+  // Which tab and slide a view is on belongs to that device. Stored in the
+  // profile, every tab change dirtied the document that holds the xp, so the
+  // next save of anything wrote this view's stale xp over another view's.
+  var UI_KEYS=['uiTab','uiSlide','uiProgRange','uiViewingSession'];
+  var prof=sandbox.dbDocs(st)['state/profile']||{};
+  cmp('the ui position is not written to the store', [], UI_KEYS.filter(function(k){ return k in prof; }));
+  cmp('nor read back from it', [], UI_KEYS.filter(function(k){ return k in back; }));
 
   // Nothing in state may be silently unmapped.
   var mapped={days:1,workoutLogs:1,saunaSessions:1,recipes:1,library:1,shoppingChecked:1,
-              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
+              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,
+              // Device-only, kept in localStorage: an old seed may still carry them.
+              uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
   var unmapped=Object.keys(st).filter(function(k){ return !mapped[k]; });
   if(unmapped.length){ fails++; console.log('  FAIL  '+name+': unmapped state keys -> '+unmapped.join(', ')); }
   else console.log('  PASS  '+name+': no state key is left unmapped');
@@ -117,6 +124,22 @@ cases.forEach(function(pair){
   else console.log('  PASS  '+name+': all '+Object.keys(docs).length+' documents are legal and within caps');
 });
 function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
+
+// Two views of the app, each merging what the store holds into its own copy
+// before it saves. A field one view changed keeps that view's value, the rest
+// take the store's, and xp adds both views' changes rather than picking one.
+(function(){
+  var m={}; new Function(grab('stableJson')+'\n'+grab('dbMerge')+'\nthis.dbMerge=dbMerge;').call(m);
+  var got=m.dbMerge('days/2026-09-30',{water:0,smoking:0,workout:{done:false,type:null}},
+    {water:0,smoking:1,workout:{done:false,type:null}},
+    {water:3,smoking:0,workout:{done:true,type:'Strength'}});
+  if(got.water===3 && got.smoking===1 && got.workout.done===true && got.workout.type==='Strength')
+    console.log('  PASS  a day merges field by field: their water and workout, my smoking');
+  else { fails++; console.log('  FAIL  a day merges field by field\n        got '+JSON.stringify(got)); }
+  var xp=m.dbMerge('state/profile',{totalXp:100,waterTarget:8},{totalXp:115,waterTarget:8},{totalXp:103,waterTarget:10});
+  if(xp.totalXp===118 && xp.waterTarget===10) console.log('  PASS  xp adds both views\' gains; an untouched target takes theirs');
+  else { fails++; console.log('  FAIL  profile merge\n        got '+JSON.stringify(xp)); }
+})();
 
 console.log(fails?('\n'+fails+' FAILING'):'\nRound-trip is lossless.');
 process.exit(fails?1:0);

@@ -609,11 +609,12 @@ function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.get
 function realToday(){return dateKey(new Date());}
 var BACKFILL_DAYS=14;
 function minLogDate(){ var d=new Date(); d.setDate(d.getDate()-(BACKFILL_DAYS-1)); return dateKey(d); }
-// Saving republishes the whole document and EVERY open view reloads onto it,
-// so anything held only in a variable is wiped on every single tap. That is why
-// the app keeps uiTab and friends in state. The log date needs the opposite
-// pair of properties: survive a save, but NOT survive closing the app. That is
-// exactly sessionStorage, which the reload keeps and closing the tab clears.
+// Saving without db republishes the whole document and EVERY open view reloads
+// onto it, so anything held only in a variable is wiped on every single tap.
+// That is why the tab and slide live in localStorage (see readUi). The log date
+// needs the opposite pair of properties: survive a save, but NOT survive
+// closing the app. That is exactly sessionStorage, which the reload keeps and
+// closing the tab clears.
 // It deliberately does not go in state: a backdate is this device's editing
 // position, not part of the record, and it must never sync to another device.
 var LOGDATE_KEY='fc.logDate';
@@ -775,11 +776,21 @@ var PREP_RECIPES=[
   });
 })();
 
-var tab=state.uiTab||'today';
-var viewingSession=!!state.uiViewingSession;
+// Which tab, slide and chart range this view is on. It is this device's
+// position, not part of the record: kept in the profile, every tab change
+// dirtied the document that holds the xp, so the next save of anything wrote
+// this view's stale xp over what another view had earned. An older seed still
+// carries the fields; they are dropped so they are never written back.
+var UI_KEY='fc.ui', uiSaved='';
+function readUi(){ try{ return JSON.parse(localStorage.getItem(UI_KEY)||'null')||{}; }catch(e){ return {}; } }
+function writeUi(v){ if(v===uiSaved) return; uiSaved=v; try{ localStorage.setItem(UI_KEY,v); }catch(e){} }
+['uiTab','uiSlide','uiProgRange','uiViewingSession'].forEach(function(k){ delete state[k]; });
+var ui0=readUi();
+var tab=ui0.tab||'today';
+var viewingSession=!!ui0.viewingSession;
 var expanded={};
-var slide=state.uiSlide||0;
-var progRange=state.uiProgRange||14;
+var slide=ui0.slide||0;
+var progRange=ui0.progRange||14;
 var logDate=null; // null means 'not read yet'; the value lives in sessionStorage
 var swipeOpen=null; // id of the row currently swiped open
 var addingExercise=false;
@@ -835,9 +846,7 @@ var lastSaved={};   // path -> JSON of what the store already holds
    actually did, without every mutation site having to declare what it dirtied. */
 function dbDocs(st){
   var out={};
-  out['state/profile']={waterTarget:st.waterTarget, totalXp:st.totalXp,
-    uiTab:st.uiTab||'today', uiSlide:st.uiSlide||0, uiProgRange:st.uiProgRange||14,
-    uiViewingSession:!!st.uiViewingSession};
+  out['state/profile']={waterTarget:st.waterTarget, totalXp:st.totalXp};
   // A document body is an object, so a list or a nullable session is wrapped.
   out['state/shopping']={checked:(st.shoppingChecked||[]).slice(), extras:(st.shopExtras||[]).slice()};
   out['state/session']={active:st.activeSession||null};
@@ -873,8 +882,6 @@ function dbApply(map){
           shoppingChecked:[], shopExtras:[], activeSession:null};
   var prof=map['state/profile']||{};
   st.waterTarget=prof.waterTarget||8; st.totalXp=prof.totalXp||0;
-  st.uiTab=prof.uiTab||'today'; st.uiSlide=prof.uiSlide||0;
-  st.uiProgRange=prof.uiProgRange||14; st.uiViewingSession=!!prof.uiViewingSession;
   if(map['state/shopping']){
     st.shoppingChecked=dbClone(map['state/shopping'].checked)||[];
     st.shopExtras=dbClone(map['state/shopping'].extras)||[];
@@ -919,8 +926,9 @@ function dbSnapshot(map){
   return snap;
 }
 
+function blankDay(){ return {water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false}; }
 function ensureDay(k){
-  if(!state.days[k]) state.days[k]={water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false};
+  if(!state.days[k]) state.days[k]=blankDay();
   return state.days[k];
 }
 function levelInfo(){ var span=150; var level=1+Math.floor(state.totalXp/span); var into=state.totalXp%span; return {level:level,into:into,span:span}; }
@@ -1078,22 +1086,31 @@ function applyUndo(){
 
 function addXp(n){ state.totalXp+=n; if(state.totalXp<0) state.totalXp=0; }
 function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(persist,1000); }
+// A page being hidden or closed may never run its timer, so a save still
+// waiting on one goes now. Nothing pending, nothing to write.
+function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); persist(); }
 
 var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
 
+/* Every read and write of the store goes through these four, so what sits
+   behind them can change in one place. dbGet answers undefined for a
+   document that is not there, which is not an error. */
+function dbGet(path){ return dbApi.doc(path).get().then(function(d){ return d.exists?d.data():undefined; }); }
+function dbPut(path,body){ return dbApi.doc(path).set(body); }
+function dbDel(path){ return dbApi.doc(path).delete(); }
 /* Read the whole store. Five collection reads and three document reads, once
    at boot. Everything here is small and there are well under a hundred
    documents, so this is one round trip's worth of work, not a paging problem. */
-function dbReadAll(db){
+function dbReadAll(){
   var jobs=DB_COLLECTIONS.map(function(coll){
-    return db.collection(coll).get().then(function(snap){
+    return dbApi.collection(coll).get().then(function(snap){
       var part={}; snap.docs.forEach(function(d){ if(d.exists) part[coll+'/'+d.id]=d.data(); });
       return part;
     });
   }).concat(DB_STATE_DOCS.map(function(path){
-    return db.doc(path).get().then(function(d){
-      var part={}; if(d.exists) part[path]=d.data(); return part;
+    return dbGet(path).then(function(v){
+      var part={}; if(v!==undefined) part[path]=v; return part;
     });
   }));
   return Promise.all(jobs).then(function(parts){
@@ -1107,7 +1124,7 @@ function dbReadAll(db){
    that dies halfway is simply retried on the next load rather than leaving a
    store that claims to be complete and is not. */
 var DB_SEED_BATCH=8;
-function dbSeed(db, st){
+function dbSeed(st){
   var docs=dbDocs(st), paths=Object.keys(docs);
   // In batches, not seventy writes at once: a burst that size is the shape the
   // store calls resource_exhausted, and a seed that always trips it would
@@ -1115,21 +1132,31 @@ function dbSeed(db, st){
   function batch(i){
     if(i>=paths.length) return Promise.resolve();
     var slice=paths.slice(i,i+DB_SEED_BATCH);
-    return Promise.all(slice.map(function(path){ return db.doc(path).set(docs[path]); }))
+    return Promise.all(slice.map(function(path){ return dbPut(path,docs[path]); }))
       .then(function(){ return batch(i+DB_SEED_BATCH); });
   }
   return batch(0)
-    .then(function(){ return db.doc('state/meta').set({seeded:true, seededAt:new Date().toISOString(), docs:paths.length}); })
+    .then(function(){ return dbPut('state/meta',{seeded:true, seededAt:new Date().toISOString(), docs:paths.length}); })
     .then(function(){ return docs; });
 }
 
+/* 'local' means there is no store: use() is missing or answered null, and
+   publish-to-save is right. A store that is there but failed to answer is
+   'error', which is not the same thing at all. Falling back to the seed then
+   meant editing a stale copy and republishing it, and every one of those taps
+   was lost on the next load, which reads the store. So in 'error' nothing is
+   changed or published, and the load is retried: once on its own, then from
+   the Retry button. */
+var booting=false, bootRetried=false;
 function dbBoot(){
   if(!window.claude || !window.claude.use){ dbState='local'; return; }
+  if(booting||dbState==='db') return;
+  booting=true;
   claude.use('db').then(function(db){
     if(!db){ dbState='local'; render(); return; }
     dbApi=db;
-    return db.doc('state/meta').get().then(function(meta){
-      if(meta.exists) return dbReadAll(db).then(function(map){
+    return dbGet('state/meta').then(function(meta){
+      if(meta) return dbReadAll().then(function(map){
         state=dbApply(map);
         lastSaved=dbSnapshot(map);
         // Recipes saved under the old shape are converted here, once. The
@@ -1140,62 +1167,145 @@ function dbBoot(){
         if(moved) scheduleSave();
       });
       // First run on this store: the document's own seed is the truth.
-      return dbSeed(db, state).then(function(docs){ lastSaved=dbSnapshot(docs); });
+      return dbSeed(state).then(function(docs){ lastSaved=dbSnapshot(docs); });
     }).then(function(){
-      dbState='db';
+      dbState='db'; dbErr=null;
       syncFromState();
       render();
     });
   }).catch(function(e){
-    // Fall back rather than lock the app: the embedded seed is real data and
-    // publish-to-save still works, it is just the expensive old path.
-    dbErr=(e&&e.code)||'unavailable'; dbState='local'; render();
-  });
+    if(!dbApi){ dbState='local'; render(); return; }
+    dbErr=(e&&e.code)||'unavailable'; dbState='error'; render();
+    if(!bootRetried){ bootRetried=true; setTimeout(dbBoot,1000+Math.random()*500); }
+  }).then(function(){ booting=false; });
 }
 
-/* The UI reads a few fields off state at load. After the store replaces
-   state wholesale those locals are stale, so they are re-read here. */
+/* The store replaces state wholesale, and a session loaded from it may
+   predate the prep steps. */
 function syncFromState(){
-  tab=state.uiTab||'today';
-  viewingSession=!!state.uiViewingSession;
-  slide=state.uiSlide||0;
-  progRange=state.uiProgRange||14;
   ensurePrep(state.activeSession);
 }
 
+/* Another view of the app, on this device or another, may have written since
+   this one loaded. The documents two views are likely both to touch are
+   re-read before every save and whenever the page is looked at again, and
+   merged field by field against what this view last heard from the store: a
+   field changed here keeps this view's value, every other field takes the
+   store's. So water tapped in one view and smoking in the other both survive,
+   where writing whole documents kept only the last. XP is a running total
+   both views add to, so it merges as the sum of the two changes. */
+function dbHot(){
+  var k=activeDate(), r=realToday(), out=DB_STATE_DOCS.concat(['days/'+k]);
+  if(r!==k) out.push('days/'+r);
+  return out;
+}
+function dbMerge(path,base,mine,theirs){
+  var keys={}, out={};
+  [base,mine,theirs].forEach(function(o){ Object.keys(o).forEach(function(k){ keys[k]=1; }); });
+  Object.keys(keys).forEach(function(k){
+    var v;
+    if(path==='state/profile' && k==='totalXp') v=Math.max(0,(theirs[k]||0)+(mine[k]||0)-(base[k]||0));
+    else v=stableJson(mine[k])!==stableJson(base[k]) ? mine[k] : theirs[k];
+    if(v!==undefined) out[k]=v;
+  });
+  return out;
+}
+// Put one merged document back into state, through dbApply so the mapping
+// from documents to state stays in one place (and bodies come out unfrozen).
+var DB_STATE_KEYS={'state/profile':['waterTarget','totalXp'], 'state/shopping':['shoppingChecked','shopExtras'],
+  'state/session':['activeSession']};
+function dbPlace(path,body){
+  var one={}; one[path]=body; var st=dbApply(one);
+  if(path.indexOf('days/')===0){ state.days[path.slice(5)]=st.days[path.slice(5)]; return; }
+  DB_STATE_KEYS[path].forEach(function(k){ state[k]=st[k]; });
+  if(path==='state/session') ensurePrep(state.activeSession);
+}
+function dbRefresh(){
+  var paths=dbHot();
+  return Promise.all(paths.map(dbGet)).then(function(got){
+    // Taken after the read, so a tap made while it was out counts as ours.
+    var mine=dbDocs(state), moved=false;
+    paths.forEach(function(path,i){
+      var theirs=got[i], isDay=path.indexOf('days/')===0;
+      // Nothing there: ours stands, and is written if we have one.
+      if(theirs===undefined){ delete lastSaved[path]; return; }
+      // Never heard from the store about it: a day starts blank, so anything
+      // still blank here takes theirs; anything else stands as ours.
+      var base=lastSaved[path]!==undefined ? JSON.parse(lastSaved[path]) : (isDay?blankDay():theirs);
+      var m=dbMerge(path,base,mine[path]||(isDay?blankDay():{}),theirs);
+      lastSaved[path]=stableJson(theirs);
+      if(stableJson(m)!==stableJson(mine[path])){ dbPlace(path,m); moved=true; }
+    });
+    return moved;
+  });
+}
+
 /* Save = write the documents that actually changed. Everything else the app
-   does is unchanged: every mutation still just calls scheduleSave(). */
+   does is unchanged: every mutation still just calls scheduleSave().
+   One save at a time. Two that overlapped diffed against the same stale
+   lastSaved, so an older write could land last, or a delete was skipped
+   because the document it had to remove was still being created. A save
+   asked for meanwhile runs when this one is done, and lastSaved moves one
+   document at a time, as each write lands. */
+var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false;
+// Retrying cannot fix these; anything else, unknown codes included, is
+// treated as transient, as the store's contract says to.
+var DB_HARD={invalid_argument:1, quota_exceeded:1, revoked:1, not_granted:1,
+  capability_disabled:1, capability_removed:1, transform_error:1};
 function dbSave(){
   if(!dbApi) return;
-  var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[];
-  Object.keys(next).forEach(function(path){
-    if(lastSaved[path]!==next[path]) jobs.push(function(){ return dbApi.doc(path).set(docs[path]); });
-  });
-  Object.keys(lastSaved).forEach(function(path){
-    if(next[path]===undefined) jobs.push(function(){ return dbApi.doc(path).delete(); });
-  });
-  if(!jobs.length) return;
-  saving=true; render();
-  // Almost every save is one or two documents, but a migration dirties every
-  // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
-  // avoid, and a save has no more right to that burst than seeding does.
-  function batch(i){
-    if(i>=jobs.length) return Promise.resolve();
-    return Promise.all(jobs.slice(i,i+DB_SEED_BATCH).map(function(run){ return run(); }))
-      .then(function(){ return batch(i+DB_SEED_BATCH); });
-  }
-  batch(0).then(function(){
-    lastSaved=next; saving=false; dbErr=null; render();
-  }).catch(function(e){
-    // Leave lastSaved alone so the next save retries the same documents.
-    saving=false; dbErr=(e&&e.code)||'unavailable'; render();
+  if(saveBusy){ saveAgain=true; return; }
+  saveBusy=true;
+  var retrying=false;
+  dbRefresh().then(function(moved){
+    var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[];
+    Object.keys(next).forEach(function(path){
+      if(lastSaved[path]!==next[path]) jobs.push(function(){
+        return dbPut(path,docs[path]).then(function(){ lastSaved[path]=next[path]; }); });
+    });
+    Object.keys(lastSaved).forEach(function(path){
+      if(next[path]===undefined) jobs.push(function(){
+        return dbDel(path).then(function(){ delete lastSaved[path]; }); });
+    });
+    if(!jobs.length){ if(moved) render(); return; }
+    saving=true; render();
+    // Almost every save is one or two documents, but a migration dirties every
+    // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
+    // avoid, and a save has no more right to that burst than seeding does.
+    function batch(i){
+      if(i>=jobs.length) return Promise.resolve();
+      return Promise.all(jobs.slice(i,i+DB_SEED_BATCH).map(function(run){ return run(); }))
+        .then(function(){ return batch(i+DB_SEED_BATCH); });
+    }
+    return batch(0).then(function(){ saving=false; render(); });
+  }).then(function(){
+    saveAttempt=0;
+    if(dbErr){ dbErr=null; dbErrHard=false; render(); }
+  }, function(e){
+    // Whatever did not land is still different from lastSaved, so the next
+    // save carries it. A transient refusal gets that next save on its own,
+    // backing off 2s, 4s, 8s up to 30s; one that retrying cannot fix waits
+    // for the next change and says so.
+    saving=false; dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr];
+    if(!dbErrHard){
+      retrying=true;
+      if(saveTimer) clearTimeout(saveTimer);
+      saveTimer=setTimeout(persist, Math.min(30000,2000*Math.pow(2,saveAttempt++))+Math.random()*500);
+    }
+    render();
+  }).then(function(){
+    saveBusy=false;
+    if(saveAgain){ saveAgain=false; if(!retrying) dbSave(); }
   });
 }
 function persist(){
+  saveTimer=null;
   // Once the store is live it is the only place data goes; republishing the
   // whole document would put a stale copy of it back inside the code.
   if(dbState==='db'){ dbSave(); return; }
-  if(dbState==='loading') return;   // dbBoot will settle and save from there
+  // Loading: dbBoot will settle and save from there. Error: there is a store
+  // and it holds the truth, so publishing the seed would be the worst answer.
+  if(dbState==='loading'||dbState==='error') return;
   if(!window.claude || !window.claude.use){ render(); return; }
   saving=true; render();
   claude.use('artifact').then(function(ns){
@@ -2621,8 +2731,11 @@ function bodyContent(){
     : '';
   return '<div class="wrap'+(backfilling()?' backfilling':'')+'">'+
       (dbState==='loading'?'<div class="banner">loading your data&hellip;</div>':'')+
+      (dbState==='error'?'<div class="banner">Could not load your saved data ('+esc(dbErr||'unavailable')+'). Changes are paused until it loads. <button data-action="retryload">Retry</button></div>':'')+
       (saving?'<div class="banner">saving&hellip;</div>':'')+
-      (dbErr?'<div class="banner">Trouble reaching your saved data ('+esc(dbErr)+'). The last thing you did may not have stuck.</div>':'')+
+      (dbErr&&dbState==='db'?'<div class="banner">'+(dbErrHard?
+        'Your last change could not be saved ('+esc(dbErr)+').':
+        'Trouble reaching your saved data ('+esc(dbErr)+'). Trying again.')+'</div>':'')+
       backfillBar+
       (window.claude && window.claude.use ? '' : '<div class="banner">Open this from your artifact link to sync across devices &mdash; changes here are local to this tab only.</div>')+
       '<div class="hud"><div class="hud-top"><h1 class="brand">Fight <span>Card</span></h1><div class="date">'+prettyDate()+'</div></div>'+
@@ -2638,7 +2751,7 @@ function bodyContent(){
 }
 
 function syncUi(){
-  state.uiTab=tab; state.uiViewingSession=viewingSession; state.uiSlide=slide; state.uiProgRange=progRange;
+  writeUi(JSON.stringify({tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange}));
 }
 
 /* Matching is forgiving about a trailing plural, because "shrugs" and "dips"
@@ -2732,7 +2845,10 @@ function onClick(e){
   // about to be replaced by the store. Reading and moving around is fine.
   var UI_ONLY_WHILE_LOADING={tab:1,prevslide:1,nextslide:1,toggleex:1,openpicker:1,
     closepicker:1,prange:1,cancelsession:1,resumesession:1,dismissundo:1};
-  if(dbState==='loading' && !UI_ONLY_WHILE_LOADING[action]) return;
+  // A store that failed to answer is held off the same way, and Retry is the
+  // one thing that can move it on.
+  if(action==='retryload'){ if(dbState==='error'){ dbState='loading'; render(); dbBoot(); } return; }
+  if((dbState==='loading'||dbState==='error') && !UI_ONLY_WHILE_LOADING[action]) return;
   if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
   else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
   else if(action==='pickday'){ setLogDate(t.getAttribute('data-k')); tab='today'; render(); return; }
@@ -2925,7 +3041,7 @@ function onChange(e){
   }
   // Same reason as onClick: state is about to be replaced by the store, so a
   // change applied now would be thrown away rather than saved.
-  else if(dbState==='loading'){ render(); return; }
+  else if(dbState==='loading'||dbState==='error'){ render(); return; }
   // Picking a day or a slot plans nothing on its own, so there is nothing to
   // save and nothing to redraw: it is remembered until Add is pressed.
   else if(action==='planday'){ var id=t.getAttribute('data-id');
@@ -3011,6 +3127,14 @@ function boot(){
   document.addEventListener('keydown',onKeydown);
   document.addEventListener('touchstart',onTouchStart,{passive:true});
   document.addEventListener('touchend',onTouchEnd,{passive:true});
+  // Hidden or closing: a save still waiting on its timer goes now, because the
+  // page may never run it. Looked at again: another view may have written in
+  // the meantime, so re-read and merge.
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden') flushSave();
+    else if(dbState==='db') dbSave();
+  });
+  window.addEventListener('pagehide',flushSave);
   // A session already in flight when this shipped has no prep steps; give it
   // them here, since viewingSession persists and such a session never goes
   // back through startWorkout.
