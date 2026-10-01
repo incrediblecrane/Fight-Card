@@ -1375,6 +1375,8 @@ srv.listen(0,async function(){
     await p.click('[data-action="logsauna"]'); await settle();
     assert.strictEqual(seedOf().saunaSessions.length,n,'it logged anyway');
     assert.strictEqual(await invalid('#sauna-temp'),'true','the bad temperature is not marked');
+    var focus=await p.evaluate(function(){ return document.activeElement&&document.activeElement.id; });
+    assert.strictEqual(focus,'sauna-temp','focus went to '+focus+', not the box that refused it');
   });
 
   await t('no page errors', function(){

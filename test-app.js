@@ -335,7 +335,10 @@ server.listen(0, async function(){
     var got=seedOf(await mp.evaluate(function(){ return window.__pub; })).days;
     assert.ok(!(await mp.$('.backfill-bar')),'the backfill bar is up though nobody picked a day');
     assert.strictEqual((got['2026-10-01']||{}).water,1,'the tap did not land on 2026-10-01');
-    assert.strictEqual(JSON.stringify(got['2026-09-30']||null),day0,'yesterday was written to');
+    // An untouched blank day for the day the tab was opened is not a write to
+    // it; whether the seed already has one depends on the real date the suite runs.
+    var y0=got['2026-09-30']||null; if(day0==='null' && y0 && !y0.touched && !y0.water) y0=null;
+    assert.strictEqual(JSON.stringify(y0),day0,'yesterday was written to');
     ok('after midnight a tap lands on the new day, not yesterday');
   }catch(e){ bad('past midnight, on the next tap',e); }
   if(mctx) await mctx.close();

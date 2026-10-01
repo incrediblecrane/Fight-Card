@@ -141,6 +141,41 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
   var xp=m.dbMerge('state/profile',{totalXp:100,waterTarget:8},{totalXp:115,waterTarget:8},{totalXp:103,waterTarget:10});
   if(xp.totalXp===118 && xp.waterTarget===10) console.log('  PASS  xp adds both views\' gains; an untouched target takes theirs');
   else { fails++; console.log('  FAIL  profile merge\n        got '+JSON.stringify(xp)); }
+  // Two views each deleting a different built-in recipe: both stay deleted,
+  // and one view putting its own back does not bring back the other's.
+  var dr=m.dbMerge('state/profile',{totalXp:0,deletedRecipes:['p1']},
+    {totalXp:0,deletedRecipes:['p1','p3']},{totalXp:0,deletedRecipes:['p1','p5']});
+  if(JSON.stringify((dr.deletedRecipes||[]).slice().sort())==='["p1","p3","p5"]')
+    console.log('  PASS  recipes deleted in two views both stay deleted');
+  else { fails++; console.log('  FAIL  deleted recipes merge\n        got '+JSON.stringify(dr)); }
+  var ud=m.dbMerge('state/profile',{totalXp:0,deletedRecipes:['p1','p3']},
+    {totalXp:0,deletedRecipes:['p3']},{totalXp:0,deletedRecipes:['p1','p3','p5']});
+  if(JSON.stringify(ud.deletedRecipes)==='["p3","p5"]')
+    console.log('  PASS  an undone delete merges as a removal, the other view\'s delete kept');
+  else { fails++; console.log('  FAIL  undone delete merge\n        got '+JSON.stringify(ud)); }
+})();
+
+// A merged profile is put back into this view's state. Anything dbApply reads
+// from the profile but dbPlace does not copy is lost on this view's next save.
+(function(){
+  var KEYS=h.match(/var DB_STATE_KEYS=\{[^}]*\};/)[0];
+  var m={state:{waterTarget:8,totalXp:0,deletedRecipes:[]}};
+  new Function('state',DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+KEYS+'\nfunction ensurePrep(){}\n'+grab('dbClone')+'\n'+
+    grab('dbApply')+'\n'+grab('dbPlace')+'\ndbPlace("state/profile",{waterTarget:9,totalXp:5,deletedRecipes:["p3"]});')
+    .call(m,m.state);
+  if(JSON.stringify(m.state.deletedRecipes)==='["p3"]' && m.state.totalXp===5)
+    console.log('  PASS  a merged profile brings another view\'s deleted recipes into state');
+  else { fails++; console.log('  FAIL  dbPlace dropped the deleted recipes\n        got '+JSON.stringify(m.state)); }
+})();
+
+// Number boxes: a comma decimal is a decimal, but "1,000" is a thousands
+// comma and must not be read as 1.
+(function(){
+  var m={}; new Function(grab('parseNum')+'\nthis.parseNum=parseNum;').call(m);
+  var got=['22,5','1,000','2,500','0,125','12,50','1000'].map(function(x){ return m.parseNum(x); });
+  if(got[0]===22.5 && isNaN(got[1]) && isNaN(got[2]) && got[3]===0.125 && got[4]===12.5 && got[5]===1000)
+    console.log('  PASS  a comma decimal reads as a decimal; a thousands comma is refused, not scaled down');
+  else { fails++; console.log('  FAIL  parseNum\n        got '+JSON.stringify(got.map(String))); }
 })();
 
 console.log(fails?('\n'+fails+' FAILING'):'\nRound-trip is lossless.');

@@ -659,12 +659,20 @@ function saunaTotal(x){
    so a simple session does not read like a compound one. */
 /* Number boxes are plain text boxes read here. A number input drops a comma
    decimal, so "22,5" was logged as 225; anything that is not a number now is
-   refused and the box marked, rather than guessed at. */
-function parseNum(s){ s=String(s==null?'':s).trim().replace(',','.');
+   refused and the box marked, rather than guessed at. "1,000" is refused too:
+   read as a decimal it would log a 1000m row as 1m. */
+function parseNum(s){ s=String(s==null?'':s).trim();
+  if(/^[1-9]\d{0,2},\d{3}$/.test(s)) return NaN;
+  s=s.replace(',','.');
   return /^(\d+\.?\d*|\.\d+)$/.test(s)?+s:NaN; }
 // Ids of boxes holding something that is not a number, marked until retyped.
 var badFields={};
 function markBad(el){ if(!el) return; badFields[el.id]=1; el.setAttribute('aria-invalid','true'); }
+// Focus the first marked box of these, in page order, so a refusal points at its cause.
+function focusBad(ids){
+  var el=[].filter.call(document.querySelectorAll('#app [aria-invalid="true"]'),function(x){ return ids.indexOf(x.id)>-1; })[0];
+  if(el) el.focus();
+}
 // null when empty, NaN (and marked) when not a number, else the number.
 function readNum(el){
   if(!el || String(el.value).trim()==='') return null;
@@ -1302,6 +1310,14 @@ function dbMerge(path,base,mine,theirs){
   Object.keys(keys).forEach(function(k){
     var v;
     if(path==='state/profile' && k==='totalXp') v=Math.max(0,(theirs[k]||0)+(mine[k]||0)-(base[k]||0));
+    // A set: their list, plus what this view deleted, minus what it put back,
+    // so two views deleting different recipes keep both.
+    else if(path==='state/profile' && k==='deletedRecipes'){
+      var b0=base[k]||[], m0=mine[k]||[];
+      v=(theirs[k]||[]).filter(function(id){ return !(b0.indexOf(id)>-1 && m0.indexOf(id)<0); });
+      m0.forEach(function(id){ if(b0.indexOf(id)<0 && v.indexOf(id)<0) v.push(id); });
+      if(!v.length) v=undefined;
+    }
     else v=stableJson(mine[k])!==stableJson(base[k]) ? mine[k] : theirs[k];
     if(v!==undefined) out[k]=v;
   });
@@ -1309,7 +1325,7 @@ function dbMerge(path,base,mine,theirs){
 }
 // Put one merged document back into state, through dbApply so the mapping
 // from documents to state stays in one place (and bodies come out unfrozen).
-var DB_STATE_KEYS={'state/profile':['waterTarget','totalXp'], 'state/shopping':['shoppingChecked','shopExtras'],
+var DB_STATE_KEYS={'state/profile':['waterTarget','totalXp','deletedRecipes'], 'state/shopping':['shoppingChecked','shopExtras'],
   'state/session':['activeSession']};
 function dbPlace(path,body){
   var one={}; one[path]=body; var st=dbApply(one);
@@ -3086,7 +3102,8 @@ function onClick(e){
   else if(action==='logset'){
     // Refused: say so where it was, and draw nothing, so the focus stays put.
     if(!logSet(t.getAttribute('data-ex'), t.getAttribute('data-type'))){
-      var badEl=document.querySelector('#app [aria-invalid="true"]'); if(badEl) badEl.focus();
+      var exB=t.getAttribute('data-ex');
+      focusBad(['log-v-','log-w-','log-lvl-'].map(function(k){ return k+exB; }));
       return;
     }
   }
@@ -3166,7 +3183,8 @@ function onClick(e){
     if(d<0 && prev<=state.waterTarget && prev>0) addXp(-XP_PER_WATER);
   }
   else if(action==='addstint'){
-    if(readStint()!==true) return;   // nothing typed, nothing to add
+    var rs=readStint(); if(rs==='bad') focusBad(['sauna-mins','sauna-temp']);
+    if(rs!==true) return;   // nothing typed, nothing to add
     uiOnly=true;
   }
   else if(action==='delstint'){
@@ -3175,7 +3193,8 @@ function onClick(e){
   else if(action==='logsauna'){
     // Whatever is still in the row counts as the last stint, so a single-stint
     // session is one tap and never needs Add first.
-    if(readStint()==='bad' || !saunaDraft.length) return;
+    if(readStint()==='bad'){ focusBad(['sauna-mins','sauna-temp']); return; }
+    if(!saunaDraft.length) return;
     var stints=saunaDraft.slice();
     state.saunaSessions.push({id:'sa'+Date.now(),date:activeDate(),
       mins:stints.reduce(function(a,st){return a+st.mins;},0),
