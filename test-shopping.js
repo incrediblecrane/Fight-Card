@@ -302,5 +302,86 @@ t('a counting noun stays on the row, so celery is sticks and not heads', functio
   assert.ok(/stick/.test(label), 'the row reads "'+label+'", which is heads of celery');
 });
 
+console.log('\nREADING WHAT PEOPLE TYPE');
+
+// The add-recipe box says "Name (quantity unit)", so anything a person might
+// type there has to come back out meaning the same thing.
+function pi(txt){ var g=sandbox({recipes:[], plan:[], shopExtras:[]}).parseIng(txt);
+  return {q:g.q, qMax:g.qMax, u:g.u, d:g.d}; }
+function sc(txt,f){ var b=sandbox({recipes:[], plan:[], shopExtras:[]}); return b.scaledIng(b.parseIng(txt),f); }
+
+t('a unit is a whole word, so "large" is not litres and "grams" is grams', function(){
+  var g=pi('Spinach (2 large handfuls)');
+  assert.deepStrictEqual([g.q,g.u,g.d],[2,'','large handfuls'], JSON.stringify(g));
+  g=pi('Onion (1 large)'); assert.deepStrictEqual([g.u,g.d],['','large'], JSON.stringify(g));
+  g=pi('Chillies (2 green)'); assert.deepStrictEqual([g.u,g.d],['','green'], JSON.stringify(g));
+  g=pi('Garlic (3 garlic cloves)'); assert.deepStrictEqual([g.u,g.d],['','garlic cloves'], JSON.stringify(g));
+  g=pi('Milk (1 litre)'); assert.deepStrictEqual([g.q,g.u,g.d],[1,'l',''], JSON.stringify(g));
+  g=pi('Flour (200 grams)'); assert.deepStrictEqual([g.q,g.u,g.d],[200,'g',''], JSON.stringify(g));
+  g=pi('Rice (400g)'); assert.deepStrictEqual([g.q,g.u,g.d],[400,'g',''], JSON.stringify(g));
+  assert.strictEqual(sc('Spinach (2 large handfuls)',3),'Spinach (6, large handfuls)');
+});
+
+t('a range keeps both ends on the card and buys the top end', function(){
+  var g=pi('Sausages (4-6)'); assert.deepStrictEqual([g.q,g.qMax],[4,6], JSON.stringify(g));
+  assert.strictEqual(sc('Sausages (4-6)',1),'Sausages (4-6)');
+  assert.strictEqual(sc('Sausages (4-6)',2),'Sausages (8-12)');
+  assert.strictEqual(sc('Bread (2-3 slices)',1),'Bread (2-3 slices)');
+  assert.strictEqual(sc('Bread (2-3 slices)',0.5),'Bread (1-2 slices)');
+  assert.strictEqual(sc('Parsley (1-2 bunches)',0.5),'Parsley (0.5-1 bunch)');
+  assert.strictEqual(sc('Chicken breast (2-3, sliced)',1),'Chicken breast (2-3, sliced)');
+  var st={recipes:[{id:'a',title:'A',base:2,ingredients:['Sausages (4-6)']}], plan:[], shopExtras:[]};
+  var box=sandbox(st);
+  st.plan.push({id:'x', recipeId:'a', date:box.planDates()[0], slot:'dinner', portions:2});
+  assert.strictEqual(labelFor(box.shoppingList(),'Sausages'),'Sausages (6)');
+});
+
+t('mixed and unicode fractions are read as numbers', function(){
+  var g=pi('Beans (1 1/2 tins)'); assert.deepStrictEqual([g.q,g.u,g.d],[1.5,'tins',''], JSON.stringify(g));
+  g=pi('Eggs (½)'); assert.strictEqual(g.q,0.5, JSON.stringify(g));
+  g=pi('Butter (1½ tbsp)'); assert.deepStrictEqual([g.q,g.u],[1.5,'tbsp'], JSON.stringify(g));
+  g=pi('Avocado (1/2)'); assert.strictEqual(g.q,0.5, JSON.stringify(g));
+  assert.strictEqual(sc('Beans (1 1/2 tins)',2),'Beans (3 tins)');
+});
+
+t('a bunch is a unit, and more than one is bunches', function(){
+  var box=sandbox({recipes:[], plan:[], shopExtras:[]});
+  assert.strictEqual(box.qtyText(2,'bunch'),'2 bunches');
+  assert.strictEqual(box.qtyText(2,'bunch',true),'2 bunches');
+  assert.strictEqual(box.qtyText(1,'bunches'),'1 bunch');
+  var g=pi('Coriander (2 bunches)'); assert.deepStrictEqual([g.q,g.u,g.d],[2,'bunches',''], JSON.stringify(g));
+  g=pi('Parsley (bunch)'); assert.deepStrictEqual([g.q,g.u],[1,'bunch'], JSON.stringify(g));
+  var st={recipes:[{id:'a',title:'A',base:1,ingredients:['Coriander (1 bunch)']},
+                   {id:'b',title:'B',base:1,ingredients:['Coriander (2 bunches)']}], plan:[], shopExtras:[]};
+  box=sandbox(st);
+  st.plan.push({id:'x', recipeId:'a', date:box.planDates()[0], slot:'dinner', portions:1});
+  st.plan.push({id:'y', recipeId:'b', date:box.planDates()[0], slot:'dinner', portions:1});
+  assert.strictEqual(labelFor(box.shoppingList(),'Coriander'),'Coriander (3 bunches)');
+});
+
+t('a small amount never rounds to nothing', function(){
+  var box=sandbox({recipes:[], plan:[], shopExtras:[]});
+  assert.strictEqual(box.qtyText(0.125,'tsp'),'0.5 tsp');
+  assert.strictEqual(box.qtyText(0.2,'tbsp',true),'0.5 tbsp');
+  assert.strictEqual(box.qtyText(0.04,'g',true),'0.1g');
+  assert.strictEqual(box.qtyText(0.04,'ml'),'0.1ml');
+});
+
+t('Egg and Eggs are one row on the list, named as first written', function(){
+  var st={recipes:ALL, plan:[], shopExtras:[]};
+  var box=sandbox(st), d=box.planDates()[0];
+  st.plan.push({id:'a', recipeId:'r13', date:d, slot:'breakfast', portions:2});
+  st.plan.push({id:'b', recipeId:'p8', date:d, slot:'dinner', portions:6});
+  var rows=box.shoppingList().filter(function(o){ return /^eggs?\b/i.test(o.label); });
+  assert.strictEqual(rows.length,1, rows.map(function(o){return o.label;}).join(' / '));
+  assert.strictEqual(rows[0].label,'Egg (14)');
+  var pep=box.shoppingList().filter(function(o){ return /^peppers?\b/i.test(o.label); });
+  assert.strictEqual(pep.length,1, pep.map(function(o){return o.label;}).join(' / '));
+  // Different things that only look alike stay apart.
+  st.recipes=[{id:'x',title:'X',base:1,ingredients:['Glass noodles (100g)','Hummus (2 tbsp)']}];
+  st.plan=[{id:'c', recipeId:'x', date:d, slot:'dinner', portions:1}];
+  assert.deepStrictEqual(box.shoppingList().map(function(o){return o.label;}),['Glass noodles (100g)','Hummus (2 tbsp)']);
+});
+
 console.log(fails?('\n'+fails+' FAILING\n'):'\nAll shopping checks pass.\n');
 process.exit(fails?1:0);

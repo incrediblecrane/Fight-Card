@@ -1439,18 +1439,24 @@ function persist(){
    what makes portions editable and the shopping list add up. Anything with no
    number ("Olive oil", "Honey (drizzle)") is carried through untouched rather
    than given invented precision. */
-var IMPLIED_ONE=/^(tin|can|head|clove|slice|stick|scoop|bunch|wedge|sprig|handful|large handful|small handful)s?$/i;
+var IMPLIED_ONE=/^((tin|can|head|clove|slice|stick|scoop|wedge|sprig|handful|large handful|small handful)s?|bunch(es)?)$/i;
 function parseIng(text){
   var raw=String(text||'').trim();
   var m=raw.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
   if(!m) return {n:raw, q:null, u:'', raw:raw};
   var name=m[1].trim(), inside=m[2].trim();
-  // "1/2" and "2-3" both appear; take the first number of a range.
-  var frac=inside.match(/^(\d+)\s*\/\s*(\d+)/);
-  var num=frac ? (+frac[1]/+frac[2]) : (inside.match(/^(\d+(?:\.\d+)?)/)||[])[1];
-  var rest=inside.replace(/^(\d+\s*\/\s*\d+|\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)/,'').trim();
-  var unit=(rest.match(/^(kg|g|ml|l|tbsp|tsp|[a-z]+)/i)||[])[1]||'';
-  if(num===undefined){
+  // "1/2", "1 1/2", "1½" and "2-3" all appear. A range keeps both ends: the
+  // card shows what the recipe says and the shopping list buys the top end.
+  inside=inside.replace(/(\d)?\s*([½¼¾⅓⅔⅛])/g,function(x,d,c){
+    return (d?d+' ':'')+{'½':'1/2','¼':'1/4','¾':'3/4','⅓':'1/3','⅔':'2/3','⅛':'1/8'}[c];
+  });
+  var N='\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:\\.\\d+)?';
+  var qm=inside.match(new RegExp('^('+N+')(?:\\s*-\\s*('+N+'))?'));
+  function val(x){ var p=x.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/); return p ? (+(p[1]||0))+p[2]/p[3] : +x; }
+  var rest=qm?inside.slice(qm[0].length).trim():inside;
+  // A whole word, or "large" reads as litres and "grams" as g plus "rams".
+  var unit=(rest.match(/^([a-z]+)(?![a-z])/i)||[])[1]||'';
+  if(!qm){
     if(IMPLIED_ONE.test(inside)) return {n:name, q:1, u:inside.toLowerCase(), raw:raw};
     // "drizzle", "mug, uncooked", "optional": no measurement, but the NAME is
     // still the name. Keeping the whole string as the name made "Honey
@@ -1460,11 +1466,16 @@ function parseIng(text){
   // "sticks" is a counting noun, not an instruction: dropping it turned
   // "Celery (2 sticks)" into "Celery (2)" on the shopping list, which is two
   // heads of celery rather than two sticks.
-  if(unit && !/^(kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|stick|scoop|bunch|wedge|sprig|handful)s?$/i.test(unit)) unit='';
+  var u=unit.toLowerCase().replace(/^(gram|gramme)s?$/,'g').replace(/^(kilogram|kilo)s?$/,'kg')
+    .replace(/^milli(litre|liter)s?$/,'ml').replace(/^(litre|liter)s?$/,'l')
+    .replace(/^tablespoons?$/,'tbsp').replace(/^teaspoons?$/,'tsp');
+  if(!/^((kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|stick|scoop|wedge|sprig|handful)s?|bunch(es)?)$/.test(u)){ u=''; unit=''; }
   // Keep whatever followed the quantity (", diced", ", optional"): it is
   // instruction, not measurement, and dropping it loses the point.
   var desc=rest.slice(unit.length).replace(/^[\s,]+/,'').trim();
-  return {n:name, q:+num, u:unit.toLowerCase(), d:desc, raw:raw};
+  var out={n:name, q:val(qm[1]), u:u, d:desc, raw:raw};
+  if(qm[2]) out.qMax=val(qm[2]);
+  return out;
 }
 function recipeIngs(r){
   // Keyed on the ingredient list it was parsed from, so a cache carried in
@@ -1596,8 +1607,9 @@ function recipePortions(r){ return r.portions||recipeBase(r); }
    look broken, because every countable line would read the same at 1 portion as
    at 4. */
 function roundQty(q,unit){
-  if(/^(g|kg|ml|l)$/.test(unit)) return Math.round(q*10)/10;
-  if(/^(tbsp|tsp)$/.test(unit)) return Math.round(q*2)/2;
+  // A pinch scaled down is still a pinch, not "0 tsp".
+  if(/^(g|kg|ml|l)$/.test(unit)) return Math.max(q>0?0.1:0, Math.round(q*10)/10);
+  if(/^(tbsp|tsp)$/.test(unit)) return Math.max(q>0?0.5:0, Math.round(q*2)/2);
   if(q<1) return Math.max(0.5, Math.round(q*2)/2);
   return Math.round(q);
 }
@@ -1626,14 +1638,21 @@ function qtyText(q,unit,buying){
   // A count of things pluralises; grams and millilitres do not. It has to
   // singularise too, or a recipe scaled down reads "1 tins".
   if(unit && !/^(kg|g|ml|l|tbsp|tsp)$/.test(unit)){
-    if(q>1 && !/s$/.test(unit)) unit=unit+'s';
-    else if(q<=1) unit=unit.replace(/s$/,'');
+    if(q>1 && !/s$/.test(unit)) unit=unit+(/(ch|sh|x)$/.test(unit)?'es':'s');
+    else if(q<=1) unit=/(ch|sh|x)es$/.test(unit)?unit.slice(0,-2):unit.replace(/s$/,'');
   }
   return fmtQty(q)+(unit?(/^(kg|g|ml|l)$/.test(unit)?unit:' '+unit):'');
 }
 function scaledIng(ing,factor){
   if(ing.q===null) return ing.raw;
-  return ing.n+' ('+qtyText(ing.q*factor,ing.u)+(ing.d?', '+ing.d:'')+')';
+  var txt=qtyText((ing.qMax||ing.q)*factor,ing.u);
+  if(ing.qMax){
+    // "4-6" scales to "8-12". The unit is written once, after the top end.
+    var lo=qtyText(ing.q*factor,ing.u), ln=lo.match(/^[\d.]+/)[0], hn=txt.match(/^[\d.]+/)[0];
+    var sg=function(x){ return x.replace(/(ch|sh|x)es$/,'$1').replace(/s$/,''); };
+    if(ln!==hn) txt=(sg(lo.slice(ln.length))===sg(txt.slice(hn.length))?ln:lo)+'-'+txt;
+  }
+  return ing.n+' ('+txt+(ing.d?', '+ing.d:'')+')';
 }
 
 /* Adding up a shopping list is where an ingredient quietly goes missing, so
@@ -1648,13 +1667,13 @@ function scaledIng(ing,factor){
    as separate quantities, but on the SAME row: "Spinach (200g + 1 handful)".
    Nothing is invented, and nothing can hide. */
 var UNIT_SCALE={kg:{u:'g',mul:1000}, l:{u:'ml',mul:1000}};
-var COUNT_UNIT=/^(tin|can|head|clove|slice|stick|scoop|bunch|wedge|sprig|handful)s$/;
+var COUNT_UNIT=/^(?:(tin|can|head|clove|slice|stick|scoop|wedge|sprig|handful)s|(bunch)es)$/;
 function canonUnit(u){
   var x=String(u||'').trim().toLowerCase();
   if(UNIT_SCALE[x]) return UNIT_SCALE[x].u;
   // "large handful" is deliberately NOT folded into "handful": they are
   // different amounts, and pretending otherwise would invent a quantity.
-  return x.replace(COUNT_UNIT,'$1');
+  return x.replace(COUNT_UNIT,'$1$2');
 }
 function canonQty(q,u){
   var x=UNIT_SCALE[String(u||'').trim().toLowerCase()];
@@ -1676,12 +1695,15 @@ function shoppingList(dates){
     recipeIngs(r).forEach(function(ing){
       var nameKey=String(ing.n||'').trim().toLowerCase();
       if(!nameKey) return;
-      var slot=byName[nameKey];
-      if(!slot){ slot=byName[nameKey]={key:'i|'+nameKey, n:ing.n, parts:{}, order:[], plain:null}; order.push(slot); }
+      // "Egg" and "Eggs" are one thing to buy. Folded only for grouping: the
+      // row keeps the first spelling, and its tick key, as it was.
+      var fold=nameKey.replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1');
+      var slot=byName[fold];
+      if(!slot){ slot=byName[fold]={key:'i|'+nameKey, n:ing.n, parts:{}, order:[], plain:null}; order.push(slot); }
       if(ing.q===null){ if(slot.plain===null) slot.plain=ing.raw; return; }
       var u=canonUnit(ing.u), part=slot.parts[u];
       if(!part){ part=slot.parts[u]={u:u,q:0}; slot.order.push(part); }
-      part.q+=canonQty(ing.q,ing.u)*f;
+      part.q+=canonQty(ing.qMax||ing.q,ing.u)*f;
     });
   });
   order.forEach(function(o){
