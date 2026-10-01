@@ -19,9 +19,9 @@ function grabVar(decl){
   if(!m) throw new Error('could not find var '+decl);
   return m[0];
 }
-var src=[grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
+var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
-  grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('dbApply'),
+  grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('mergeImport')].join('\n');
 var box={};
 new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this.exportText=exportText;'+

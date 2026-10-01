@@ -757,6 +757,9 @@ state.saunaSessions.forEach(function(x,i){
   if(!x.position) x.position=x.stints[0].position;
 });
 if(state.activeSession===undefined) state.activeSession=null;
+// Ids of the sessions that have ended, newest last, so one written back by a
+// view that had not heard is not live again.
+if(!state.endedSessions) state.endedSessions=[];
 if(!state.totalXp) state.totalXp=0;
 if(!state.waterTarget) state.waterTarget=8;
 if(!state.weekTarget) state.weekTarget=3;
@@ -934,6 +937,7 @@ function dbDocs(st){
   // A document body is an object, so a list or a nullable session is wrapped.
   out['state/shopping']={checked:(st.shoppingChecked||[]).slice(), extras:(st.shopExtras||[]).slice()};
   out['state/session']={active:st.activeSession||null};
+  if((st.endedSessions||[]).length) out['state/session'].ended=st.endedSessions.slice(-SESS_ENDED_KEEP);
   Object.keys(st.days||{}).forEach(function(k){ out['days/'+k]=st.days[k]; });
   (st.workoutLogs||[]).forEach(function(l){ if(l&&l.id) out['workoutLogs/'+l.id]=l; });
   (st.saunaSessions||[]).forEach(function(x){ if(x&&x.id) out['sauna/'+x.id]=x; });
@@ -951,6 +955,7 @@ function stripDerived(r){
   var out={}; Object.keys(r).forEach(function(k){ if(k!=='_ings'&&k!=='_ingsFor') out[k]=r[k]; });
   return out;
 }
+var SESS_ENDED_KEEP=20;
 var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library', recipes:'recipes', plan:'plan'};
 /* Rebuild state from what the store returned. Order matters for the lists:
    the app renders workout logs and sauna sessions newest-last, and document
@@ -963,7 +968,7 @@ var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library
 function dbClone(v){ return v===undefined?v:JSON.parse(JSON.stringify(v)); }
 function dbApply(map){
   var st={days:{}, workoutLogs:[], saunaSessions:[], library:[], recipes:[], plan:[],
-          shoppingChecked:[], shopExtras:[], activeSession:null};
+          shoppingChecked:[], shopExtras:[], activeSession:null, endedSessions:[]};
   var prof=map['state/profile']||{};
   st.waterTarget=prof.waterTarget||8; st.weekTarget=prof.weekTarget||3; st.totalXp=prof.totalXp||0;
   st.deletedRecipes=dbClone(prof.deletedRecipes)||[];
@@ -971,7 +976,10 @@ function dbApply(map){
     st.shoppingChecked=dbClone(map['state/shopping'].checked)||[];
     st.shopExtras=dbClone(map['state/shopping'].extras)||[];
   }
-  if(map['state/session']) st.activeSession=dbClone(map['state/session'].active)||null;
+  if(map['state/session']){
+    st.activeSession=dbClone(liveSession(map['state/session']))||null;
+    st.endedSessions=dbClone(map['state/session'].ended)||[];
+  }
   var buckets={};
   Object.keys(map).forEach(function(path){
     var cut=path.indexOf('/'); if(cut<0) return;
@@ -984,13 +992,13 @@ function dbApply(map){
   });
   Object.keys(buckets).forEach(function(key){ st[key]=buckets[key]; });
   // Logged work is read back in the order it happened.
-  st.workoutLogs.sort(function(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); });
-  st.saunaSessions.sort(function(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); });
+  st.workoutLogs.sort(byDateId); st.saunaSessions.sort(byDateId);
   // The calendar reads the plan in day then slot order, so sort it once here
   // rather than at every render.
   st.plan.sort(planOrder);
   return st;
 }
+function byDateId(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); }
 /* Key order, canonicalised. The store hands documents back with their keys in
    alphabetical order rather than the order they were written in. That does not
    bite today, because state and lastSaved are both built from the very same
@@ -1321,7 +1329,8 @@ function applyUndo(){
     planBack(u.plan);
     u.checked.forEach(function(k){ if(state.shoppingChecked.indexOf(k)<0) state.shoppingChecked.push(k); });
   }
-  else if(u.kind==='session'){ state.activeSession=u.item; }
+  else if(u.kind==='session'){ state.activeSession=u.item; var uid=sessId(u.item);
+    state.endedSessions=(state.endedSessions||[]).filter(function(x){ return x!==uid; }); }
   else if(u.kind==='sessionEx'){
     var s=state.activeSession, at=Math.min(u.pos,s.exIds.length);
     s.exIds.splice(at,0,u.exId);
@@ -1524,60 +1533,276 @@ function dbHot(){
   return out;
 }
 function dbMerge(path,base,mine,theirs){
+  if(path==='state/session') return mergeSessionDoc(base,mine,theirs);
   var keys={}, out={};
   [base,mine,theirs].forEach(function(o){ Object.keys(o).forEach(function(k){ keys[k]=1; }); });
   Object.keys(keys).forEach(function(k){
-    var v;
-    if(path==='state/profile' && k==='totalXp') v=Math.max(0,(theirs[k]||0)+(mine[k]||0)-(base[k]||0));
-    // A set: their list, plus what this view deleted, minus what it put back,
-    // so two views deleting different recipes keep both.
-    else if(path==='state/profile' && k==='deletedRecipes'){
-      var b0=base[k]||[], m0=mine[k]||[];
-      v=(theirs[k]||[]).filter(function(id){ return !(b0.indexOf(id)>-1 && m0.indexOf(id)<0); });
-      m0.forEach(function(id){ if(b0.indexOf(id)<0 && v.indexOf(id)<0) v.push(id); });
-      if(!v.length) v=undefined;
-    }
-    else v=stableJson(mine[k])!==stableJson(base[k]) ? mine[k] : theirs[k];
+    var v, b=base[k], m=mine[k], t=theirs[k];
+    if(path==='state/profile' && k==='totalXp') v=Math.max(0,(t||0)+(m||0)-(b||0));
+    // Sets: their list, less what this view took out, plus what it added, so
+    // two views deleting different recipes, ticking different items or adding
+    // different extras keep both.
+    else if(path==='state/profile' && k==='deletedRecipes'){ v=mergeKeyed(b,m,t,String); if(!v.length) v=undefined; }
+    else if(path==='state/shopping') v=mergeKeyed(b,m,t,k==='extras'?function(x){ return x&&x.id||stableJson(x); }:String);
+    else if(path.indexOf('workoutLogs/')===0 && k==='logs') v=mergeSetLogs(b,m,t);
+    else v=stableJson(m)!==stableJson(b) ? m : t;
     if(v!==undefined) out[k]=v;
   });
   return out;
 }
+/* A list merged three ways as a set: theirs, less what this view took out
+   since base, plus what it added, each added entry after the one it follows
+   here. An entry changed here keeps this view's copy; one deleted elsewhere
+   stays deleted. key names an entry, and the same key twice is two entries. */
+function mergeKeyed(base,mine,theirs,key){
+  function keyed(list){
+    var seen={}, o={k:[], v:{}};
+    (list||[]).forEach(function(x){ var k='~'+key(x); seen[k]=(seen[k]||0)+1; if(seen[k]>1) k+='#'+seen[k]; o.k.push(k); o.v[k]=x; });
+    return o;
+  }
+  var B=keyed(base), M=keyed(mine), T=keyed(theirs), ks=[], v={};
+  T.k.forEach(function(k){
+    if(k in B.v && !(k in M.v)) return;
+    v[k]=(k in M.v && stableJson(M.v[k])!==stableJson(B.v[k]))?M.v[k]:T.v[k]; ks.push(k);
+  });
+  M.k.forEach(function(k,i){
+    if(k in B.v || k in v) return;
+    var at=0; for(var j=i-1;j>=0;j--){ var p=ks.indexOf(M.k[j]); if(p>-1){ at=p+1; break; } }
+    ks.splice(at,0,k); v[k]=M.v[k];
+  });
+  return ks.map(function(k){ return v[k]; });
+}
+// A set is named by when it was logged; an older one with no time by itself.
+function setKey(x){ return x&&x.t!==undefined?'t'+x.t:stableJson(x); }
+/* Sets per exercise, from two views: none lost and none twice, in the order
+   they were logged. An exercise not changed here is as stored, so a log
+   nothing was added to is never rewritten. */
+function mergeSetLogs(base,mine,theirs){
+  base=base||{}; mine=mine||{}; theirs=theirs||{};
+  var out={};
+  Object.keys(mine).concat(Object.keys(theirs)).forEach(function(ex){
+    if(out.hasOwnProperty(ex)) return;
+    if(stableJson(mine[ex])===stableJson(base[ex])){ if(theirs[ex]!==undefined) out[ex]=theirs[ex]; return; }
+    var l=mergeKeyed(base[ex],mine[ex],theirs[ex],setKey);
+    if(l.every(function(s){ return s && typeof s.t==='number'; })) l.sort(function(a,b){ return a.t-b.t; });
+    out[ex]=l;
+  });
+  return out;
+}
+/* Which session this is, the same in every view that holds it: when it
+   started. Its log is named after it, so two views finishing it write one
+   document, not two, and a view can tell its session has ended elsewhere. */
+function sessId(s){ return !s?null:s.id||(s.t0?'s'+s.t0:'s'+s.workoutId+'.'+(s.startedAt||'')); }
+function sessLogId(s){ return s&&s.t0?'wl'+s.t0:null; }
+// The session a state/session document holds, unless it has ended. A view
+// hidden straight after a set, with no time to read first, can write back a
+// session that ended elsewhere; it is not live again for that.
+function liveSession(doc){ var a=doc&&doc.active; return a && (doc.ended||[]).indexOf(sessId(a))<0 ? a : null; }
+function endSession(s){
+  var id=sessId(s); if(!id) return;
+  state.endedSessions=(state.endedSessions||[]).filter(function(x){ return x!==id; }).concat([id]).slice(-SESS_ENDED_KEEP);
+}
+function mergeSessionDoc(base,mine,theirs){
+  var ended=mergeKeyed(base.ended,mine.ended,theirs.ended,String).slice(-SESS_ENDED_KEEP);
+  var a=mergeActive(liveSession(base),liveSession(mine),liveSession(theirs)), out={active:a&&ended.indexOf(sessId(a))<0?a:null};
+  if(ended.length) out.ended=ended;
+  return out;
+}
+/* The session in flight. One ended elsewhere (finished, discarded, or
+   replaced by an import) stays ended: what this view still holds of it does
+   not bring it back, and dbSettleSession finds a home for its sets first. The
+   same session in two views merges exercise by exercise. */
+function mergeActive(b,m,t){
+  var B=sessId(b), M=sessId(m), T=sessId(t);
+  if(B && M===B && T!==B) return t;
+  if(M && M===T) return mergeSession(B===M?b:{},m,t);
+  return stableJson(m)!==stableJson(b)?m:t;
+}
+function mergeSession(b,m,t){
+  var keys={}, out={};
+  [b,m,t].forEach(function(o){ Object.keys(o).forEach(function(k){ keys[k]=1; }); });
+  Object.keys(keys).forEach(function(k){
+    var v;
+    if(k==='logs') v=mergeSetLogs(b.logs,m.logs,t.logs);
+    else if(k==='exIds') v=mergeKeyed(b.exIds,m.exIds,t.exIds,String);
+    // Key by key: a target or a superset changed here, and the rest as stored.
+    else if(k==='targets'||k==='supersets') v=dbMerge('',b[k]||{},m[k]||{},t[k]||{});
+    else v=stableJson(m[k])!==stableJson(b[k])?m[k]:t[k];
+    if(v!==undefined) out[k]=v;
+  });
+  return out;
+}
+// Sets in logs that base does not have, by exercise, or null for none.
+function setsSince(base,logs){
+  var out=null; base=base||{};
+  Object.keys(logs||{}).forEach(function(ex){
+    var had={}; (base[ex]||[]).forEach(function(x){ had[setKey(x)]=1; });
+    var add=(logs[ex]||[]).filter(function(x){ return !had[setKey(x)]; });
+    if(add.length){ out=out||{}; out[ex]=add; }
+  });
+  return out;
+}
+function setCount(logs){ var n=0; Object.keys(logs||{}).forEach(function(k){ n+=(logs[k]||[]).length; }); return n; }
+/* A session is one thing however many views hold it. Before the merge, with
+   what was just read in at:
+   - a log this view wrote for a session another view had finished first gives
+     back the XP its finish paid, since that was paid there;
+   - sets logged elsewhere on a session finished here go onto this view's log;
+   - sets logged here on a session ended elsewhere go onto its log, or, when
+     there is none (it was discarded), the session is offered back by Undo. */
+var finishPaid={};
+function dbSettleSession(at){
+  var moved=false;
+  Object.keys(finishPaid).forEach(function(id){
+    var path='workoutLogs/'+id;
+    if(!(path in at)) return;
+    if(at[path]!==undefined && lastSaved[path]===undefined){ addXp(-finishPaid[id]); moved=true; }
+    delete finishPaid[id];
+  });
+  var tdoc=at['state/session']; if(!tdoc) return moved;
+  var sb=savedBody('state/session'), b=liveSession(sb), t=liveSession(tdoc), m=state.activeSession;
+  var B=sessId(b), lid=sessLogId(b), log=lid&&at['workoutLogs/'+lid], extra, tr=tdoc.active, R=sessId(tr);
+  // A session ended here that the store still holds, logged on elsewhere or
+  // written back by a view that had not heard: its sets go onto this view's
+  // log: when this view last heard of it as live, only the sets new since,
+  // so a set taken back here does not come back.
+  if(tr && R!==sessId(m) && (state.endedSessions||[]).indexOf(R)>-1){
+    var own=state.workoutLogs.filter(function(l){ return l.sessionId===R||l.id===sessLogId(tr); })[0];
+    extra=R===B?setsSince(b.logs,tr.logs):tr.logs;
+    if(own && extra){ var nl=mergeSetLogs(null,own.logs,extra); if(stableJson(nl)!==stableJson(own.logs)){ own.logs=nl; moved=true; } }
+  }
+  if(B && sessId(m)===B && sessId(t)!==B){
+    extra=setsSince(b.logs,m.logs);
+    if(!extra) return moved;
+    if(log){
+      var have=state.workoutLogs.filter(function(l){ return l.id===lid; })[0], body=dbClone(have||log);
+      body.logs=mergeSetLogs(null,extra,body.logs); dbPlace('workoutLogs/'+lid,body); return true;
+    }
+    var n=setCount(extra);
+    parkUndo({kind:'session', item:dbClone(m), label:'the '+sessionTitle(m)+' session',
+      text:'The '+sessionTitle(m)+' session was ended on another device, with '+n+' set'+(n===1?'':'s')+' logged here.'});
+    return true;
+  }
+  return moved;
+}
 // Put one merged document back into state, through dbApply so the mapping
 // from documents to state stays in one place (and bodies come out unfrozen).
+// No body takes a day or a list entry out.
 var DB_STATE_KEYS={'state/profile':['waterTarget','weekTarget','totalXp','deletedRecipes'], 'state/shopping':['shoppingChecked','shopExtras'],
-  'state/session':['activeSession']};
+  'state/session':['activeSession','endedSessions']};
 function dbPlace(path,body){
-  var one={}; one[path]=body; var st=dbApply(one);
-  if(path.indexOf('days/')===0){ state.days[path.slice(5)]=st.days[path.slice(5)]; return; }
+  var one={}; if(body!==undefined) one[path]=body;
+  var st=dbApply(one), cut=path.indexOf('/'), coll=path.slice(0,cut), id=path.slice(cut+1), key=DB_LISTS[coll];
+  if(coll==='days'){ if(body===undefined) delete state.days[id]; else state.days[id]=st.days[id]; return; }
+  if(key){
+    var list=state[key], at=-1; list.forEach(function(x,i){ if(x.id===id) at=i; });
+    if(body===undefined){ if(at>-1) list.splice(at,1); return; }
+    if(at>-1){ list[at]=st[key][0]; return; }
+    list.push(st[key][0]);
+    if(key==='plan') list.sort(planOrder); else if(key==='workoutLogs'||key==='saunaSessions') list.sort(byDateId);
+    return;
+  }
   DB_STATE_KEYS[path].forEach(function(k){ state[k]=st[k]; });
-  if(path==='state/session') ensurePrep(state.activeSession);
+  if(path==='state/session'){ ensurePrep(state.activeSession); if(!state.activeSession){ viewingSession=false; addingExercise=false; } }
+}
+function dbListed(path){
+  return DB_STATE_DOCS.indexOf(path)>-1 || DB_COLLECTIONS.indexOf(path.slice(0,path.indexOf('/')))>-1;
+}
+// In batches, as writes are: a migration can put fifty documents up for reading.
+function dbGetAll(paths){
+  var got=[];
+  function batch(i){
+    if(i>=paths.length) return Promise.resolve(got);
+    return Promise.all(paths.slice(i,i+DB_SEED_BATCH).map(function(p){ return dbStore.get(p); }))
+      .then(function(part){ got=got.concat(part); return batch(i+DB_SEED_BATCH); });
+  }
+  return batch(0);
 }
 /* Read back what is about to be written, not only what is likely: removing a
    session or putting one back changes the day it was on, which can be any
    day, and a whole stale copy of it would undo what another view logged
-   there. Lists of sessions, recipes and the rest are not re-read; each entry
-   is its own document under an id no other view writes. */
-function dbRefresh(){
-  var paths=dbHot(), snap=dbSnapshot(dbDocs(state));
+   there. A list entry (a session, a recipe, a note) already saved is re-read
+   before it is written again, since another view may have changed or deleted
+   it. A new entry has an id no other view writes, except a finished
+   session's log, which is named after its session: another view may have
+   finished the same one. The log of the session this view last heard of is
+   read too, so a session finished elsewhere is found.
+   With all (the page is looked at again) the whole store is read, so what
+   other views added, changed or deleted reaches this one: an entry this view
+   has not changed takes the store's copy, or goes when the store's has gone.
+   An entry changed here and deleted elsewhere stays deleted: writing it
+   back would undo a deletion nobody here asked to undo. */
+function dbRefresh(all){
+  var snap=dbSnapshot(dbDocs(state)), sb=savedBody('state/session'), lid=sessLogId(sb&&sb.active), want=dbHot();
   Object.keys(snap).forEach(function(path){
-    if(path.indexOf('days/')===0 && snap[path]!==lastSaved[path] && paths.indexOf(path)<0) paths.push(path);
+    if(snap[path]===lastSaved[path]) return;
+    if(path.indexOf('days/')===0 || lastSaved[path]!==undefined || path.indexOf('workoutLogs/')===0) want.push(path);
   });
-  return Promise.all(paths.map(dbStore.get)).then(function(got){
+  if(lid) want.push('workoutLogs/'+lid);
+  function uniq(list){ var seen={}; return list.filter(function(p){ if(seen[p]||!dbListed(p)) return false; seen[p]=1; return true; }); }
+  var read=all ? dbStore.readAll().then(function(map){
+      var at={};
+      uniq(want.concat(Object.keys(map),Object.keys(lastSaved),Object.keys(snap))).forEach(function(p){ at[p]=map[p]; });
+      return at;
+    }) : (function(paths){ return dbGetAll(paths).then(function(got){
+      var at={}; paths.forEach(function(p,i){ at[p]=got[i]; }); return at; }); })(uniq(want));
+  return read.then(function(at){
+    var moved=dbSettleSession(at);
     // Taken after the read, so a tap made while it was out counts as ours.
-    var mine=dbDocs(state), moved=false;
-    paths.forEach(function(path,i){
-      var theirs=got[i], isDay=path.indexOf('days/')===0;
-      // Nothing there: ours stands, and is written if we have one.
-      if(theirs===undefined){ delete lastSaved[path]; return; }
+    var mine=dbDocs(state);
+    Object.keys(at).forEach(function(path){
+      var theirs=at[path], m=mine[path], coll=path.slice(0,path.indexOf('/')), isDay=coll==='days', entry=!!DB_LISTS[coll];
+      if(theirs===undefined){
+        // Nothing there and never was: ours stands, and is written if we have one.
+        if(lastSaved[path]===undefined) return;
+        // Deleted elsewhere. A list entry stays deleted, and so does a day
+        // nothing was tapped on here; a state document is ours and is written.
+        var same=stableJson(m)===lastSaved[path];
+        delete lastSaved[path]; savedGen[path]=saveGen;
+        if(m!==undefined && (entry || (isDay && same))){ dbPlace(path,undefined); moved=true; }
+        return;
+      }
+      if(m===undefined){
+        // Taken out here and not saved yet: it stays out, and the save deletes it.
+        if(lastSaved[path]!==undefined) return;
+        // Made elsewhere.
+        if(entry||isDay){ dbPlace(path,theirs); moved=true; }
+        lastSaved[path]=stableJson(theirs); savedGen[path]=saveGen;
+        return;
+      }
       // Never heard from the store about it: a day starts blank, so anything
-      // still blank here takes theirs; anything else stands as ours.
-      // Unreadable is treated as never heard, rather than failing every save.
-      var base=savedBody(path); if(!base) base=isDay?blankDay():theirs;
-      var m=dbMerge(path,base,mine[path]||(isDay?blankDay():{}),theirs);
+      // still blank here takes theirs, and a session's log keeps the sets of
+      // both; anything else stands as ours. Unreadable is treated as never
+      // heard, rather than failing every save.
+      var base=savedBody(path); if(!base) base=isDay?blankDay():coll==='workoutLogs'?{}:theirs;
+      var r=dbMerge(path,base,m,theirs);
       lastSaved[path]=stableJson(theirs); savedGen[path]=saveGen;
-      if(stableJson(m)!==stableJson(mine[path])){ dbPlace(path,m); moved=true; }
+      if(stableJson(r)!==stableJson(m)){ dbPlace(path,r); moved=true; }
     });
     return moved;
+  });
+}
+/* An import is about to be written. What it replaces is kept first, and that
+   is what the store holds with this view's unsaved changes on top: this
+   view's copy alone lacks whatever another view saved after it loaded.
+   Replacing everything deletes whatever the store holds that the import does
+   not, which includes what lastSaved never heard of, so for a replace all of
+   it is folded into lastSaved too: the save then deletes what is not in the
+   import. */
+var importPrev=null;
+function dbFold(replace){
+  return dbStore.readAll().then(function(map){
+    if(importPrev){
+      var docs={}; Object.keys(map).forEach(function(p){ docs[p]=map[p]; });
+      Object.keys(lastSaved).forEach(function(p){ if(importPrev[p]===undefined) delete docs[p]; });
+      Object.keys(importPrev).forEach(function(p){ if(stableJson(importPrev[p])!==lastSaved[p]) docs[p]=importPrev[p]; });
+      writeBackup(exportText(dbApply(docs))); importPrev=null;
+    }
+    if(replace){
+      Object.keys(lastSaved).forEach(function(p){ if(map[p]===undefined){ delete lastSaved[p]; savedGen[p]=saveGen; } });
+      Object.keys(map).forEach(function(p){ lastSaved[p]=stableJson(map[p]); savedGen[p]=saveGen; });
+    }
+    return false;
   });
 }
 
@@ -1588,7 +1813,7 @@ function dbRefresh(){
    because the document it had to remove was still being created. A save
    asked for meanwhile runs when this one is done, and lastSaved moves one
    document at a time, as each write lands. */
-var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, saveNow=false;
+var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, saveNow=false, saveSync=false;
 // Which save last recorded each document in lastSaved, so a write from an
 // older save landing late can never put back a snapshot a newer one replaced.
 var saveGen=0, savedGen={};
@@ -1604,15 +1829,17 @@ function dbSettle(list){
   return Promise.all(list.map(function(run){ return run().then(null,function(e){ if(!err) err=e||{}; }); }))
     .then(function(){ if(err) throw err; });
 }
-/* saveNow picks how: false re-reads and merges first, 'flush' sends only the
-   fields changed since lastSaved (a page going away has no time to read), and
-   'put' writes whole documents, for an import, which is meant to replace. */
+/* saveNow picks how: false re-reads and merges first (all of the store when
+   saveSync, as the page is looked at again), 'flush' sends only the fields
+   changed since lastSaved (a page going away has no time to read), and
+   'put' and 'replace' write an import as whole documents, after reading the
+   whole store (see dbFold); 'replace' then deletes whatever it leaves out. */
 function dbSave(){
   if(!dbStore) return;
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
-  var retrying=false, mode=saveNow, gen=++saveGen; saveNow=false;
-  (mode?Promise.resolve(false):dbRefresh()).then(function(moved){
+  var retrying=false, mode=saveNow, all=!mode&&saveSync, gen=++saveGen; saveNow=false; if(all) saveSync=false;
+  (mode==='put'||mode==='replace'?dbFold(mode==='replace'):mode?Promise.resolve(false):dbRefresh(all)).then(function(moved){
     var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[], logs=[], landing=[], session=null;
     // Finishing clears the session and writes its log in one go, and a
     // cleared session whose log was refused would leave the sets nowhere. So
@@ -1674,6 +1901,9 @@ function dbSave(){
     // backing off 2s, 4s, 8s up to 30s; one that retrying cannot fix waits
     // for the next change and says so.
     setSaving(false); dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr];
+    // An import still owed goes the same way next time: a re-read and merge
+    // would put the old days back over it.
+    if((mode==='put'||mode==='replace') && !saveNow) saveNow=mode;
     if(!dbErrHard){
       retrying=true;
       if(saveTimer) clearTimeout(saveTimer);
@@ -1725,12 +1955,12 @@ var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
 var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s'}]};
 var IMPORT_FIELDS={
   days:{water:'n',alcohol:'n',smoking:'n',weed:'n',rest:'b',touched:'b',workout:{done:'b',type:'s'}},
-  workoutLogs:{workoutId:'s',title:'s',tag:'s',logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['s'],rounds:'n'}]},
+  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:'s',logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['s'],rounds:'n'}]},
   saunaSessions:{mins:'n',temp:'n',position:'s',stints:[{mins:'n',position:'s'}]},
   library:{title:'s',tag:'s',notes:'s'},
   recipes:{title:'s',tag:'s',instructions:'s',ingredients:['s'],macros:['n'],base:'n',portions:'n',inPlan:'b',day:'s'},
   plan:{slot:'s',portions:'n'},
-  activeSession:{workoutId:'s',startedAt:'s',t0:'n',exIds:['s'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,supersets:'o'}};
+  activeSession:{id:'s',workoutId:'s',startedAt:'s',t0:'n',exIds:['s'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,supersets:'o'}};
 function exportData(st){
   var n=dbApply(dbDocs(st)), out={schema:EXPORT_SCHEMA, exportedAt:new Date().toISOString()};
   EXPORT_KEYS.forEach(function(k){ out[k]=n[k]; });
@@ -1852,13 +2082,18 @@ function dataCard(){
    than after the re-read, because the re-read would merge the old day back
    over the one just imported. */
 function applyImport(st,mode){
-  writeBackup(exportText(state));
+  writeBackup(exportText(state)); importPrev=dbState==='db'?dbDocs(state):null;
+  var ended=state.endedSessions||[], was=sessId(state.activeSession);
   state=mode==='merge'?mergeImport(state,st):st;
+  // A session this replaces is over in every view; the one it brings is live.
+  var now=sessId(state.activeSession);
+  if(was && was!==now) ended=ended.concat([was]);
+  state.endedSessions=ended.filter(function(x){ return x!==now; }).slice(-SESS_ENDED_KEEP);
   // A file in an older shape is converted now, as dbBoot does a store.
   migratePlan(); prunePlan(); migrateMinutes();
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
-  saveNow=dbState==='db'?'put':false; persist();
+  saveNow=dbState==='db'?(mode==='merge'?'put':'replace'):false; persist();
 }
 /* ---------- recipe scaling ---------------------------------------------
    Ingredients are written as "Name (quantity unit)". Parsing that once at
@@ -2214,7 +2449,8 @@ function startWorkout(id){
   var w=WORKOUTS.filter(function(x){return x.id===id;})[0];
   if(!w || sessionBusy(id)) return;
   if(!state.activeSession || state.activeSession.workoutId!==id){
-    state.activeSession={workoutId:id,startedAt:activeDate(),t0:Date.now(),exIds:w.plan.map(function(p){return p.ex;}),targets:{},logs:{}};
+    var t0=Date.now();
+    state.activeSession={id:'s'+t0,workoutId:id,startedAt:activeDate(),t0:t0,exIds:w.plan.map(function(p){return p.ex;}),targets:{},logs:{}};
     w.plan.forEach(function(p){ state.activeSession.targets[p.ex]={sets:p.sets,reps:p.reps}; });
   }
   ensurePrep(state.activeSession);
@@ -2301,7 +2537,7 @@ function sessionTitle(sess){
 function discardSession(){
   var sess=state.activeSession; if(!sess) return;
   parkUndo({kind:'session',item:sess,label:'the '+sessionTitle(sess)+' session'});
-  state.activeSession=null; viewingSession=false; addingExercise=false;
+  endSession(sess); state.activeSession=null; viewingSession=false; addingExercise=false;
 }
 function finishWorkout(){
   var sess=state.activeSession; if(!sess) return;
@@ -2309,16 +2545,22 @@ function finishWorkout(){
   // way a discard does, so a Finish tapped by mistake can be undone.
   var n=0; Object.keys(sess.logs||{}).forEach(function(k){ n+=(sess.logs[k]||[]).length; });
   if(!n){ discardSession(); return; }
+  var sid=sessId(sess), lid=sessLogId(sess)||'wl'+Date.now();
+  // Finished already, in another view: its sets go onto that log rather than
+  // into a second one, and the day and its XP were seen to there.
+  var had=state.workoutLogs.filter(function(l){ return l.sessionId===sid||l.id===lid; })[0];
+  if(had){ had.logs=mergeSetLogs(null,sess.logs,had.logs); endSession(sess); state.activeSession=null; viewingSession=false; tab='progress'; return; }
   var w=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
   var title=w?w.title:'Workout', tag=w?w.tag:'Strength';
-  var log={id:'wl'+Date.now(),workoutId:sess.workoutId,title:title,tag:tag,date:sess.startedAt||activeDate(),logs:sess.logs};
+  var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:sess.startedAt||activeDate(),logs:sess.logs};
   var ss=supersetRecord(sess); if(ss.length) log.supersets=ss;
   var mins=sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
   state.workoutLogs.push(log);
-  var today=ensureDay(sess.startedAt||activeDate());
-  if(!today.workout.done){ addXp(XP_WORKOUT); if(today.rest) addXp(-XP_REST); }
+  var today=ensureDay(sess.startedAt||activeDate()), paid=0;
+  if(!today.workout.done){ paid+=addXp(XP_WORKOUT); if(today.rest) paid+=addXp(-XP_REST); }
+  if(paid) finishPaid[lid]=paid;
   today.workout.done=true; today.workout.type=tag; today.rest=false; today.touched=true;
-  state.activeSession=null; viewingSession=false; tab='progress';
+  endSession(sess); state.activeSession=null; viewingSession=false; tab='progress';
 }
 /* Returns the id actually added, which is NOT always the id asked for: a
    superset mints a fresh instance. The caller navigates to the new slide by
@@ -3488,7 +3730,7 @@ function bodyContent(){
 function undoToast(){
   var u=readUndo();
   if(!u || undoMoot(u)) return '';
-  return '<div class="undo-bar" role="status"><span>Removed '+esc(u.label)+'</span>'+
+  return '<div class="undo-bar" role="status"><span>'+esc(u.text||'Removed '+u.label)+'</span>'+
     '<span><button data-action="undo">Undo</button>'+
     '<button class="ghost" data-action="dismissundo">Dismiss</button></span></div>';
 }
@@ -4030,7 +4272,7 @@ function boot(){
   document.addEventListener('visibilitychange',function(){
     if(document.visibilityState==='hidden') flushSave();
     // The day may have turned while nobody was looking, so draw it again.
-    else { render(); if(dbState==='db') dbSave(); }
+    else { render(); if(dbState==='db'){ saveSync=true; dbSave(); } }
   });
   window.addEventListener('pagehide',flushSave);
   // A session already in flight when this shipped has no prep steps; give it

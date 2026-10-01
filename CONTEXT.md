@@ -18,7 +18,7 @@ documents:
 |---|---|
 | `state/profile` | XP, the water target (in 0.25L taps, 1-5L), the weekly sessions target (`weekTarget`, 1-7), and any built-in meal-prep recipes deleted (`deletedRecipes`, so they are not topped up again) |
 | `state/shopping` | which shopping items are ticked, plus the hand-added ones |
-| `state/session` | the in-flight workout, or null |
+| `state/session` | the in-flight workout, or null, and `ended`: the ids of the last twenty sessions finished or discarded |
 | `state/meta` | the seeded marker; its presence means the store is the truth |
 | `days/<YYYY-MM-DD>` | one day: water, workout, rest, alcohol, smoking, weed |
 | `workoutLogs/<id>` | one finished session and its sets |
@@ -50,23 +50,45 @@ and recipe cards are unfolded, is that device's, not the record's: it lives in
 `localStorage` under `fc.ui`, not in the store.
 
 Saving goes one save at a time through `dbSave`, and all store access through
-one **Store** (see below). Before each save, and whenever the
-page is looked at again, the documents two open views are likely both to touch
-(`state/*`, the day being logged, and any other day about to be written) are
-re-read and merged field by field
-against what this view last heard from the store: a field changed here keeps
-this view's value, every other field takes the store's, and XP merges as the
-sum of both views' changes. A transient refusal (`unavailable`,
-`resource_exhausted`, anything unknown) is retried with backoff; one retrying
-cannot fix is shown and waits for the next change. Every write in a save
-settles before the next save starts. When a save clears `state/session` and
-writes workout logs, the session is written only after those logs landed, so a
-finished session is never cleared before its log is stored; any other session
-change goes out alongside the rest. A save still waiting on its timer goes at
-once when the page is hidden or closed; with no time to re-read, it sends only
-the fields this view changed (`update`), never a whole document, and the next
-save merges. A day this view never read is diffed against a blank day, and put
-whole only when the store refuses the update because there is no such day.
+one **Store** (see below). Before each save the documents two open views are
+likely both to touch (`state/*`, the day being logged, and any other day about
+to be written) are re-read and merged field by field against what this view
+last heard from the store: a field changed here keeps this view's value, every
+other field takes the store's, and XP merges as the sum of both views'
+changes. Shopping ticks, hand-added extras and deleted built-in recipes merge
+as sets (the store's, less what this view took out since, plus what it added),
+so two views adding different things keep both. A list entry already saved (a
+session, a recipe, a note, a planned meal) is re-read before it is written
+again: one this view changed but another deleted stays deleted rather than
+being written back. When the page is looked at again the whole store is read
+(`readAll`), so what other views added, changed or deleted reaches this one:
+an entry this view has not changed takes the store's copy, or goes when the
+store's has gone, and one that is new elsewhere is added. A transient refusal
+(`unavailable`, `resource_exhausted`, anything unknown) is retried with
+backoff; one retrying cannot fix is shown and waits for the next change. Every
+write in a save settles before the next save starts. When a save clears
+`state/session` and writes workout logs, the session is written only after
+those logs landed, so a finished session is never cleared before its log is
+stored; any other session change goes out alongside the rest. A save still
+waiting on its timer goes at once when the page is hidden or closed; with no
+time to re-read, it sends only the fields this view changed (`update`), never
+a whole document, and the next save merges. A day this view never read is
+diffed against a blank day, and put whole only when the store refuses the
+update because there is no such day.
+
+The session in flight is one thing however many views hold it. It has an id
+(`s` and its start time), and the same session in two views merges exercise by
+exercise: sets as a union keyed by when each was logged, the exercise list and
+targets key by key. One that has ended elsewhere (finished, discarded, or
+replaced by an import) stays ended, whatever this view still holds of it: sets
+logged here since go onto its log, or, if it was discarded, the session is
+offered back here by Undo. A finished log carries the session's id as
+`sessionId` and is named after it (`wl` and its start time), so two views
+finishing the same session write one document, keep the sets of both, and pay
+its XP once, and `finishWorkout` adds to a log the session already has rather
+than writing a second. Every ended session's id is kept in `state/session`'s
+`ended`, so a view hidden straight after a set, which sends without reading,
+cannot make an ended session live again by writing it back.
 
 ## The Store seam
 
@@ -75,18 +97,19 @@ Every read and write of saved data goes through one object, `dbStore`:
 | call | does |
 |---|---|
 | `get(path)` | the body, or `undefined` when there is none (not an error) |
-| `readAll()` | `{path: body}` for every document in the six collections and the three `state/*` documents |
+| `readAll()` | `{path: body}` for every document in the six collections and the three `state/*` documents: read at load, when the page is looked at again, and before an import is written |
 | `put(path, body)` | write the whole document |
 | `update(path, fields)` | merge fields into a document that exists; rejects `invalid_argument` if it does not |
 | `remove(path)` | delete it; deleting nothing is fine |
 | `subscribe(fn)` | optional: `fn(path, body or undefined)` on every change, returns a stop function |
 
 `DbStore(db)` wraps `claude.use('db')`; `subscribe` is there only when the db
-handed over has `onSnapshot`, and nothing calls it yet. `MemoryStore(init)` is
-the same contract over a plain object, used by the headless suite
-(`test-store.js`). `dbDocs`/`dbApply` stay the serialisation layer either
-side: state in, `{path: body}` out, and back. A rejection carries `{code}`;
-`dbSave` treats the codes in `DB_HARD` as final and anything else as
+handed over has `onSnapshot`, and nothing calls it yet: a view picks up other
+views' changes before each save and with `readAll` when it is looked at again.
+`MemoryStore(init)` is the same contract over a plain object, used by the
+headless suite (`test-store.js`). `dbDocs`/`dbApply` stay the serialisation
+layer either side: state in, `{path: body}` out, and back. A rejection carries
+`{code}`; `dbSave` treats the codes in `DB_HARD` as final and anything else as
 transient.
 
 A self-hosted backend would be a third Store, with the same paths as REST
@@ -128,9 +151,14 @@ sessions, planned meals, recipes, notes, sauna) and then:
 
 Either way it becomes state and is written by `dbSave` through the Store,
 straight away rather than after the usual re-read (which would merge the old
-day back over the imported one). The data it replaced is kept first, in the
-export format, in `localStorage` under `fc.backup`, and "Put back the data
-before the last import" restores it the same way.
+day back over the imported one); a write that fails is retried the same way.
+The whole store is read first. The data it replaced is kept, in the export
+format, in `localStorage` under `fc.backup`: what the store held, with this
+view's unsaved changes on top, so it includes what another view saved after
+this one loaded. Replace then deletes every document the import does not
+have, those included. "Put back the data before the last import" restores the
+backup as a Replace. A session in progress that an import replaces counts as
+ended in every view.
 
 ## Vocabulary
 
@@ -142,9 +170,9 @@ before the last import" restores it the same way.
   A day with something used is shown as "used" in a neutral colour.
 - **The week target** is sessions in the rolling last seven days: days whose
   workout is done, quick logs included, against `weekTarget`.
-- **Session** — a workout in progress: an ordered list of exercise ids, a
-  target per exercise, and the sets logged so far. Dated by when it STARTED,
-  so a session crossing midnight lands on the right day.
+- **Session**: a workout in progress, with an id, an ordered list of exercise
+  ids, a target per exercise, and the sets logged so far. Dated by when it
+  STARTED, so a session crossing midnight lands on the right day.
 - **Set** — one logged effort. Its shape follows the exercise's `type`:
   `load` (weight and reps), `time`, `distance`, `reps`, `cardio` (minutes,
   machine, work/rest effort), `prep` (minutes, option, level).

@@ -16,11 +16,11 @@ function grab(name){
   }
   throw new Error(name+' never closed');
 }
-var DB_LISTS=h.match(/var DB_LISTS=\{[^}]*\};/)[0];
+var DB_LISTS=h.match(/var SESS_ENDED_KEEP=\d+;/)[0]+'\n'+h.match(/var DB_LISTS=\{[^}]*\};/)[0];
 var sandbox={};
 var SLOTS=h.match(/var SLOTS=\[[^\]]*\];/)[0];
 new Function(DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+
-  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('dbApply')+
+  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
   '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
 var seedRaw=h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>'));
@@ -91,6 +91,7 @@ cases.forEach(function(pair){
   cmp('the shopping ticks survive', st.shoppingChecked||[], back.shoppingChecked);
   cmp('your own shopping items survive', st.shopExtras||[], back.shopExtras);
   cmp('an in-flight session survives', st.activeSession||null, back.activeSession);
+  cmp('the sessions that have ended stay ended', st.endedSessions||[], back.endedSessions);
   cmp('xp survives', st.totalXp||0, back.totalXp);
   cmp('the water target survives', st.waterTarget||8, back.waterTarget);
   cmp('deleted meal-prep recipes stay deleted', st.deletedRecipes||[], back.deletedRecipes);
@@ -104,7 +105,7 @@ cases.forEach(function(pair){
 
   // Nothing in state may be silently unmapped.
   var mapped={days:1,workoutLogs:1,saunaSessions:1,recipes:1,library:1,shoppingChecked:1,
-              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,weekTarget:1,deletedRecipes:1,
+              shopExtras:1,plan:1,activeSession:1,endedSessions:1,totalXp:1,waterTarget:1,weekTarget:1,deletedRecipes:1,
               // Device-only, kept in localStorage: an old seed may still carry them.
               uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
   var unmapped=Object.keys(st).filter(function(k){ return !mapped[k]; });
@@ -131,7 +132,8 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
 // before it saves. A field one view changed keeps that view's value, the rest
 // take the store's, and xp adds both views' changes rather than picking one.
 (function(){
-  var m={}; new Function(grab('stableJson')+'\n'+grab('dbMerge')+'\nthis.dbMerge=dbMerge;').call(m);
+  var m={}; new Function(['stableJson','dbMerge','mergeKeyed','setKey','mergeSetLogs','sessId','liveSession','mergeSessionDoc','mergeActive','mergeSession'].map(grab).join('\n')+
+    '\nvar SESS_ENDED_KEEP=20;\nthis.dbMerge=dbMerge;').call(m);
   var got=m.dbMerge('days/2026-09-30',{water:0,smoking:0,workout:{done:false,type:null}},
     {water:0,smoking:1,workout:{done:false,type:null}},
     {water:3,smoking:0,workout:{done:true,type:'Strength'}});
@@ -153,6 +155,42 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
   if(JSON.stringify(ud.deletedRecipes)==='["p3","p5"]')
     console.log('  PASS  an undone delete merges as a removal, the other view\'s delete kept');
   else { fails++; console.log('  FAIL  undone delete merge\n        got '+JSON.stringify(ud)); }
+  function check(label,ok,got){ if(ok) console.log('  PASS  '+label); else { fails++; console.log('  FAIL  '+label+'\n        got '+JSON.stringify(got)); } }
+  // Shopping: ticks and extras are sets, as deleted recipes are.
+  var sh=m.dbMerge('state/shopping',{checked:['a','c'],extras:[{id:'x1',text:'Tea'}]},
+    {checked:['a','b'],extras:[{id:'x1',text:'Tea'},{id:'x2',text:'Coffee'}]},
+    {checked:['a','c','d'],extras:[{id:'x1',text:'Tea'},{id:'x3',text:'Bin bags'}]});
+  check('ticks and extras from two views are both kept, an untick too',
+    JSON.stringify(sh.checked.slice().sort())==='["a","b","d"]' &&
+    JSON.stringify(sh.extras.map(function(x){ return x.id; }).sort())==='["x1","x2","x3"]', sh);
+  // One session open in two views: sets are a union by when they were logged,
+  // an exercise added here keeps its place before the cool-down.
+  var S=function(ids,logs,extra){ var o={id:'s1',workoutId:'w6',t0:1,exIds:ids,targets:{},logs:logs}; Object.keys(extra||{}).forEach(function(k){ o[k]=extra[k]; }); return o; };
+  var b0=S(['warmup','press_bench','cooldown'],{press_bench:[{v:8,w:60,t:10}]});
+  var mine=S(['warmup','press_bench','dip','cooldown'],{press_bench:[{v:8,w:60,t:10},{v:7,w:60,t:30}]},{targets:{dip:{sets:3,reps:'8'}}});
+  var theirs=S(['warmup','press_bench','cooldown'],{press_bench:[{v:8,w:60,t:10},{v:8,w:62.5,t:20}],press_ohp:[{v:8,w:40,t:25}]});
+  var sm=m.dbMerge('state/session',{active:b0},{active:mine},{active:theirs}).active;
+  check('sets logged on one session in two views are all kept, in order, once each',
+    sm && JSON.stringify(sm.logs.press_bench.map(function(x){ return x.t; }))==='[10,20,30]' && sm.logs.press_ohp.length===1 &&
+    JSON.stringify(sm.exIds)==='["warmup","press_bench","dip","cooldown"]' && sm.targets.dip.sets===3, sm);
+  // Ended elsewhere: what this view holds of it does not bring it back.
+  var en=m.dbMerge('state/session',{active:b0},{active:mine},{active:null,ended:['s1']});
+  check('a session finished elsewhere stays finished whatever this view logged on it', en.active===null && en.ended[0]==='s1', en);
+  var en2=m.dbMerge('state/session',{active:b0},{active:mine},{active:null});
+  check('and so does one discarded or replaced elsewhere', en2.active===null, en2);
+  // A view hidden straight after a set wrote it back without reading: still ended.
+  var zb=m.dbMerge('state/session',{active:null,ended:['s1']},{active:null,ended:['s1']},{active:mine,ended:['s1']});
+  check('a session written back by a view that had not heard is not live again', zb.active===null, zb);
+  // Put back by Undo in one view: live again everywhere.
+  var ub=m.dbMerge('state/session',{active:null,ended:['s1']},{active:null,ended:['s1']},{active:mine});
+  check('a session put back on purpose is live again', ub.active && ub.active.id==='s1' && !ub.ended, ub);
+  // A log for the same session from two views, one never seen here: both sets.
+  var lg=m.dbMerge('workoutLogs/wl1',{},{id:'wl1',logs:{press_bench:[{v:8,t:10},{v:7,t:30}]}},{id:'wl1',logs:{press_bench:[{v:8,t:10},{v:8,t:20}]}});
+  check('one session\'s log written in two views keeps every set once',
+    JSON.stringify(lg.logs.press_bench.map(function(x){ return x.t; }))==='[10,20,30]', lg);
+  // Two equal sets with no time are two sets, not one.
+  var nt=m.dbMerge('workoutLogs/wl2',{},{logs:{a:[{v:8},{v:8}]}},{logs:{a:[{v:8},{v:8}]}});
+  check('two equal sets from before set times are not merged into one', nt.logs.a.length===2, nt);
 })();
 
 // A merged profile is put back into this view's state. Anything dbApply reads
@@ -161,7 +199,7 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
   var KEYS=h.match(/var DB_STATE_KEYS=\{[^}]*\};/)[0];
   var m={state:{waterTarget:8,totalXp:0,deletedRecipes:[]}};
   new Function('state',DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+KEYS+'\nfunction ensurePrep(){}\n'+grab('dbClone')+'\n'+
-    grab('dbApply')+'\n'+grab('dbPlace')+'\ndbPlace("state/profile",{waterTarget:9,totalXp:5,deletedRecipes:["p3"]});')
+    grab('byDateId')+'\n'+grab('dbApply')+'\n'+grab('dbPlace')+'\ndbPlace("state/profile",{waterTarget:9,totalXp:5,deletedRecipes:["p3"]});')
     .call(m,m.state);
   if(JSON.stringify(m.state.deletedRecipes)==='["p3"]' && m.state.totalXp===5)
     console.log('  PASS  a merged profile brings another view\'s deleted recipes into state');

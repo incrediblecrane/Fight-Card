@@ -148,7 +148,9 @@ srv.listen(0,async function(){
   p.setDefaultTimeout(8000);
   var fails=0, ok=function(m){console.log('  PASS  '+m);},
       bad=function(m,e){fails++;console.log('  FAIL  '+m+'\n        '+e.message);};
-  var t=async function(name,fn){ try{ await fn(); ok(name); }catch(e){ bad(name,e); } };
+  // FC_ONLY=pattern runs only the checks whose names match it, for a quick loop.
+  var t=async function(name,fn){ if(process.env.FC_ONLY && !new RegExp(process.env.FC_ONLY).test(name)) return;
+    try{ await fn(); ok(name); }catch(e){ bad(name,e); } };
   var url='http://127.0.0.1:'+srv.address().port+'/';
   // A seed can carry an in-flight session, which opens on the session view
   // rather than the tabs. Get to Today before touching the water card.
@@ -1045,6 +1047,223 @@ srv.listen(0,async function(){
     assert.ok(store['workoutLogs/wlNoTag'],'undo did not put the session back');
   });
 
+  console.log('\nONE SESSION, HOWEVER MANY VIEWS HOLD IT');
+  // Push opens on the warm-up; the bench is the first lift.
+  var BENCH='press_bench';
+  var toEx=async function(pg,ex){
+    for(var i=0;i<12 && !(await pg.locator('#log-v-'+ex).count());i++){ await pg.click('[data-action="nextslide"]'); await pg.waitForTimeout(80); } };
+  var logIn=async function(pg,ex,w,v){
+    await pg.fill('#log-w-'+ex,String(w)); await pg.fill('#log-v-'+ex,String(v));
+    await pg.click('[data-action="logset"][data-ex="'+ex+'"]'); };
+  var finishIn=async function(pg){
+    for(var i=0;i<12 && !(await pg.locator('[data-action="finishworkout"]').count());i++){ await pg.click('[data-action="nextslide"]'); await pg.waitForTimeout(80); }
+    await pg.click('[data-action="finishworkout"]'); };
+  var resumeIn=async function(pg){
+    await pg.click('[data-action="tab"][data-tab="training"]'); await pg.waitForTimeout(200);
+    await pg.click('[data-action="resumesession"]'); await pg.waitForTimeout(200); };
+  // The stored sessions holding the set logged at t1.
+  var logsOf=function(t1){ return Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0 &&
+      Object.keys(store[k].logs||{}).some(function(ex){ return (store[k].logs[ex]||[]).some(function(s){ return s.t===t1; }); }); })
+    .map(function(k){ return store[k]; }); };
+  // Every set across every stored session, by when it was logged.
+  var dupSets=function(){ var seen={}, dup=[];
+    Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0; }).forEach(function(k){
+      var l=store[k].logs||{}; Object.keys(l).forEach(function(ex){ (l[ex]||[]).forEach(function(s){
+        if(s.t===undefined) return; if(seen[s.t]) dup.push(ex+'@'+s.t+' in '+seen[s.t]+' and '+k); else seen[s.t]=k; }); }); });
+    return dup; };
+  // A starts Push and logs a set, B opens it, A finishes.
+  var startShared=async function(){
+    var day=await today();
+    store['state/session']={active:null}; store['days/'+day]=blank();
+    await go();
+    await p.click('[data-action="tab"][data-tab="training"]');
+    await p.click('[data-action="startworkout"][data-id="w6"]'); await toEx(p,BENCH);
+    await logIn(p,BENCH,60,8); await p.waitForTimeout(1800);
+    var s=(store['state/session']||{}).active;
+    assert.ok(s && s.logs[BENCH] && s.logs[BENCH].length===1,'A did not save its set: '+JSON.stringify(s));
+    var q=await openView(); await resumeIn(q); await toEx(q,BENCH);
+    return {q:q, t1:s.logs[BENCH][0].t, day:day};
+  };
+
+  await t('a session finished in one view stays finished when another view logs a set on it', async function(){
+    var o=await startShared(), q=o.q;
+    try{
+      await finishIn(p); await p.waitForTimeout(1800);
+      assert.strictEqual(store['state/session'].active,null,'A finished, but the session is still stored');
+      var xp=store['state/profile'].totalXp;
+      await logIn(q,BENCH,60,7); await q.waitForTimeout(2200);
+      assert.strictEqual(store['state/session'].active,null,'the set logged in B brought the finished session back: '+
+        JSON.stringify(store['state/session']).slice(0,160));
+      var logs=logsOf(o.t1);
+      assert.strictEqual(logs.length,1,logs.length+' logs for one session');
+      assert.deepStrictEqual(logs[0].logs[BENCH].map(function(s){ return s.v; }),[8,7],'the set B logged is not on the session\'s log: '+
+        JSON.stringify(logs[0].logs[BENCH]));
+      assert.deepStrictEqual(dupSets(),[],'a set is stored twice');
+      assert.strictEqual(store['state/profile'].totalXp,xp,'the extra set paid xp');
+      // Nothing that view does next puts it back.
+      if(await q.locator('[data-action="finishworkout"]').count()) await finishIn(q);
+      await q.waitForTimeout(1800);
+      assert.strictEqual(store['state/session'].active,null,'B brought the session back');
+      assert.strictEqual(logsOf(o.t1).length,1,'B logged the session a second time');
+      assert.deepStrictEqual(dupSets(),[],'a set is stored twice');
+    } finally { await q.context().close(); }
+    await go(); await p.click('[data-action="tab"][data-tab="training"]');
+    assert.strictEqual(await p.locator('[data-action="resumesession"]').count(),0,'the finished session is offered to resume');
+    await toToday();
+  });
+
+  // Hidden straight after the set, the view has no time to read and sends what
+  // it changed, so the session goes back in whole.
+  await t('a view hidden straight after a set on a session finished elsewhere does not bring it back', async function(){
+    var o=await startShared(), q=o.q;
+    try{
+      await finishIn(p); await p.waitForTimeout(1800);
+      await logIn(q,BENCH,60,7); await hideIn(q); await q.waitForTimeout(1200);
+      var sd=store['state/session'];
+      assert.ok(!(sd.active && (sd.ended||[]).indexOf(sd.active.id)<0),'the hidden view made the finished session live again: '+JSON.stringify(sd).slice(0,160));
+      await showIn(q); await q.waitForTimeout(2000);
+      var logs=logsOf(o.t1);
+      assert.strictEqual(logs.length,1,logs.length+' logs for one session');
+      assert.deepStrictEqual(logs[0].logs[BENCH].map(function(s){ return s.v; }),[8,7],'the set logged before hiding is not on the log: '+
+        JSON.stringify(logs[0].logs[BENCH]));
+      assert.deepStrictEqual(dupSets(),[],'a set is stored twice');
+      assert.strictEqual(store['state/session'].active,null,'the session written back is still stored');
+    } finally { await q.context().close(); }
+    await go(); await p.click('[data-action="tab"][data-tab="training"]');
+    assert.strictEqual(await p.locator('[data-action="resumesession"]').count(),0,'the finished session is offered to resume');
+    await toToday();
+  });
+
+  await t('a session finished in two views is logged once, with every set, and pays once', async function(){
+    var o=await startShared(), q=o.q;
+    try{
+      var xp0=store['state/profile'].totalXp;
+      await finishIn(p); await p.waitForTimeout(1800);
+      var xp=store['state/profile'].totalXp;
+      assert.ok(xp>xp0,'finishing paid no xp, so this proves nothing');
+      // B has not looked since: it logs one more and finishes straight away.
+      await q.evaluate(function(ex){
+        document.getElementById('log-w-'+ex).value='60'; document.getElementById('log-v-'+ex).value='7';
+        document.querySelector('[data-action="logset"][data-ex="'+ex+'"]').click();
+        for(var i=0;i<12 && !document.querySelector('[data-action="finishworkout"]');i++) document.querySelector('[data-action="nextslide"]').click();
+        document.querySelector('[data-action="finishworkout"]').click();
+      },BENCH);
+      await q.waitForTimeout(2500);
+      var logs=logsOf(o.t1);
+      assert.strictEqual(logs.length,1,logs.length+' logs for one session: '+logs.map(function(l){ return l.id; }).join(', '));
+      assert.deepStrictEqual(logs[0].logs[BENCH].map(function(s){ return s.v; }),[8,7],'the sets are not all on the log: '+
+        JSON.stringify(logs[0].logs[BENCH]));
+      assert.deepStrictEqual(dupSets(),[],'a set is stored twice');
+      assert.strictEqual(store['state/session'].active,null,'the session is still stored');
+      assert.strictEqual(store['state/profile'].totalXp,xp,'one session paid twice: xp '+xp+' became '+store['state/profile'].totalXp);
+    } finally { await q.context().close(); }
+  });
+
+  await t('a session discarded in one view is not brought back by a set in another, and can be put back there', async function(){
+    var o=await startShared(), q=o.q, logs0=Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0; }).length;
+    try{
+      await tap('[data-action="cancelsession"]'); await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(200);
+      await p.click('[data-action="discardsession"]'); await p.waitForTimeout(1800);
+      assert.strictEqual(store['state/session'].active,null,'the discard was not saved');
+      await logIn(q,BENCH,60,7); await q.waitForTimeout(2200);
+      assert.strictEqual(store['state/session'].active,null,'a set logged in B brought the discarded session back');
+      var bar=await q.evaluate(function(){ var e=document.querySelector('.undo-bar'); return e?e.textContent:''; });
+      assert.ok(/ended on another device/.test(bar),'B is not told, nor offered it back: '+bar);
+      await q.click('[data-action="undo"]'); await q.waitForTimeout(1800);
+      var s=store['state/session'].active;
+      assert.ok(s && s.logs[BENCH].length===2,'Undo did not put the session back with both sets: '+JSON.stringify(s));
+      assert.strictEqual(Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0; }).length,logs0,'a log was written');
+    } finally { await q.context().close(); }
+    store['state/session']={active:null};
+    await go();
+  });
+
+  console.log('\nTWO VIEWS ADDING TO THE SAME LISTS');
+  await t('extras added in two views are both kept', async function(){
+    store['state/shopping']={checked:[],extras:[]};
+    await go();
+    var q=await openView();
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await q.click('[data-action="tab"][data-tab="meals"]');
+      await p.fill('#shop-add','coffee'); await p.click('[data-action="addextra"]'); await p.waitForTimeout(1800);
+      await q.fill('#shop-add','bin bags'); await q.click('[data-action="addextra"]'); await q.waitForTimeout(1800);
+      var got=store['state/shopping'].extras.map(function(x){ return x.text; }).sort();
+      assert.deepStrictEqual(got,['bin bags','coffee'],'the store holds '+JSON.stringify(got));
+    } finally { await q.context().close(); }
+  });
+
+  await t('ticks made in two views are both kept, and so is an untick', async function(){
+    store['state/shopping']={checked:['x|xC'],extras:[{id:'xA',text:'Apples'},{id:'xB',text:'Bread'},{id:'xC',text:'Cheese'}]};
+    await go();
+    var q=await openView();
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await q.click('[data-action="tab"][data-tab="meals"]');
+      await p.click('[data-action="shopcheck"][data-item="x|xA"]'); await p.waitForTimeout(1800);
+      await q.click('[data-action="shopcheck"][data-item="x|xB"]'); await q.click('[data-action="shopcheck"][data-item="x|xC"]');
+      await q.waitForTimeout(1800);
+      assert.deepStrictEqual(store['state/shopping'].checked.slice().sort(),['x|xA','x|xB'],'ticks: '+JSON.stringify(store['state/shopping'].checked));
+    } finally { await q.context().close(); }
+    store['state/shopping']={checked:[],extras:[]};
+  });
+
+  await t('sets logged on one session from two views are all kept', async function(){
+    var o=await startShared(), q=o.q;
+    try{
+      await logIn(p,BENCH,62.5,8); await p.waitForTimeout(1800);
+      await logIn(q,BENCH,65,6); await q.waitForTimeout(1800);
+      var s=store['state/session'].active;
+      assert.deepStrictEqual(s.logs[BENCH].map(function(x){ return x.w; }),[60,62.5,65],'the sets: '+JSON.stringify(s.logs[BENCH]));
+      // And each view now shows all three.
+      await p.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); }); await p.waitForTimeout(1200);
+      var chips=await p.locator('.setchip').count();
+      assert.ok(chips>=3,'A shows '+chips+' sets');
+    } finally { await q.context().close(); }
+    store['state/session']={active:null};
+    await go();
+  });
+
+  console.log('\nWHAT OTHER VIEWS ADD OR DELETE REACHES THIS ONE');
+  await t('a sauna visit logged in another view shows here once the page is looked at again', async function(){
+    await go();
+    var q=await openView();
+    try{
+      await q.fill('#sauna-mins','17'); await q.fill('#sauna-temp','77'); await q.selectOption('#sauna-pos','Top');
+      await q.click('[data-action="logsauna"]'); await q.waitForTimeout(1800);
+      var id=Object.keys(store).filter(function(k){ return k.indexOf('sauna/')===0 && store[k].mins===17 && store[k].temp===77; })[0];
+      assert.ok(id,'B did not save its visit');
+      await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1500);
+      assert.ok(await p.locator('[data-action="delsauna"][data-id="'+store[id].id+'"]').count(),'A does not show the visit B logged');
+      // And one B deletes goes from here too.
+      await q.click('[data-action="tab"][data-tab="progress"]'); await q.waitForTimeout(300);
+      await q.evaluate(function(x){ document.querySelector('[data-action="delsauna"][data-id="'+x+'"]').click(); },store[id].id);
+      await q.waitForTimeout(1800);
+      assert.ok(!store[id],'B did not delete it');
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1500);
+      assert.strictEqual(await p.locator('[data-action="delsauna"][data-id="'+id.slice(6)+'"]').count(),0,'A still shows the visit B deleted');
+      assert.ok(!store[id],'A wrote the deleted visit back');
+    } finally { await q.context().close(); }
+    await toToday();
+  });
+
+  await t('a recipe deleted in another view is not written back by a change here', async function(){
+    await go();
+    var rid=Object.keys(store).filter(function(k){ return k.indexOf('recipes/')===0; }).sort().slice(-1)[0].slice(8);
+    var q=await openView();
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await q.click('[data-action="tab"][data-tab="meals"]');
+      await q.click('[data-action="delrecipe"][data-id="'+rid+'"]'); await q.waitForTimeout(1800);
+      assert.ok(!store['recipes/'+rid],'B did not delete the recipe');
+      await p.click('[data-action="toggleex"][data-id="rec:'+rid+'"]');
+      await p.click('[data-action="portions"][data-id="'+rid+'"][data-d="1"]'); await p.waitForTimeout(1800);
+      assert.ok(!store['recipes/'+rid],'A wrote the deleted recipe back: '+JSON.stringify(store['recipes/'+rid]));
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1500);
+      assert.ok(!store['recipes/'+rid],'A wrote the deleted recipe back when looked at again');
+      assert.strictEqual(await p.locator('[data-action="delrecipe"][data-id="'+rid+'"]').count(),0,'A still shows the deleted recipe');
+    } finally { await q.context().close(); }
+    await toToday();
+  });
+
   console.log('\nEXPORT AND IMPORT');
   var exported=async function(){
     await p.click('[data-action="tab"][data-tab="progress"]');
@@ -1099,6 +1318,28 @@ srv.listen(0,async function(){
     await p.click('[data-action="restorebackup"]'); await settle();
     await go();
     assert.deepStrictEqual(await exported(),a,'putting the backup back did not restore the data');
+  });
+
+  // Another device saves after this view loaded, so this view never heard of
+  // what it saved; replacing everything still has to take it away.
+  await t('replacing everything also removes what another view saved after this one loaded', async function(){
+    await go(); var day=await today();
+    store['sauna/sa999']={id:'sa999',date:'2026-09-30',mins:12,temp:80,position:'Top',stints:[{mins:12,position:'Top'}]};
+    store['workoutLogs/wl999']={id:'wl999',workoutId:'w6',title:'Push',tag:'Strength',date:'2026-09-30',logs:{press_bench:[{v:5,w:100,t:1}]}};
+    await importing(JSON.stringify({schema:1,days:{'2026-09-29':blank()}}));
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    // Today is made again by the first tap after it, as on any day.
+    var left=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('state/')!==0 && k!=='days/2026-09-29' && k!=='days/'+day; }); };
+    assert.deepStrictEqual(left(),[],'documents the import does not have are still stored');
+    await go();
+    assert.deepStrictEqual(left(),[],'they came back on a reload');
+    // Putting the data back goes the same way.
+    store['sauna/sa998']={id:'sa998',date:'2026-09-30',mins:9,temp:80,position:'Top',stints:[{mins:9,position:'Top'}]};
+    await p.click('[data-action="tab"][data-tab="progress"]');
+    if(!(await p.locator('[data-action="restorebackup"]').count())) await p.click('[data-action="datapane"][data-p="import"]');
+    await p.click('[data-action="restorebackup"]'); await settle();
+    assert.ok(!store['sauna/sa998'],'putting the data back kept a visit it never had');
+    assert.ok(store['sauna/sa999'] && store['workoutLogs/wl999'],'putting the data back did not restore what the import replaced');
   });
 
   // A file in the seed's shape, recipes carrying inPlan/day, goes through the
