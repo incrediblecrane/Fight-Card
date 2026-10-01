@@ -1335,7 +1335,7 @@ function applyUndo(){
     var s=state.activeSession, at=Math.min(u.pos,s.exIds.length);
     s.exIds.splice(at,0,u.exId);
     if(u.target) s.targets[u.exId]=u.target;
-    if(u.logs && !s.logs[u.exId]) s.logs[u.exId]=u.logs;
+    if(u.logs && !(s.logs[u.exId]||[]).length) s.logs[u.exId]=u.logs;
     if(u.box){ if(!s.supersets) s.supersets={}; s.supersets[u.exId]=u.box; }
     slide=at;
   }
@@ -1488,6 +1488,7 @@ function dbBoot(){
     dbStore=DbStore(db);
     return dbStore.get('state/meta').then(function(meta){
       if(meta) return dbStore.readAll().then(function(map){
+        map=dbUnpendAll(map);
         state=dbApply(map);
         lastSaved=dbSnapshot(map);
         // Recipes saved under the old shape are converted here, once. The
@@ -1496,6 +1497,9 @@ function dbBoot(){
         // Both write, so either one changing anything has to be saved.
         var moved=migratePlan(); if(prunePlan()) moved=true;
         if(migrateMinutes()) moved=true;
+        // A change a closed view sent beside a document is folded in above
+        // and goes into the document itself now.
+        if(Object.keys(pendSeen).length) moved=true;
         if(moved) scheduleSave();
       });
       // First run on this store: the document's own seed is the truth.
@@ -1576,7 +1580,10 @@ function mergeKeyed(base,mine,theirs,key){
 function setKey(x){ return x&&x.t!==undefined?'t'+x.t:stableJson(x); }
 /* Sets per exercise, from two views: none lost and none twice, in the order
    they were logged. An exercise not changed here is as stored, so a log
-   nothing was added to is never rewritten. */
+   nothing was added to is never rewritten. One left with no sets (taken out
+   of the session here, or its only set undone) goes, rather than staying as
+   an empty list: Undo would read that as the sets still being there, and a
+   finished log holding one stopped Progress drawing. */
 function mergeSetLogs(base,mine,theirs){
   base=base||{}; mine=mine||{}; theirs=theirs||{};
   var out={};
@@ -1585,7 +1592,7 @@ function mergeSetLogs(base,mine,theirs){
     if(stableJson(mine[ex])===stableJson(base[ex])){ if(theirs[ex]!==undefined) out[ex]=theirs[ex]; return; }
     var l=mergeKeyed(base[ex],mine[ex],theirs[ex],setKey);
     if(l.every(function(s){ return s && typeof s.t==='number'; })) l.sort(function(a,b){ return a.t-b.t; });
-    out[ex]=l;
+    if(l.length) out[ex]=l;
   });
   return out;
 }
@@ -1646,7 +1653,9 @@ function setCount(logs){ var n=0; Object.keys(logs||{}).forEach(function(k){ n+=
 /* A session is one thing however many views hold it. Before the merge, with
    what was just read in at:
    - a log this view wrote for a session another view had finished first gives
-     back the XP its finish paid, since that was paid there;
+     back the XP its finish paid, since that was paid there. One stored just as
+     this view wrote it is its own write, landed though it answered with an
+     error, and keeps it;
    - sets logged elsewhere on a session finished here go onto this view's log;
    - sets logged here on a session ended elsewhere go onto its log, or, when
      there is none (it was discarded), the session is offered back by Undo. */
@@ -1656,7 +1665,8 @@ function dbSettleSession(at){
   Object.keys(finishPaid).forEach(function(id){
     var path='workoutLogs/'+id;
     if(!(path in at)) return;
-    if(at[path]!==undefined && lastSaved[path]===undefined){ addXp(-finishPaid[id]); moved=true; }
+    var own=state.workoutLogs.filter(function(l){ return l.id===id; })[0];
+    if(at[path]!==undefined && lastSaved[path]===undefined && stableJson(at[path])!==stableJson(own)){ addXp(-finishPaid[id]); moved=true; }
     delete finishPaid[id];
   });
   var tdoc=at['state/session']; if(!tdoc) return moved;
@@ -1718,6 +1728,53 @@ function dbGetAll(paths){
   }
   return batch(0);
 }
+/* A view hidden straight after a change has no time to read first, so what
+   it changed in a field that merges (ticks, extras, deleted recipes, XP, the
+   session, a log's sets) is not written over the store's copy: that took
+   away whatever another view had added since, and the next merge counted
+   this view's change a second time. It goes beside it instead, in a field of
+   this view's own, pend_ and the view: those fields as this view last heard
+   of them (b) and as they are now (m). Every read folds in another view's
+   as that view's change, and the next save puts the document back without
+   it. A view's own is left out of its reads: the change is still in its
+   state, against the base it was sent from. */
+var DB_VIEW='pend_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+var DB_MERGED={'state/profile':['totalXp','deletedRecipes'], 'state/shopping':['checked','extras'], 'state/session':['active','ended']};
+function mergedKeys(path){ return DB_MERGED[path]||(path.indexOf('workoutLogs/')===0?['logs']:[]); }
+// Documents read with a pend_ field in them, which the next save puts back
+// clean, and this view's own sent and not yet put back by this view.
+var pendSeen={}, pendSent={};
+function foldPend(path,raw,own){
+  var body={}, ks=[];
+  Object.keys(raw).forEach(function(k){ if(k.indexOf('pend_')!==0) body[k]=raw[k]; else if(k!==own) ks.push(k); });
+  ks.sort().forEach(function(k){
+    var P=raw[k]||{}, b={}, m={};
+    Object.keys(body).forEach(function(f){ b[f]=m[f]=body[f]; });
+    Object.keys(P.b||{}).forEach(function(f){ b[f]=P.b[f]; });
+    Object.keys(P.m||{}).forEach(function(f){ m[f]=P.m[f]; });
+    var r=dbMerge(path,b,m,body), a=P.m&&P.m.active;
+    // Sets logged on a session that ended elsewhere stay with it, not live,
+    // so dbSettleSession takes them to its log.
+    if(path==='state/session' && !r.active && a && (r.ended||[]).indexOf(sessId(a))>-1) r.active=a;
+    body=r;
+  });
+  return body;
+}
+function dbUnpend(path,raw){
+  if(!raw || typeof raw!=='object') return raw;
+  var any=Object.keys(raw).some(function(k){ return k.indexOf('pend_')===0; }), sent=pendSent[path];
+  if(any) pendSeen[path]=1; else delete pendSeen[path];
+  // Ours is gone: another view folded it in and put the document back. A
+  // list or a session merged with it again comes out the same, but XP is a
+  // sum, so what this view sent is now part of what it last heard.
+  if(sent && !raw[DB_VIEW]){
+    var sb=savedBody(path);
+    if(sb && sent.m.totalXp!==undefined){ sb.totalXp=(sb.totalXp||0)+(sent.m.totalXp||0)-(sent.b.totalXp||0); lastSaved[path]=stableJson(sb); }
+    delete pendSent[path];
+  }
+  return any?foldPend(path,raw,DB_VIEW):raw;
+}
+function dbUnpendAll(map){ var out={}; Object.keys(map).forEach(function(p){ out[p]=dbUnpend(p,map[p]); }); return out; }
 /* Read back what is about to be written, not only what is likely: removing a
    session or putting one back changes the day it was on, which can be any
    day, and a whole stale copy of it would undo what another view logged
@@ -1747,6 +1804,7 @@ function dbRefresh(all){
     }) : (function(paths){ return dbGetAll(paths).then(function(got){
       var at={}; paths.forEach(function(p,i){ at[p]=got[i]; }); return at; }); })(uniq(want));
   return read.then(function(at){
+    at=dbUnpendAll(at);
     var moved=dbSettleSession(at);
     // Taken after the read, so a tap made while it was out counts as ours.
     var mine=dbDocs(state);
@@ -1792,6 +1850,7 @@ function dbRefresh(all){
 var importPrev=null;
 function dbFold(replace){
   return dbStore.readAll().then(function(map){
+    map=dbUnpendAll(map);
     if(importPrev){
       var docs={}; Object.keys(map).forEach(function(p){ docs[p]=map[p]; });
       Object.keys(lastSaved).forEach(function(p){ if(importPrev[p]===undefined) delete docs[p]; });
@@ -1799,6 +1858,11 @@ function dbFold(replace){
       writeBackup(exportText(dbApply(docs))); importPrev=null;
     }
     if(replace){
+      // A session another view started since this one last read is replaced
+      // too, so it is ended in every view, as this view's own was.
+      var y=sessId(liveSession(map['state/session']));
+      if(y && y!==sessId(state.activeSession) && (state.endedSessions||[]).indexOf(y)<0)
+        state.endedSessions=(state.endedSessions||[]).concat([y]).slice(-SESS_ENDED_KEEP);
       Object.keys(lastSaved).forEach(function(p){ if(map[p]===undefined){ delete lastSaved[p]; savedGen[p]=saveGen; } });
       Object.keys(map).forEach(function(p){ lastSaved[p]=stableJson(map[p]); savedGen[p]=saveGen; });
     }
@@ -1846,25 +1910,37 @@ function dbSave(){
     // then, and only then, the session waits, and only for those logs.
     var ending=docs['state/session'].active===null && lastSaved['state/session']!==next['state/session'];
     function landed(path,json){
+      delete pendSeen[path]; delete pendSent[path];
       if(gen<(savedGen[path]||0)) return;
       savedGen[path]=gen;
       if(json===undefined) delete lastSaved[path]; else lastSaved[path]=json;
     }
     Object.keys(next).forEach(function(path){
-      if(lastSaved[path]===next[path]) return;
+      // One read with a pend_ field in it is put back clean, once this view's
+      // state has merged what was read: not by an import, which has not.
+      if(lastSaved[path]===next[path] && (mode || !pendSeen[path])) return;
       var was=mode==='flush'?savedBody(path):undefined, job, fresh=false;
       // A day this view never read may have been made by another view since:
       // send what changed from a blank day, and put it whole only if the
       // store says there is no such day yet.
       if(mode==='flush'&&was===undefined&&path.indexOf('days/')===0){ was=blankDay(); fresh=true; }
+      // So may a finished session's log, by a view that finished it first.
+      else if(mode==='flush'&&was===undefined&&path.indexOf('workoutLogs/')===0){ was={}; fresh=true; }
       if(was){
         // What the store holds is unknown, so lastSaved stays as it was: the
         // next save re-reads this document and merges it, our fields included.
-        var changed={}, body=docs[path];
-        Object.keys(body).forEach(function(k){ if(stableJson(body[k])!==stableJson(was[k])&&stableJson(body[k])!==undefined) changed[k]=body[k]; });
-        if(!fresh) Object.keys(was).forEach(function(k){ if(stableJson(body[k])===undefined) changed[k]=null; });
+        // A field that merges goes beside the document, not over it (see DB_VIEW).
+        var changed={}, body=docs[path], mk=mergedKeys(path), pend=null;
+        var note=function(k,v){
+          if(mk.indexOf(k)<0){ changed[k]=v; return; }
+          pend=pend||{b:{},m:{}}; pend.b[k]=was[k]===undefined?null:was[k]; pend.m[k]=v;
+        };
+        Object.keys(body).forEach(function(k){ if(stableJson(body[k])!==stableJson(was[k])&&stableJson(body[k])!==undefined) note(k,body[k]); });
+        if(!fresh) Object.keys(was).forEach(function(k){ if(stableJson(body[k])===undefined) note(k,null); });
+        if(pend) changed[DB_VIEW]=pend;
         if(!Object.keys(changed).length) return;
         job=function(){ var pr=dbStore.update(path,changed);
+          if(pend) pr=pr.then(function(){ pendSent[path]=pend; });
           return fresh?pr.then(null,function(e){
             if(!e||(e.code!=='invalid_argument'&&e.code!=='not_found')) throw e;
             return put(); }):pr; };
@@ -2494,7 +2570,10 @@ function logSet(exId,type,quiet){
   consumed(['log-v-','log-w-','log-opt-','log-lvl-','log-machine-','log-work-','log-rest-'].map(function(k){ return k+exId; }));
   return true;
 }
-function undoSet(exId){ var arr=state.activeSession && state.activeSession.logs[exId]; if(arr&&arr.length) arr.pop(); }
+function undoSet(exId){
+  var logs=state.activeSession && state.activeSession.logs, arr=logs && logs[exId];
+  if(arr&&arr.length){ arr.pop(); if(!arr.length) delete logs[exId]; }
+}
 /* Which members each round actually logged, so a round can be taken back as a
    round. A box from before this was kept gets one empty entry per round it
    already counts, so the count and the log agree from the start. */
@@ -2552,7 +2631,9 @@ function finishWorkout(){
   if(had){ had.logs=mergeSetLogs(null,sess.logs,had.logs); endSession(sess); state.activeSession=null; viewingSession=false; tab='progress'; return; }
   var w=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
   var title=w?w.title:'Workout', tag=w?w.tag:'Strength';
-  var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:sess.startedAt||activeDate(),logs:sess.logs};
+  // An exercise with no sets left on it is not part of what was done.
+  var done={}; Object.keys(sess.logs||{}).forEach(function(k){ if((sess.logs[k]||[]).length) done[k]=sess.logs[k]; });
+  var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:sess.startedAt||activeDate(),logs:done};
   var ss=supersetRecord(sess); if(ss.length) log.supersets=ss;
   var mins=sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
   state.workoutLogs.push(log);
@@ -3263,7 +3344,10 @@ function bodyContent(){
   // Newest date, not the date of whichever log was saved last: a backfilled
   // log lands on the end of the list with an older date.
   var newest=function(id){ return histo[id].reduce(function(a,h){ return h.date>a?h.date:a; },''); };
-  var exIds=Object.keys(histo).sort(function(a,b){ var da=newest(a), db=newest(b); return da<db?1:(da>db?-1:0); });
+  // A log saved before empty lists were dropped can hold an exercise with no
+  // sets, which has no history to show.
+  var exIds=Object.keys(histo).filter(function(id){ return histo[id].length; })
+    .sort(function(a,b){ var da=newest(a), db=newest(b); return da<db?1:(da>db?-1:0); });
 
   var isSet=countsAsSet;
   var totalSets=0, totalVolume=0;

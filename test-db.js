@@ -945,6 +945,11 @@ srv.listen(0,async function(){
     await leave();
   });
 
+  // A page going away sends the session beside the stored one (pend_ and
+  // its view), which any view reading the store takes up.
+  var sentSession=function(){ var d=store['state/session']||{}, a=d.active||null;
+    Object.keys(d).forEach(function(k){ if(!a && k.indexOf('pend_')===0 && d[k] && d[k].m) a=d[k].m.active||null; });
+    return a; };
   await t('a page going away sends a started session alongside a slow write, not after it', async function(){
     await go();
     setDelays.push({op:'update',match:'days/',ms:3000});
@@ -953,9 +958,10 @@ srv.listen(0,async function(){
     await p.locator('[data-action="startworkout"]').first().click();
     await hideIn(p); await p.waitForTimeout(800);
     assert.strictEqual(setDelays.length,0,'the day was never held, so this proves nothing');
-    var s=store['state/session'];
-    assert.ok(s && s.active,'the session waited for the day: '+JSON.stringify(s));
+    assert.ok(sentSession(),'the session waited for the day: '+JSON.stringify(store['state/session']));
     await p.waitForTimeout(3000); await showIn(p); await p.waitForTimeout(1500);
+    var s=store['state/session'];
+    assert.ok(s.active && !Object.keys(s).some(function(k){ return k.indexOf('pend_')===0; }),'looked at again, the session is not stored as itself: '+JSON.stringify(s).slice(0,160));
     await leave();
   });
 
@@ -1159,6 +1165,34 @@ srv.listen(0,async function(){
     } finally { await q.context().close(); }
   });
 
+  // Hidden straight after its Finish, the second view writes its log with no
+  // read first, onto a log the first view already wrote for the same session.
+  await t('a session finished in two views, the second hidden at once, keeps every set and pays once', async function(){
+    var o=await startShared(), q=o.q;
+    try{
+      var xp0=store['state/profile'].totalXp;
+      await logIn(p,BENCH,62.5,8); await p.waitForTimeout(300);
+      await finishIn(p); await p.waitForTimeout(1800);
+      var xp=store['state/profile'].totalXp;
+      assert.ok(xp>xp0,'finishing paid no xp, so this proves nothing');
+      await q.evaluate(function(ex){
+        document.getElementById('log-w-'+ex).value='60'; document.getElementById('log-v-'+ex).value='7';
+        document.querySelector('[data-action="logset"][data-ex="'+ex+'"]').click();
+        for(var i=0;i<12 && !document.querySelector('[data-action="finishworkout"]');i++) document.querySelector('[data-action="nextslide"]').click();
+        document.querySelector('[data-action="finishworkout"]').click();
+      },BENCH);
+      await hideIn(q); await q.waitForTimeout(1200); await showIn(q); await q.waitForTimeout(2000);
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1800);
+      var logs=logsOf(o.t1);
+      assert.strictEqual(logs.length,1,logs.length+' logs for one session: '+logs.map(function(l){ return l.id; }).join(', '));
+      assert.deepStrictEqual(logs[0].logs[BENCH].map(function(s){ return s.w+'x'+s.v; }),['60x8','62.5x8','60x7'],'the sets are not all on the log: '+
+        JSON.stringify(logs[0].logs[BENCH]));
+      assert.deepStrictEqual(dupSets(),[],'a set is stored twice');
+      assert.strictEqual(store['state/session'].active,null,'the session is still stored');
+      assert.strictEqual(store['state/profile'].totalXp,xp,'one session paid twice: xp '+xp+' became '+store['state/profile'].totalXp);
+    } finally { await q.context().close(); }
+  });
+
   await t('a session discarded in one view is not brought back by a set in another, and can be put back there', async function(){
     var o=await startShared(), q=o.q, logs0=Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0; }).length;
     try{
@@ -1220,6 +1254,207 @@ srv.listen(0,async function(){
     } finally { await q.context().close(); }
     store['state/session']={active:null};
     await go();
+  });
+
+  // A view hidden straight after a change has no time to read first. What it
+  // changed in a list both views add to, or in XP, must not be written over
+  // what another view saved meanwhile, and must not be counted twice.
+  console.log('\nA VIEW HIDDEN STRAIGHT AFTER A CHANGE BOTH VIEWS ADD TO');
+  // Documents still carrying what a hidden view sent beside them.
+  var pending=function(){ return Object.keys(store).filter(function(k){
+    return store[k] && typeof store[k]==='object' && Object.keys(store[k]).some(function(f){ return f.indexOf('pend_')===0; }); }); };
+  await t('a tick in a view hidden at once keeps the tick another view saved, if that view is never seen again', async function(){
+    store['state/shopping']={checked:[],extras:[{id:'xA',text:'Apples'},{id:'xB',text:'Bread'}]};
+    await go();
+    var q=await openView();
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await q.click('[data-action="tab"][data-tab="meals"]');
+      await p.click('[data-action="shopcheck"][data-item="x|xA"]'); await p.waitForTimeout(1800);
+      assert.deepStrictEqual(store['state/shopping'].checked,['x|xA'],'A did not save its tick');
+      await q.click('[data-action="shopcheck"][data-item="x|xB"]'); await hideIn(q); await q.waitForTimeout(800);
+    } finally { await q.context().close(); }
+    await hideIn(p); await showIn(p); await p.waitForTimeout(1800);
+    assert.deepStrictEqual(store['state/shopping'].checked.slice().sort(),['x|xA','x|xB'],'ticks: '+JSON.stringify(store['state/shopping'].checked));
+    assert.ok(await p.locator('.shop.checked[data-item="x|xB"]').count(),'A does not show the tick made in the hidden view');
+    assert.deepStrictEqual(pending(),[],'what the hidden view sent is still beside the list');
+    store['state/shopping']={checked:[],extras:[]};
+    await toToday();
+  });
+
+  await t('an extra added in a view hidden at once keeps the one another view saved', async function(){
+    store['state/shopping']={checked:[],extras:[]};
+    await go();
+    var q=await openView();
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await q.click('[data-action="tab"][data-tab="meals"]');
+      await p.fill('#shop-add','coffee'); await p.click('[data-action="addextra"]'); await p.waitForTimeout(1800);
+      await q.fill('#shop-add','bin bags'); await q.click('[data-action="addextra"]'); await hideIn(q); await q.waitForTimeout(800);
+      await showIn(q); await q.waitForTimeout(1800);
+      var got=store['state/shopping'].extras.map(function(x){ return x.text; }).sort();
+      assert.deepStrictEqual(got,['bin bags','coffee'],'the store holds '+JSON.stringify(got));
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1500);
+      got=store['state/shopping'].extras.map(function(x){ return x.text; }).sort();
+      assert.deepStrictEqual(got,['bin bags','coffee'],'after both looked again the store holds '+JSON.stringify(got));
+      assert.deepStrictEqual(pending(),[],'what the hidden view sent is still beside the list');
+    } finally { await q.context().close(); }
+    store['state/shopping']={checked:[],extras:[]};
+    await toToday();
+  });
+
+  await t('a set logged in a view hidden at once keeps the set another view saved', async function(){
+    var o=await startShared(), q=o.q;
+    try{
+      await logIn(p,BENCH,62.5,8); await p.waitForTimeout(1800);
+      await logIn(q,BENCH,65,6); await hideIn(q); await q.waitForTimeout(800);
+      await showIn(q); await q.waitForTimeout(1800);
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1800);
+      var s=store['state/session'].active;
+      assert.deepStrictEqual(s.logs[BENCH].map(function(x){ return x.w; }),[60,62.5,65],'the sets: '+JSON.stringify(s.logs[BENCH]));
+      var chips=await p.locator('.setchip').count();
+      assert.ok(chips>=3,'A shows '+chips+' sets');
+      assert.deepStrictEqual(pending(),[],'what the hidden view sent is still beside the session');
+    } finally { await q.context().close(); }
+    store['state/session']={active:null};
+    await go();
+  });
+
+  await t('xp earned in a view hidden at once is counted once, and keeps what another view earned', async function(){
+    var day=await today(); store['days/'+day]=blank();
+    await go();
+    var x0=store['state/profile'].totalXp, cup=+doc.match(/var XP_PER_WATER=(\d+)/)[1];
+    await p.click(W); await p.waitForTimeout(200);
+    await hideIn(p); await p.waitForTimeout(800); await showIn(p); await p.waitForTimeout(1800);
+    var x1=store['state/profile'].totalXp;
+    assert.strictEqual(x1,x0+cup,'one cup earned '+(x1-x0)+' xp, not '+cup);
+    // A second view that has not looked since, closed straight after its tap.
+    var q=await openView();
+    try{
+      await p.click(W); await p.waitForTimeout(1800);
+      assert.strictEqual(store['state/profile'].totalXp,x1+cup,'A did not save its xp');
+      await q.click('[data-action="water"][data-d="1"]'); await hideIn(q); await q.waitForTimeout(800);
+    } finally { await q.context().close(); }
+    await hideIn(p); await showIn(p); await p.waitForTimeout(1800);
+    assert.strictEqual(store['state/profile'].totalXp,x0+3*cup,'three cups, each paid once, but xp went '+x0+' to '+store['state/profile'].totalXp);
+    assert.deepStrictEqual(pending(),[],'what the hidden view sent is still beside the xp');
+  });
+
+  // Hidden straight after Finish, the log goes without a read first. A write
+  // that lands but answers with an error is this view's own log, not one
+  // another view wrote first, so the finish keeps its xp.
+  await t('a finish whose log landed but answered with an error, hidden at once, keeps its xp', async function(){
+    var day=await today();
+    store['state/session']={active:null}; store['days/'+day]=blank();
+    await go();
+    await p.click('[data-action="tab"][data-tab="training"]');
+    await p.click('[data-action="startworkout"][data-id="w6"]'); await toEx(p,BENCH);
+    await logIn(p,BENCH,60,8); await p.waitForTimeout(1800);
+    var x0=store['state/profile'].totalXp, hit=0;
+    await p.route('**/db/set',async function(route){
+      var body=JSON.parse(route.request().postData()||'{}');
+      if(!hit && String(body.path).indexOf('workoutLogs/')===0){ hit++; var r=await route.fetch(); await r.text();
+        return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({err:'unavailable'})}); }
+      return route.continue();
+    });
+    try{
+      await finishIn(p); await hideIn(p); await p.waitForTimeout(5000); await showIn(p); await p.waitForTimeout(2500);
+    } finally { await p.unroute('**/db/set'); }
+    assert.strictEqual(hit,1,'the log write was never answered with an error, so this proves nothing');
+    assert.ok(store['state/profile'].totalXp>x0,'the finish paid nothing: xp '+x0+' then '+store['state/profile'].totalXp);
+    assert.strictEqual(store['state/session'].active,null,'the finish was not saved');
+    await toToday();
+  });
+
+  // A tick sent by a view that then closed is not lost to a view that loads later.
+  await t('a change sent by a view closed at once reaches the next view to load', async function(){
+    store['state/shopping']={checked:[],extras:[{id:'xA',text:'Apples'},{id:'xB',text:'Bread'}]};
+    await go();
+    var q=await openView();
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await q.click('[data-action="tab"][data-tab="meals"]');
+      await p.click('[data-action="shopcheck"][data-item="x|xA"]'); await p.waitForTimeout(1800);
+      await q.click('[data-action="shopcheck"][data-item="x|xB"]'); await hideIn(q); await q.waitForTimeout(800);
+    } finally { await q.context().close(); }
+    await go(); await p.click('[data-action="tab"][data-tab="meals"]');
+    assert.ok(await p.locator('.shop.checked[data-item="x|xA"]').count() && await p.locator('.shop.checked[data-item="x|xB"]').count(),'the view loaded after does not show both ticks');
+    await p.waitForTimeout(1800);
+    assert.deepStrictEqual(store['state/shopping'].checked.slice().sort(),['x|xA','x|xB'],'ticks: '+JSON.stringify(store['state/shopping'].checked));
+    assert.deepStrictEqual(pending(),[],'what the closed view sent was never folded in');
+    store['state/shopping']={checked:[],extras:[]};
+    await toToday();
+  });
+
+  console.log('\nAN EXERCISE TAKEN OUT OF A SESSION');
+  var startPush=async function(){
+    var day=await today();
+    store['state/session']={active:null}; store['days/'+day]=blank();
+    await go();
+    await p.click('[data-action="tab"][data-tab="training"]');
+    await p.click('[data-action="startworkout"][data-id="w6"]'); await p.waitForTimeout(300);
+  };
+  // Logs holding an exercise with no sets. Each check clears them on the way
+  // out, so one that fails cannot stop the next from loading.
+  var emptyLogs=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0 &&
+      Object.keys(store[k].logs||{}).some(function(ex){ return !(store[k].logs[ex]||[]).length; }); }); };
+  var clearEmpty=function(){ emptyLogs().forEach(function(k){ delete store[k]; }); };
+  var progressShows=async function(){
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(400);
+    assert.ok(/sets logged/i.test(await text()),'Progress did not draw');
+  };
+  await t('an exercise taken out after its set was saved comes back with that set on Undo', async function(){
+    await startPush(); await toEx(p,BENCH);
+    await logIn(p,BENCH,60,8); await p.waitForTimeout(1800);
+    assert.strictEqual(store['state/session'].active.logs[BENCH].length,1,'the set was not saved');
+    await p.click('[data-action="removeex"][data-id="'+BENCH+'"]'); await p.waitForTimeout(1800);
+    var s=store['state/session'].active;
+    assert.ok(s.exIds.indexOf(BENCH)<0,'the removal was not saved');
+    assert.ok(!(BENCH in s.logs),'an emptied list was stored for the exercise taken out: '+JSON.stringify(s.logs));
+    await p.click('[data-action="undo"]'); await p.waitForTimeout(1800);
+    s=store['state/session'].active;
+    assert.ok(s.exIds.indexOf(BENCH)>-1,'Undo did not put the exercise back');
+    assert.ok(s.logs[BENCH] && s.logs[BENCH].length===1,'Undo put it back without its set: '+JSON.stringify(s.logs[BENCH]));
+    store['state/session']={active:null};
+    await go();
+  });
+
+  await t('a session finished after its warm-up was taken out logs no empty warm-up, and Progress draws', async function(){
+    try{
+      await startPush();
+      await p.fill('#log-v-warmup','5'); await p.click('[data-action="logset"][data-ex="warmup"]'); await p.waitForTimeout(1800);
+      await p.click('[data-action="removeex"][data-id="warmup"]'); await p.waitForTimeout(1800);
+      await toEx(p,BENCH); await logIn(p,BENCH,60,8); await p.waitForTimeout(300);
+      var n=errs.length;
+      await finishIn(p); await p.waitForTimeout(1800);
+      assert.deepStrictEqual(errs.slice(n),[],'finishing threw: '+errs.slice(n).join(' | '));
+      assert.strictEqual(store['state/session'].active,null,'the finish was not saved');
+      assert.deepStrictEqual(emptyLogs(),[],'a log holds an exercise with no sets');
+      await progressShows();
+      assert.deepStrictEqual(errs.slice(n),[],'Progress threw: '+errs.slice(n).join(' | '));
+    } finally { clearEmpty(); store['state/session']={active:null}; await go(); await toToday(); }
+  });
+
+  await t('a session finished after its only warm-up set was undone logs no empty warm-up, and Progress draws', async function(){
+    try{
+      await startPush();
+      await p.fill('#log-v-warmup','5'); await p.click('[data-action="logset"][data-ex="warmup"]'); await p.waitForTimeout(300);
+      await p.click('[data-action="undoset"][data-ex="warmup"]'); await p.waitForTimeout(1800);
+      await toEx(p,BENCH); await logIn(p,BENCH,60,8); await p.waitForTimeout(300);
+      var n=errs.length;
+      await finishIn(p); await p.waitForTimeout(1800);
+      assert.deepStrictEqual(emptyLogs(),[],'a log holds an exercise with no sets');
+      await progressShows();
+      assert.deepStrictEqual(errs.slice(n),[],'Progress threw: '+errs.slice(n).join(' | '));
+    } finally { clearEmpty(); store['state/session']={active:null}; await go(); await toToday(); }
+  });
+
+  // Saved by an earlier version, which could log an exercise with no sets.
+  await t('a stored log holding an exercise with no sets does not stop Progress drawing', async function(){
+    store['workoutLogs/wlEmpty']={id:'wlEmpty',workoutId:'w6',title:'Push',tag:'Strength',date:'2026-09-28',
+      logs:{warmup:[],press_bench:[{v:8,w:60,t:5}]}};
+    try{
+      await go(); var n=errs.length;
+      await progressShows();
+      assert.deepStrictEqual(errs.slice(n),[],'Progress threw: '+errs.slice(n).join(' | '));
+    } finally { clearEmpty(); await go(); await toToday(); }
   });
 
   console.log('\nWHAT OTHER VIEWS ADD OR DELETE REACHES THIS ONE');
@@ -1340,6 +1575,31 @@ srv.listen(0,async function(){
     await p.click('[data-action="restorebackup"]'); await settle();
     assert.ok(!store['sauna/sa998'],'putting the data back kept a visit it never had');
     assert.ok(store['sauna/sa999'] && store['workoutLogs/wl999'],'putting the data back did not restore what the import replaced');
+  });
+
+  // Another view started a session after this one last read the store.
+  await t('replacing everything ends a session another view started, and its next hidden set does not bring it back', async function(){
+    var day=await today();
+    store['state/session']={active:null}; store['days/'+day]=blank();
+    await go();
+    var q=await openView();
+    try{
+      await q.click('[data-action="tab"][data-tab="training"]');
+      await q.click('[data-action="startworkout"][data-id="w6"]'); await toEx(q,BENCH);
+      await logIn(q,BENCH,60,8); await q.waitForTimeout(1800);
+      var y=(store['state/session'].active||{}).id;
+      assert.ok(y,'the other view did not save its session');
+      await importing(JSON.stringify({schema:1,days:{'2026-09-29':blank()}}));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      var sd=store['state/session'];
+      assert.ok((sd.ended||[]).indexOf(y)>-1,'the replaced session is not recorded as ended: '+JSON.stringify(sd).slice(0,160));
+      await logIn(q,BENCH,60,7); await hideIn(q); await q.waitForTimeout(1000);
+      sd=store['state/session'];
+      assert.ok(!(sd.active && (sd.ended||[]).indexOf(sd.active.id)<0),'the replaced session is live again: '+JSON.stringify(sd).slice(0,160));
+    } finally { await q.context().close(); }
+    await go(); await p.click('[data-action="tab"][data-tab="training"]');
+    assert.strictEqual(await p.locator('[data-action="resumesession"]').count(),0,'the replaced session is offered to resume');
+    await toToday();
   });
 
   // A file in the seed's shape, recipes carrying inPlan/day, goes through the

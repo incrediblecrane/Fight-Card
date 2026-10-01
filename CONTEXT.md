@@ -73,22 +73,36 @@ stored; any other session change goes out alongside the rest. A save still
 waiting on its timer goes at once when the page is hidden or closed; with no
 time to re-read, it sends only the fields this view changed (`update`), never
 a whole document, and the next save merges. A day this view never read is
-diffed against a blank day, and put whole only when the store refuses the
-update because there is no such day.
+diffed against a blank day, and a finished session's log it never read
+against an empty log (another view may have finished the same session); each
+is put whole only when the store refuses the update because there is none.
+A field that merges (XP, deleted
+recipes, ticks, extras, the session and `ended`, a log's sets) is not sent
+over the store's copy, which would take away what another view added since
+and count this view's change twice: it goes beside it, in a field of the
+view's own, `pend_` and a view id made at load, holding those fields as the
+view last heard of them (`b`) and as they are now (`m`). Every read (load,
+the re-read before a save, an import) folds another view's `pend_` in as that
+view's change and leaves its own out, since its own change is still in its
+state; the next save puts the document back without it. When a view's own
+has been folded and cleared by another view, the XP it sent counts as heard.
 
 The session in flight is one thing however many views hold it. It has an id
 (`s` and its start time), and the same session in two views merges exercise by
 exercise: sets as a union keyed by when each was logged, the exercise list and
-targets key by key. One that has ended elsewhere (finished, discarded, or
-replaced by an import) stays ended, whatever this view still holds of it: sets
+targets key by key. An exercise left with no sets, taken out of the session
+or its only set undone, has no entry in `logs` (not an empty list), and a
+finished log holds only exercises with sets. A session that has ended
+elsewhere (finished, discarded, or replaced by an import) stays ended,
+whatever this view still holds of it: sets
 logged here since go onto its log, or, if it was discarded, the session is
 offered back here by Undo. A finished log carries the session's id as
 `sessionId` and is named after it (`wl` and its start time), so two views
 finishing the same session write one document, keep the sets of both, and pay
 its XP once, and `finishWorkout` adds to a log the session already has rather
 than writing a second. Every ended session's id is kept in `state/session`'s
-`ended`, so a view hidden straight after a set, which sends without reading,
-cannot make an ended session live again by writing it back.
+`ended`, so a set sent by a view hidden straight after it cannot make an
+ended session live again: it is kept beside it, not live, for its log.
 
 ## The Store seam
 
@@ -158,7 +172,8 @@ view's unsaved changes on top, so it includes what another view saved after
 this one loaded. Replace then deletes every document the import does not
 have, those included. "Put back the data before the last import" restores the
 backup as a Replace. A session in progress that an import replaces counts as
-ended in every view.
+ended in every view: this view's own, and for a Replace the one the store
+holds, which another view may have started since this one last read.
 
 ## Vocabulary
 

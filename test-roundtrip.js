@@ -184,6 +184,16 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
   // Put back by Undo in one view: live again everywhere.
   var ub=m.dbMerge('state/session',{active:null,ended:['s1']},{active:null,ended:['s1']},{active:mine});
   check('a session put back on purpose is live again', ub.active && ub.active.id==='s1' && !ub.ended, ub);
+  // An exercise taken out here, nothing logged on it elsewhere: it goes, rather
+  // than staying as a list with no sets, which Undo and Progress read as there.
+  var gone=S(['warmup','cooldown'],{});
+  var rm=m.dbMerge('state/session',{active:b0},{active:gone},{active:b0}).active;
+  check('an exercise taken out of the session is dropped, not left with no sets', rm && !('press_bench' in rm.logs), rm);
+  var un=m.dbMerge('state/session',{active:b0},{active:S(b0.exIds,{press_bench:[]})},{active:b0}).active;
+  check('and so is one whose only set was undone', un && !('press_bench' in un.logs), un);
+  var kept2=m.dbMerge('state/session',{active:b0},{active:gone},{active:theirs}).active;
+  check('a set logged elsewhere on an exercise taken out here is kept',
+    kept2 && JSON.stringify(kept2.logs.press_bench.map(function(x){ return x.t; }))==='[20]', kept2);
   // A log for the same session from two views, one never seen here: both sets.
   var lg=m.dbMerge('workoutLogs/wl1',{},{id:'wl1',logs:{press_bench:[{v:8,t:10},{v:7,t:30}]}},{id:'wl1',logs:{press_bench:[{v:8,t:10},{v:8,t:20}]}});
   check('one session\'s log written in two views keeps every set once',
@@ -191,6 +201,36 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
   // Two equal sets with no time are two sets, not one.
   var nt=m.dbMerge('workoutLogs/wl2',{},{logs:{a:[{v:8},{v:8}]}},{logs:{a:[{v:8},{v:8}]}});
   check('two equal sets from before set times are not merged into one', nt.logs.a.length===2, nt);
+})();
+
+// A view hidden straight after a change sends what it changed in a field that
+// merges beside the document (pend_ and the view), not over it. A read folds
+// another view's in as that view's change and leaves its own out.
+(function(){
+  var m={}; new Function(['stableJson','dbMerge','mergeKeyed','setKey','mergeSetLogs','sessId','liveSession','mergeSessionDoc','mergeActive','mergeSession','foldPend'].map(grab).join('\n')+
+    '\nvar SESS_ENDED_KEEP=20;\nthis.foldPend=foldPend;this.liveSession=liveSession;').call(m);
+  function check(label,ok,got){ if(ok) console.log('  PASS  '+label); else { fails++; console.log('  FAIL  '+label+'\n        got '+JSON.stringify(got)); } }
+  var sh=m.foldPend('state/shopping',{checked:['a','b'],extras:[],pend_v2:{b:{checked:['a']},m:{checked:['a','c']}}},'pend_v1');
+  check('a tick sent beside the list keeps the ticks stored since, and goes in once',
+    JSON.stringify(sh.checked.slice().sort())==='["a","b","c"]' && !Object.keys(sh).some(function(k){ return k.indexOf('pend_')===0; }), sh);
+  var un=m.foldPend('state/shopping',{checked:['a','b'],extras:[],pend_v2:{b:{checked:['a']},m:{checked:[]}}},'pend_v1');
+  check('an untick sent beside it takes out only that tick', JSON.stringify(un.checked)==='["b"]', un);
+  var xp=m.foldPend('state/profile',{totalXp:120,waterTarget:8,pend_v2:{b:{totalXp:100},m:{totalXp:102}}},'pend_v1');
+  check('xp sent beside it adds what that view earned to what is stored', xp.totalXp===122 && xp.waterTarget===8, xp);
+  var own=m.foldPend('state/profile',{totalXp:120,pend_v1:{b:{totalXp:100},m:{totalXp:102}}},'pend_v1');
+  check('a view\'s own is left out of what it reads', own.totalXp===120 && !('pend_v1' in own), own);
+  var dr=m.foldPend('state/profile',{totalXp:0,deletedRecipes:['p5'],pend_v2:{b:{deletedRecipes:null},m:{deletedRecipes:['p3']}}},'pend_v1');
+  check('a recipe deleted in a view that had none deleted keeps the one deleted since',
+    JSON.stringify((dr.deletedRecipes||[]).slice().sort())==='["p3","p5"]', dr);
+  var S=function(logs){ return {id:'s1',workoutId:'w6',t0:1,exIds:['press_bench'],targets:{},logs:{press_bench:logs}}; };
+  var se=m.foldPend('state/session',{active:S([{v:8,t:10},{v:8,t:20}]),pend_v2:{b:{active:S([{v:8,t:10}])},m:{active:S([{v:8,t:10},{v:6,t:30}])}}},'pend_v1');
+  check('a set sent beside the session joins the sets stored since',
+    se.active && JSON.stringify(se.active.logs.press_bench.map(function(x){ return x.t; }))==='[10,20,30]', se);
+  var en=m.foldPend('state/session',{active:null,ended:['s1'],pend_v2:{b:{active:S([{v:8,t:10}])},m:{active:S([{v:8,t:10},{v:6,t:30}])}}},'pend_v1');
+  check('a set sent on a session ended elsewhere leaves it ended, with that set kept beside it',
+    !m.liveSession(en) && en.active && en.active.logs.press_bench.length===2 && en.ended[0]==='s1', en);
+  var st=m.foldPend('state/session',{active:null,pend_v2:{b:{active:null},m:{active:S([])}}},'pend_v1');
+  check('a session started in a view hidden at once is live for whoever reads it', m.liveSession(st) && m.liveSession(st).id==='s1', st);
 })();
 
 // A merged profile is put back into this view's state. Anything dbApply reads
