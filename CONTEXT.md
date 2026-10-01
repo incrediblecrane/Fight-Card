@@ -50,7 +50,7 @@ and recipe cards are unfolded, is that device's, not the record's: it lives in
 `localStorage` under `fc.ui`, not in the store.
 
 Saving goes one save at a time through `dbSave`, and all store access through
-`dbGet`, `dbPut`, `dbDel` and `dbReadAll`. Before each save, and whenever the
+one **Store** (see below). Before each save, and whenever the
 page is looked at again, the documents two open views are likely both to touch
 (`state/*` and the day being logged) are re-read and merged field by field
 against what this view last heard from the store: a field changed here keeps
@@ -59,6 +59,70 @@ sum of both views' changes. A transient refusal (`unavailable`,
 `resource_exhausted`, anything unknown) is retried with backoff; one retrying
 cannot fix is shown and waits for the next change. A save still waiting on its
 timer goes at once when the page is hidden or closed.
+
+## The Store seam
+
+Every read and write of saved data goes through one object, `dbStore`:
+
+| call | does |
+|---|---|
+| `get(path)` | the body, or `undefined` when there is none (not an error) |
+| `readAll()` | `{path: body}` for every document in the six collections and the three `state/*` documents |
+| `put(path, body)` | write the whole document |
+| `update(path, fields)` | merge fields into a document that exists; rejects `invalid_argument` if it does not |
+| `remove(path)` | delete it; deleting nothing is fine |
+| `subscribe(fn)` | optional: `fn(path, body or undefined)` on every change, returns a stop function |
+
+`DbStore(db)` wraps `claude.use('db')`; `subscribe` is there only when the db
+handed over has `onSnapshot`, and nothing calls it yet. `MemoryStore(init)` is
+the same contract over a plain object, used by the headless suite
+(`test-store.js`). `dbDocs`/`dbApply` stay the serialisation layer either
+side: state in, `{path: body}` out, and back. A rejection carries `{code}`;
+`dbSave` treats the codes in `DB_HARD` as final and anything else as
+transient.
+
+A self-hosted backend would be a third Store, with the same paths as REST
+resources:
+
+- `put` is `PUT /docs/<path>` with the JSON body; `remove` is
+  `DELETE /docs/<path>` (204 whether or not it existed); `get` is
+  `GET /docs/<path>`, 404 meaning `undefined`.
+- `update` is `PATCH /docs/<path>` with the fields, 404 when absent.
+- `readAll` is `GET /docs`, answering `{path: body}` for the paths above.
+- Errors map to codes: 429 and 5xx to `unavailable`, 400 to
+  `invalid_argument`, 413 to `quota_exceeded`, 401/403 to `not_granted`.
+- `subscribe` can be left out, or done with server-sent events on
+  `GET /docs/events`.
+
+The artifact page probably cannot reach such a server (its CSP is likely to
+block `fetch` to other hosts), so a backend may mean hosting the page as well.
+Check the CSP before building one.
+
+## Export and import
+
+**Export** (Progress, Your data) is the whole record as one JSON document:
+`{schema: 1, exportedAt, waterTarget, weekTarget, totalXp, deletedRecipes,
+days, workoutLogs, saunaSessions, library, recipes, plan, shoppingChecked,
+shopExtras, activeSession}`, the same shape as the seed embedded in the
+document. It is shown as text with Copy and a download; it uses no capability
+other than `db`.
+
+**Import** takes pasted JSON. `readImport` only `JSON.parse`s it and checks
+every shape before any of it becomes state: `schema` must be 1, days keyed by
+date, every list entry an object whose id is a safe path segment (ids become
+document paths), no duplicate ids, targets in range. Anything else is refused
+with a reason and nothing is written. A good one shows a summary (days,
+sessions, planned meals, recipes, notes, sauna) and then:
+
+- **Replace** makes it the whole record.
+- **Merge** adds what is new and replaces anything with the same id or date,
+  keeping this view's targets, XP, shopping and session in progress.
+
+Either way it becomes state and is written by `dbSave` through the Store,
+straight away rather than after the usual re-read (which would merge the old
+day back over the imported one). The data it replaced is kept first, in the
+export format, in `localStorage` under `fc.backup`, and "Put back the data
+before the last import" restores it the same way.
 
 ## Vocabulary
 
@@ -211,6 +275,8 @@ set's margins against the rig's limits while it is being authored.
 - `test-session.js` — prep steps, per-implement weights, sauna stints, search.
 - `test-db.js` — seeding, small saves, reload survival, and the fallback.
 - `test-roundtrip.js` — state survives the trip through documents unchanged.
+- `test-store.js`: the Store contract over `MemoryStore`, and export then
+  import reproducing the record exactly; malformed imports refused.
 
 Every browser suite stubs the artifact capability faithfully: a publish saves
 AND reloads. Tests that skipped the reload once hid a whole class of bug.

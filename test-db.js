@@ -839,6 +839,62 @@ srv.listen(0,async function(){
     } finally { await ctx2.close(); }
   });
 
+  console.log('\nEXPORT AND IMPORT');
+  var exported=async function(){
+    await p.click('[data-action="tab"][data-tab="progress"]');
+    await p.click('[data-action="datapane"][data-p="export"]');
+    var o=JSON.parse(await p.inputValue('#export-json')); delete o.exportedAt; return o;
+  };
+  var importing=async function(json){
+    await p.click('[data-action="tab"][data-tab="progress"]');
+    if(!(await p.locator('#import-json').count())) await p.click('[data-action="datapane"][data-p="import"]');
+    await p.fill('#import-json',json); await p.click('[data-action="checkimport"]');
+  };
+  var kept=null;
+  await t('an export imported into an empty store gives back the same data', async function(){
+    await go(); await water(1);
+    var a=await exported();
+    assert.strictEqual(a.schema,1,'no schema on the export');
+    assert.ok(a.workoutLogs.length && a.recipes.length,'the export carries no sessions or recipes');
+    kept=JSON.parse(JSON.stringify(store));
+    Object.keys(store).forEach(function(k){ delete store[k]; });
+    store['state/meta']={seeded:true};
+    await go();
+    await importing(JSON.stringify(a));
+    var body=await text();
+    assert.ok(body.indexOf(a.workoutLogs.length+' session')>-1,'the summary does not count the sessions: '+body.slice(-600));
+    calls.publish=0;
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    assert.strictEqual(calls.publish,0,'the import republished the document');
+    var paths=function(m){ return Object.keys(m).filter(function(k){ return k!=='state/meta'; }).sort(); };
+    assert.deepStrictEqual(paths(store),paths(kept),'the store does not hold the same documents');
+    await go();
+    assert.deepStrictEqual(await exported(),a,'an export after the import differs from the one imported');
+  });
+
+  await t('a malformed import is refused with a message and writes nothing', async function(){
+    var n=calls.set+calls.del;
+    await importing('{"schema":1,"days":{"tomorrow":{}}}');
+    var msg=await p.locator('[role="alert"]').first().textContent();
+    assert.ok(/not a date/.test(msg),'no reason given: '+msg);
+    assert.strictEqual(await p.locator('[data-action="doimport"]').count(),0,'it offered to import it anyway');
+    await importing('<script>window.__pwned=1<\/script>');
+    assert.ok(/not valid JSON/.test(await p.locator('[role="alert"]').first().textContent()));
+    assert.ok(!(await p.evaluate(function(){ return window.__pwned; })),'pasted text ran');
+    await p.waitForTimeout(1300);
+    assert.strictEqual(calls.set+calls.del,n,'a refused import wrote to the store');
+  });
+
+  await t('the data an import replaced can be put back', async function(){
+    var a=await exported();
+    await importing(JSON.stringify({schema:1}));
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    assert.ok(!Object.keys(store).some(function(k){ return k.indexOf('workoutLogs/')===0; }),'an empty import left sessions behind');
+    await p.click('[data-action="restorebackup"]'); await settle();
+    await go();
+    assert.deepStrictEqual(await exported(),a,'putting the backup back did not restore the data');
+  });
+
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
   await t('a view that cannot run db falls back to publish-to-save', async function(){
     await p.addInitScript(function(){ window.__DB_OFF=true; });

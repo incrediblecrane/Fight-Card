@@ -68,6 +68,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .pill{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:8px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text-soft);cursor:pointer;}\
 .pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}\
 .note{font-size:0.78rem;color:var(--text-faint);margin-top:10px;}\
+.datacard textarea{width:100%;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:8px 10px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);margin-top:10px;resize:vertical;}.datarow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.datarow button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;}.note.bad{color:var(--warn);}\
 .sectiontitle{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.1rem;letter-spacing:0.01em;margin:26px 0 10px;}\
 .sectiontitle:first-child{margin-top:0;}\
 .libitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}\
@@ -920,7 +921,7 @@ var touchX=null;
    dbState: 'loading' until we know, then 'db' or 'local'. Mutations are held
    off while loading rather than applied to state that is about to be
    replaced, because a tap silently thrown away is worse than a slow one.  */
-var dbApi=null, dbState='loading', dbErr=null;
+var dbStore=null, dbState='loading', dbErr=null;
 var lastSaved={};   // path -> JSON of what the store already holds
 
 /* One flat map of every document this state implies. Diffing two of these is
@@ -1344,30 +1345,87 @@ function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=
 var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
 
-/* Every read and write of the store goes through these four, so what sits
-   behind them can change in one place. dbGet answers undefined for a
-   document that is not there, which is not an error. */
-function dbGet(path){ return dbApi.doc(path).get().then(function(d){ return d.exists?d.data():undefined; }); }
-function dbPut(path,body){ return dbApi.doc(path).set(body); }
-function dbDel(path){ return dbApi.doc(path).delete(); }
-/* Read the whole store. Five collection reads and three document reads, once
-   at boot. Everything here is small and there are well under a hundred
-   documents, so this is one round trip's worth of work, not a paging problem. */
-function dbReadAll(){
-  var jobs=DB_COLLECTIONS.map(function(coll){
-    return dbApi.collection(coll).get().then(function(snap){
-      var part={}; snap.docs.forEach(function(d){ if(d.exists) part[coll+'/'+d.id]=d.data(); });
-      return part;
+/* ---------- the Store seam ----------------------------------------------
+   Every read and write of saved data goes through one Store, so what sits
+   behind it can change in one place:
+     get(path)          the body, or undefined when there is none (not an error)
+     readAll()          {path: body} for every collection and state document
+     put(path, body)    write the whole document
+     update(path, f)    merge fields into a document that exists
+     remove(path)       delete it; deleting nothing is fine
+     subscribe(fn)      optional: fn(path, body|undefined) on every change,
+                        returns a function that stops it
+   DbStore is the db capability. MemoryStore is the same contract over a plain
+   object, for tests and anything with no db; a self-hosted backend would be a
+   third (see CONTEXT.md). dbDocs/dbApply stay the serialisation either side. */
+function DbStore(db){
+  function get(path){ return db.doc(path).get().then(function(d){ return d.exists?d.data():undefined; }); }
+  var s={get:get,
+    put:function(path,body){ return db.doc(path).set(body); },
+    update:function(path,f){ return db.doc(path).update(f); },
+    remove:function(path){ return db.doc(path).delete(); },
+    /* Five collection reads and three document reads, once at boot.
+       Everything here is small and there are well under a hundred documents,
+       so this is one round trip's worth of work, not a paging problem. */
+    readAll:function(){
+      var jobs=DB_COLLECTIONS.map(function(coll){
+        return db.collection(coll).get().then(function(snap){
+          var part={}; snap.docs.forEach(function(d){ if(d.exists) part[coll+'/'+d.id]=d.data(); });
+          return part;
+        });
+      }).concat(DB_STATE_DOCS.map(function(path){
+        return get(path).then(function(v){ var part={}; if(v!==undefined) part[path]=v; return part; });
+      }));
+      return Promise.all(jobs).then(function(parts){
+        var map={}; parts.forEach(function(part){ Object.keys(part).forEach(function(k){ map[k]=part[k]; }); });
+        return map;
+      });
+    }};
+  if(typeof db.collection(DB_COLLECTIONS[0]).onSnapshot==='function') s.subscribe=function(fn){
+    var offs=DB_COLLECTIONS.map(function(coll){
+      return db.collection(coll).onSnapshot(function(snap){
+        snap.docChanges().forEach(function(c){ fn(coll+'/'+c.doc.id, c.type==='removed'?undefined:c.doc.data()); });
+      },function(){});
+    }).concat(DB_STATE_DOCS.map(function(path){
+      return db.doc(path).onSnapshot(function(d){ fn(path, d.exists?d.data():undefined); },function(){});
+    }));
+    return function(){ offs.forEach(function(off){ off(); }); };
+  };
+  return s;
+}
+/* Bodies are kept as JSON, so nothing handed out can reach back in, which is
+   the same guarantee the frozen bodies from db give. */
+function MemoryStore(init){
+  var m={}, subs=[];
+  Object.keys(init||{}).forEach(function(k){ m[k]=JSON.stringify(init[k]); });
+  function out(path){ return m[path]===undefined?undefined:JSON.parse(m[path]); }
+  function tell(path){ subs.forEach(function(fn){ fn(path,out(path)); }); }
+  function deep(a,b){
+    Object.keys(b).forEach(function(k){
+      var v=b[k];
+      a[k]=(v&&typeof v==='object'&&!Array.isArray(v)&&a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k]))?deep(a[k],v):v;
     });
-  }).concat(DB_STATE_DOCS.map(function(path){
-    return dbGet(path).then(function(v){
-      var part={}; if(v!==undefined) part[path]=v; return part;
-    });
-  }));
-  return Promise.all(jobs).then(function(parts){
-    var map={}; parts.forEach(function(part){ Object.keys(part).forEach(function(k){ map[k]=part[k]; }); });
-    return map;
-  });
+    return a;
+  }
+  return {
+    get:function(path){ return Promise.resolve(out(path)); },
+    readAll:function(){
+      var map={};
+      Object.keys(m).forEach(function(k){
+        var coll=k.slice(0,k.indexOf('/'));
+        if(DB_STATE_DOCS.indexOf(k)>-1 || (DB_COLLECTIONS.indexOf(coll)>-1 && k.split('/').length===2)) map[k]=out(k);
+      });
+      return Promise.resolve(map);
+    },
+    put:function(path,body){ m[path]=JSON.stringify(body); tell(path); return Promise.resolve(); },
+    update:function(path,f){
+      if(m[path]===undefined) return Promise.reject({code:'invalid_argument', message:'no document at '+path});
+      m[path]=JSON.stringify(deep(out(path),f)); tell(path); return Promise.resolve();
+    },
+    remove:function(path){ delete m[path]; tell(path); return Promise.resolve(); },
+    subscribe:function(fn){ subs.push(fn); return function(){ subs=subs.filter(function(x){ return x!==fn; }); }; },
+    dump:function(){ var o={}; Object.keys(m).forEach(function(k){ o[k]=out(k); }); return o; }
+  };
 }
 
 /* Write every document the seed implies, then mark the store seeded. The
@@ -1383,11 +1441,11 @@ function dbSeed(st){
   function batch(i){
     if(i>=paths.length) return Promise.resolve();
     var slice=paths.slice(i,i+DB_SEED_BATCH);
-    return Promise.all(slice.map(function(path){ return dbPut(path,docs[path]); }))
+    return Promise.all(slice.map(function(path){ return dbStore.put(path,docs[path]); }))
       .then(function(){ return batch(i+DB_SEED_BATCH); });
   }
   return batch(0)
-    .then(function(){ return dbPut('state/meta',{seeded:true, seededAt:new Date().toISOString(), docs:paths.length}); })
+    .then(function(){ return dbStore.put('state/meta',{seeded:true, seededAt:new Date().toISOString(), docs:paths.length}); })
     .then(function(){ return docs; });
 }
 
@@ -1405,9 +1463,9 @@ function dbBoot(){
   booting=true;
   claude.use('db').then(function(db){
     if(!db){ dbState='local'; render(); return; }
-    dbApi=db;
-    return dbGet('state/meta').then(function(meta){
-      if(meta) return dbReadAll().then(function(map){
+    dbStore=DbStore(db);
+    return dbStore.get('state/meta').then(function(meta){
+      if(meta) return dbStore.readAll().then(function(map){
         state=dbApply(map);
         lastSaved=dbSnapshot(map);
         // Recipes saved under the old shape are converted here, once. The
@@ -1426,7 +1484,7 @@ function dbBoot(){
       render();
     });
   }).catch(function(e){
-    if(!dbApi){ dbState='local'; render(); return; }
+    if(!dbStore){ dbState='local'; render(); return; }
     dbErr=(e&&e.code)||'unavailable'; dbState='error'; render();
     if(!bootRetried){ bootRetried=true; setTimeout(function(){
       if(dbState!=='error') return; dbState='loading'; render(); dbBoot(); },1000+Math.random()*500); }
@@ -1483,7 +1541,7 @@ function dbPlace(path,body){
 }
 function dbRefresh(){
   var paths=dbHot();
-  return Promise.all(paths.map(dbGet)).then(function(got){
+  return Promise.all(paths.map(dbStore.get)).then(function(got){
     // Taken after the read, so a tap made while it was out counts as ours.
     var mine=dbDocs(state), moved=false;
     paths.forEach(function(path,i){
@@ -1514,7 +1572,7 @@ var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, saveNow=fal
 var DB_HARD={invalid_argument:1, quota_exceeded:1, revoked:1, not_granted:1,
   capability_disabled:1, capability_removed:1, transform_error:1};
 function dbSave(){
-  if(!dbApi) return;
+  if(!dbStore) return;
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
   var retrying=false, now=saveNow; saveNow=false;
@@ -1522,11 +1580,11 @@ function dbSave(){
     var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[];
     Object.keys(next).forEach(function(path){
       if(lastSaved[path]!==next[path]) jobs.push(function(){
-        return dbPut(path,docs[path]).then(function(){ lastSaved[path]=next[path]; }); });
+        return dbStore.put(path,docs[path]).then(function(){ lastSaved[path]=next[path]; }); });
     });
     Object.keys(lastSaved).forEach(function(path){
       if(next[path]===undefined) jobs.push(function(){
-        return dbDel(path).then(function(){ delete lastSaved[path]; }); });
+        return dbStore.remove(path).then(function(){ delete lastSaved[path]; }); });
     });
     if(!jobs.length){ if(moved) render(); return; }
     setSaving(true); if(moved) render();
@@ -1580,6 +1638,127 @@ function persist(){
       render();
     });
   });
+}
+/* ---------- export and import -------------------------------------------
+   The whole record as one versioned JSON file, in the same shape as the seed
+   embedded in this document, so it is also what build-publish --state takes.
+   It goes out through dbDocs/dbApply, which drops render caches and puts the
+   lists in their stored order, so exporting the same data twice gives the same
+   file but for exportedAt. Import only ever JSON.parses what it is given and
+   checks every shape before any of it becomes state. */
+var EXPORT_SCHEMA=1;
+var EXPORT_KEYS=['waterTarget','weekTarget','totalXp','deletedRecipes','days','workoutLogs','saunaSessions',
+  'library','recipes','plan','shoppingChecked','shopExtras','activeSession'];
+var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
+function exportData(st){
+  var n=dbApply(dbDocs(st)), out={schema:EXPORT_SCHEMA, exportedAt:new Date().toISOString()};
+  EXPORT_KEYS.forEach(function(k){ out[k]=n[k]; });
+  return out;
+}
+function exportText(st){ return JSON.stringify(exportData(st),null,1); }
+/* Answers {ok:true, state, summary} or {ok:false, msg}. Ids become document
+   paths, so one with a slash in it would be a different document, or none. */
+function readImport(text){
+  function no(msg){ return {ok:false, msg:msg}; }
+  function obj(v){ return !!v && typeof v==='object' && !Array.isArray(v); }
+  var ID=/^[A-Za-z0-9_.-]{1,80}$/, DAY=/^\d{4}-\d{2}-\d{2}$/, o;
+  text=String(text||'').trim();
+  if(!text) return no('Paste an export first.');
+  if(text.length>5e6) return no('That is too big to be a Fight Card export.');
+  try{ o=JSON.parse(text); }catch(e){ return no('That is not valid JSON, so nothing was read. Paste the whole export, from the first { to the last }.'); }
+  if(!obj(o)) return no('That JSON is not a Fight Card export.');
+  if(o.schema===undefined) return no('That JSON has no schema number, so it is not a Fight Card export.');
+  if(o.schema!==EXPORT_SCHEMA) return no('That export is schema '+String(o.schema).slice(0,10)+'; this version reads schema '+EXPORT_SCHEMA+' only.');
+  if(o.days!==undefined && !obj(o.days)) return no('"days" should be an object keyed by date.');
+  var bad=Object.keys(o.days||{}).filter(function(k){ return !DAY.test(k) || !obj(o.days[k]); })[0];
+  if(bad!==undefined) return no('The day "'+bad.slice(0,20)+'" is not a date with a record.');
+  for(var i=0;i<EXPORT_LISTS.length;i++){
+    var k=EXPORT_LISTS[i], list=o[k], seen={};
+    if(list===undefined) continue;
+    if(!Array.isArray(list)) return no('"'+k+'" should be a list.');
+    for(var j=0;j<list.length;j++){
+      var x=list[j];
+      if(!obj(x) || typeof x.id!=='string' || !ID.test(x.id)) return no('Entry '+(j+1)+' in "'+k+'" has no usable id.');
+      if(seen[x.id]) return no('"'+k+'" has the id "'+x.id+'" twice.');
+      seen[x.id]=1;
+      if((k==='workoutLogs'||k==='saunaSessions'||k==='plan') && !(typeof x.date==='string' && DAY.test(x.date)))
+        return no('Entry "'+x.id+'" in "'+k+'" has no date.');
+      if(k==='workoutLogs' && !obj(x.logs)) return no('Session "'+x.id+'" has no sets.');
+      if(k==='recipes' && !(typeof x.title==='string' && Array.isArray(x.ingredients))) return no('Recipe "'+x.id+'" needs a title and ingredients.');
+      if(k==='plan' && typeof x.recipeId!=='string') return no('Planned meal "'+x.id+'" names no recipe.');
+    }
+  }
+  function strings(v){ return v===undefined || (Array.isArray(v) && v.every(function(s){ return typeof s==='string'; })); }
+  if(!strings(o.shoppingChecked)) return no('"shoppingChecked" should be a list of names.');
+  if(!strings(o.deletedRecipes)) return no('"deletedRecipes" should be a list of ids.');
+  if(o.shopExtras!==undefined && !(Array.isArray(o.shopExtras) && o.shopExtras.every(function(x){
+    return obj(x) && typeof x.id==='string' && ID.test(x.id) && typeof x.text==='string'; }))) return no('"shopExtras" should be a list of items with an id and text.');
+  function whole(v,lo,hi){ return v===undefined || (typeof v==='number' && v%1===0 && v>=lo && v<=hi); }
+  if(!whole(o.waterTarget,4,20)) return no('"waterTarget" should be 4 to 20 taps.');
+  if(!whole(o.weekTarget,1,7)) return no('"weekTarget" should be 1 to 7 sessions.');
+  if(!whole(o.totalXp,0,1e9)) return no('"totalXp" should be a whole number.');
+  var s=o.activeSession;
+  if(s!==undefined && s!==null && !(obj(s) && Array.isArray(s.exIds) && obj(s.logs||{}))) return no('"activeSession" is not a session.');
+  var st={};
+  EXPORT_KEYS.forEach(function(key){ if(o[key]!==undefined) st[key]=o[key]; });
+  // dbApply supplies a default for anything left out, as it does for a store.
+  st=dbApply(dbDocs(st));
+  return {ok:true, state:st, summary:{days:Object.keys(st.days).length, sessions:st.workoutLogs.length,
+    meals:st.plan.length, recipes:st.recipes.length, notes:st.library.length, sauna:st.saunaSessions.length,
+    exportedAt:typeof o.exportedAt==='string'?o.exportedAt.slice(0,40):''}};
+}
+/* Merging adds what the import has and replaces anything with the same id or
+   date; everything else here is kept, along with this view's targets, XP,
+   shopping ticks and the session in progress. */
+function mergeImport(cur,inc){
+  var st=dbApply(dbDocs(cur));
+  Object.keys(inc.days).forEach(function(k){ st.days[k]=inc.days[k]; });
+  EXPORT_LISTS.forEach(function(k){
+    var at={}; st[k].forEach(function(x,i){ at[x.id]=i; });
+    inc[k].forEach(function(x){ if(at[x.id]!==undefined) st[k][at[x.id]]=x; else st[k].push(x); });
+  });
+  inc.deletedRecipes.forEach(function(id){ if(st.deletedRecipes.indexOf(id)<0) st.deletedRecipes.push(id); });
+  return dbApply(dbDocs(st));
+}
+/* The Data card on Progress. What is open and what has been pasted belong to
+   this view, not the record. The copy of the data an import replaced is kept
+   on this device in the export format, so it can be put back or saved. */
+var dataPane=null, exportSnap='', importRaw='', importRes=null, dataMsg='', BACKUP_KEY='fc.backup', backupMem=null;
+function readBackup(){ try{ var v=localStorage.getItem(BACKUP_KEY); if(v) return v; }catch(e){} return backupMem; }
+function writeBackup(v){ backupMem=v; try{ localStorage.setItem(BACKUP_KEY,v); }catch(e){} }
+function dataCard(){
+  var b=readBackup(), r=importRes, sm=r&&r.ok&&r.summary;
+  function n(x,one){ return x+' '+one+(x===1?'':'s'); }
+  return '<div class="card datacard"><div class="sub">Everything you have logged, as one file you can keep, or bring back here.</div>'+
+    '<div class="datarow"><button data-action="datapane" data-p="export" aria-pressed="'+(dataPane==='export')+'">Export</button>'+
+      '<button data-action="datapane" data-p="import" aria-pressed="'+(dataPane==='import')+'">Import</button></div>'+
+    (dataPane==='export'?
+      '<textarea id="export-json" readonly rows="8" aria-label="Your data as JSON">'+esc(exportSnap)+'</textarea>'+
+      '<div class="datarow"><button data-action="copyexport">Copy to clipboard</button><button data-action="downloadexport">Download file</button></div>':'')+
+    (dataPane==='import'?
+      '<textarea id="import-json" rows="6" placeholder="Paste an export here" aria-label="Export to import">'+esc(importRaw)+'</textarea>'+
+      '<div class="datarow"><button data-action="checkimport">Check</button></div>'+
+      (r&&!r.ok?'<p class="note bad" role="alert">'+esc(r.msg)+'</p>':'')+
+      (sm?'<p class="note" role="status">'+(sm.exportedAt?'Exported '+esc(sm.exportedAt.slice(0,10))+': ':'')+
+        n(sm.days,'day')+', '+n(sm.sessions,'session')+', '+n(sm.meals,'planned meal')+', '+n(sm.recipes,'recipe')+', '+
+        n(sm.notes,'note')+', '+n(sm.sauna,'sauna visit')+'.</p>'+
+        '<div class="datarow"><button data-action="doimport" data-mode="replace">Replace everything with this</button>'+
+        '<button data-action="doimport" data-mode="merge">Merge in by id</button></div>'+
+        '<p class="note">Merge adds what is new and replaces anything with the same id or date, and keeps your targets, XP, shopping and the session in progress.</p>':'')+
+      (b?'<div class="datarow"><button data-action="restorebackup">Put back the data before the last import</button></div>':''):'')+
+    (dataMsg?'<p class="note" role="status">'+esc(dataMsg)+'</p>':'')+
+  '</div>';
+}
+/* An import becomes state like any other change, so it is written by the
+   same one-at-a-time save, through the Store. It goes straight away rather
+   than after the re-read, because the re-read would merge the old day back
+   over the one just imported. */
+function applyImport(st,mode){
+  writeBackup(exportText(state));
+  state=mode==='merge'?mergeImport(state,st):st;
+  ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+  saveNow=dbState==='db'; persist();
 }
 /* ---------- recipe scaling ---------------------------------------------
    Ingredients are written as "Name (quantity unit)". Parsing that once at
@@ -2946,7 +3125,8 @@ function bodyContent(){
       aria:'Sauna minutes per session'}):'')+saunaHtml+
     '<div class="sectiontitle">Exercise progression</div>'+
     '<p class="note" style="margin-top:0;">Tap any exercise to chart it.</p>'+exList+
-    '<div class="sectiontitle">Recent sessions</div>'+recentHtml;
+    '<div class="sectiontitle">Recent sessions</div>'+recentHtml+
+    '<div class="sectiontitle">Your data</div>'+dataCard();
 
   var sessionHtml='';
   if(viewingSession && state.activeSession){
@@ -3567,6 +3747,45 @@ function onClick(e){
       if(e.id!==mid) return;
       e.portions=Math.max(1, Math.min(20, planPortions(e)+md));
     });
+  }
+  else if(action==='datapane'){
+    var dp=t.getAttribute('data-p'); dataPane=dataPane===dp?null:dp; dataMsg=''; importRes=null;
+    if(dataPane==='export') exportSnap=exportText(state);
+    uiOnly=true;
+  }
+  else if(action==='copyexport'){
+    var ex=document.getElementById('export-json');
+    var copied=function(){ dataMsg='Copied.'; render(); };
+    var byHand=function(){ try{ ex.select(); if(document.execCommand('copy')) return copied(); }catch(err){}
+      dataMsg='Could not reach the clipboard. Select the text and copy it.'; render(); };
+    try{ navigator.clipboard.writeText(exportSnap).then(copied,byHand); }catch(err){ byHand(); }
+    return;
+  }
+  else if(action==='downloadexport'){
+    try{
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([exportSnap],{type:'application/json'}));
+      a.download='fight-card-'+realToday()+'.json'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); },1000);
+      dataMsg='';
+    }catch(err){ dataMsg='This view cannot save files. Copy the text instead.'; }
+    uiOnly=true;
+  }
+  else if(action==='checkimport'){
+    var ij=document.getElementById('import-json'); importRaw=ij?ij.value:''; consumed(['import-json']);
+    importRes=readImport(importRaw); dataMsg=''; uiOnly=true;
+  }
+  else if(action==='doimport'){
+    if(!importRes||!importRes.ok) return;
+    var mode=t.getAttribute('data-mode')==='merge'?'merge':'replace';
+    applyImport(importRes.state,mode); importRes=null; importRaw='';
+    dataMsg=(mode==='merge'?'Merged.':'Imported.')+' The data from before is kept on this device until the next import.';
+    render(); return;
+  }
+  else if(action==='restorebackup'){
+    var back=readImport(readBackup()); if(!back.ok) return;
+    applyImport(back.state,'replace'); importRes=null;
+    dataMsg='Put back. What it replaced is now the one kept.'; render(); return;
   }
   else if(action==='shoprange'){ shopRange=parseInt(t.getAttribute('data-n'),10)||7; uiOnly=true; }
   else if(action==='clearweek'){
