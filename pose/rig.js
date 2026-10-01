@@ -158,13 +158,18 @@ function solveFront(f){
   // elbow to the mirror branch whenever a hand crossed the shoulder's x, a
   // one-frame pop, so frontAt hands each pose the sign its keyframes chose
   // (kneeSignL/R, elbSignL/R, which a keyframe may also set by hand).
-  function side(a,b,l1,l2,s,better){
-    if(s===undefined) s=better(ik(a,b,l1,l2,1),ik(a,b,l1,l2,-1))?1:-1;
-    return {s:s, j:ik(a,b,l1,l2,s)};
+  // t: the hand hangs (near enough) straight below the shoulder, see below.
+  function side(a,b,l1,l2,s,better,tied){
+    var p=ik(a,b,l1,l2,1), m=ik(a,b,l1,l2,-1), t=s===undefined&&!!tied&&tied(p,m)&&p.y+m.y>2*a.y;
+    if(s===undefined) s=better(p,m)?1:-1;
+    return {s:s, j:ik(a,b,l1,l2,s), t:t};
   }
   // A hand (near enough) straight above or below the shoulder leaves neither
-  // branch clearly lower; there the elbow flares out, rather than going
-  // whichever way rounding says.
+  // branch clearly lower. Overhead, the elbow flares out, rather than going
+  // whichever way rounding says. Hanging below, the arm bends front to back (a
+  // row, a running arm), so this view has nothing to choose a side by: frontAt
+  // hands that keyframe its nearest decided neighbour's branch, and only with
+  // none does the elbow flare out.
   function outL(p,m){ return p.x<=m.x; }
   function outR(p,m){ return p.x>=m.x; }
   function tie(p,m){ return Math.abs(p.y-m.y)<=Math.abs(p.x-m.x)*0.1; }
@@ -178,7 +183,7 @@ function solveFront(f){
   var aL=f.armScaleL===undefined?1:f.armScaleL, aR=f.armScaleR===undefined?1:f.armScaleR;
   var kL=side(hipL,footL,L.THIGH,L.SHIN,f.kneeSignL,outL), kR=side(hipR,footR,L.THIGH,L.SHIN,f.kneeSignR,outR);
   // An arm pointing at the camera projects short, so its segments scale down.
-  var eL=side(shL,handL,L.UPPER*aL,L.FORE*aL,f.elbSignL,lowL), eR=side(shR,handR,L.UPPER*aR,L.FORE*aR,f.elbSignR,lowR);
+  var eL=side(shL,handL,L.UPPER*aL,L.FORE*aL,f.elbSignL,lowL,tie), eR=side(shR,handR,L.UPPER*aR,L.FORE*aR,f.elbSignR,lowR,tie);
   var kneeL = f.kneeL ? P(f.kneeL[0],f.kneeL[1]) : kL.j;
   var kneeR = f.kneeR ? P(f.kneeR[0],f.kneeR[1]) : kR.j;
   var elbL = f.elbL ? P(f.elbL[0],f.elbL[1]) : eL.j;
@@ -186,7 +191,7 @@ function solveFront(f){
   return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
     footL:footL,footR:footR,handL:handL,handR:handR,
     kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,armScaleL:aL,armScaleR:aR,
-    sign:{kneeL:kL.s,kneeR:kR.s,elbL:eL.s,elbR:eR.s},
+    sign:{kneeL:kL.s,kneeR:kR.s,elbL:eL.s,elbR:eR.s}, hang:{elbL:eL.t,elbR:eR.t},
     fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
 }
 // An explicit joint in only one of the two keyframes is blended with the joint
@@ -219,6 +224,22 @@ function frontAt(ex,u){
   var target=((u%1)+1)%1*total, acc=0, i=0;
   for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
   if(i>=n) i=n-1;
-  return lerpFront(fr[i], fr[(i+1)%n], easeInOutSine((target-acc)/tempo[i]));
+  return lerpFront(frontKey(fr,i), frontKey(fr,(i+1)%n), easeInOutSine((target-acc)/tempo[i]));
+}
+// A keyframe whose hand hangs straight below the shoulder (see solveFront)
+// bends that elbow the way its nearest decided neighbour does. Flaring it out
+// instead swung the elbow through the limb line on the way to and from that
+// keyframe, the arm shrinking to a stub, and threw the single-arm row's tucked
+// elbow out wide every rep.
+function frontKey(fr,j){
+  var s=solveFront(fr[j]), n=fr.length, o=null;
+  ['L','R'].forEach(function(k){
+    if(!s.hang['elb'+k]) return;
+    for(var q=1;q<n;q++) for(var w=0;w<2;w++){
+      var y=solveFront(fr[((j+(w?-q:q))%n+n)%n]);
+      if(!y.hang['elb'+k]){ if(!o){ o={}; for(var x in fr[j]) o[x]=fr[j][x]; } o['elbSign'+k]=y.sign['elb'+k]; return; }
+    }
+  });
+  return o||fr[j];
 }
 if(typeof module!=='undefined'){ module.exports.solveFront=solveFront; module.exports.frontAt=frontAt; module.exports.lerpFront=lerpFront; }

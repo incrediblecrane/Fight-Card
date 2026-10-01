@@ -155,7 +155,8 @@ timer goes at once when the page is hidden or closed.
   It is decided at keyframes only (`kneeSign`/`elbowSign` on a side frame; on a
   front frame the solver picks elbows low and knees out, or `kneeSignL/R`,
   `elbSignL/R` set it) and blends between them, so a joint never jumps to its
-  mirror mid-rep. A sign that changes between two side keyframes swings the
+  mirror mid-rep. A front keyframe whose hand hangs straight below the
+  shoulder has no low side, so it takes its nearest neighbour's elbow side. A sign that changes between two side keyframes swings the
   limb through straight, which the stretch check flags.
 - **Plan view** (`frontPlan`) — looking down at someone on the floor. No
   gravity and no ground line; labelled "Above".

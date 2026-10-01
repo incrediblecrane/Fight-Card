@@ -1220,19 +1220,23 @@ var FRONTS = {
 
   // High knees from the front. Which knee is up alternates, and from here you
   // can see the knee driving straight up rather than swinging out to the side.
+  // The arms pump front to back, so from here each elbow stays under its
+  // shoulder and is given: solved, it had to bend sideways, out like a chicken
+  // wing or in across the chest.
   highknees:[
-    {hipY:107,footL:[58,120],footR:[80,163],handL:[54,140],handR:[86,96]},
-    {hipY:110,footL:[58,150],footR:[80,146],handL:[54,124],handR:[86,120]},
-    {hipY:107,footL:[58,163],footR:[80,120],handL:[54,96], handR:[86,140]},
-    {hipY:110,footL:[58,146],footR:[80,150],handL:[54,120],handR:[86,124]}],
+    {hipY:107,footL:[58,120],footR:[80,163],handL:[54,140],handR:[86,96], elbL:[53,93.6],elbR:[87,93.6]},
+    {hipY:110,footL:[58,150],footR:[80,146],handL:[54,124],handR:[86,120],elbL:[53,96.6],elbR:[87,96.6]},
+    {hipY:107,footL:[58,163],footR:[80,120],handL:[54,96], handR:[86,140],elbL:[53,93.6],elbR:[87,93.6]},
+    {hipY:110,footL:[58,146],footR:[80,150],handL:[54,120],handR:[86,124],elbL:[53,96.6],elbR:[87,96.6]}],
 
   // Sprint from the front. Arms driving front to back rather than crossing the
   // midline is the cue this view exists for; from the side they overlap.
+  // Elbows given under the shoulders, as for high knees.
   sprint:[
-    {hipY:104,footL:[58,134],footR:[80,158],handL:[52,132],handR:[86,86]},
-    {hipY:110,footL:[58,152],footR:[80,140],handL:[52,116],handR:[86,110]},
-    {hipY:104,footL:[58,158],footR:[80,134],handL:[52,86], handR:[86,132]},
-    {hipY:110,footL:[58,140],footR:[80,152],handL:[52,110],handR:[86,116]}],
+    {hipY:104,footL:[58,134],footR:[80,158],handL:[52,132],handR:[86,86], elbL:[53,90.6],elbR:[87,90.6]},
+    {hipY:110,footL:[58,152],footR:[80,140],handL:[52,116],handR:[86,110],elbL:[53,96.6],elbR:[87,96.6]},
+    {hipY:104,footL:[58,158],footR:[80,134],handL:[52,86], handR:[86,132],elbL:[53,90.6],elbR:[87,90.6]},
+    {hipY:110,footL:[58,140],footR:[80,152],handL:[52,110],handR:[86,116],elbL:[53,96.6],elbR:[87,96.6]}],
 
   // Brisk walk or jog from the front. Relaxed and symmetrical, with the arms
   // swinging by the ribs rather than across the body.
