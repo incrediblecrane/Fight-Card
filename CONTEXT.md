@@ -59,11 +59,14 @@ this view's value, every other field takes the store's, and XP merges as the
 sum of both views' changes. A transient refusal (`unavailable`,
 `resource_exhausted`, anything unknown) is retried with backoff; one retrying
 cannot fix is shown and waits for the next change. Every write in a save
-settles before the next save starts, and `state/session` is written only after
-everything else in that save landed, so a finished session is never cleared
-before its log is stored. A save still waiting on its timer goes at once when
-the page is hidden or closed; with no time to re-read, it sends only the fields
-this view changed (`update`), never a whole document, and the next save merges.
+settles before the next save starts. When a save clears `state/session` and
+writes workout logs, the session is written only after those logs landed, so a
+finished session is never cleared before its log is stored; any other session
+change goes out alongside the rest. A save still waiting on its timer goes at
+once when the page is hidden or closed; with no time to re-read, it sends only
+the fields this view changed (`update`), never a whole document, and the next
+save merges. A day this view never read is diffed against a blank day, and put
+whole only when the store refuses the update because there is no such day.
 
 ## The Store seam
 

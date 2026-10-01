@@ -13,8 +13,9 @@ var calls={set:0,del:0,get:0,collGet:0,publish:0};
 var inflight=0, peak=0, slowGetMs=0;
 // Scripted trouble. failNext: the next request of that op whose path contains
 // `match` is refused with `code`, the way the store refuses one. setDelays: the
-// next set whose path contains `match` is held for `ms` and only lands in the
-// store when it completes, which is what makes an overlapping save observable.
+// next write of that op (set, or update) whose path contains `match` is held
+// for `ms` and only lands in the store when it completes, which is what makes
+// an overlapping save observable.
 var failNext=[], setDelays=[];
 function take(list,op,path){
   for(var i=0;i<list.length;i++){ var f=list[i];
@@ -111,7 +112,13 @@ var srv=http.createServer(function(q,r){
         if(held){ return setTimeout(function(){ store[body.path]=body.data; inflight--; srvJson(r,{ok:1}); },held.ms); }
         store[body.path]=body.data;
         setTimeout(function(){ inflight--; srvJson(r,{ok:1}); },12); return; }
-      if(op==='update'){ calls.set++; store[body.path]=Object.assign({},store[body.path]||{},body.data); return srvJson(r,{ok:1}); }
+      // As the real store does: update merges into a document that exists and
+      // is refused for one that does not.
+      if(op==='update'){ calls.set++;
+        if(!Object.prototype.hasOwnProperty.call(store,body.path)) return srvJson(r,{err:'invalid_argument'});
+        var hold=take(setDelays,op,body.path), apply=function(){ store[body.path]=Object.assign({},store[body.path],body.data); };
+        if(hold){ return setTimeout(function(){ apply(); srvJson(r,{ok:1}); },hold.ms); }
+        apply(); return srvJson(r,{ok:1}); }
       if(op==='del'){ calls.del++; delete store[body.path]; return srvJson(r,{ok:1}); }
       if(op==='coll'){ calls.collGet++;
         var pre=body.path+'/', docs=Object.keys(store).filter(function(k){
@@ -886,6 +893,68 @@ srv.listen(0,async function(){
       d=store['days/'+day];
       assert.ok(d.water===2 && d.smoking===1 && d.alcohol===1,'a later save undid the merge: '+JSON.stringify(d));
     } finally { await q.context().close(); }
+  });
+
+  // The view hidden has never read today's day: it was opened before the
+  // other view created it, or before midnight.
+  await t('a view hidden straight after a tap on a day it never read keeps what another view wrote there', async function(){
+    var day=await today(); delete store['days/'+day];
+    await go();
+    var q=await openView();
+    try{
+      await go();
+      await water(2);
+      await p.click('[data-action="smoking"][data-d="1"]'); await p.waitForTimeout(2000);
+      assert.strictEqual(store['days/'+day].water,2,'the first view did not save its water');
+      await q.click('[data-action="alcohol"][data-d="1"]'); await q.waitForTimeout(200);
+      await hideIn(q); await q.waitForTimeout(1500);
+      var d=store['days/'+day];
+      assert.strictEqual(d.alcohol,1,'the hidden view did not save its tap');
+      assert.ok(d.water===2 && d.smoking===1 && d.wx===2,'the hidden view wrote its blank copy of the day: '+JSON.stringify(d));
+      await showIn(q); await q.waitForTimeout(1500);
+      await p.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); }); await p.waitForTimeout(1500);
+      d=store['days/'+day];
+      assert.ok(d.water===2 && d.smoking===1 && d.alcohol===1,'a later save undid the merge: '+JSON.stringify(d));
+    } finally { await q.context().close(); }
+  });
+
+  await t('a view hidden straight after a tap on a day nobody has written yet still saves it', async function(){
+    var day=await today(); delete store['days/'+day];
+    await go();
+    var q=await openView();
+    try{
+      await q.click('[data-action="alcohol"][data-d="1"]'); await q.waitForTimeout(200);
+      await hideIn(q); await q.waitForTimeout(1500);
+      var d=store['days/'+day];
+      assert.ok(d && d.alcohol===1,'the tap was not saved: '+JSON.stringify(d));
+      assert.strictEqual(d.water,0,'the day went in incomplete: '+JSON.stringify(d));
+    } finally { await q.context().close(); }
+  });
+
+  await t('starting a session is stored even when another write in the same save is refused', async function(){
+    await go();
+    failNext.push({op:'set',match:'days/',code:'quota_exceeded'});
+    await p.click(W);
+    await p.click('[data-action="tab"][data-tab="training"]');
+    await p.locator('[data-action="startworkout"]').first().click(); await p.waitForTimeout(2500);
+    assert.strictEqual(failNext.length,0,'the day was never refused, so this proves nothing');
+    var s=store['state/session'];
+    assert.ok(s && s.active,'the started session was never stored: '+JSON.stringify(s));
+    await leave();
+  });
+
+  await t('a page going away sends a started session alongside a slow write, not after it', async function(){
+    await go();
+    setDelays.push({op:'update',match:'days/',ms:3000});
+    await p.click(W);
+    await p.click('[data-action="tab"][data-tab="training"]');
+    await p.locator('[data-action="startworkout"]').first().click();
+    await hideIn(p); await p.waitForTimeout(800);
+    assert.strictEqual(setDelays.length,0,'the day was never held, so this proves nothing');
+    var s=store['state/session'];
+    assert.ok(s && s.active,'the session waited for the day: '+JSON.stringify(s));
+    await p.waitForTimeout(3000); await showIn(p); await p.waitForTimeout(1500);
+    await leave();
   });
 
   await t('removing a session from an older day keeps what another view logged on that day', async function(){

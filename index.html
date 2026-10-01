@@ -1613,7 +1613,11 @@ function dbSave(){
   saveBusy=true;
   var retrying=false, mode=saveNow, gen=++saveGen; saveNow=false;
   (mode?Promise.resolve(false):dbRefresh()).then(function(moved){
-    var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[], last=[];
+    var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[], logs=[], landing=[], session=null;
+    // Finishing clears the session and writes its log in one go, and a
+    // cleared session whose log was refused would leave the sets nowhere. So
+    // then, and only then, the session waits, and only for those logs.
+    var ending=docs['state/session'].active===null && lastSaved['state/session']!==next['state/session'];
     function landed(path,json){
       if(gen<(savedGen[path]||0)) return;
       savedGen[path]=gen;
@@ -1621,27 +1625,37 @@ function dbSave(){
     }
     Object.keys(next).forEach(function(path){
       if(lastSaved[path]===next[path]) return;
-      var was=mode==='flush'?savedBody(path):undefined, job;
+      var was=mode==='flush'?savedBody(path):undefined, job, fresh=false;
+      // A day this view never read may have been made by another view since:
+      // send what changed from a blank day, and put it whole only if the
+      // store says there is no such day yet.
+      if(mode==='flush'&&was===undefined&&path.indexOf('days/')===0){ was=blankDay(); fresh=true; }
       if(was){
         // What the store holds is unknown, so lastSaved stays as it was: the
         // next save re-reads this document and merges it, our fields included.
         var changed={}, body=docs[path];
         Object.keys(body).forEach(function(k){ if(stableJson(body[k])!==stableJson(was[k])&&stableJson(body[k])!==undefined) changed[k]=body[k]; });
-        Object.keys(was).forEach(function(k){ if(stableJson(body[k])===undefined) changed[k]=null; });
+        if(!fresh) Object.keys(was).forEach(function(k){ if(stableJson(body[k])===undefined) changed[k]=null; });
         if(!Object.keys(changed).length) return;
-        job=function(){ return dbStore.update(path,changed); };
+        job=function(){ var pr=dbStore.update(path,changed);
+          return fresh?pr.then(null,function(e){
+            if(!e||(e.code!=='invalid_argument'&&e.code!=='not_found')) throw e;
+            return put(); }):pr; };
       }
-      else job=function(){ return dbStore.put(path,docs[path]).then(function(){ landed(path,next[path]); }); };
-      // The session goes last, below, and only once everything else landed:
-      // finishing clears it and writes its log in one go, and a cleared
-      // session whose log was refused would leave the sets nowhere.
-      (path==='state/session'?last:jobs).push(job);
+      else job=put;
+      function put(){ return dbStore.put(path,docs[path]).then(function(){ landed(path,next[path]); }); }
+      if(ending&&path.indexOf('workoutLogs/')===0) logs.push(function(){ var pr=job(); landing.push(pr); return pr; });
+      else if(ending&&path==='state/session') session=function(){ return Promise.all(landing).then(job); };
+      else jobs.push(job);
     });
     Object.keys(lastSaved).forEach(function(path){
       if(next[path]===undefined) jobs.push(function(){
         return dbStore.remove(path).then(function(){ landed(path,undefined); }); });
     });
-    if(!jobs.length&&!last.length){ if(moved) render(); return; }
+    // Logs first and the session straight after, so it waits on nothing else:
+    // a write of anything else that is slow or refused never holds it back.
+    jobs=logs.concat(session?[session]:[],jobs);
+    if(!jobs.length){ if(moved) render(); return; }
     setSaving(true); if(moved) render();
     // Almost every save is one or two documents, but a migration dirties every
     // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
@@ -1650,7 +1664,7 @@ function dbSave(){
       if(i>=list.length) return Promise.resolve();
       return dbSettle(list.slice(i,i+DB_SEED_BATCH)).then(function(){ return batch(list,i+DB_SEED_BATCH); });
     }
-    return batch(jobs,0).then(function(){ return batch(last,0); }).then(function(){ setSaving(false); });
+    return batch(jobs,0).then(function(){ setSaving(false); });
   }).then(function(){
     saveAttempt=0;
     if(dbErr){ dbErr=null; dbErrHard=false; render(); }
