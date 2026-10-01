@@ -839,6 +839,143 @@ srv.listen(0,async function(){
     } finally { await ctx2.close(); }
   });
 
+  console.log('\nA SAVE NEVER WRITES OVER WHAT IT HAS NOT READ');
+  // A second view, on Today, loaded from the store as it is now.
+  var openView=async function(){
+    var ctx=await b.newContext({viewport:{width:420,height:900},hasTouch:true,
+      timezoneId:process.env.FC_TZ||'Pacific/Kiritimati'});
+    var q=await ctx.newPage(); q.setDefaultTimeout(8000);
+    q.on('pageerror',function(e){errs.push('second view: '+e.message);});
+    await q.goto(url);
+    await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); });
+    if(await q.locator('[data-action="cancelsession"]').count()) await q.click('[data-action="cancelsession"]');
+    if(await q.locator('[data-action="tab"][data-tab="today"]').count()) await q.click('[data-action="tab"][data-tab="today"]');
+    await q.waitForTimeout(600);
+    return q;
+  };
+  var hideIn=function(pg){ return pg.evaluate(function(){
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:function(){ return 'hidden'; }});
+    document.dispatchEvent(new Event('visibilitychange')); }); };
+  var showIn=function(pg){ return pg.evaluate(function(){
+    delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); }); };
+  var dk=function(off){ return p.evaluate(function(off){
+    var d=new Date(); d.setDate(d.getDate()+off); var z=function(n){ return (n<10?'0':'')+n; };
+    return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); },off); };
+  var blank=function(){ return {water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true}; };
+
+  await t('a view hidden straight after a tap writes only that tap, not its stale copy of the day', async function(){
+    await go(); var day=await today();
+    store['days/'+day]=blank();
+    var q=await openView();
+    try{
+      await go();
+      await water(2);
+      await p.click('[data-action="smoking"][data-d="1"]'); await p.waitForTimeout(2000);
+      assert.strictEqual(store['days/'+day].water,2,'the first view did not save its water');
+      // The second view loaded before any of that and is still on screen.
+      await q.click('[data-action="alcohol"][data-d="1"]'); await q.waitForTimeout(200);
+      await hideIn(q); await q.waitForTimeout(1500);
+      var d=store['days/'+day];
+      assert.strictEqual(d.alcohol,1,'the hidden view did not save its tap');
+      assert.strictEqual(d.water,2,'the hidden view wrote its stale water: '+JSON.stringify(d));
+      assert.strictEqual(d.smoking,1,'the hidden view wrote its stale smoking: '+JSON.stringify(d));
+      assert.strictEqual(d.wx,2,'the cups that earned xp were lost: '+JSON.stringify(d));
+      // And it stays that way once both views have looked again.
+      await showIn(q); await q.waitForTimeout(1500);
+      await p.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); }); await p.waitForTimeout(1500);
+      d=store['days/'+day];
+      assert.ok(d.water===2 && d.smoking===1 && d.alcohol===1,'a later save undid the merge: '+JSON.stringify(d));
+    } finally { await q.context().close(); }
+  });
+
+  await t('removing a session from an older day keeps what another view logged on that day', async function(){
+    var D=await dk(-2);
+    store['days/'+D]={water:0,workout:{done:true,type:'Strength'},rest:false,alcohol:0,smoking:0,weed:0,touched:true};
+    store['workoutLogs/wlT1']={id:'wlT1',workoutId:'w1',title:'Full body',tag:'Strength',date:D,logs:{press_push:[{v:8,w:20}]}};
+    await go(); await hideIn(p);
+    var q=await openView();
+    try{
+      await q.evaluate(function(k){ document.querySelector('[data-action="pickday"][data-k="'+k+'"]').click(); },D);
+      await q.waitForTimeout(300);
+      await q.click('[data-action="water"][data-d="1"]'); await q.click('[data-action="water"][data-d="1"]');
+      await q.click('[data-action="smoking"][data-d="1"]'); await q.waitForTimeout(2000);
+      assert.strictEqual(store['days/'+D].water,2,'the backfilling view did not save');
+    } finally { await q.context().close(); }
+    await showIn(p); await p.waitForTimeout(1200);
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
+    var did=await p.evaluate(function(){ var e=document.querySelector('[data-action="dellog"][data-id="wlT1"]');
+      if(!e) return false; e.click(); return true; });
+    assert.ok(did,'no session to remove on Progress');
+    await p.waitForTimeout(2200);
+    var d=store['days/'+D];
+    assert.ok(!store['workoutLogs/wlT1'],'the session is still in the store');
+    assert.strictEqual(d.workout.done,false,'the day is still marked trained');
+    assert.strictEqual(d.water,2,'the removal wrote a stale copy of the day: '+JSON.stringify(d));
+    assert.strictEqual(d.smoking,1,'the removal wrote a stale copy of the day: '+JSON.stringify(d));
+    if(await tap('[data-action="dismissundo"]')) await p.waitForTimeout(300);
+  });
+
+  await t('a save with one write refused waits for the others before the next save starts', async function(){
+    await go(); var day=await today();
+    var w0=dayWater(day), x0=store['state/profile'].totalXp;
+    setDelays.push({op:'set',match:'days/'+day,ms:3500});
+    failNext.push({op:'set',match:'state/profile',code:'unavailable'});
+    await p.click(W); await p.waitForTimeout(1500);
+    await p.click(W); await p.waitForTimeout(7000);
+    assert.strictEqual(failNext.length+setDelays.length,0,'the scripted trouble never happened, so this proves nothing');
+    assert.strictEqual(dayWater(day),w0+2,'two taps, but the store reads '+dayWater(day)+' from '+w0);
+    assert.strictEqual(store['state/profile'].totalXp,x0+4,'two cups paid '+(store['state/profile'].totalXp-x0)+' xp');
+    var shown=await waterCount();
+    await go();
+    assert.strictEqual(await waterCount(),shown,'after a reload water reads '+(await waterCount())+', not '+shown);
+  });
+
+  await t('finishing a session whose log cannot be written keeps its sets', async function(){
+    var day=await today();
+    store['state/session']={active:{workoutId:'w1',startedAt:day,t0:Date.now()-600000,exIds:['press_push'],
+      targets:{press_push:{sets:3,reps:'8'}},logs:{press_push:[{v:8,w:20},{v:8,w:21},{v:8,w:22}]}}};
+    var logs0=Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0; });
+    await go();
+    var q=await openView();
+    try{
+      await q.click('[data-action="tab"][data-tab="training"]'); await q.waitForTimeout(300);
+      await q.click('[data-action="resumesession"]'); await q.waitForTimeout(300);
+      for(var i=0;i<6 && !(await q.locator('[data-action="finishworkout"]').count());i++){
+        await q.click('[data-action="nextslide"]'); await q.waitForTimeout(200); }
+      for(i=0;i<6;i++) failNext.push({op:'set',match:'workoutLogs/',code:'unavailable'});
+      await q.click('[data-action="finishworkout"]'); await q.waitForTimeout(2500);
+      assert.ok(failNext.length<6,'the log was never refused, so this proves nothing');
+    } finally { await q.context().close(); failNext.length=0; }
+    await go();
+    var sess=(store['state/session']||{}).active;
+    var log=Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0 && logs0.indexOf(k)<0; })
+      .map(function(k){ return store[k]; })[0];
+    var sets=(log&&log.logs.press_push)||(sess&&sess.logs.press_push)||[];
+    assert.strictEqual(sets.length,3,'the sets are gone: no new log and the session is '+JSON.stringify(sess));
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(300);
+    if(await tap('[data-action="discardsession"]')) await p.waitForTimeout(1600);
+    if(await tap('[data-action="dismissundo"]')) await p.waitForTimeout(300);
+  });
+
+  await t('putting back a session that has no tag does not break every later save', async function(){
+    var day=await today();
+    store['days/'+day]={water:0,workout:{done:true,type:'Strength'},rest:false,alcohol:0,smoking:0,weed:0,touched:true};
+    store['workoutLogs/wlNoTag']={id:'wlNoTag',workoutId:'w1',title:'Imported session',date:day,logs:{pullup:[{v:8,w:null}]}};
+    await go();
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
+    assert.ok(await p.evaluate(function(){ var e=document.querySelector('[data-action="dellog"][data-id="wlNoTag"]');
+      if(!e) return false; e.click(); return true; }),'no session to remove on Progress');
+    await p.waitForTimeout(1600);
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await p.waitForTimeout(1600);
+    await toToday();
+    for(var i=0;i<3;i++){ await p.click(W); await p.waitForTimeout(1600); }
+    await p.waitForTimeout(1000);
+    assert.strictEqual(dayWater(day),3,'water reads '+dayWater(day)+' in the store after three taps');
+    var banner=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.banner'),function(e){ return e.textContent; }).join(' | '); });
+    assert.ok(!/saved|Trouble/i.test(banner),'an error is up: '+banner);
+    assert.ok(store['workoutLogs/wlNoTag'],'undo did not put the session back');
+  });
+
   console.log('\nEXPORT AND IMPORT');
   var exported=async function(){
     await p.click('[data-action="tab"][data-tab="progress"]');

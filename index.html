@@ -999,12 +999,23 @@ function dbApply(map){
    plain JSON.stringify would call every document changed and the diff would
    rewrite all seventy instead of the one that moved. Comparing on a canonical
    form costs nothing and removes the trap. */
+/* It follows JSON's own rules, so what it writes always parses: a key whose
+   value is undefined or a function is left out, and such an entry in a list
+   is null. Writing a bare `undefined` made lastSaved unreadable, and every
+   save after that failed on reading it back. */
 function stableJson(v){
   if(v===null||typeof v!=='object') return JSON.stringify(v);
-  if(Array.isArray(v)) return '['+v.map(stableJson).join(',')+']';
-  return '{'+Object.keys(v).sort().map(function(k){
-    return JSON.stringify(k)+':'+stableJson(v[k]);
-  }).join(',')+'}';
+  if(Array.isArray(v)) return '['+v.map(function(x){ var j=stableJson(x); return j===undefined?'null':j; }).join(',')+']';
+  var out=[];
+  Object.keys(v).sort().forEach(function(k){
+    var j=stableJson(v[k]); if(j!==undefined) out.push(JSON.stringify(k)+':'+j);
+  });
+  return '{'+out.join(',')+'}';
+}
+// What the store was last known to hold, or null when that cannot be read.
+function savedBody(path){
+  if(lastSaved[path]===undefined) return undefined;
+  try{ return JSON.parse(lastSaved[path]); }catch(e){ return null; }
 }
 function dbSnapshot(map){
   var snap={}; Object.keys(map).forEach(function(k){ snap[k]=stableJson(map[k]); });
@@ -1299,7 +1310,7 @@ function applyUndo(){
     var d=ensureDay(u.item.date);
     // Only a day this makes trained again earns its XP back, and a rest day
     // marked since gives its own back as it is replaced.
-    if(!d.workout.done){ if(d.rest) addXp(-XP_REST); d.workout.done=true; d.workout.type=u.item.tag; d.rest=false; addXp(u.xp); }
+    if(!d.workout.done){ if(d.rest) addXp(-XP_REST); d.workout.done=true; d.workout.type=u.item.tag||null; d.rest=false; addXp(u.xp); }
     d.touched=true;
   }
   else if(u.kind==='recipe'){ putBack(state.recipes,u.item,u.pos); planBack(u.plan);
@@ -1339,8 +1350,10 @@ function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTim
 // A page being hidden or closed may never run its timer, so a save still
 // waiting on one goes now. Nothing pending, nothing to write. It may be frozen
 // or killed within moments, so it writes straight away and skips the re-read
-// that normally goes first; the next save, on being looked at again, merges.
-function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=null; saveNow=dbState==='db'; persist(); }
+// that normally goes first. Unread, it must not put whole documents: another
+// view may have written fields this copy has never seen. So it sends only the
+// fields this view changed, and the next save, on being looked at again, merges.
+function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=null; saveNow=dbState==='db'?'flush':false; persist(); }
 
 var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
@@ -1539,8 +1552,16 @@ function dbPlace(path,body){
   DB_STATE_KEYS[path].forEach(function(k){ state[k]=st[k]; });
   if(path==='state/session') ensurePrep(state.activeSession);
 }
+/* Read back what is about to be written, not only what is likely: removing a
+   session or putting one back changes the day it was on, which can be any
+   day, and a whole stale copy of it would undo what another view logged
+   there. Lists of sessions, recipes and the rest are not re-read; each entry
+   is its own document under an id no other view writes. */
 function dbRefresh(){
-  var paths=dbHot();
+  var paths=dbHot(), snap=dbSnapshot(dbDocs(state));
+  Object.keys(snap).forEach(function(path){
+    if(path.indexOf('days/')===0 && snap[path]!==lastSaved[path] && paths.indexOf(path)<0) paths.push(path);
+  });
   return Promise.all(paths.map(dbStore.get)).then(function(got){
     // Taken after the read, so a tap made while it was out counts as ours.
     var mine=dbDocs(state), moved=false;
@@ -1550,9 +1571,10 @@ function dbRefresh(){
       if(theirs===undefined){ delete lastSaved[path]; return; }
       // Never heard from the store about it: a day starts blank, so anything
       // still blank here takes theirs; anything else stands as ours.
-      var base=lastSaved[path]!==undefined ? JSON.parse(lastSaved[path]) : (isDay?blankDay():theirs);
+      // Unreadable is treated as never heard, rather than failing every save.
+      var base=savedBody(path); if(!base) base=isDay?blankDay():theirs;
       var m=dbMerge(path,base,mine[path]||(isDay?blankDay():{}),theirs);
-      lastSaved[path]=stableJson(theirs);
+      lastSaved[path]=stableJson(theirs); savedGen[path]=saveGen;
       if(stableJson(m)!==stableJson(mine[path])){ dbPlace(path,m); moved=true; }
     });
     return moved;
@@ -1567,36 +1589,68 @@ function dbRefresh(){
    asked for meanwhile runs when this one is done, and lastSaved moves one
    document at a time, as each write lands. */
 var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, saveNow=false;
+// Which save last recorded each document in lastSaved, so a write from an
+// older save landing late can never put back a snapshot a newer one replaced.
+var saveGen=0, savedGen={};
 // Retrying cannot fix these; anything else, unknown codes included, is
 // treated as transient, as the store's contract says to.
 var DB_HARD={invalid_argument:1, quota_exceeded:1, revoked:1, not_granted:1,
   capability_disabled:1, capability_removed:1, transform_error:1};
+/* Every job runs to the end, and the first refusal is reported only once all
+   of them have. Rejecting on the first one let the next save start while
+   its siblings were still out, and one of those could then land last. */
+function dbSettle(list){
+  var err=null;
+  return Promise.all(list.map(function(run){ return run().then(null,function(e){ if(!err) err=e||{}; }); }))
+    .then(function(){ if(err) throw err; });
+}
+/* saveNow picks how: false re-reads and merges first, 'flush' sends only the
+   fields changed since lastSaved (a page going away has no time to read), and
+   'put' writes whole documents, for an import, which is meant to replace. */
 function dbSave(){
   if(!dbStore) return;
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
-  var retrying=false, now=saveNow; saveNow=false;
-  (now?Promise.resolve(false):dbRefresh()).then(function(moved){
-    var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[];
+  var retrying=false, mode=saveNow, gen=++saveGen; saveNow=false;
+  (mode?Promise.resolve(false):dbRefresh()).then(function(moved){
+    var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[], last=[];
+    function landed(path,json){
+      if(gen<(savedGen[path]||0)) return;
+      savedGen[path]=gen;
+      if(json===undefined) delete lastSaved[path]; else lastSaved[path]=json;
+    }
     Object.keys(next).forEach(function(path){
-      if(lastSaved[path]!==next[path]) jobs.push(function(){
-        return dbStore.put(path,docs[path]).then(function(){ lastSaved[path]=next[path]; }); });
+      if(lastSaved[path]===next[path]) return;
+      var was=mode==='flush'?savedBody(path):undefined, job;
+      if(was){
+        // What the store holds is unknown, so lastSaved stays as it was: the
+        // next save re-reads this document and merges it, our fields included.
+        var changed={}, body=docs[path];
+        Object.keys(body).forEach(function(k){ if(stableJson(body[k])!==stableJson(was[k])&&stableJson(body[k])!==undefined) changed[k]=body[k]; });
+        Object.keys(was).forEach(function(k){ if(stableJson(body[k])===undefined) changed[k]=null; });
+        if(!Object.keys(changed).length) return;
+        job=function(){ return dbStore.update(path,changed); };
+      }
+      else job=function(){ return dbStore.put(path,docs[path]).then(function(){ landed(path,next[path]); }); };
+      // The session goes last, below, and only once everything else landed:
+      // finishing clears it and writes its log in one go, and a cleared
+      // session whose log was refused would leave the sets nowhere.
+      (path==='state/session'?last:jobs).push(job);
     });
     Object.keys(lastSaved).forEach(function(path){
       if(next[path]===undefined) jobs.push(function(){
-        return dbStore.remove(path).then(function(){ delete lastSaved[path]; }); });
+        return dbStore.remove(path).then(function(){ landed(path,undefined); }); });
     });
-    if(!jobs.length){ if(moved) render(); return; }
+    if(!jobs.length&&!last.length){ if(moved) render(); return; }
     setSaving(true); if(moved) render();
     // Almost every save is one or two documents, but a migration dirties every
     // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
     // avoid, and a save has no more right to that burst than seeding does.
-    function batch(i){
-      if(i>=jobs.length) return Promise.resolve();
-      return Promise.all(jobs.slice(i,i+DB_SEED_BATCH).map(function(run){ return run(); }))
-        .then(function(){ return batch(i+DB_SEED_BATCH); });
+    function batch(list,i){
+      if(i>=list.length) return Promise.resolve();
+      return dbSettle(list.slice(i,i+DB_SEED_BATCH)).then(function(){ return batch(list,i+DB_SEED_BATCH); });
     }
-    return batch(0).then(function(){ setSaving(false); });
+    return batch(jobs,0).then(function(){ return batch(last,0); }).then(function(){ setSaving(false); });
   }).then(function(){
     saveAttempt=0;
     if(dbErr){ dbErr=null; dbErrHard=false; render(); }
@@ -1790,7 +1844,7 @@ function applyImport(st,mode){
   migratePlan(); prunePlan(); migrateMinutes();
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
-  saveNow=dbState==='db'; persist();
+  saveNow=dbState==='db'?'put':false; persist();
 }
 /* ---------- recipe scaling ---------------------------------------------
    Ingredients are written as "Name (quantity unit)". Parsing that once at

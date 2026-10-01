@@ -52,13 +52,18 @@ and recipe cards are unfolded, is that device's, not the record's: it lives in
 Saving goes one save at a time through `dbSave`, and all store access through
 one **Store** (see below). Before each save, and whenever the
 page is looked at again, the documents two open views are likely both to touch
-(`state/*` and the day being logged) are re-read and merged field by field
+(`state/*`, the day being logged, and any other day about to be written) are
+re-read and merged field by field
 against what this view last heard from the store: a field changed here keeps
 this view's value, every other field takes the store's, and XP merges as the
 sum of both views' changes. A transient refusal (`unavailable`,
 `resource_exhausted`, anything unknown) is retried with backoff; one retrying
-cannot fix is shown and waits for the next change. A save still waiting on its
-timer goes at once when the page is hidden or closed.
+cannot fix is shown and waits for the next change. Every write in a save
+settles before the next save starts, and `state/session` is written only after
+everything else in that save landed, so a finished session is never cleared
+before its log is stored. A save still waiting on its timer goes at once when
+the page is hidden or closed; with no time to re-read, it sends only the fields
+this view changed (`update`), never a whole document, and the next save merges.
 
 ## The Store seam
 
