@@ -45,8 +45,9 @@ missing or answers null). A store that is there but fails to answer at load is
 retried once on its own and then from a Retry button, because editing the
 embedded seed would be thrown away by the next load, which reads the store.
 
-Which tab, slide and chart range a view is on is that device's, not the
-record's: it lives in `localStorage` under `fc.ui`, not in the store.
+Which tab, slide and chart range a view is on, and which exercise histories
+and recipe cards are unfolded, is that device's, not the record's: it lives in
+`localStorage` under `fc.ui`, not in the store.
 
 Saving goes one save at a time through `dbSave`, and all store access through
 `dbGet`, `dbPut`, `dbDel` and `dbReadAll`. Before each save, and whenever the

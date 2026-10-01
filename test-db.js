@@ -677,6 +677,9 @@ srv.listen(0,async function(){
     // Another view earned xp since this one loaded.
     store['state/profile']=Object.assign({},store['state/profile'],{totalXp:xp+100});
     await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(400);
+    // Recipe cards start closed, so open one to reach its portions.
+    assert.ok(await tap('[data-action="toggleex"][data-id^="rec:"]'),'no recipe card to open on Meals');
+    await p.waitForTimeout(200);
     assert.ok(await tap('[data-action="portions"][data-d="1"]'),'no portions control on Meals');
     await p.waitForTimeout(1800);
     var ui=await p.evaluate(function(){ try{ return JSON.parse(localStorage.getItem('fc.ui')); }catch(e){ return null; } });

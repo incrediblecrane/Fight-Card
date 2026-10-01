@@ -4,20 +4,23 @@ var CSS = "\
 *{box-sizing:border-box;}\
 :root{\
   --bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;\
-  --text:#18181C;--text-soft:#55555F;--text-faint:#8A8A93;\
-  --accent:#E8500F;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;\
+  --text:#18181C;--text-soft:#55555F;--text-faint:#64646D;\
+  --accent:#E8500F;--accent-ink:#FFFFFF;--good:#2A7D4F;--good-ink:#FFFFFF;--warn:#8A6000;--warn-ink:#FFFFFF;--line:#DAD4C6;--field-border:#8E877A;\
+  color-scheme:light;\
 }\
 @media (prefers-color-scheme: dark){\
   :root:not([data-theme=light]){\
     --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;\
-    --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;\
-    --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;\
+    --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#9696A0;\
+    --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--good-ink:#15151B;--warn:#F2B134;--warn-ink:#15151B;--line:#303038;--field-border:#7A7A86;\
+    color-scheme:dark;\
   }\
 }\
 :root[data-theme=dark]{\
   --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;\
-  --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;\
-  --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;\
+  --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#9696A0;\
+  --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--good-ink:#15151B;--warn:#F2B134;--warn-ink:#15151B;--line:#303038;--field-border:#7A7A86;\
+  color-scheme:dark;\
 }\
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}\
 .wrap{max-width:680px;margin:0 auto;padding:18px 16px 90px;}\
@@ -25,6 +28,11 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}\
 .brand{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:0.02em;font-size:1.5rem;text-transform:uppercase;margin:0;}\
 .brand span{color:var(--accent);}\
+.hud.slim{padding:8px 14px;margin-bottom:12px;}\
+.hud.slim .hud-top{align-items:center;}\
+.hud.slim .brand{font-size:1.1rem;}\
+.hud.slim .lvl-badge{font-size:0.85rem;padding:2px 8px;}\
+.week-hint{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--text-faint);margin-top:6px;}\
 .date{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);text-align:right;line-height:1.5;}\
 .lvl-row{display:flex;align-items:center;gap:10px;margin-top:14px;}\
 .lvl-badge{font-family:'Anton',sans-serif;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:4px 10px;font-size:1rem;letter-spacing:0.02em;white-space:nowrap;}\
@@ -38,10 +46,10 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .week{display:flex;gap:6px;margin-top:14px;}\
 .dot{width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--text-faint);}\
 .dot.touched{border-color:var(--accent);color:var(--text);}\
-.dot.clean{background:var(--good);border-color:var(--good);color:#fff;}\
-.dot.flagged{background:var(--warn);border-color:var(--warn);color:#1a1a1a;}\
+.dot.clean{background:var(--good);border-color:var(--good);color:var(--good-ink);}\
+.dot.flagged{background:var(--warn);border-color:var(--warn);color:var(--warn-ink);}\
 .tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}\
-.tab{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 14px;border-radius:8px;cursor:pointer;}\
+.tab{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 14px;border-radius:8px;cursor:pointer;}\
 .tab.active{background:var(--text);color:var(--bg);border-color:var(--text);}\
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}\
 @media (max-width:420px){.grid{grid-template-columns:1fr;}}\
@@ -50,14 +58,14 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .card .sub{font-size:0.78rem;color:var(--text-faint);margin:-6px 0 12px;}\
 .linklike{background:none;border:none;color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:0.72rem;cursor:pointer;padding:0;margin-top:10px;display:block;}\
 .stepper{display:flex;align-items:center;gap:12px;}\
-.stepper button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1.2rem;cursor:pointer;}\
+.stepper button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1.2rem;cursor:pointer;}\
 .stepper button.big{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}\
 .stepper .count{font-family:'IBM Plex Mono',monospace;font-size:1.6rem;font-weight:600;min-width:2.2ch;text-align:center;font-variant-numeric:tabular-nums;}\
 .dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;}\
 .dots .cup{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line);}\
 .dots .cup.on{background:var(--accent);border-color:var(--accent);}\
 .pillgrid{display:flex;flex-wrap:wrap;gap:8px;}\
-.pill{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:8px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text-soft);cursor:pointer;}\
+.pill{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:8px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text-soft);cursor:pointer;}\
 .pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}\
 .note{font-size:0.78rem;color:var(--text-faint);margin-top:10px;}\
 .sectiontitle{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.1rem;letter-spacing:0.01em;margin:26px 0 10px;}\
@@ -69,12 +77,14 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .libitem p{font-size:0.86rem;color:var(--text-soft);margin:6px 0 0;white-space:pre-wrap;}\
 .libitem ul{margin:8px 0 0;padding-left:1.1em;font-size:0.86rem;color:var(--text-soft);}\
 .libitem li{margin:2px 0;}\
-.libitem .x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1rem;padding:2px 6px;}\
+.libitem .x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1.1rem;padding:0;margin:-10px -10px 0 0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
+.rtoggle{flex:1;min-width:0;cursor:pointer;}\
+.rtoggle .chev{font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-soft);margin-left:8px;}\
 .recipe-controls{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}\
-.recipe-controls select{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.recipe-controls select{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;padding:6px 8px;border-radius:6px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
 .inplan{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-soft);cursor:pointer;}\
 .addform{background:var(--surface-raised);border:1px dashed var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;}\
-.addform input,.addform select,.addform textarea{width:100%;font-family:'Work Sans',sans-serif;font-size:0.9rem;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);margin-top:8px;}\
+.addform input,.addform select,.addform textarea{width:100%;font-family:'Work Sans',sans-serif;font-size:0.9rem;padding:8px 10px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface);color:var(--text);margin-top:8px;}\
 .addform textarea{min-height:60px;resize:vertical;}\
 .addform button{margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 16px;cursor:pointer;}\
 .weekbox{background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;}\
@@ -94,10 +104,10 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .mealrow .slot{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);min-width:5.2em;}\
 .mealrow .mt{flex:1;min-width:0;}\
 .mealrow .mp{display:flex;align-items:center;gap:5px;flex-shrink:0;}\
-.mealrow .mp button{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-size:0.9rem;line-height:1;cursor:pointer;}\
+.mealrow .mp button{width:44px;height:44px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-size:0.9rem;line-height:1;cursor:pointer;}\
 .mealrow .mp b{font-family:'IBM Plex Mono',monospace;font-size:0.82rem;min-width:1.4ch;text-align:center;}\
-.mealrow .mx{border:none;background:none;color:var(--text-faint);font-size:1.05rem;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0;}\
-.addplan{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;}\
+.mealrow .mx{border:none;background:none;color:var(--text-faint);font-size:1.15rem;line-height:1;padding:0;cursor:pointer;flex-shrink:0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
+.addplan{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;}\
 .planned{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--text-faint);}\
 .shoprange{margin-bottom:10px;}\
 .shop{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:0.9rem;}\
@@ -106,9 +116,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .shop.checked{color:var(--text-faint);text-decoration:line-through;}\
 .shop.checked .box{background:var(--good);border-color:var(--good);}\
 .shop .shop-t{flex:1;}\
-.shop-x{border:none;background:none;color:var(--text-faint);font-size:1.05rem;line-height:1;padding:0 2px;cursor:pointer;}\
+.shop-x{border:none;background:none;color:var(--text-faint);font-size:1.15rem;line-height:1;padding:0;margin:-8px 0;cursor:pointer;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
 .addshop{display:flex;gap:8px;margin-top:12px;}\
-.addshop input{flex:1;min-width:0;font-family:'Work Sans',sans-serif;font-size:0.88rem;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--text);}\
+.addshop input{flex:1;min-width:0;font-family:'Work Sans',sans-serif;font-size:0.88rem;padding:9px 11px;border-radius:9px;border:1px solid var(--field-border);background:var(--surface);color:var(--text);}\
 .addshop button{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:9px;padding:9px 15px;cursor:pointer;}\
 .clearbtn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;margin-top:10px;}\
 .banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}\
@@ -118,7 +128,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}\
 .resume-banner .btns{display:flex;gap:8px;flex-shrink:0;}\
 .resume-banner button.go{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:8px 12px;cursor:pointer;}\
-.resume-banner button.x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1rem;}\
+.resume-banner button.x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1.1rem;padding:0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
 .wcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}\
 .wcard .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}\
 .wcard h4{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
@@ -126,10 +136,11 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;}\
 .wcard .start:disabled{background:var(--surface-raised);color:var(--text-faint);border:1px solid var(--line);cursor:default;}\
 .story{max-width:420px;margin:0 auto;}\
-.story-bar{display:flex;gap:4px;margin-bottom:12px;}\
+.story-bar{display:flex;align-items:center;gap:4px;margin-bottom:12px;min-height:8px;}\
 .story-bar i{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;position:relative;}\
 .story-bar i b{display:block;height:100%;background:var(--accent);width:0%;}\
-.story-bar i.done b{width:100%;}\
+.story-bar i.done b{width:100%;background:var(--good);}\
+.story-bar i.now{height:8px;border-radius:4px;}\
 .story-bar i.now b{width:100%;}\
 .story-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}\
 .story-head button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap;}\
@@ -146,38 +157,39 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .setchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;justify-content:center;}\
 .perimp{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--warn);text-align:center;margin:0 0 10px;letter-spacing:0.02em;}\
 .setchip{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:var(--surface-raised);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-variant-numeric:tabular-nums;}\
-.chipx{border:none;background:none;color:var(--text-faint);font-size:0.9rem;line-height:1;padding:0 0 0 3px;cursor:pointer;}\
+.chipx{border:none;background:none;color:var(--text-faint);font-size:0.9rem;line-height:1;padding:0 0 0 3px;cursor:pointer;position:relative;}\
+.chipx::after{content:'';position:absolute;inset:-14px -12px;}\
 .logrow{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}\
-.logrow input{width:76px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}\
-.logrow button{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;background:var(--good);color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;}\
-.logrow .undo{background:none;color:var(--text-faint);border:1px solid var(--line);}\
+.logrow input{width:76px;min-height:52px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);text-align:center;}\
+.logrow button{flex:1 1 auto;min-height:52px;font-family:'IBM Plex Mono',monospace;font-size:0.92rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;background:var(--good);color:var(--good-ink);border:none;border-radius:10px;padding:12px 20px;cursor:pointer;}\
+.logrow .undo{flex:0 0 auto;font-size:0.76rem;font-weight:400;text-transform:none;background:none;color:var(--text-soft);border:1px solid var(--line);}\
 .cardio-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;}\
-.cardio-select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.cardio-select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:9px 10px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
 .sauna-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}\
-.sauna-row input{width:64px;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);text-align:center;}\
-.sauna-row select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.sauna-row input{width:64px;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;padding:8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);text-align:center;}\
+.sauna-row select{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;padding:8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
 input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}\
 .logbtn{display:block;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;}\
 .storynav{display:flex;gap:10px;margin-top:16px;}\
 .storynav button{flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;text-transform:uppercase;border-radius:10px;padding:13px;cursor:pointer;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
-.storynav button.next{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}\
+.storynav button.next{border-color:var(--accent);color:var(--text);}\
 .storynav button.finish{background:var(--text);border-color:var(--text);color:var(--bg);}\
 .storynav button.skip{background:none;color:var(--text-faint);border-style:dashed;flex:0.7;}\
 .storynav button:disabled{opacity:0.35;cursor:default;}\
 .ssrow{background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;}\
 .ssrow-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}\
 .ssrow .ssn{font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.92rem;}\
-.ssx{border:none;background:none;color:var(--text-faint);font-size:1.05rem;line-height:1;padding:0 2px;cursor:pointer;}\
+.ssx{border:none;background:none;color:var(--text-faint);font-size:1.15rem;line-height:1;padding:0;margin:-10px -8px -10px 0;cursor:pointer;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
 .ssrow .logrow input{width:70px;}\
 .ssrow .setchips{margin-bottom:8px;}\
 .ssadd{display:flex;gap:8px;margin:12px 0 4px;}\
-.ssadd select{flex:1;min-width:0;font-family:'IBM Plex Mono',monospace;font-size:0.76rem;padding:9px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
+.ssadd select{flex:1;min-width:0;font-family:'IBM Plex Mono',monospace;font-size:0.76rem;padding:9px 8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
 .ssadd button{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;}\
-.loground{display:block;width:100%;margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;text-transform:uppercase;background:var(--good);color:#fff;border:none;border-radius:10px;padding:13px;cursor:pointer;}\
+.loground{display:block;width:100%;margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;text-transform:uppercase;background:var(--good);color:var(--good-ink);border:none;border-radius:10px;padding:13px;cursor:pointer;}\
 .addex-btn{display:block;width:100%;margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;text-transform:uppercase;background:none;border:1px dashed var(--line);color:var(--text-soft);border-radius:10px;padding:10px;cursor:pointer;}\
 .discard-btn{display:block;width:100%;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;background:none;border:none;color:var(--text-faint);cursor:pointer;padding:6px;}\
 .picker{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;}\
-.picker input{width:100%;font-family:'Work Sans',sans-serif;font-size:0.92rem;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);margin-bottom:12px;}\
+.picker input{width:100%;font-family:'Work Sans',sans-serif;font-size:0.92rem;padding:10px 12px;border-radius:10px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);margin-bottom:12px;}\
 .pickgroup-title{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);padding:16px 4px 4px;}\
 .pickrow{border-bottom:1px solid var(--line);}\
 .pickrow:last-child{border-bottom:none;}\
@@ -211,7 +223,7 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 .recent-log .d{color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:0.74rem;white-space:nowrap;}\
 .ssnote{display:block;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);margin-top:2px;}\
 @media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}\
-.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--line);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.flagged,.legend i.flagged{background:var(--warn);border-color:var(--warn);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.fig-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:#fff;font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;}.swipe-x{border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:0 2px;cursor:pointer;opacity:0;transition:opacity .15s ease;}@media (hover:hover){.swipe:hover .swipe-x{opacity:1;}}.swipe.open .swipe-x{opacity:0;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-faint);border-color:var(--line);}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{margin-left:auto;text-transform:uppercase;letter-spacing:0.06em;font-size:0.62rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 11px;height:28px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:#fff;border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{background:#fff;color:var(--warn);border:none;border-radius:999px;padding:6px 13px;font-size:0.76rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}.datepick button{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:6px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--line);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.flagged,.legend i.flagged{background:var(--warn);border-color:var(--warn);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;}.swipe-x{border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:0 2px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-faint);border-color:var(--line);}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{margin-left:auto;text-transform:uppercase;letter-spacing:0.06em;font-size:0.62rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 13px;font-size:0.76rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick button{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:6px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
 ";
 
 var WORKOUT_TYPES=["Boxing/MMA","Strength","Power/Speed","Flexibility","Conditioning","Custom"];
@@ -827,7 +839,9 @@ function writeUi(v){ if(v===uiSaved) return; uiSaved=v; try{ localStorage.setIte
 var ui0=readUi();
 var tab=ui0.tab||'today';
 var viewingSession=!!ui0.viewingSession;
-var expanded={};
+// What is unfolded (an exercise's history, a recipe's ingredients) is this
+// device's view too, kept with the tab so a save-and-reload keeps it open.
+var expanded={}; (ui0.open||[]).forEach(function(k){ expanded[k]=true; });
 var slide=ui0.slide||0;
 var progRange=ui0.progRange||14;
 var logDate; // undefined means 'not read yet'; the value lives in sessionStorage
@@ -994,7 +1008,8 @@ function shortDay(k){ return k.slice(8,10)+'/'+k.slice(5,7); }
 /* ---------- charts ----------------------------------------------------
    Inline SVG, no library: the page has a strict CSP and one measure per
    chart, so a single hue carries it and no legend is needed. Hover text
-   rides on <title>, which needs no tooltip layer to keep in sync. */
+   rides on <title>; touch never shows that, so each mark also carries its
+   text in data-tip and a tap writes it into the chart's head line. */
 function chartEmpty(msg){ return '<div class="chart empty-chart">'+esc(msg)+'</div>'; }
 function chartHead(title,sub){ return '<div class="chart-head"><h4>'+esc(title)+'</h4><span class="sub">'+esc(sub||'')+'</span></div>'; }
 
@@ -1009,10 +1024,13 @@ function barChart(rows,opts){
   var bars=rows.map(function(r,i){
     var x=Math.round(i*slot+(slot-bw)/2);
     var tip='<title>'+esc(r.tip||'')+'</title>';
-    if(!(r.v>0)) return '<rect x="'+x+'" y="'+(base-2)+'" width="'+bw+'" height="2" rx="1" fill="var(--line)">'+tip+'</rect>';
+    // The whole column takes the tap: a bar a few pixels wide, or an empty
+    // day, is too small a thing to hit with a thumb.
+    var g='<g class="mark" data-action="charttip" data-tip="'+esc(r.tip||'')+'"><rect x="'+Math.round(i*slot)+'" y="'+padT+'" width="'+Math.ceil(slot)+'" height="'+plotH+'" fill="transparent"/>';
+    if(!(r.v>0)) return g+'<rect x="'+x+'" y="'+(base-2)+'" width="'+bw+'" height="2" rx="1" fill="var(--line)">'+tip+'</rect></g>';
     var h=Math.max(3,Math.round(r.v/max*plotH));
     var fill=r.state==='warn'?'var(--warn)':(r.state==='mute'?'var(--line)':'var(--accent)');
-    return '<rect x="'+x+'" y="'+(base-h)+'" width="'+bw+'" height="'+h+'" rx="4" fill="'+fill+'">'+tip+'</rect>';
+    return g+'<rect x="'+x+'" y="'+(base-h)+'" width="'+bw+'" height="'+h+'" rx="4" fill="'+fill+'">'+tip+'</rect></g>';
   }).join('');
   var tline='';
   if(opts.target){
@@ -1046,7 +1064,8 @@ function lineChart(pts,opts){
   function Y(v){ return base-(v-min)/(max-min)*plotH; }
   var d=pts.map(function(p,i){ return (i?'L':'M')+X(i).toFixed(1)+' '+Y(p.v).toFixed(1); }).join(' ');
   var dots=pts.map(function(p,i){
-    return '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"><title>'+esc(p.tip||'')+'</title></circle>';
+    return '<g class="mark" data-action="charttip" data-tip="'+esc(p.tip||'')+'"><circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="16" fill="transparent"/>'+
+      '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"><title>'+esc(p.tip||'')+'</title></circle></g>';
   }).join('');
   var first=pts[0], last=pts[pts.length-1];
   var lbls='<text x="0" y="'+(H-4)+'" class="c-lbl">'+esc(first.k)+'</text>'+
@@ -2385,34 +2404,34 @@ function bodyContent(){
     if(k===activeDate()) cls+=' active';
     // The strip is where you notice a gap, so it is also how you fix one.
     var pickable=k>=minLogDate() && k<=realToday();
-    return '<div class="'+cls+(pickable?' pickable':'')+'"'+(pickable?' data-action="pickday" data-k="'+k+'"':'')+
-      ' title="'+k+(pickable?' — tap to log for this day':'')+'">'+dd+'</div>';
+    return '<div class="'+cls+(pickable?' pickable':'')+'"'+(pickable?' data-action="pickday" data-k="'+k+'" role="button" tabindex="0" aria-label="Log for '+esc(prettyKey(k))+'"':'')+
+      (k===activeDate()?' aria-current="date"':'')+' title="'+k+(pickable?': tap to log for this day':'')+'">'+dd+'</div>';
   }).join('');
   var cupsRow=''; for(var i=0;i<Math.max(state.waterTarget,t.water);i++){ cupsRow+='<div class="cup'+(i<t.water?' on':'')+'"></div>'; }
   var typePills=WORKOUT_TYPES.map(function(wt){
-    var on=t.workout.done && t.workout.type===wt;
-    return '<button class="pill'+(on?' on':'')+'" data-action="workout" data-type="'+wt+'">'+wt+'</button>';
-  }).join('')+'<button class="pill'+(t.rest?' on':'')+'" data-action="rest">Rest day</button>';
+    var on=!!(t.workout.done && t.workout.type===wt);
+    return '<button class="pill'+(on?' on':'')+'" data-action="workout" data-type="'+wt+'" aria-pressed="'+on+'">'+wt+'</button>';
+  }).join('')+'<button class="pill'+(t.rest?' on':'')+'" data-action="rest" aria-pressed="'+!!t.rest+'">Rest day</button>';
 
   var todayView =
     '<div class="grid">'+
       '<div class="card"><h3>Water</h3><div class="sub">Target '+litres(state.waterTarget)+' a day &middot; taps of '+litres(1)+'</div>'+
-        '<div class="stepper"><button data-action="water" data-d="-1">-</button><span class="count">'+litres(t.water)+'</span><button class="big" data-action="water" data-d="1">+</button></div>'+
+        '<div class="stepper"><button data-action="water" data-d="-1" aria-label="Less water">-</button><span class="count">'+litres(t.water)+'</span><button class="big" data-action="water" data-d="1" aria-label="More water">+</button></div>'+
         '<div class="dots">'+cupsRow+'</div></div>'+
       '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+t.workout.type):(t.rest?'Recovery day':'Not logged yet'))+'</div>'+
         (t.workout.done&&dayHasLog(activeDate())?'<p class="note">From a logged session. Remove it on Progress to clear the day.</p>':'')+
         '<div class="pillgrid">'+typePills+'</div>'+
         '<button class="linklike" data-action="tab" data-tab="training">Or start a guided session &rarr;</button></div>'+
       '<div class="card"><h3>Alcohol</h3><div class="sub">Units / drinks '+dayWord()+'</div>'+
-        '<div class="stepper"><button data-action="alcohol" data-d="-1">-</button><span class="count">'+t.alcohol+'</span><button data-action="alcohol" data-d="1">+</button></div></div>'+
+        '<div class="stepper"><button data-action="alcohol" data-d="-1" aria-label="One less drink">-</button><span class="count">'+t.alcohol+'</span><button data-action="alcohol" data-d="1" aria-label="One more drink">+</button></div></div>'+
       '<div class="card"><h3>Smoking</h3><div class="sub">Cigarettes '+dayWord()+'</div>'+
-        '<div class="stepper"><button data-action="smoking" data-d="-1">-</button><span class="count">'+t.smoking+'</span><button data-action="smoking" data-d="1">+</button></div></div>'+
+        '<div class="stepper"><button data-action="smoking" data-d="-1" aria-label="One less cigarette">-</button><span class="count">'+t.smoking+'</span><button data-action="smoking" data-d="1" aria-label="One more cigarette">+</button></div></div>'+
       '<div class="card"><h3>Weed</h3><div class="sub">Sessions '+dayWord()+'</div>'+
-        '<div class="stepper"><button data-action="weed" data-d="-1">-</button><span class="count">'+t.weed+'</span><button data-action="weed" data-d="1">+</button></div></div>'+
+        '<div class="stepper"><button data-action="weed" data-d="-1" aria-label="One less session">-</button><span class="count">'+t.weed+'</span><button data-action="weed" data-d="1" aria-label="One more session">+</button></div></div>'+
       '<div class="card"><h3>Sauna</h3><div class="sub">'+(todaySaunaCount?(todaySaunaCount+' session'+(todaySaunaCount===1?'':'s')+' '+dayWord()):'Mins, temp &amp; bench position')+'</div>'+
         (saunaDraft.length?('<div class="setchips" style="justify-content:flex-start;">'+
           saunaDraft.map(function(st,i){ return '<span class="setchip">'+st.mins+' min &middot; '+esc(st.position)+
-            ' <button class="chipx" data-action="delstint" data-i="'+i+'">&times;</button></span>'; }).join('')+'</div>'):'')+
+            ' <button class="chipx" data-action="delstint" data-i="'+i+'" aria-label="Remove this stint">&times;</button></span>'; }).join('')+'</div>'):'')+
         '<div class="sauna-row"><input id="sauna-mins" type="text" inputmode="decimal" placeholder="mins">'+
           '<input id="sauna-temp" type="text" inputmode="decimal" placeholder="&deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
           '<select id="sauna-pos"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
@@ -2427,7 +2446,7 @@ function bodyContent(){
 
   var trainingItems=state.library.map(function(item){
     return '<div class="libitem"><div class="row"><div><span class="tag">'+esc(item.tag)+'</span><h4>'+esc(item.title)+'</h4></div>'+
-      '<button class="x" data-action="dellib" data-id="'+item.id+'">&times;</button></div>'+(item.notes?'<p>'+esc(item.notes)+'</p>':'')+'</div>';
+      '<button class="x" data-action="dellib" data-id="'+item.id+'" aria-label="Remove '+esc(item.title)+'">&times;</button></div>'+(item.notes?'<p>'+esc(item.notes)+'</p>':'')+'</div>';
   }).join('');
 
   var resumeBanner='';
@@ -2435,7 +2454,7 @@ function bodyContent(){
     var aw=WORKOUTS.filter(function(x){return x.id===state.activeSession.workoutId;})[0];
     var cnt=0; Object.keys(state.activeSession.logs).forEach(function(k){cnt+=state.activeSession.logs[k].length;});
     resumeBanner='<div class="resume-banner"><span>In progress: <strong>'+(aw?esc(aw.title):'Workout')+'</strong> ('+cnt+' sets logged)</span>'+
-      '<span class="btns"><button class="go" data-action="resumesession">Resume</button><button class="x" data-action="discardsession" title="Discard">&times;</button></span></div>';
+      '<span class="btns"><button class="go" data-action="resumesession">Resume</button><button class="x" data-action="discardsession" title="Discard" aria-label="Discard this session">&times;</button></span></div>';
   }
   var workoutCards=WORKOUTS.map(function(w){
     var meta=w.plan.length?(w.plan.length+' exercises'):'Build it as you go';
@@ -2468,11 +2487,11 @@ function bodyContent(){
         '<span class="slot">'+esc(SLOT_LABEL[e.slot]||e.slot)+'</span>'+
         '<span class="mt">'+esc(r?r.title:'(recipe removed)')+'</span>'+
         '<span class="mp">'+
-          '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="-1">-</button>'+
+          '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="-1" aria-label="One portion less">-</button>'+
           '<b>'+planPortions(e)+'</b>'+
-          '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="1">+</button>'+
+          '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="1" aria-label="One portion more">+</button>'+
         '</span>'+
-        '<button class="mx" data-action="delmeal" data-id="'+esc(e.id)+'" title="Remove">&times;</button>'+
+        '<button class="mx" data-action="delmeal" data-id="'+esc(e.id)+'" title="Remove" aria-label="Remove this meal">&times;</button>'+
       '</div>';
     }).join('');
     return '<div class="calday'+(i===0?' today':'')+(meals.length?'':' bare')+'">'+
@@ -2487,7 +2506,7 @@ function bodyContent(){
     var checked=state.shoppingChecked.indexOf(it.key)>-1;
     return '<div class="shop'+(checked?' checked':'')+'" data-action="shopcheck" data-item="'+esc(it.key)+'">'+
       '<span class="box"></span><span class="shop-t">'+esc(it.label)+'</span>'+
-      (it.extra?'<button class="shop-x" data-action="delextra" data-id="'+esc(it.extraId)+'" title="Remove">&times;</button>':'')+'</div>';
+      (it.extra?'<button class="shop-x" data-action="delextra" data-id="'+esc(it.extraId)+'" title="Remove" aria-label="Remove '+esc(it.label)+'">&times;</button>':'')+'</div>';
   }).join('');
   function recipeCard(r){
     var f=recipePortions(r)/recipeBase(r);
@@ -2503,16 +2522,20 @@ function bodyContent(){
     }).join('');
     var planned=(state.plan||[]).filter(function(e){return e.recipeId===r.id;}).length;
     var m=r.macros;
-    return '<div class="libitem"><div class="row"><div><span class="tag">'+esc(r.tag||'Recipe')+'</span><h4>'+esc(r.title)+'</h4></div>'+
-      '<button class="x" data-action="delrecipe" data-id="'+r.id+'">&times;</button></div>'+
+    // Closed by default: what you scan the list for is the name, the macros
+    // and the add button. The batch and the method open on a tap.
+    var rk='rec:'+r.id, open=!!expanded[rk];
+    return '<div class="libitem"><div class="row"><div class="rtoggle" data-action="toggleex" data-id="'+esc(rk)+'" role="button" tabindex="0" aria-expanded="'+open+'">'+
+        '<span class="tag">'+esc(r.tag||'Recipe')+'</span><span class="chev">'+(open?'&#9650; hide':'&#9660; ingredients')+'</span><h4>'+esc(r.title)+'</h4></div>'+
+      '<button class="x" data-action="delrecipe" data-id="'+r.id+'" aria-label="Delete '+esc(r.title)+'">&times;</button></div>'+
       (m?macroLine(r):'')+
-      '<div class="portions"><span class="l">Portions</span>'+
-        '<button data-action="portions" data-id="'+r.id+'" data-d="-1">-</button>'+
+      (open?('<div class="portions"><span class="l">Portions</span>'+
+        '<button data-action="portions" data-id="'+r.id+'" data-d="-1" aria-label="One portion less">-</button>'+
         '<span class="n">'+recipePortions(r)+'</span>'+
-        '<button data-action="portions" data-id="'+r.id+'" data-d="1">+</button>'+
+        '<button data-action="portions" data-id="'+r.id+'" data-d="1" aria-label="One portion more">+</button>'+
         (recipePortions(r)!==recipeBase(r)?'<button class="reset" data-action="portions" data-id="'+r.id+'" data-d="0">Reset to '+recipeBase(r)+'</button>':'')+
       '</div>'+
-      (ingList?'<ul>'+ingList+'</ul>':'')+(r.instructions?'<p>'+esc(r.instructions)+'</p>':'')+
+      (ingList?'<ul>'+ingList+'</ul>':'')+(r.instructions?'<p>'+esc(r.instructions)+'</p>':'')):'')+
       '<div class="recipe-controls">'+
         '<select data-action="planday" data-id="'+r.id+'">'+dayOptions+'</select>'+
         '<select data-action="planslot" data-id="'+r.id+'">'+slotOptions+'</select>'+
@@ -2529,7 +2552,7 @@ function bodyContent(){
     '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+
       '<div class="rangebar shoprange">'+
         [[3,'Next 3 days'],[7,'Whole week']].map(function(o){
-          return '<button data-action="shoprange" data-n="'+o[0]+'"'+(shopRange===o[0]?' class="on"':'')+'>'+o[1]+'</button>';
+          return '<button data-action="shoprange" data-n="'+o[0]+'"'+(shopRange===o[0]?' class="on"':'')+' aria-pressed="'+(shopRange===o[0])+'">'+o[1]+'</button>';
         }).join('')+'</div>'+
       (shopRows||'<div class="empty">Nothing planned in this stretch &mdash; add a meal below, or add your own item.</div>')+
       '<div class="addshop"><input id="shop-add" autocomplete="off" maxlength="60" '+
@@ -2597,14 +2620,14 @@ function bodyContent(){
   });
   var trainRows=rangeKeys.map(function(k){
     var n=setsByDay[k]||0, sess=sessionsByDay[k]||0, e=state.days[k];
-    var tip=k+' — '+(n?n+' set'+(n===1?'':'s')+(sess?' over '+sess+' session'+(sess===1?'':'s'):''):(e&&e.rest?'rest day':'nothing logged'));
+    var tip=k+': '+(n?n+' set'+(n===1?'':'s')+(sess?' over '+sess+' session'+(sess===1?'':'s'):''):(e&&e.rest?'rest day':'nothing logged'));
     return {k:shortDay(k), v:n, lbl:n+' sets', tip:tip, state:(!n&&e&&e.rest)?'mute':null};
   });
   var trainedDays=rangeKeys.filter(function(k){return setsByDay[k];}).length;
 
   var volRows=rangeKeys.map(function(k){
     var v=Math.round(volumeByDay[k]||0);
-    return {k:shortDay(k), v:v, lbl:v+'kg', tip:k+' — '+(v?v+'kg lifted':'no loaded work')};
+    return {k:shortDay(k), v:v, lbl:v+'kg', tip:k+': '+(v?v+'kg lifted':'no loaded work')};
   });
   var rangeVolume=volRows.reduce(function(a,r){return a+r.v;},0);
 
@@ -2612,7 +2635,7 @@ function bodyContent(){
   var waterRows=rangeKeys.map(function(k){
     var e=state.days[k], u=e?e.water:0;
     var hit=u>=state.waterTarget;
-    return {k:shortDay(k), v:u, lbl:litres(u), tip:k+' — '+litres(u)+(hit?' (target hit)':' of '+litres(state.waterTarget))};
+    return {k:shortDay(k), v:u, lbl:litres(u), tip:k+': '+litres(u)+(hit?' (target hit)':' of '+litres(state.waterTarget))};
   });
   var waterHits=waterRows.filter(function(r){return r.v>=state.waterTarget;}).length;
   // Average over every day since tracking started, not only the days water
@@ -2659,12 +2682,12 @@ function bodyContent(){
   var saunaMins=saunaAll.reduce(function(a,x){return a+saunaTotal(x);},0);
   var saunaRows=saunaAll.slice(0,20).reverse().map(function(x){
     return {k:shortDay(x.date), v:saunaTotal(x), lbl:saunaTotal(x)+' min',
-            tip:x.date+' — '+saunaTotal(x)+' min'+(x.temp?' at '+x.temp+'°C':'')+' · '+saunaStintText(x)};
+            tip:x.date+': '+saunaTotal(x)+' min'+(x.temp?' at '+x.temp+'°C':'')+' · '+saunaStintText(x)};
   });
 
   var pStreaks=computeStreaks();
   var rangeBar='<div class="rangebar">'+[14,30,90].map(function(n){
-    return '<button class="'+(progRange===n?'on':'')+'" data-action="prange" data-n="'+n+'">'+n+' days</button>';
+    return '<button class="'+(progRange===n?'on':'')+'" data-action="prange" data-n="'+n+'" aria-pressed="'+(progRange===n)+'">'+n+' days</button>';
   }).join('')+'</div>';
 
   var statRow=
@@ -2709,7 +2732,7 @@ function bodyContent(){
       var pts=dates.map(function(dt){
         var b=bestSet(kind,byDate[dt]);
         return {k:shortDay(dt), v:bestValue(kind,b), lbl:bestValue(kind,b)+unit,
-                tip:dt+' — best set '+setLabel(def,b)+' of '+byDate[dt].length+' set'+(byDate[dt].length===1?'':'s')};
+                tip:dt+': best set '+setLabel(def,b)+' of '+byDate[dt].length+' set'+(byDate[dt].length===1?'':'s')};
       });
       // Can be empty now: a warm-up whose every entry was a set at a weight
       // leaves nothing for a minutes chart, and reading .lbl off nothing would
@@ -2732,7 +2755,7 @@ function bodyContent(){
           '<span>Sets <b>'+hist.length+'</b></span></div>'+
         '<table><tr><th>Date</th><th>Set</th></tr>'+rows+'</table></div>';
     }
-    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+exId+'"><h4>'+esc(def.name)+'</h4>'+
+    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+exId+'" role="button" tabindex="0" aria-expanded="'+isOpen+'"><h4>'+esc(def.name)+'</h4>'+
       '<span class="last">'+setLabel(def,last)+' &middot; '+last.date+'<span class="chev">'+(isOpen?'&#9650;':'&#9660;')+'</span></span></div>'+
       detail+'</div>';
   }).join('') || '<p class="note" style="margin-top:0;">Log a workout to start building exercise history.</p>';
@@ -2826,7 +2849,7 @@ function bodyContent(){
         }
         return '<div class="ssrow">'+
           '<div class="ssrow-head"><span class="ssn">'+esc(d.name)+'</span>'+
-            '<button class="ssx" data-action="ssdel" data-ss="'+ssId+'" data-ex="'+m+'" title="Take out of the superset">&times;</button></div>'+
+            '<button class="ssx" data-action="ssdel" data-ss="'+ssId+'" data-ex="'+m+'" title="Take out of the superset" aria-label="Take '+esc(d.name)+' out of the superset">&times;</button></div>'+
           (mChips?'<div class="setchips">'+mChips+'</div>':'')+mCardio+
           '<div class="logrow">'+
             (d.type==='load'?('<input id="log-w-'+m+'" type="text" inputmode="decimal" placeholder="'+(mPer?'kg each':'kg')+'">'):'')+
@@ -2979,12 +3002,13 @@ function bodyContent(){
   else if(tab==='progress'){ current=progressView; }
   else { current=todayView; }
 
-  var tabsBar=(viewingSession && state.activeSession)?'':
+  var inSession=!!(viewingSession && state.activeSession);
+  var tabsBar=inSession?'':
     '<div class="tabs">'+
-      '<button class="tab'+(tab==='today'?' active':'')+'" data-action="tab" data-tab="today">Today</button>'+
-      '<button class="tab'+(tab==='training'?' active':'')+'" data-action="tab" data-tab="training">Training</button>'+
-      '<button class="tab'+(tab==='meals'?' active':'')+'" data-action="tab" data-tab="meals">Meals</button>'+
-      '<button class="tab'+(tab==='progress'?' active':'')+'" data-action="tab" data-tab="progress">Progress</button>'+
+      '<button class="tab'+(tab==='today'?' active':'')+'" data-action="tab" data-tab="today" aria-pressed="'+(tab==='today')+'">Today</button>'+
+      '<button class="tab'+(tab==='training'?' active':'')+'" data-action="tab" data-tab="training" aria-pressed="'+(tab==='training')+'">Training</button>'+
+      '<button class="tab'+(tab==='meals'?' active':'')+'" data-action="tab" data-tab="meals" aria-pressed="'+(tab==='meals')+'">Meals</button>'+
+      '<button class="tab'+(tab==='progress'?' active':'')+'" data-action="tab" data-tab="progress" aria-pressed="'+(tab==='progress')+'">Progress</button>'+
     '</div>';
 
   var backfillBar = backfilling()
@@ -3000,6 +3024,10 @@ function bodyContent(){
         'Trouble reaching your saved data ('+esc(dbErr)+'). Trying again.')+'</div>':'')+
       backfillBar+
       (window.claude && window.claude.use ? '' : '<div class="banner">Open this from your artifact link to sync across devices &mdash; changes here are local to this tab only.</div>')+
+      // A session is the one place the phone screen is short: the level
+      // stays as a line, streaks and the week strip wait until it is closed.
+      (inSession?'<div class="hud slim"><div class="hud-top"><h1 class="brand">Fight <span>Card</span></h1>'+
+        '<div class="lvl-badge">LV '+lvl.level+'</div></div></div>':
       '<div class="hud"><div class="hud-top"><h1 class="brand">Fight <span>Card</span></h1><div class="date">'+prettyDate()+'</div></div>'+
         '<div class="lvl-row"><div class="lvl-badge">LV '+lvl.level+'</div>'+
           '<div class="xp-track"><div class="xp-fill" style="width:'+Math.round((lvl.into/lvl.span)*100)+'%"></div></div>'+
@@ -3007,7 +3035,8 @@ function bodyContent(){
         '<div class="streaks"><div class="streak"><span class="n">'+streaks.dayStreak+'</span><span class="l">day streak</span></div>'+
           '<div class="streak"><span class="n">'+streaks.cleanStreak+'</span><span class="l">clean streak</span></div>'+
           '<div class="streak"><span class="n">'+state.totalXp+'</span><span class="l">total xp</span></div></div>'+
-        '<div class="week">'+week+'</div></div>'+
+        '<div class="week" role="group" aria-label="The last seven days">'+week+'</div>'+
+        '<div class="week-hint">Tap a day to log it</div></div>')+
       tabsBar+current+undoToast()+
     '</div>';
 }
@@ -3023,7 +3052,8 @@ function undoToast(){
 }
 
 function syncUi(){
-  writeUi(JSON.stringify({tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange}));
+  writeUi(JSON.stringify({tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange,
+    open:Object.keys(expanded).filter(function(k){ return expanded[k]; })}));
 }
 
 /* Matching is forgiving about a trailing plural, because "shrugs" and "dips"
@@ -3145,6 +3175,13 @@ function onClick(e){
   // A store that failed to answer is held off the same way, and Retry is the
   // one thing that can move it on.
   if(action==='retryload'){ if(dbState==='error'){ dbState='loading'; render(); dbBoot(); } return; }
+  // A chart mark only changes the words above its own chart. Rendering would
+  // put the head line straight back, so this writes it and stops.
+  if(action==='charttip'){ var ch=t.closest('.chart'), sub=ch&&ch.querySelector('.chart-head .sub');
+    if(sub){ sub.textContent=t.getAttribute('data-tip')||''; } return; }
+  // The desktop × on a history row only shows on hover. On touch it is never
+  // seen, so a tap that reaches it anyway must not delete the row.
+  if(t.classList.contains('swipe-x') && window.matchMedia && !matchMedia('(hover:hover)').matches) return;
   if((dbState==='loading'||dbState==='error') && !UI_ONLY_WHILE_LOADING[action]) return;
   if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
   else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
@@ -3430,6 +3467,9 @@ function onInput(e){
 // Enter in the shopping box adds the item. Typing something and then having to
 // reach for a button is exactly the friction that stops a list being used.
 function onKeydown(e){
+  // A div that stands in for a button answers the keys a button would.
+  var rb=e.target && e.target.getAttribute && e.target.getAttribute('role')==='button' && e.target.hasAttribute('data-action');
+  if(rb && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); e.target.click(); return; }
   if(e.key!=='Enter' || !e.target || e.target.id!=='shop-add') return;
   e.preventDefault();
   var btn=document.querySelector('[data-action="addextra"]');

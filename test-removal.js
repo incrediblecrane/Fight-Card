@@ -29,6 +29,26 @@ srv.listen(0,async function(){
   var before=await ids();
   console.log('sauna rows before:', before.length);
 
+  // On a phone the hover-only x is never drawn, yet it used to take taps: one
+  // touch on a blank spot at the right of a row deleted it outright.
+  try{
+    var mctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+    var mp=await mctx.newPage(); mp.setDefaultTimeout(8000);
+    await mp.goto('http://127.0.0.1:'+srv.address().port+'/'); await mp.waitForTimeout(500);
+    var mb=await mp.$('[data-action="cancelsession"]'); if(mb){ await mb.click(); await mp.waitForTimeout(400); }
+    await mp.click('[data-action="tab"][data-tab="progress"]'); await mp.waitForTimeout(400);
+    assert.strictEqual(await mp.evaluate(function(){ return matchMedia('(hover:hover)').matches; }),false,'this context still hovers, so it proves nothing');
+    var count=function(){ return mp.evaluate(function(){ return document.querySelectorAll('.swipe').length; }); };
+    var n0=await count();
+    var xb=await mp.evaluate(function(){ var x=document.querySelector('.swipe-x'); x.scrollIntoView({block:'center'});
+      var r=x.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; });
+    await mp.touchscreen.tap(xb.x,xb.y); await mp.waitForTimeout(2600);
+    assert.strictEqual(await count(),n0,'a tap on the unseen x removed a row');
+    assert.strictEqual(await mp.$('.undo-bar'),null,'a tap on the unseen x offered an undo, so it deleted something');
+    await mctx.close();
+    ok('on a touch screen a tap where the hidden x sits deletes nothing');
+  }catch(e){ bad('hidden x on touch',e); }
+
   try{
     // swipe left on the first sauna row
     var rows=await p.$$('[data-swipe]');

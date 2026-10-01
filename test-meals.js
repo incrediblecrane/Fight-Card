@@ -20,14 +20,18 @@ srv.listen(0,async function(){
   var back=await p.$('[data-action="cancelsession"]'); if(back){await back.click(); await p.waitForTimeout(400);}
   await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(500);
 
-  var card=id=>p.evaluate(function(i){
+  // Recipe cards start closed; portions and ingredients show once opened, and
+  // stay open across the save-and-reload because the view remembers it.
+  var openCard=async id=>{ var tg=await p.$('[data-action="toggleex"][data-id="rec:'+id+'"][aria-expanded="false"]');
+    if(tg){ await tg.click(); await p.waitForTimeout(250); } };
+  var card=async id=>{ await openCard(id); return p.evaluate(function(i){
     var b=document.querySelector('[data-action="portions"][data-id="'+i+'"]');
     if(!b) return null; var c=b.closest('.libitem');
     return {portions:c.querySelector('.portions .n').textContent,
             ings:Array.prototype.slice.call(c.querySelectorAll('li')).map(function(x){return x.textContent;}),
             macros:(c.querySelector('.macros')||{textContent:''}).textContent.replace(/\s+/g,' ').trim()};
-  }, id);
-  var bump=async(id,d,n)=>{ for(var i=0;i<(n||1);i++){
+  }, id); };
+  var bump=async(id,d,n)=>{ await openCard(id); for(var i=0;i<(n||1);i++){
     await p.click('[data-action="portions"][data-id="'+id+'"][data-d="'+d+'"]'); await p.waitForTimeout(250);} };
 
   try{
