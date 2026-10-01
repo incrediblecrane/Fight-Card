@@ -1313,16 +1313,17 @@ srv.listen(0,async function(){
     assert.ok(await toSlide('Bench press'),'never reached the bench press');
     // Typed a key at a time, as a phone keyboard does: a number box used to
     // drop the comma, so "22,5" was read as 225.
-    await p.click('#log-w-press_bench'); await p.keyboard.type('22,5');
-    await p.click('#log-v-press_bench'); await p.keyboard.type('8');
+    // The boxes now start from last time's set, so they are emptied first.
+    await p.fill('#log-w-press_bench',''); await p.click('#log-w-press_bench'); await p.keyboard.type('22,5');
+    await p.fill('#log-v-press_bench',''); await p.click('#log-v-press_bench'); await p.keyboard.type('8');
     await p.click('[data-action="logset"]'); await settle();
     var c=await chipsNow();
     assert.deepStrictEqual(c,['22.5kg × 8'],'chips: '+c.join(' | '));
   });
 
   await t('a weight that is not a number logs nothing and is marked', async function(){
-    await p.click('#log-w-press_bench'); await p.keyboard.type('abc');
-    await p.click('#log-v-press_bench'); await p.keyboard.type('8');
+    await p.fill('#log-w-press_bench',''); await p.click('#log-w-press_bench'); await p.keyboard.type('abc');
+    await p.fill('#log-v-press_bench',''); await p.click('#log-v-press_bench'); await p.keyboard.type('8');
     await p.click('[data-action="logset"]'); await settle();
     assert.strictEqual((await chipsNow()).length,1,'a set was logged from "abc"');
     assert.strictEqual(await invalid('#log-w-press_bench'),'true','the bad field is not marked');
@@ -1337,6 +1338,8 @@ srv.listen(0,async function(){
   });
 
   await t('Log set with nothing typed says so rather than doing nothing', async function(){
+    // The reps box starts from the last set now; empty it to test the refusal.
+    await p.fill('#log-v-press_bench','');
     await p.click('[data-action="logset"]'); await p.waitForTimeout(300);
     assert.strictEqual(await invalid('#log-v-press_bench'),'true','the empty reps box is not marked');
     var focus=await p.evaluate(function(){ return document.activeElement&&document.activeElement.id; });
@@ -1377,6 +1380,88 @@ srv.listen(0,async function(){
     assert.strictEqual(await invalid('#sauna-temp'),'true','the bad temperature is not marked');
     var focus=await p.evaluate(function(){ return document.activeElement&&document.activeElement.id; });
     assert.strictEqual(focus,'sauna-temp','focus went to '+focus+', not the box that refused it');
+  });
+
+  console.log('\nLAST TIME, WARM-UP SETS, REST AND THE WEEK');
+  var finishNow=async function(){
+    for(var k=0;k<30;k++){ if(!(await tapIf('[data-action="nextslide"]'))) break; await p.waitForTimeout(120); }
+    assert.ok(await tapIf('[data-action="finishworkout"]'),'no Finish on the last slide'); await settle();
+  };
+
+  await t('a logged set prefills the next one, starts the rest clock, and can be marked a warm-up', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    assert.ok(await toSlide('Bench press'),'never reached the bench press');
+    await p.fill('#log-w-press_bench','20'); await p.fill('#log-v-press_bench','10');
+    await p.click('[data-action="logset"]'); await settle();
+    assert.deepStrictEqual([await p.inputValue('#log-w-press_bench'),await p.inputValue('#log-v-press_bench')],['20','10'],
+      'the boxes did not start from the set just logged');
+    var rest=await p.evaluate(function(){ var r=document.getElementById('restline'); return r?r.textContent:''; });
+    assert.ok(/^Rest 0:0\d \/ 2:30$/.test(rest),'rest line: '+rest);
+    await p.click('[data-action="togglewu"][data-i="0"]'); await settle();
+    var chip=await p.evaluate(function(){ var c=document.querySelector('[data-action="togglewu"][data-i="0"]'); return c?[c.textContent,c.getAttribute('aria-pressed')]:null; });
+    assert.deepStrictEqual(chip,['Warm-up 20kg × 10','true']);
+    assert.strictEqual(seedOf().activeSession.logs.press_bench[0].wu,true,'the warm-up mark was not saved');
+    assert.ok(seedOf().activeSession.logs.press_bench[0].t>0,'the set has no time');
+    await p.fill('#log-w-press_bench','60'); await p.fill('#log-v-press_bench','8');
+    await p.click('[data-action="logset"]'); await settle();
+    await finishNow();
+    var l=seedOf().workoutLogs; l=l[l.length-1];
+    assert.ok(l.durationMin>=1,'no session length: '+l.durationMin);
+  });
+
+  await t('next time the lift says what was done, without the warm-up, and starts from it', async function(){
+    await startWorkout('Push');
+    assert.ok(await toSlide('Bench press'),'never reached the bench press');
+    var line=await p.evaluate(function(){ var e=document.querySelector('.slide .lasttime'); return e?e.textContent:''; });
+    assert.ok(/^Last time: 60kg × 8\./.test(line),'last time line: '+line);
+    assert.ok(/Aim for 8 on every set|try \+2\.5kg/.test(line),'no progression hint: '+line);
+    assert.deepStrictEqual([await p.inputValue('#log-w-press_bench'),await p.inputValue('#log-v-press_bench')],['60','8']);
+    await leaveSession();
+  });
+
+  await t('the workout card says when it was last done, and the week counts it', async function(){
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
+    var meta=await p.evaluate(function(){
+      var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h4').textContent.trim()==='Push'; })[0];
+      return c?c.querySelector('.meta').textContent:''; });
+    assert.ok(/last done today/.test(meta),'card meta: '+meta);
+    var wk=await p.evaluate(function(){ var e=document.querySelector('.weekgoal'); return e?e.textContent:''; });
+    assert.ok(/Last 7 days: \d+ of 3 sessions/.test(wk),'weekly line: '+wk);
+    await p.click('[data-action="weektarget"][data-d="1"]'); await settle();
+    assert.strictEqual(seedOf().weekTarget,4,'the weekly target did not save');
+  });
+
+  await t('the water target can be changed from the Water card, inside 1-5L', async function(){
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    var w0=seedOf().waterTarget;
+    await p.click('[data-action="watertarget"][data-d="1"]'); await settle();
+    assert.strictEqual(seedOf().waterTarget,Math.min(20,w0+1));
+    for(var k=0;k<20;k++){ await p.click('[data-action="watertarget"][data-d="-1"]'); await p.waitForTimeout(40); }
+    await settle();
+    assert.strictEqual(seedOf().waterTarget,4,'the target went below 1L');
+  });
+
+  await t('yesterday not logged is offered once, and waved off for good', async function(){
+    var yk=await p.evaluate(function(){ var d=new Date(); d.setDate(d.getDate()-1);
+      return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); });
+    var yd=seedOf().days[yk], shown=!!(await p.$('.nudge'));
+    assert.strictEqual(shown,!(yd&&yd.touched),'nudge shown: '+shown+', yesterday: '+JSON.stringify(yd));
+    if(!shown) return;
+    await p.click('.nudge [data-action="pickday"]'); await p.waitForTimeout(300);
+    assert.ok(await p.$('.backfill-bar'),'Log yesterday did not switch to yesterday');
+    assert.strictEqual(await p.$('.nudge'),null,'the nudge stayed while logging yesterday');
+    await p.click('.backfill-bar [data-action="today"]'); await p.waitForTimeout(300);
+    await p.click('.nudge [data-action="nudgeoff"]'); await p.waitForTimeout(300);
+    assert.strictEqual(await p.$('.nudge'),null,'Nothing to log did not dismiss it');
+    await go();
+    assert.strictEqual(await p.$('.nudge'),null,'the dismissal did not survive a reload');
+  });
+
+  await t('a day with something used reads as used, in a neutral colour, never flagged', async function(){
+    var cls=await p.evaluate(function(){ return document.body.innerHTML.indexOf('flagged'); });
+    assert.strictEqual(cls,-1,'"flagged" is still in the page');
+    var note=await text();
+    assert.ok(!/resets/.test(note),'the reset copy is still there');
   });
 
   await t('no page errors', function(){

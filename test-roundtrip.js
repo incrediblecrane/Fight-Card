@@ -104,7 +104,7 @@ cases.forEach(function(pair){
 
   // Nothing in state may be silently unmapped.
   var mapped={days:1,workoutLogs:1,saunaSessions:1,recipes:1,library:1,shoppingChecked:1,
-              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,deletedRecipes:1,
+              shopExtras:1,plan:1,activeSession:1,totalXp:1,waterTarget:1,weekTarget:1,deletedRecipes:1,
               // Device-only, kept in localStorage: an old seed may still carry them.
               uiTab:1,uiSlide:1,uiProgRange:1,uiViewingSession:1};
   var unmapped=Object.keys(st).filter(function(k){ return !mapped[k]; });

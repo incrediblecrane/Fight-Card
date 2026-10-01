@@ -753,7 +753,8 @@ srv.listen(0,async function(){
     await p.fill('#log-w-'+ex,'60'); await p.fill('#log-v-'+ex,'8');
     await p.click('[data-action="logset"][data-ex="'+ex+'"]'); await p.waitForTimeout(200);
     var cleared=await p.evaluate(function(ex){ return [document.getElementById('log-w-'+ex).value, document.getElementById('log-v-'+ex).value]; },ex);
-    assert.deepStrictEqual(cleared,['',''],'the fields a logged set used were kept: '+JSON.stringify(cleared));
+    // Drawn afresh from state: the boxes now start from the set just logged.
+    assert.deepStrictEqual(cleared,['60','8'],'the boxes did not start from the set just logged: '+JSON.stringify(cleared));
     await p.fill('#log-w-'+ex,'62.5'); await p.fill('#log-v-'+ex,'6');
     await p.waitForTimeout(2500);
     var st=await p.evaluate(function(ex){ var a=document.activeElement;

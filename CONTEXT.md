@@ -16,7 +16,7 @@ documents:
 
 | path | what |
 |---|---|
-| `state/profile` | XP, the water target, and any built-in meal-prep recipes deleted (`deletedRecipes`, so they are not topped up again) |
+| `state/profile` | XP, the water target (in 0.25L taps, 1-5L), the weekly sessions target (`weekTarget`, 1-7), and any built-in meal-prep recipes deleted (`deletedRecipes`, so they are not topped up again) |
 | `state/shopping` | which shopping items are ticked, plus the hand-added ones |
 | `state/session` | the in-flight workout, or null |
 | `state/meta` | the seeded marker; its presence means the store is the truth |
@@ -64,6 +64,12 @@ timer goes at once when the page is hidden or closed.
 
 - **Day** — one dated record. `touched` distinguishes "nothing happened" from
   "not logged", which is what streaks count.
+- **Streaks** are forgiving. The clean streak counts touched days with nothing
+  used and steps over a day not logged; only a touched day with something used
+  ends it. The day streak lets one untouched day go and ends on two in a row.
+  A day with something used is shown as "used" in a neutral colour.
+- **The week target** is sessions in the rolling last seven days: days whose
+  workout is done, quick logs included, against `weekTarget`.
 - **Session** — a workout in progress: an ordered list of exercise ids, a
   target per exercise, and the sets logged so far. Dated by when it STARTED,
   so a session crossing midnight lands on the right day.
@@ -72,7 +78,16 @@ timer goes at once when the page is hidden or closed.
   machine, work/rest effort), `prep` (minutes, option, level).
   A `time` exercise marked `unit: 'min'` (the drilling block, the brisk
   walk) is logged in minutes, and its sets carry `u: 'min'` so the one-off
-  conversion of older sets typed as seconds runs once. Numbers are typed
+  conversion of older sets typed as seconds runs once.
+  Every set carries `t`, when it was logged, which drives the rest clock on a
+  slide; a session carries `t0` and a finished log `durationMin`. A lift's set
+  can be marked a **warm-up set** (`wu`) by tapping it: still weight moved,
+  but left out of PBs, set counts, "last time" and the prefill.
+- **Last time**: the newest finished log holding working sets of the
+  exercise. The slide shows it with a double-progression hint (every working
+  set at the top of the rep range: add weight; otherwise build the reps) and
+  prefills kg and reps from the previous set this session or, failing that,
+  the first working set last time. Numbers are typed
   into text boxes and read with `parseNum`, which takes a comma decimal;
   anything else is refused and the box marked.
 - **Superset** — several exercises done back to back as one round. It is a
