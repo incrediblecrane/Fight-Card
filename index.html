@@ -1171,12 +1171,14 @@ function restTick(){
   el.textContent=restText(t,g); el.className='restline'+((Date.now()-t)/1000>=g?' over':'');
 }
 function clock(sec){ sec=Math.max(0,Math.floor(sec)); return Math.floor(sec/60)+':'+pad(sec%60); }
-// Start to finish, unless it was left open: past four hours it ends at the
-// last set instead. No start and no set times is no length, not a guess.
+// Start to finish, unless it was left open: opened over two hours before the
+// first set, it starts at that set; past four hours it ends at the last set.
+// No start and no set times is no length, not a guess.
 function sessionMinutes(sess,now){
   var ts=[]; Object.keys(sess.logs||{}).forEach(function(k){ (sess.logs[k]||[]).forEach(function(s){ if(s.t) ts.push(s.t); }); });
-  var t0=sess.t0||(ts.length?Math.min.apply(null,ts):0);
+  var first=ts.length?Math.min.apply(null,ts):0, t0=sess.t0||first;
   if(!t0) return null;
+  if(first && first-t0>2*3600000) t0=first;
   var end=now;
   if(end-t0>4*3600000) end=ts.length?Math.max.apply(null,ts):t0;
   return Math.max(1,Math.round((end-t0)/60000));
@@ -1187,20 +1189,36 @@ function lastDoneAgo(wid){
   var n=Math.round((new Date(realToday()+'T12:00:00')-new Date(k+'T12:00:00'))/86400000);
   return 'last done '+(n<=0?'today':n===1?'yesterday':n+' days ago');
 }
-function weekSessions(){ return last7Keys().filter(function(k){ var e=state.days[k]; return !!(e && e.workout && e.workout.done); }).length; }
+// Sessions, not days: two logged on one day are two. A day ticked as trained
+// with no log behind it is one.
+function weekSessions(){
+  return last7Keys().reduce(function(n,k){
+    var e=state.days[k], c=state.workoutLogs.filter(function(l){ return l.date===k; }).length;
+    return n+(c||(e && e.workout && e.workout.done ? 1 : 0));
+  },0);
+}
+// Yesterday, when it is a gap in logging that is going on: not on a first
+// open, and not after a long break, where nothing recent was logged before it.
+function unloggedYesterday(){
+  var yk=lastNKeys(2)[0], ye=state.days[yk], lo=minLogDate();
+  if((ye&&ye.touched) || yk<lo) return '';
+  return Object.keys(state.days).some(function(k){ return k<yk && k>=lo && state.days[k].touched; })?yk:'';
+}
 function stepTarget(v,d,lo,hi){ return Math.max(lo,Math.min(hi,(v||lo)+(v?d:0))); }
 /* Forgiving on purpose. A day not logged is not a day something was used, so
-   the clean streak steps over it and only a day with something logged ends
-   it. The day streak lets one missed day go; two in a row end it. */
+   the clean streak steps over it and only a day with something used ends
+   it, or more than a week with nothing logged, since that is no longer a
+   current streak. The day streak lets one missed day go; two in a row end it. */
 function computeStreaks(){
   var d=new Date();
   var todayEntry=state.days[dateKey(d)];
   if(!todayEntry || !todayEntry.touched){ d.setDate(d.getDate()-1); }
-  var dayStreak=0, cleanStreak=0, missed=0, breakingDay=false, breakingClean=false;
+  var dayStreak=0, cleanStreak=0, missed=0, gap=0, breakingDay=false, breakingClean=false;
   for(var i=0;i<400;i++){
     var entry=state.days[dateKey(d)], on=!!(entry && entry.touched);
     if(!breakingDay){ if(on){ dayStreak++; missed=0; } else if(++missed>1) breakingDay=true; }
-    if(!breakingClean && on){ if(entry.alcohol===0 && entry.smoking===0 && entry.weed===0) cleanStreak++; else breakingClean=true; }
+    if(!breakingClean && !on && ++gap>7) breakingClean=true;
+    if(!breakingClean && on){ gap=0; if(entry.alcohol===0 && entry.smoking===0 && entry.weed===0) cleanStreak++; else breakingClean=true; }
     if(breakingDay && breakingClean) break;
     d.setDate(d.getDate()-1);
   }
@@ -1304,6 +1322,17 @@ function applyUndo(){
 }
 
 // Returns what actually changed, which the clamp at zero can make less than n.
+// A tap of water, and the XP it gives or takes back. The day keeps count of
+// the cups that earned XP (wx), so a target moved in between cannot leave XP
+// behind or take back more than was given. A day saved before wx existed
+// earned up to the target, as it was then.
+function waterStep(e,d,tgt){
+  var prev=e.water, got=e.wx!==undefined?e.wx:Math.min(prev,tgt), x=0;
+  e.water=Math.max(0,prev+d); if(e.water>0) e.touched=true;
+  if(d>0 && prev<tgt){ got++; x=XP_PER_WATER; }
+  if(d<0 && e.water<got){ got--; x=-XP_PER_WATER; }
+  e.wx=got; return x;
+}
 function addXp(n){ var b=state.totalXp; state.totalXp+=n; if(state.totalXp<0) state.totalXp=0; return state.totalXp-b; }
 function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(persist,1000); }
 // A page being hidden or closed may never run its timer, so a save still
@@ -2516,8 +2545,8 @@ function bodyContent(){
 
   // Yesterday not logged is offered once, not nagged: it goes when the day is
   // filled in or waved off, and never while another day is being logged.
-  var yk=lastNKeys(2)[0], ye=state.days[yk];
-  var nudge=(!backfilling() && !(ye&&ye.touched) && yk>=minLogDate() && nudgeOff!==yk)
+  var yk=unloggedYesterday();
+  var nudge=(yk && !backfilling() && nudgeOff!==yk)
     ? ('<div class="nudge"><span>Yesterday isn&#39;t logged. Fill it in?</span>'+
        '<span class="btns"><button class="go" data-action="pickday" data-k="'+yk+'">Log yesterday</button>'+
        '<button data-action="nudgeoff" data-k="'+yk+'">Nothing to log</button></span></div>')
@@ -2863,7 +2892,9 @@ function bodyContent(){
       detail='<div class="exdetail">'+
         lineChart(pts,{title:pbLabel+' by session',sub:dates.length+' session'+(dates.length===1?'':'s'),
                        empty:(!pts.length&&hist.length)
-                         ? 'These were sets at a weight rather than minutes, so there is no time trend. They are listed below.'
+                         ? (hist.every(function(h){ return h.wu; })
+                            ? 'Every set so far was a warm-up, with no working set to chart. They are listed below.'
+                            : 'These were sets at a weight rather than minutes, so there is no time trend. They are listed below.')
                          : 'Logged once so far. Log it again to see the trend.'})+
         '<div class="pbrow">'+
           (pb?('<span>Personal best <b>'+esc(pb.lbl)+'</b></span>'):'')+
@@ -3414,10 +3445,7 @@ function onClick(e){
   }
   else if(action==='removeex'){ removeExFromSession(t.getAttribute('data-id')); }
   else if(action==='water'){
-    var d=parseInt(t.getAttribute('data-d'),10); var prev=today.water;
-    today.water=Math.max(0,today.water+d); if(today.water>0) today.touched=true;
-    if(d>0 && prev<state.waterTarget) addXp(XP_PER_WATER);
-    if(d<0 && prev<=state.waterTarget && prev>0) addXp(-XP_PER_WATER);
+    var x=waterStep(today,parseInt(t.getAttribute('data-d'),10),state.waterTarget); if(x) addXp(x);
   }
   else if(action==='watertarget'){ state.waterTarget=stepTarget(state.waterTarget,parseInt(t.getAttribute('data-d'),10),4,20); }
   else if(action==='weektarget'){ state.weekTarget=stepTarget(state.weekTarget,parseInt(t.getAttribute('data-d'),10),1,7); }

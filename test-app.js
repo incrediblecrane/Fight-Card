@@ -23,13 +23,15 @@ var doc=(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
   // premise held by luck; built against live state, which already has warm-up
   // minutes in it, the chart had something to plot and the empty case was
   // never reached. The check has to construct its own world.
-  (st.workoutLogs||[]).forEach(function(l){ if(l.logs) delete l.logs.warmup; });
+  (st.workoutLogs||[]).forEach(function(l){ if(l.logs){ delete l.logs.warmup; delete l.logs.press_ohp; } });
   st.workoutLogs=(st.workoutLogs||[]).concat([{
     id:'wl-lightsets', workoutId:'w6', title:'Push', tag:'Strength', date:'2026-08-28',
     logs:{ warmup:[
       {v:10, w:20, opt:'Light sets of the first lift', lvl:'', lvlKind:'load'},
       {v:5,  w:40, opt:'Light sets of the first lift', lvl:'', lvlKind:'load'}
-    ]}
+    ],
+    // A lift whose every set was marked warm-up: no working set to chart.
+    press_ohp:[{v:10, w:20, wu:true},{v:6, w:30, wu:true}]}
   }]);
   doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
 })();
@@ -147,6 +149,32 @@ server.listen(0, async function(){
       'no explanation of why there is no time trend: '+detail.slice(0,200));
     ok('it opens, explains why there is no time trend, and lists the sets');
   }catch(e){ bad('light-sets-only warm-up',e); }
+  try{
+    var before2=errs.length;
+    var opened2=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow .top h4'));
+      for(var i=0;i<rows.length;i++){
+        if(rows[i].textContent.trim()==='Overhead press'){ rows[i].closest('.top').click(); return true; }
+      }
+      return false;
+    });
+    assert.ok(opened2,'the overhead press is not in the exercise history');
+    await p.waitForTimeout(700);
+    assert.strictEqual(errs.length,before2,'opening it threw: '+errs.slice(before2).join(' | '));
+    var detail2=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow'));
+      for(var i=0;i<rows.length;i++){
+        var h=rows[i].querySelector('.top h4');
+        if(h && h.textContent.trim()==='Overhead press') return rows[i].innerText;
+      }
+      return '';
+    });
+    assert.ok(/30kg/.test(detail2),'the warm-up sets are not listed: '+detail2.slice(0,200));
+    assert.ok(!/rather than minutes/i.test(detail2),'it says these were not minutes: '+detail2.slice(0,200));
+    assert.ok(/warm-up/i.test(detail2) && /no working set|only warm-up|all warm-up/i.test(detail2),
+      'no explanation that every set was a warm-up: '+detail2.slice(0,200));
+    ok('a lift logged only as warm-ups says so, not that it was not minutes');
+  }catch(e){ bad('warm-ups-only lift',e); }
 
   console.log('\nEXERCISE HISTORY');
   var pctx=await b.newContext({viewport:{width:420,height:900}}), pp=await pctx.newPage();

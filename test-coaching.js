@@ -33,13 +33,15 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 var box={};
 var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','perImplement','isSuperset','supersetMembers',
   'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','lastTimeLine','prefillFor',
-  'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget'];
+  'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','minLogDate','unloggedYesterday'];
 var loaded=null;
 try{
   new Function(
     'var EX='+literal('var EX')+';\n'+
     'var WORKOUTS='+literal('var WORKOUTS')+';\n'+
     'var PER_IMPLEMENT='+literal('var PER_IMPLEMENT')+';\n'+
+    'var BACKFILL_DAYS='+h.match(/BACKFILL_DAYS=(\d+)/)[1]+';\n'+
+    'var XP_PER_WATER='+h.match(/XP_PER_WATER=(\d+)/)[1]+';\n'+
     'var state={days:{},workoutLogs:[],activeSession:null};\n'+
     NAMES.map(grab).join('\n')+'\n'+
     'this.state=function(s){ state=s; };\n'+
@@ -82,6 +84,18 @@ if(loaded===true){
     var days={}; days[keyAgo(1)]=day(true); days[keyAgo(2)]=day(true);
     box.state({days:days,workoutLogs:[]});
     assert.strictEqual(box.computeStreaks().dayStreak,2);
+  });
+
+  t('logged days months ago are not a current clean streak', function(){
+    var days={}; days[keyAgo(90)]=day(true); days[keyAgo(91)]=day(true); days[keyAgo(92)]=day(true);
+    box.state({days:days,workoutLogs:[]});
+    assert.strictEqual(box.computeStreaks().cleanStreak,0);
+  });
+
+  t('a gap of more than a week not logged ends the clean streak', function(){
+    var days={}; days[keyAgo(0)]=day(true); days[keyAgo(1)]=day(true); days[keyAgo(10)]=day(true); days[keyAgo(11)]=day(true);
+    box.state({days:days,workoutLogs:[]});
+    assert.strictEqual(box.computeStreaks().cleanStreak,2);
   });
 
   console.log('\nLAST TIME, PREFILL AND DOUBLE PROGRESSION');
@@ -185,6 +199,13 @@ if(loaded===true){
     assert.strictEqual(box.sessionMinutes(s,t0+9*3600000),40);
   });
 
+  t('a session opened hours before its first set is timed from that set', function(){
+    var t0=Date.UTC(2026,8,1,8,0,0), f=t0+9*3600000;
+    var s={t0:t0,logs:{press_bench:[{v:8,w:60,t:f},{v:8,w:60,t:f+30*60000}]}};
+    assert.strictEqual(box.sessionMinutes(s,f+45*60000),45);
+    assert.strictEqual(box.sessionMinutes(s,f+20*3600000),30);
+  });
+
   t('a session from before timestamps has no length rather than a wrong one', function(){
     assert.strictEqual(box.sessionMinutes({logs:{press_bench:[{v:8,w:60}]}},Date.now()),null);
   });
@@ -209,6 +230,63 @@ if(loaded===true){
     days[keyAgo(8)]=day(true); days[keyAgo(8)].workout={done:true,type:'Strength'};
     box.state({days:days,workoutLogs:[]});
     assert.strictEqual(box.weekSessions(),2);
+  });
+
+  t('two sessions on one day count as two', function(){
+    var days={}; days[keyAgo(0)]=day(true); days[keyAgo(0)].workout={done:true,type:'Strength'};
+    days[keyAgo(2)]=day(true); days[keyAgo(2)].workout={done:true,type:'Cardio'};
+    box.state({days:days,workoutLogs:[{id:'p',workoutId:'w6',date:keyAgo(0),logs:{}},{id:'q',workoutId:'w7',date:keyAgo(0),logs:{}},
+      {id:'r',workoutId:'w7',date:keyAgo(9),logs:{}}]});
+    assert.strictEqual(box.weekSessions(),3);
+  });
+
+  console.log('\nYESTERDAY NOT LOGGED');
+
+  t('a gap after recent logging is offered', function(){
+    var days={}; days[keyAgo(3)]=day(true);
+    box.state({days:days,workoutLogs:[]});
+    assert.strictEqual(box.unloggedYesterday(),keyAgo(1));
+  });
+
+  t('a first open, or a return after a long break, is not asked about yesterday', function(){
+    box.state({days:{},workoutLogs:[]});
+    assert.strictEqual(box.unloggedYesterday(),'');
+    var days={}; days[keyAgo(0)]=day(true); days[keyAgo(40)]=day(true); days[keyAgo(1)]=day(false);
+    box.state({days:days,workoutLogs:[]});
+    assert.strictEqual(box.unloggedYesterday(),'');
+  });
+
+  t('yesterday logged is not offered', function(){
+    var days={}; days[keyAgo(1)]=day(true); days[keyAgo(2)]=day(true);
+    box.state({days:days,workoutLogs:[]});
+    assert.strictEqual(box.unloggedYesterday(),'');
+  });
+
+  console.log('\nWATER XP FOLLOWS WHAT WAS EARNED');
+
+  t('lowering the target before removing water takes back all the XP it gave', function(){
+    var e=day(false), xp=0, k;
+    for(k=0;k<20;k++) xp+=box.waterStep(e,1,20);
+    assert.strictEqual(xp,40);
+    for(k=0;k<20;k++) xp+=box.waterStep(e,-1,4);
+    assert.strictEqual(e.water,0); assert.strictEqual(xp,0);
+  });
+
+  t('raising the target before removing water takes back no more than it gave', function(){
+    var e=day(false), xp=0, k;
+    for(k=0;k<10;k++) xp+=box.waterStep(e,1,8);
+    assert.strictEqual(xp,16);
+    for(k=0;k<10;k++) xp+=box.waterStep(e,-1,20);
+    assert.strictEqual(xp,0);
+  });
+
+  t('a day saved before the count was kept still gives and takes as before', function(){
+    var e=day(true); e.water=10;
+    assert.strictEqual(box.waterStep(e,-1,8),0);
+    assert.strictEqual(box.waterStep(e,-1,8),0);
+    assert.strictEqual(box.waterStep(e,-1,8),-2);
+    assert.strictEqual(box.waterStep(e,1,8),2);
+    assert.strictEqual(box.waterStep(e,1,8),0);
   });
 
   t('targets step inside their limits', function(){

@@ -1444,8 +1444,12 @@ srv.listen(0,async function(){
   await t('yesterday not logged is offered once, and waved off for good', async function(){
     var yk=await p.evaluate(function(){ var d=new Date(); d.setDate(d.getDate()-1);
       return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); });
-    var yd=seedOf().days[yk], shown=!!(await p.$('.nudge'));
-    assert.strictEqual(shown,!(yd&&yd.touched),'nudge shown: '+shown+', yesterday: '+JSON.stringify(yd));
+    var lo=await p.evaluate(function(){ var d=new Date(); d.setDate(d.getDate()-13);
+      return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); });
+    var days=seedOf().days, yd=days[yk], shown=!!(await p.$('.nudge'));
+    // Only a gap in logging that is going on: something logged before it, recently.
+    var before=Object.keys(days).some(function(k){ return k<yk && k>=lo && days[k].touched; });
+    assert.strictEqual(shown,!(yd&&yd.touched)&&before,'nudge shown: '+shown+', yesterday: '+JSON.stringify(yd)+', logged before it: '+before);
     if(!shown) return;
     await p.click('.nudge [data-action="pickday"]'); await p.waitForTimeout(300);
     assert.ok(await p.$('.backfill-bar'),'Log yesterday did not switch to yesterday');
