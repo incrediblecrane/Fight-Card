@@ -518,7 +518,7 @@ var EXERCISES = [
   frames:[
     {hip:[46,156],torso:268,ankN:[86,150],ankF:[78,158], handN:[14,120],handF:[24,152], kneeSign:-1, elbowSign:-1},
     {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:-1},
-    {hip:[56,138],torso:344,ankN:[82,163],ankF:[32,159], handN:[52,70], handF:[36,136], kneeSign:-1, elbowSign:1},
+    {hip:[56,138],torso:344,ankN:[82,163],ankF:[32,159], handN:[50,67], handF:[38,142], kneeSign:-1, elbowSign:-1},
     {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:-1}
   ]},
 
@@ -957,7 +957,7 @@ var EXERCISES = [
   frames:[
     {hip:[55,107],torso:4, ankN:[60,163],ankF:[50,163], handN:[59,111],handF:[53,111], kneeSign:-1, elbowSign:-1},
     {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
-    {hip:[46,136],torso:92,ankN:[4,161],ankF:[0,160],  handN:[80,163],handF:[72,163], kneeSign:1,  elbowSign:-1},
+    {hip:[46,136],torso:92,ankN:[-5,161],ankF:[-10,160],handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
     {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
     {hip:[55,112],torso:8, ankN:[60,163],ankF:[50,163], handN:[78,100],handF:[72,102], kneeSign:-1, elbowSign:-1},
     {hip:[55,96], torso:2, ankN:[60,152],ankF:[50,151], handN:[58,26], handF:[52,26],  kneeSign:-1, elbowSign:-1},
@@ -1094,11 +1094,14 @@ var FRONTS = {
   // Bear crawl seen from ABOVE (frontPlan): opposite hand and foot travel
   // together, which is the whole coordination and is invisible from the side
   // because the near limbs hide the far ones.
+  // The arms point at the camera, so they project as short stubs with the
+  // elbow given. Left to the solver, a hand passing the shoulder on screen
+  // swung the folded elbow from below it to above it in one frame.
   bearcrawl:[
-    {hipY:134,footL:[58,166],footR:[82,166],handL:[54,106],handR:[86,106]},
-    {hipY:134,footL:[58,152],footR:[82,166],handL:[54,106],handR:[86,94]},
-    {hipY:134,footL:[58,166],footR:[82,166],handL:[54,106],handR:[86,106]},
-    {hipY:134,footL:[58,166],footR:[82,152],handL:[54,94], handR:[86,106]}],
+    {hipY:134,footL:[58,166],footR:[82,166],handL:[54,106],handR:[86,106],elbL:[52,103],elbR:[88,103]},
+    {hipY:134,footL:[58,152],footR:[82,166],handL:[54,106],handR:[86,94], elbL:[52,103],elbR:[88,97]},
+    {hipY:134,footL:[58,166],footR:[82,166],handL:[54,106],handR:[86,106],elbL:[52,103],elbR:[88,103]},
+    {hipY:134,footL:[58,166],footR:[82,152],handL:[54,94], handR:[86,106],elbL:[52,97], elbR:[88,103]}],
 
   // Woodchopper from the front. The hands travel a long diagonal from high on
   // one side to the opposite hip, and the whole point is that the torso turns
@@ -1373,13 +1376,16 @@ var FRONTS = {
   // Pistol squat from the front. The free leg points AT the camera, so it
   // projects short and sits high on screen; the standing leg does all the
   // visible travelling. Which leg is working is the whole point of the view.
-  // Elbows and most knees are left to the solver: a hand-placed joint is taken
-  // verbatim, so getting one wrong silently draws a limb the wrong length.
+  // Elbows and the standing knee are left to the solver: a hand-placed joint is
+  // taken verbatim, so getting one wrong silently draws a limb the wrong length.
+  // The free knee is given, on the hip-to-foot line, because that leg is end-on:
+  // solved, it folded out sideways and flipped from the floor to the chest as
+  // the foot rose past the hip.
   pistol:[
-    {hipY:110,footL:[60,163],footR:[78,146],handL:[60,102],handR:[82,102]},
-    {hipY:128,footL:[60,163],footR:[80,138],handL:[60,120],handR:[82,120]},
-    {hipY:143,footL:[60,163],footR:[82,132],handL:[60,134],handR:[82,134]},
-    {hipY:128,footL:[60,163],footR:[80,138],handL:[60,120],handR:[82,120]}],
+    {hipY:110,footL:[60,163],footR:[78,146],handL:[60,102],handR:[82,102],kneeR:[82,128]},
+    {hipY:128,footL:[60,163],footR:[80,138],handL:[60,120],handR:[82,120],kneeR:[83,133]},
+    {hipY:143,footL:[60,163],footR:[82,132],handL:[60,134],handR:[82,134],kneeR:[83,137]},
+    {hipY:128,footL:[60,163],footR:[80,138],handL:[60,120],handR:[82,120],kneeR:[83,133]}],
 
   // Walking lunge from the front. Which leg is leading shows in how low its
   // foot sits on screen, never by the legs crossing over: the trailing leg is

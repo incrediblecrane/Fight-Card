@@ -40,6 +40,37 @@ EX.forEach(function(ex){
     ck(ex.id,'bar path stays vertical through the whole rep', spread<14,'horizontal drift '+r(spread));
   }
 });
+// No joint may jump between two moments of the rep that sit next to each
+// other. Every check above samples 120 points, and a joint can teleport
+// between two of them while each pose is valid on its own: an elbow taking the
+// mirror IK branch when a hand passes the shoulder's x, or a knee bend sign
+// held from one keyframe and swapped at the next. Sampled fine enough that
+// honest motion moves well under a unit per step, in both views, for this rig
+// and for the copy of it the app ships.
+var FINE=2000, JUMP=3;
+var app=(function(){
+  var h=require('fs').readFileSync(require('path').join(__dirname,'..','..','index.html'),'utf8');
+  var src=h.slice(h.indexOf('var RL='), h.indexOf('function rSeg('))+h.slice(h.indexOf('function rSolveFront('), h.indexOf('function rEquipFront('));
+  return new Function(src+';return {RIGFRAMES:RIGFRAMES,solve:rSolve,poseAt:rPoseAt,solveFront:rSolveFront,frontAt:rFrontAt};')();
+})();
+function jumps(tag,at){
+  var prev=null, worst=0, where='';
+  for(var i=0;i<=FINE;i++){
+    var s=at(i/FINE);
+    if(prev) for(var k in s){ var a=s[k], b=prev[k];
+      if(a && typeof a.x==='number'){ var dd=d(a,b); if(dd>worst){ worst=dd; where=k+' at u='+(i/FINE).toFixed(4); } } }
+    prev=s;
+  }
+  ck(tag,'no joint jumps between adjacent moments', worst<=JUMP,'worst '+r(worst)+' '+where);
+}
+EX.forEach(function(ex){
+  var ax=app.RIGFRAMES[ex.id];
+  jumps(ex.id+' side',function(u){ return rig.solve(rig.poseAt(ex,u)); });
+  jumps(ex.id+' side (app)',function(u){ return app.solve(app.poseAt(ax,u)); });
+  if(!ex.front) return;
+  jumps(ex.id+' front',function(u){ return rig.solveFront(rig.frontAt(ex,u)); });
+  jumps(ex.id+' front (app)',function(u){ return app.solveFront(app.frontAt(ax,u)); });
+});
 console.log('=== CONTINUOUS MOTION CHECK ('+SAMPLES+' samples/exercise) ===');
 if(!fails.length) console.log('PASS: motion is valid at every point, not just the keyframes.');
 else { console.log('FAILURES ('+fails.length+'):');

@@ -151,6 +151,12 @@ timer goes at once when the page is hidden or closed.
   the head, a lateral raise drew a curl, and the cable flys went from a nearly
   straight arm to a badly folded one inside a rep instead of holding the one
   soft elbow bend they ask for.
+- **Bend sign**: which of the two mirror IK solutions a knee or elbow takes.
+  It is decided at keyframes only (`kneeSign`/`elbowSign` on a side frame; on a
+  front frame the solver picks elbows low and knees out, or `kneeSignL/R`,
+  `elbSignL/R` set it) and blends between them, so a joint never jumps to its
+  mirror mid-rep. A sign that changes between two side keyframes swings the
+  limb through straight, which the stretch check flags.
 - **Plan view** (`frontPlan`) — looking down at someone on the floor. No
   gravity and no ground line; labelled "Above".
 - **Axis** — which way a dumbbell's handle runs: `lateral` (across the body),

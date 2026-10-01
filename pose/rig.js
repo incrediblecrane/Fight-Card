@@ -88,7 +88,13 @@ function handFromAngles(f,arm,far){
 function lerpFrame(A,B,t){
   var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
-          kneeSign:A.kneeSign, elbowSign:A.elbowSign,
+          // The bend sign blends too. Held from A for the whole segment, a sign
+          // that changes at B drew B's pose bent A's way and then snapped the
+          // knee to its mirror the instant the next segment began. ik() scales
+          // the bend by the sign, so in between the joint swings through the
+          // limb line instead of jumping across it.
+          kneeSign:lerp(A.kneeSign===undefined?-1:A.kneeSign,B.kneeSign===undefined?-1:B.kneeSign,t),
+          elbowSign:lerp(A.elbowSign===undefined?1:A.elbowSign,B.elbowSign===undefined?1:B.elbowSign,t),
           shrug:lerp(A.shrug||0,B.shrug||0,t),
           armScaleN:lerp(A.armScaleN===undefined?1:A.armScaleN,B.armScaleN===undefined?1:B.armScaleN,t),
           armScaleF:lerp(A.armScaleF===undefined?1:A.armScaleF,B.armScaleF===undefined?1:B.armScaleF,t),
@@ -147,31 +153,51 @@ function solveFront(f){
   var handL=P(f.handL[0],f.handL[1]), handR=P(f.handR[0],f.handR[1]);
   // Pick the anatomically correct branch rather than a fixed sign:
   // knees track outward away from the midline, elbows always droop below the
-  // shoulder-to-hand line (a human elbow never bends upward).
-  function both(a,b,l1,l2){ return [ik(a,b,l1,l2,1), ik(a,b,l1,l2,-1)]; }
-  function lower(p){ return p[0].y>=p[1].y?p[0]:p[1]; }
+  // shoulder-to-hand line (a human elbow never bends upward). That rule is
+  // applied at a keyframe only. Applied to every in-between pose it flipped the
+  // elbow to the mirror branch whenever a hand crossed the shoulder's x, a
+  // one-frame pop, so frontAt hands each pose the sign its keyframes chose
+  // (kneeSignL/R, elbSignL/R, which a keyframe may also set by hand).
+  function side(a,b,l1,l2,s,better){
+    if(s===undefined) s=better(ik(a,b,l1,l2,1),ik(a,b,l1,l2,-1))?1:-1;
+    return {s:s, j:ik(a,b,l1,l2,s)};
+  }
+  // A hand (near enough) straight above or below the shoulder leaves neither
+  // branch clearly lower; there the elbow flares out, rather than going
+  // whichever way rounding says.
+  function outL(p,m){ return p.x<=m.x; }
+  function outR(p,m){ return p.x>=m.x; }
+  function tie(p,m){ return Math.abs(p.y-m.y)<=Math.abs(p.x-m.x)*0.1; }
+  function lowL(p,m){ return tie(p,m)?outL(p,m):p.y>m.y; }
+  function lowR(p,m){ return tie(p,m)?outR(p,m):p.y>m.y; }
   // Explicit joints win over IK. A limb that bends front-to-back (every hinge,
   // every squat) has no lateral bend to solve for: its knee or elbow sits on
   // the hip-to-foot line at the height the side view already gives it. Solving
   // it as a frontal-plane bend instead threw the knees and elbows out sideways,
   // which is why the row read as chicken-winged.
   var aL=f.armScaleL===undefined?1:f.armScaleL, aR=f.armScaleR===undefined?1:f.armScaleR;
-  var kneeL = f.kneeL ? P(f.kneeL[0],f.kneeL[1])
-    : (function(k){ return k[0].x<=k[1].x?k[0]:k[1]; })(both(hipL,footL,L.THIGH,L.SHIN));
-  var kneeR = f.kneeR ? P(f.kneeR[0],f.kneeR[1])
-    : (function(k){ return k[0].x>=k[1].x?k[0]:k[1]; })(both(hipR,footR,L.THIGH,L.SHIN));
+  var kL=side(hipL,footL,L.THIGH,L.SHIN,f.kneeSignL,outL), kR=side(hipR,footR,L.THIGH,L.SHIN,f.kneeSignR,outR);
   // An arm pointing at the camera projects short, so its segments scale down.
-  var elbL = f.elbL ? P(f.elbL[0],f.elbL[1]) : lower(both(shL,handL,L.UPPER*aL,L.FORE*aL));
-  var elbR = f.elbR ? P(f.elbR[0],f.elbR[1]) : lower(both(shR,handR,L.UPPER*aR,L.FORE*aR));
+  var eL=side(shL,handL,L.UPPER*aL,L.FORE*aL,f.elbSignL,lowL), eR=side(shR,handR,L.UPPER*aR,L.FORE*aR,f.elbSignR,lowR);
+  var kneeL = f.kneeL ? P(f.kneeL[0],f.kneeL[1]) : kL.j;
+  var kneeR = f.kneeR ? P(f.kneeR[0],f.kneeR[1]) : kR.j;
+  var elbL = f.elbL ? P(f.elbL[0],f.elbL[1]) : eL.j;
+  var elbR = f.elbR ? P(f.elbR[0],f.elbR[1]) : eR.j;
   return {hipC:hipC,shC:shC,head:head,hipL:hipL,hipR:hipR,shL:shL,shR:shR,
     footL:footL,footR:footR,handL:handL,handR:handR,
     kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,armScaleL:aL,armScaleR:aR,
+    sign:{kneeL:kL.s,kneeR:kR.s,elbL:eL.s,elbR:eR.s},
     fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
 }
-// Explicit joints only carry through when BOTH keyframes have them; a frame
-// that mixes the two would jump between a solved and a given joint.
-function both2(a,b,t){ return (a&&b)?lerpPt(a,b,t):undefined; }
+// An explicit joint in only one of the two keyframes is blended with the joint
+// the other keyframe solves to. Dropping it instead (it used to carry through
+// only when both had one) jumped from the given joint to a solved one at the
+// keyframe boundary.
 function lerpFront(A,B,t){
+  var sA=solveFront(A), sB=solveFront(B);
+  function jt(k){ if(!A[k]&&!B[k]) return undefined;
+    return lerpPt(A[k]||[sA[k].x,sA[k].y], B[k]||[sB[k].x,sB[k].y], t); }
+  function sg(k){ return lerp(sA.sign[k],sB.sign[k],t); }
   return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
     shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
@@ -183,8 +209,8 @@ function lerpFront(A,B,t){
     armScaleR:lerp(A.armScaleR===undefined?1:A.armScaleR,B.armScaleR===undefined?1:B.armScaleR,t),
     footL:lerpPt(A.footL,B.footL,t), footR:lerpPt(A.footR,B.footR,t),
     handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t),
-    kneeL:both2(A.kneeL,B.kneeL,t), kneeR:both2(A.kneeR,B.kneeR,t),
-    elbL:both2(A.elbL,B.elbL,t),    elbR:both2(A.elbR,B.elbR,t)};
+    kneeL:jt('kneeL'), kneeR:jt('kneeR'), elbL:jt('elbL'), elbR:jt('elbR'),
+    kneeSignL:sg('kneeL'), kneeSignR:sg('kneeR'), elbSignL:sg('elbL'), elbSignR:sg('elbR')};
 }
 function frontAt(ex,u){
   var fr=ex.front; if(!fr) return null;
