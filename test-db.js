@@ -895,6 +895,17 @@ srv.listen(0,async function(){
     assert.deepStrictEqual(await exported(),a,'putting the backup back did not restore the data');
   });
 
+  // A file in the seed's shape, recipes carrying inPlan/day, goes through the
+  // same conversion a store in that shape gets on load, not on the next load.
+  await t('an import in the old recipe shape is converted as it goes in', async function(){
+    await go();
+    await importing(JSON.stringify({schema:1, recipes:[{id:'oldr',title:'Old one',ingredients:['Eggs (2)'],inPlan:true,day:'Mon'}]}));
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    var r=store['recipes/oldr'];
+    assert.ok(r && !('inPlan' in r) && !('day' in r),'the recipe went in unconverted: '+JSON.stringify(r));
+    assert.ok(Object.keys(store).some(function(k){ return k.indexOf('plan/')===0 && store[k].recipeId==='oldr'; }),'its place in the plan was dropped');
+  });
+
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
   await t('a view that cannot run db falls back to publish-to-save', async function(){
     await p.addInitScript(function(){ window.__DB_OFF=true; });

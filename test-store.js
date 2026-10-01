@@ -20,7 +20,7 @@ function grabVar(decl){
   return m[0];
 }
 var src=[grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
-  grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'),
+  grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
   grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('dbApply'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('mergeImport')].join('\n');
 var box={};
@@ -84,6 +84,30 @@ t('malformed input is refused with a message', function(){
   });
 });
 
+// One field of the wrong kind gets past a check on ids and keys and breaks
+// render, which is where the way back is drawn, on every load after.
+t('a field of the wrong kind is refused, and a real export still passes', function(){
+  var good=JSON.parse(box.exportText(rich())), day=Object.keys(good.days)[0];
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  assert.ok(box.readImport(JSON.stringify(good)).ok,'a real export was refused');
+  [[w(function(o){o.library[0].title=5;}),/title/],
+   [w(function(o){o.workoutLogs[0].logs={press_bench:5};}),/logs/],
+   [w(function(o){o.workoutLogs[0].logs={press_bench:[{v:'<b>'}]};}),/logs/],
+   [w(function(o){o.recipes[0].ingredients=[5];}),/ingredients/],
+   [w(function(o){o.days[day].water='lots';}),/water/],
+   [w(function(o){o.days[day].workout={type:3};}),/workout/],
+   [w(function(o){o.plan[0].portions='x';}),/portions/],
+   [w(function(o){o.saunaSessions[0].mins='<img>';}),/mins/],
+   [w(function(o){o.activeSession.logs={press_bench:'x'};}),/activeSession/],
+   [w(function(o){o.activeSession.exIds=[1];}),/activeSession/],
+   [w(function(o){delete o.activeSession.targets;}),/activeSession/]
+  ].forEach(function(c){
+    var r=box.readImport(c[0]);
+    assert.strictEqual(r.ok,false,'accepted: '+c[1]);
+    assert.ok(c[1].test(r.msg),'message "'+r.msg+'" for '+c[1]);
+  });
+});
+
 t('import only reads data: a script in it stays text', function(){
   var o=JSON.parse(box.exportText(rich()));
   o.library[0].title='<img src=x onerror=alert(1)>'; o.toString='function(){throw 1}'; o.__proto__x=1;
@@ -103,6 +127,20 @@ t('merge by id replaces matches, adds the rest and keeps this view\'s profile', 
   assert.deepStrictEqual(m.days['2026-09-20'],{water:3});
   assert.strictEqual(m.totalXp,cur.totalXp); assert.strictEqual(m.weekTarget,cur.weekTarget);
   assert.deepStrictEqual(m.deletedRecipes.sort(),['p3','zz']);
+});
+
+// A backup that could not be written to localStorage still holds the newest
+// copy; the older one left there would put back data from two imports ago.
+t('put back gives the latest backup even when only the first one reached localStorage', function(){
+  var ls={n:0, v:{}, getItem:function(k){ return this.v[k]||null; },
+    setItem:function(k,v){ if(this.n++) throw new Error('quota'); this.v[k]=v; },
+    removeItem:function(k){ delete this.v[k]; }};
+  var b={};
+  new Function('localStorage',grabVar('dataPane')+grab('readBackup')+grab('writeBackup')+
+    'this.read=readBackup;this.write=writeBackup;').call(b,ls);
+  b.write('first'); b.write('second');
+  assert.strictEqual(b.read(),'second');
+  assert.deepStrictEqual(ls.v,{},'the older backup was left for the next load to offer');
 });
 
 t('MemoryStore keeps the db contract: copies out, update needs the document', async function(){

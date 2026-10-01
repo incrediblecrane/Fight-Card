@@ -1650,6 +1650,19 @@ var EXPORT_SCHEMA=1;
 var EXPORT_KEYS=['waterTarget','weekTarget','totalXp','deletedRecipes','days','workoutLogs','saunaSessions',
   'library','recipes','plan','shoppingChecked','shopExtras','activeSession'];
 var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
+// What each field holds when it is there: 's' text, 'n' a number, 'b' true or
+// false, 'o' any object, [t] a list of t, {f:t} an object with those fields
+// and {'*':t} one whose every value is a t. Null or missing passes; the
+// fields that must be there are checked on their own.
+var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s'}]};
+var IMPORT_FIELDS={
+  days:{water:'n',alcohol:'n',smoking:'n',weed:'n',rest:'b',touched:'b',workout:{done:'b',type:'s'}},
+  workoutLogs:{workoutId:'s',title:'s',tag:'s',logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['s'],rounds:'n'}]},
+  saunaSessions:{mins:'n',temp:'n',position:'s',stints:[{mins:'n',position:'s'}]},
+  library:{title:'s',tag:'s',notes:'s'},
+  recipes:{title:'s',tag:'s',instructions:'s',ingredients:['s'],macros:['n'],base:'n',portions:'n',inPlan:'b',day:'s'},
+  plan:{slot:'s',portions:'n'},
+  activeSession:{workoutId:'s',startedAt:'s',t0:'n',exIds:['s'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,supersets:'o'}};
 function exportData(st){
   var n=dbApply(dbDocs(st)), out={schema:EXPORT_SCHEMA, exportedAt:new Date().toISOString()};
   EXPORT_KEYS.forEach(function(k){ out[k]=n[k]; });
@@ -1672,6 +1685,20 @@ function readImport(text){
   if(o.days!==undefined && !obj(o.days)) return no('"days" should be an object keyed by date.');
   var bad=Object.keys(o.days||{}).filter(function(k){ return !DAY.test(k) || !obj(o.days[k]); })[0];
   if(bad!==undefined) return no('The day "'+bad.slice(0,20)+'" is not a date with a record.');
+  // A field the app shows or counts has to hold what the app put there. A
+  // number where text goes stops esc(), one where a list goes stops forEach,
+  // and either breaks render, with the way back drawn inside that render.
+  function fits(v,t){
+    if(v===undefined||v===null) return true;
+    if(t==='n') return typeof v==='number' && isFinite(v);
+    if(t==='o') return obj(v);
+    if(typeof t==='string') return typeof v===(t==='s'?'string':'boolean');
+    if(Array.isArray(t)) return Array.isArray(v) && v.every(function(x){ return x!==null && fits(x,t[0]); });
+    return obj(v) && Object.keys(t['*']?v:t).every(function(f){ return fits(v[f],t['*']||t[f]); });
+  }
+  function odd(x,t){ return Object.keys(t).filter(function(f){ return !fits(x[f],t[f]); })[0]; }
+  bad=Object.keys(o.days||{}).filter(function(k){ return odd(o.days[k],IMPORT_FIELDS.days); })[0];
+  if(bad!==undefined) return no('The day "'+bad+'" has "'+odd(o.days[bad],IMPORT_FIELDS.days)+'" of the wrong kind.');
   for(var i=0;i<EXPORT_LISTS.length;i++){
     var k=EXPORT_LISTS[i], list=o[k], seen={};
     if(list===undefined) continue;
@@ -1686,6 +1713,7 @@ function readImport(text){
       if(k==='workoutLogs' && !obj(x.logs)) return no('Session "'+x.id+'" has no sets.');
       if(k==='recipes' && !(typeof x.title==='string' && Array.isArray(x.ingredients))) return no('Recipe "'+x.id+'" needs a title and ingredients.');
       if(k==='plan' && typeof x.recipeId!=='string') return no('Planned meal "'+x.id+'" names no recipe.');
+      if(odd(x,IMPORT_FIELDS[k])) return no('Entry "'+x.id+'" in "'+k+'" has "'+odd(x,IMPORT_FIELDS[k])+'" of the wrong kind.');
     }
   }
   function strings(v){ return v===undefined || (Array.isArray(v) && v.every(function(s){ return typeof s==='string'; })); }
@@ -1698,7 +1726,7 @@ function readImport(text){
   if(!whole(o.weekTarget,1,7)) return no('"weekTarget" should be 1 to 7 sessions.');
   if(!whole(o.totalXp,0,1e9)) return no('"totalXp" should be a whole number.');
   var s=o.activeSession;
-  if(s!==undefined && s!==null && !(obj(s) && Array.isArray(s.exIds) && obj(s.logs||{}))) return no('"activeSession" is not a session.');
+  if(s!==undefined && s!==null && !(obj(s) && Array.isArray(s.exIds) && obj(s.targets) && !odd(s,IMPORT_FIELDS.activeSession))) return no('"activeSession" is not a session.');
   var st={};
   EXPORT_KEYS.forEach(function(key){ if(o[key]!==undefined) st[key]=o[key]; });
   // dbApply supplies a default for anything left out, as it does for a store.
@@ -1724,8 +1752,10 @@ function mergeImport(cur,inc){
    this view, not the record. The copy of the data an import replaced is kept
    on this device in the export format, so it can be put back or saved. */
 var dataPane=null, exportSnap='', importRaw='', importRes=null, dataMsg='', BACKUP_KEY='fc.backup', backupMem=null;
-function readBackup(){ try{ var v=localStorage.getItem(BACKUP_KEY); if(v) return v; }catch(e){} return backupMem; }
-function writeBackup(v){ backupMem=v; try{ localStorage.setItem(BACKUP_KEY,v); }catch(e){} }
+// The copy in memory is the newest; one left in localStorage by an earlier
+// import, when this one could not be written there, is gone rather than kept.
+function readBackup(){ if(backupMem) return backupMem; try{ return localStorage.getItem(BACKUP_KEY); }catch(e){} return null; }
+function writeBackup(v){ backupMem=v; try{ localStorage.setItem(BACKUP_KEY,v); }catch(e){ try{ localStorage.removeItem(BACKUP_KEY); }catch(e2){} } }
 function dataCard(){
   var b=readBackup(), r=importRes, sm=r&&r.ok&&r.summary;
   function n(x,one){ return x+' '+one+(x===1?'':'s'); }
@@ -1756,6 +1786,8 @@ function dataCard(){
 function applyImport(st,mode){
   writeBackup(exportText(state));
   state=mode==='merge'?mergeImport(state,st):st;
+  // A file in an older shape is converted now, as dbBoot does a store.
+  migratePlan(); prunePlan(); migrateMinutes();
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
   saveNow=dbState==='db'; persist();
