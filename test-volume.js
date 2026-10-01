@@ -31,7 +31,7 @@ new Function(
   'var PER_IMPLEMENT='+literal('var PER_IMPLEMENT')+';\n'+
   'function esc(s){ return String(s); }\n'+
   'var state={};\n'+
-  grab('perImplement')+'\n'+grab('volumeOf')+'\n'+
+  grab('hasOwn')+'\n'+grab('perImplement')+'\n'+grab('volumeOf')+'\n'+
   grab('isSuperset')+'\n'+grab('supersetMembers')+'\n'+grab('exDef')+'\n'+
   grab('movesWeight')+'\n'+grab('supersetRecord')+'\n'+grab('supersetSummary')+'\n'+
   'this.volumeOf=volumeOf;this.movesWeight=movesWeight;this.exDef=exDef;'+

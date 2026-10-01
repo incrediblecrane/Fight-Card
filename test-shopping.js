@@ -209,10 +209,7 @@ t('spoons stay in halves rather than jumping to the next whole spoon', function(
 console.log('\nEVERY RECIPE, NOT JUST THESE TWO');
 
 // The real seed, so this is swept over the recipes that actually ship.
-var SEED=(function(){
-  var i=h.lastIndexOf(')({')+2, j=h.lastIndexOf(');</'+'script>');
-  return JSON.parse(h.slice(i,j));
-})();
+var SEED=require('./test-env.js').seedOf(h);
 var ALL=SEED.recipes.filter(function(r){ return (r.ingredients||[]).length; });
 
 // What a set of planned meals genuinely consumes, computed straight from the

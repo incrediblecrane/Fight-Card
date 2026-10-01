@@ -13,12 +13,11 @@ var doc=env.readDoc();
    rendered a blank page. */
 var MIGRATED_ID='r6';
 (function seedOldShape(){
-  var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
-  var st=JSON.parse(doc.slice(i,j));
+  var st=env.seedOf(doc);
   var hit=st.recipes.filter(function(r){return r.id===MIGRATED_ID;})[0];
   if(!hit) throw new Error('seed has no recipe '+MIGRATED_ID+' to plan');
   hit.inPlan=true; hit.day='Thu';
-  doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
+  doc=env.withSeed(doc,st);
 })();
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'
  +'.then(function(){setTimeout(function(){location.reload();},0);});}};'
@@ -266,8 +265,8 @@ srv.listen(0,async function(){
   });
 
   await t('nothing still carries the old inPlan/day fields', async function(){
-    assert.ok(published().indexOf('"inPlan"')<0,'a recipe is still storing inPlan');
-    assert.ok(published().indexOf('"day":"Mon"')<0,'a recipe is still storing a weekday');
+    assert.ok(JSON.stringify(env.seedOf(published())).indexOf('"inPlan"')<0,'a recipe is still storing inPlan');
+    assert.ok(JSON.stringify(env.seedOf(published())).indexOf('"day":"Mon"')<0,'a recipe is still storing a weekday');
   });
 
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');

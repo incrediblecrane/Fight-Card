@@ -31,7 +31,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
   catch(e){ fails++; console.log('  FAIL  '+name+'\n        '+e.message); } }
 
 var box={};
-var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','perImplement','isSuperset','supersetMembers',
+var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','isSuperset','supersetMembers',
   'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','lastTimeLine','prefillFor',
   'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','minLogDate','unloggedYesterday'];
 var loaded=null;

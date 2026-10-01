@@ -10,9 +10,12 @@ willpower or memory to keep up.
 ## Layout
 
 - `index.html` — the whole app. One inline `<script>`: `function App(DATA){...}`
-  then `App({...seed data...})`. Republishing regenerates the document with
-  `(${App.toString()})(${JSON.stringify(data)})`, so the function source
-  round-trips through `.toString()`.
+  called with the seed data. Republishing regenerates the document with
+  `(${App.toString()})(JSON.parse("<the data as JSON>"))`, so the function
+  source round-trips through `.toString()`. The data goes in as text for
+  `JSON.parse`, not as an object literal, which would take a key called
+  `__proto__` as a prototype; an older document holding the literal still
+  reads, and `seedAt` in `test-env.js` finds the seed either way.
 - `pose/` — the exercise-animation rig, extracted and independently testable.
   - `rig.js` — planted-feet inverse kinematics, human proportions, interpolation
   - `exercises.js` — exercises as keyframes plus per-exercise tempo

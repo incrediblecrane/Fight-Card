@@ -102,9 +102,8 @@ srv.listen(0,async function(){
   // document, and can edit the seed before a load, because XP and the undo slot
   // are bookkeeping that a list of rows on screen cannot show.
   var url='http://127.0.0.1:'+srv.address().port+'/';
-  var seedOf=function(){ return JSON.parse(doc.slice(doc.lastIndexOf(')({')+2, doc.lastIndexOf(');</'+'script>'))); };
-  var setSeed=function(fn){ var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
-    var st=JSON.parse(doc.slice(i,j)); fn(st); doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j); };
+  var seedOf=function(){ return env.seedOf(doc); };
+  var setSeed=function(fn){ var st=env.seedOf(doc); fn(st); doc=env.withSeed(doc,st); };
   var settle=function(){ return p.waitForTimeout(1800); };
   var go=async function(){ await p.goto(url); await p.waitForTimeout(600);
     var bk=await p.$('[data-action="cancelsession"]'); if(bk){ await bk.click(); await p.waitForTimeout(300); } };

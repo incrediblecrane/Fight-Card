@@ -17,8 +17,7 @@ var doc=(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
    took the whole progress tab down. Seeded here because a suite that logs a
    few minutes along the way can never reach the empty case. */
 (function seedOnlyLightSets(){
-  var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
-  var st=JSON.parse(doc.slice(i,j));
+  var st=env.seedOf(doc);
   // Clear every existing warm-up first. Built against the repo seed the
   // premise held by luck; built against live state, which already has warm-up
   // minutes in it, the chart had something to plot and the empty case was
@@ -33,7 +32,7 @@ var doc=(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
     // A lift whose every set was marked warm-up: no working set to chart.
     press_ohp:[{v:10, w:20, wu:true},{v:6, w:30, wu:true}]}
   }]);
-  doc=doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
+  doc=env.withSeed(doc,st);
 })();
 /* A world of its own for the exercise history: every log replaced, so what the
    progress page counts is exactly what is below. A bench session with three
@@ -44,8 +43,7 @@ function localKey(o){ var d=new Date(); d.setDate(d.getDate()-o);
   var q=function(n){return String(n).padStart(2,'0');};
   return d.getFullYear()+'-'+q(d.getMonth()+1)+'-'+q(d.getDate()); }
 var progDoc=(function(){
-  var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
-  var st=JSON.parse(doc.slice(i,j));
+  var st=env.seedOf(doc);
   st.activeSession=null;
   st.workoutLogs=[
     {id:'wl-a', workoutId:'w6', title:'Push', tag:'Strength', date:localKey(2), logs:{
@@ -60,7 +58,7 @@ var progDoc=(function(){
     {id:'wl-d', workoutId:'w1', title:'Strength', tag:'Strength', date:localKey(9), logs:{
       plank:[{v:30,w:null}]}}
   ];
-  return doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
+  return env.withSeed(doc,st);
 })();
 var SHIM='<script>(function(){var ns={publish:function(h){'+
   'return fetch("/publish",{method:"POST",body:h}).then(function(){setTimeout(function(){location.reload();},0);});}};'+
@@ -341,7 +339,7 @@ server.listen(0, async function(){
   // Today mode used to hold the date string read at load, so after midnight a
   // tap still went to yesterday, with the backfill bar claiming it was chosen.
   try{
-    seedOf=function(d){ return JSON.parse(d.slice(d.lastIndexOf(')({')+2, d.lastIndexOf(');</'+'script>'))); };
+    seedOf=env.seedOf;
     day0=JSON.stringify(seedOf(doc).days['2026-09-30']||null);
     mctx=await b.newContext({viewport:{width:420,height:900},timezoneId:'UTC'});
     mctx.setDefaultTimeout(8000);

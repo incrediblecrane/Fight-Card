@@ -160,7 +160,7 @@ srv.listen(0,async function(){
   await t('the ingredient parse is not frozen into saved data', async function(){
     // A cached parse used to be stored with the recipe, so a fix to how
     // ingredients are read could never reach a recipe already saved.
-    assert.ok(published().indexOf('"_ings"')<0,'the parse cache is being written into saved state');
+    assert.ok(JSON.stringify(env.seedOf(published())).indexOf('"_ings"')<0,'the parse cache is being written into saved state');
   });
 
   console.log('\nYOUR OWN SHOPPING ITEMS');
@@ -259,8 +259,32 @@ srv.listen(0,async function(){
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
     await p.waitForTimeout(400);
     assert.ok(!(await p.$('[data-action="delrecipe"][data-id="p3"]')),'p3 came back');
-    var seed=JSON.parse(published().slice(published().lastIndexOf(')({')+2, published().lastIndexOf(');</'+'script>')));
+    var seed=env.seedOf(published());
     assert.ok(!seed.recipes.some(function(r){ return r.id==='p3'; }),'p3 is in the saved recipes');
+  });
+
+  console.log('\nANY WORD CAN BE AN INGREDIENT');
+  // The shopping list groups rows by name in a lookup, and a name a plain
+  // object already has (constructor, __proto__) found a row that was not
+  // there. It threw on every render after, and the recipe is saved.
+  await t('ingredients called Constructor or __proto__ go on the list like any other', async function(){
+    var e0=errs.length;
+    await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
+    await p.fill('#rec-title','Built-in names');
+    await p.fill('#rec-ing','Constructor (1)\n__proto__ (2)\nToString (3)\nhasOwnProperty');
+    await p.click('[data-action="addrecipe"]'); await p.waitForTimeout(2600);
+    await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
+    var rid=await p.evaluate(function(){ var b=[].filter.call(document.querySelectorAll('[data-action="delrecipe"]'),function(x){
+      return /Built-in names/.test(x.getAttribute('aria-label')); })[0]; return b&&b.getAttribute('data-id'); });
+    assert.ok(rid,'the recipe was not added');
+    await p.click('[data-action="addmeal"][data-id="'+rid+'"]'); await p.waitForTimeout(2600);
+    await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
+    var shop=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.shop'),function(x){ return x.textContent.trim(); }); });
+    ['Constructor (1)','__proto__ (2)','ToString (3)','hasOwnProperty'].forEach(function(n){
+      assert.ok(shop.some(function(x){ return x.indexOf(n)>-1; }),n+' is not on the shopping list: '+shop.join(' | '));
+    });
+    assert.deepStrictEqual(errs.slice(e0),[],'a render stopped');
+    await p.click('[data-action="delrecipe"][data-id="'+rid+'"]'); await p.waitForTimeout(2600);
   });
 
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');

@@ -21,11 +21,11 @@ async function t(name,fn){
   await t('a document whose seed does not start with waterTarget builds again', function(){
     // Live state pulled off the artifact has its keys in whatever order the
     // store gave them; the build used to search for `)({"waterTarget"`.
-    var seed=JSON.parse(h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>')));
+    var seed=env.seedOf(h);
     var st={days:seed.days}; Object.keys(seed).forEach(function(k){ if(k!=='days') st[k]=seed[k]; });
     fs.writeFileSync(tmp+'/state.json',JSON.stringify(st));
     build([tmp+'/one.html','--state',tmp+'/state.json']);
-    assert.ok(fs.readFileSync(tmp+'/one.html','utf8').indexOf(')({"days"')>0,'the reordered seed did not ship');
+    assert.strictEqual(Object.keys(env.seedOf(fs.readFileSync(tmp+'/one.html','utf8')))[0],'days','the reordered seed did not ship');
     build([tmp+'/two.html','--src',tmp+'/one.html']);
     assert.ok(fs.readFileSync(tmp+'/two.html','utf8')===fs.readFileSync(tmp+'/one.html','utf8'),
       'feeding a build back in did not reproduce it');
@@ -84,7 +84,7 @@ async function t(name,fn){
   };
   var built=tmp+'/notes.html';
   await t('a build --state whose notes hold </script and <!-- loads with the notes intact', async function(){
-    var seed=JSON.parse(h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>')));
+    var seed=env.seedOf(h);
     seed.library=[{id:'n1',title:'Close',tag:'Note',notes:NOTES[0]},{id:'n2',title:'Open',tag:'Note',notes:NOTES[1]}];
     fs.writeFileSync(tmp+'/notes.json',JSON.stringify(seed));
     build([built,'--state',tmp+'/notes.json']);
@@ -101,6 +101,30 @@ async function t(name,fn){
     }
     var doc=await p.evaluate(function(){ return window.__pub; });
     await loadQuick(doc); await notesShown('the self-saved document');
+  });
+
+  console.log('\nTHE SEED IS DATA, NOT CODE');
+  // Written as an object literal, a key named __proto__ set the object's
+  // prototype instead of being a key, so it was gone after one load and save.
+  await t('a key named __proto__ survives the document, a load and the next save', async function(){
+    var seed=env.seedOf(h);
+    seed.library=[{id:'n1',title:'Proto',tag:'Note',notes:'KEEP'}];
+    fs.writeFileSync(tmp+'/proto.json',JSON.stringify(seed).replace('"notes":"KEEP"','"notes":"KEEP","__proto__":{"kept":1}'));
+    build([tmp+'/proto.html','--state',tmp+'/proto.json']);
+    var own=function(d,where){ var l=env.seedOf(d).library[0];
+      assert.ok(Object.prototype.hasOwnProperty.call(l,'__proto__') && l.__proto__.kept===1,where+' lost the key: '+JSON.stringify(l)); };
+    var built=fs.readFileSync(tmp+'/proto.html','utf8');
+    own(built,'the build');
+    await loadQuick(built);
+    await p.evaluate(function(){ delete window.__pub; });
+    await p.click('[data-action="tab"][data-tab="today"]');
+    await p.click('[data-action="water"][data-d="1"]');
+    await p.waitForFunction(function(){ return !!window.__pub; });
+    var saved=await p.evaluate(function(){ return window.__pub; });
+    own(saved,'the self-saved document');
+    // And the app's own save reads back the way the build writes.
+    build([tmp+'/proto2.html','--src',tmp+'/proto.html']);
+    assert.ok(fs.readFileSync(tmp+'/proto2.html','utf8')===built,'feeding the build back in did not reproduce it');
   });
   await b.close();
   fs.rmSync(tmp,{recursive:true,force:true});

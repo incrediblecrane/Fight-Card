@@ -270,7 +270,10 @@ var PREP_LEVEL={
   "Ski erg":'resistance',"Stair climber":'resistance',
   "Treadmill walk/jog":'speed',"Treadmill walk":'speed'
 };
-function prepLevelKind(opt){ return PREP_LEVEL[opt]||'effort'; }
+// A table looked up by a name that came from a person or a file answers only
+// for its own entries: "constructor" or "toString" would find Object's.
+function hasOwn(o,k){ return Object.prototype.hasOwnProperty.call(o,k); }
+function prepLevelKind(opt){ return hasOwn(PREP_LEVEL,opt)?PREP_LEVEL[opt]:'effort'; }
 var RESISTANCE_LEVELS=(function(a){ for(var i=1;i<=20;i++) a.push(String(i)); return a; })([]);
 var XP_PER_WATER=2, XP_WORKOUT=15, XP_REST=6, XP_SAUNA=5;
 var WATER_STEP_L=0.25;
@@ -375,7 +378,7 @@ var EQUIP={
   wallsit:'wall', boxjump:'box', shoulderdisloc:'band', woodchopper:'band', palloffpress:'band', battleropes:'band',
   russiantwist:'dumbbell', shrug:'dumbbell'
 };
-function equipFor(id){ return EQUIP[id]||null; }
+function equipFor(id){ return hasOwn(EQUIP,id)?EQUIP[id]:null; }
 
 /* A logged weight is one implement, never the pair or the total. Getting this
    wrong does not error, it quietly doubles or halves a year of progression, so
@@ -390,7 +393,7 @@ var PER_IMPLEMENT={
   fly_cable:'side', fly_cable_high:'side', fly_cable_rev:'side',
   raise_front:'dumbbell', raise_lateral:'dumbbell'
 };
-function perImplement(id){ return PER_IMPLEMENT[id]||null; }
+function perImplement(id){ return hasOwn(PER_IMPLEMENT,id)?PER_IMPLEMENT[id]:null; }
 /* Volume is weight actually moved, so a set recorded per implement moved twice
    what it says: two 20kg dumbbells for 10 is 400kg, not 200. Without this a
    dumbbell day reads as half a barbell day of the same work. */
@@ -859,7 +862,7 @@ var tab=ui0.tab||'today';
 var viewingSession=!!ui0.viewingSession;
 // What is unfolded (an exercise's history, a recipe's ingredients) is this
 // device's view too, kept with the tab so a save-and-reload keeps it open.
-var expanded={}; (ui0.open||[]).forEach(function(k){ expanded[k]=true; });
+var expanded=Object.create(null); (ui0.open||[]).forEach(function(k){ expanded[k]=true; });
 var slide=ui0.slide||0;
 var progRange=ui0.progRange||14;
 var nudgeOff=ui0.nudgeOff||'';
@@ -2025,18 +2028,20 @@ var EXPORT_KEYS=['waterTarget','weekTarget','totalXp','deletedRecipes','days','w
   'library','recipes','plan','shoppingChecked','shopExtras','activeSession'];
 var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
 // What each field holds when it is there: 's' text, 'n' a number, 'b' true or
-// false, 'o' any object, [t] a list of t, {f:t} an object with those fields
-// and {'*':t} one whose every value is a t. Null or missing passes; the
-// fields that must be there are checked on their own.
-var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s'}]};
+// false, 'i' an id, 'o' any object, [t] a list of t, {f:t} an object with
+// those fields, {'*':t} one whose every key is an id and every value a t, and
+// {'|':[..]} one of those values. Null or missing passes; the fields that
+// must be there are checked on their own. Every field of a set is drawn, so
+// every one logSet writes is here.
+var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',machine:'s',work:'s',rest:'s',wu:'b'}]};
 var IMPORT_FIELDS={
-  days:{water:'n',alcohol:'n',smoking:'n',weed:'n',rest:'b',touched:'b',workout:{done:'b',type:'s'}},
-  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:'s',logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['s'],rounds:'n'}]},
+  days:{water:'n',alcohol:'n',smoking:'n',weed:'n',rest:'b',touched:'b',workout:{done:'b',type:{'|':WORKOUT_TYPES}}},
+  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:{'|':WORKOUT_TYPES},logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['s'],rounds:'n'}]},
   saunaSessions:{mins:'n',temp:'n',position:'s',stints:[{mins:'n',position:'s'}]},
   library:{title:'s',tag:'s',notes:'s'},
   recipes:{title:'s',tag:'s',instructions:'s',ingredients:['s'],macros:['n'],base:'n',portions:'n',inPlan:'b',day:'s'},
   plan:{slot:'s',portions:'n'},
-  activeSession:{id:'s',workoutId:'s',startedAt:'s',t0:'n',exIds:['s'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,supersets:'o'}};
+  activeSession:{id:'s',workoutId:'s',startedAt:'s',t0:'n',exIds:['i'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,supersets:'o'}};
 function exportData(st){
   var n=dbApply(dbDocs(st)), out={schema:EXPORT_SCHEMA, exportedAt:new Date().toISOString()};
   EXPORT_KEYS.forEach(function(k){ out[k]=n[k]; });
@@ -2044,15 +2049,22 @@ function exportData(st){
 }
 function exportText(st){ return JSON.stringify(exportData(st),null,1); }
 /* Answers {ok:true, state, summary} or {ok:false, msg}. Ids become document
-   paths, so one with a slash in it would be a different document, or none. */
+   paths, so one with a slash in it would be a different document, or none.
+   They and the keys of a map are also looked up in plain objects and written
+   into attributes, so a name Object already has is no id, nor is markup. */
 function readImport(text){
   function no(msg){ return {ok:false, msg:msg}; }
   function obj(v){ return !!v && typeof v==='object' && !Array.isArray(v); }
-  var ID=/^[A-Za-z0-9_.-]{1,80}$/, DAY=/^\d{4}-\d{2}-\d{2}$/, o;
+  var ID=/^[A-Za-z0-9_.-]{1,80}$/, DAY=/^\d{4}-\d{2}-\d{2}$/, o, proto=false;
+  function isId(k){ return typeof k==='string' && ID.test(k) && !(k in Object.prototype); }
   text=String(text||'').trim();
   if(!text) return no('Paste an export first.');
   if(text.length>5e6) return no('That is too big to be a Fight Card export.');
-  try{ o=JSON.parse(text); }catch(e){ return no('That is not valid JSON, so nothing was read. Paste the whole export, from the first { to the last }.'); }
+  // JSON keeps a key called __proto__ as a key, but the first object built
+  // from it in code takes it as a prototype instead, so it would not last.
+  try{ o=JSON.parse(text,function(k,v){ if(k==='__proto__') proto=true; return v; }); }
+  catch(e){ return no('That is not valid JSON, so nothing was read. Paste the whole export, from the first { to the last }.'); }
+  if(proto) return no('That export has something named "__proto__", which this app cannot keep, so nothing was read.');
   if(!obj(o)) return no('That JSON is not a Fight Card export.');
   if(o.schema===undefined) return no('That JSON has no schema number, so it is not a Fight Card export.');
   if(o.schema!==EXPORT_SCHEMA) return no('That export is schema '+String(o.schema).slice(0,10)+'; this version reads schema '+EXPORT_SCHEMA+' only.');
@@ -2066,20 +2078,24 @@ function readImport(text){
     if(v===undefined||v===null) return true;
     if(t==='n') return typeof v==='number' && isFinite(v);
     if(t==='o') return obj(v);
+    if(t==='i') return isId(v);
     if(typeof t==='string') return typeof v===(t==='s'?'string':'boolean');
     if(Array.isArray(t)) return Array.isArray(v) && v.every(function(x){ return x!==null && fits(x,t[0]); });
-    return obj(v) && Object.keys(t['*']?v:t).every(function(f){ return fits(v[f],t['*']||t[f]); });
+    if(t['|']) return t['|'].indexOf(v)>-1;
+    if(t['*']) return obj(v) && Object.keys(v).every(function(f){ return isId(f) && fits(v[f],t['*']); });
+    return obj(v) && Object.keys(t).every(function(f){ return fits(v[f],t[f]); });
   }
   function odd(x,t){ return Object.keys(t).filter(function(f){ return !fits(x[f],t[f]); })[0]; }
   bad=Object.keys(o.days||{}).filter(function(k){ return odd(o.days[k],IMPORT_FIELDS.days); })[0];
   if(bad!==undefined) return no('The day "'+bad+'" has "'+odd(o.days[bad],IMPORT_FIELDS.days)+'" of the wrong kind.');
   for(var i=0;i<EXPORT_LISTS.length;i++){
-    var k=EXPORT_LISTS[i], list=o[k], seen={};
+    var k=EXPORT_LISTS[i], list=o[k], seen=Object.create(null);
     if(list===undefined) continue;
     if(!Array.isArray(list)) return no('"'+k+'" should be a list.');
     for(var j=0;j<list.length;j++){
       var x=list[j];
       if(!obj(x) || typeof x.id!=='string' || !ID.test(x.id)) return no('Entry '+(j+1)+' in "'+k+'" has no usable id.');
+      if(!isId(x.id)) return no('Entry '+(j+1)+' in "'+k+'" has the id "'+x.id+'", a name this app keeps for itself.');
       if(seen[x.id]) return no('"'+k+'" has the id "'+x.id+'" twice.');
       seen[x.id]=1;
       if((k==='workoutLogs'||k==='saunaSessions'||k==='plan') && !(typeof x.date==='string' && DAY.test(x.date)))
@@ -2087,6 +2103,7 @@ function readImport(text){
       if(k==='workoutLogs' && !obj(x.logs)) return no('Session "'+x.id+'" has no sets.');
       if(k==='recipes' && !(typeof x.title==='string' && Array.isArray(x.ingredients))) return no('Recipe "'+x.id+'" needs a title and ingredients.');
       if(k==='plan' && typeof x.recipeId!=='string') return no('Planned meal "'+x.id+'" names no recipe.');
+      if(k==='plan' && SLOTS.indexOf(x.slot)<0) return no('Planned meal "'+x.id+'" is not at breakfast, lunch or dinner.');
       if(odd(x,IMPORT_FIELDS[k])) return no('Entry "'+x.id+'" in "'+k+'" has "'+odd(x,IMPORT_FIELDS[k])+'" of the wrong kind.');
     }
   }
@@ -2094,7 +2111,7 @@ function readImport(text){
   if(!strings(o.shoppingChecked)) return no('"shoppingChecked" should be a list of names.');
   if(!strings(o.deletedRecipes)) return no('"deletedRecipes" should be a list of ids.');
   if(o.shopExtras!==undefined && !(Array.isArray(o.shopExtras) && o.shopExtras.every(function(x){
-    return obj(x) && typeof x.id==='string' && ID.test(x.id) && typeof x.text==='string'; }))) return no('"shopExtras" should be a list of items with an id and text.');
+    return obj(x) && isId(x.id) && typeof x.text==='string'; }))) return no('"shopExtras" should be a list of items with an id and text.');
   function whole(v,lo,hi){ return v===undefined || (typeof v==='number' && v%1===0 && v>=lo && v<=hi); }
   if(!whole(o.waterTarget,4,20)) return no('"waterTarget" should be 4 to 20 taps.');
   if(!whole(o.weekTarget,1,7)) return no('"weekTarget" should be 1 to 7 sessions.');
@@ -2116,7 +2133,7 @@ function mergeImport(cur,inc){
   var st=dbApply(dbDocs(cur));
   Object.keys(inc.days).forEach(function(k){ st.days[k]=inc.days[k]; });
   EXPORT_LISTS.forEach(function(k){
-    var at={}; st[k].forEach(function(x,i){ at[x.id]=i; });
+    var at=Object.create(null); st[k].forEach(function(x,i){ at[x.id]=i; });
     inc[k].forEach(function(x){ if(at[x.id]!==undefined) st[k][at[x.id]]=x; else st[k].push(x); });
   });
   inc.deletedRecipes.forEach(function(id){ if(st.deletedRecipes.indexOf(id)<0) st.deletedRecipes.push(id); });
@@ -2425,7 +2442,9 @@ function unitRank(u){ return u==='g'?0 : u==='ml'?1 : u===''?3 : 2; }
 // what makes the same recipe twice in a week add up to two lots, and what lets
 // the list be scoped to part of the week.
 function shoppingList(dates){
-  var byName={}, order=[];
+  // Keyed by what was typed: an ingredient called Constructor is a row of its
+  // own, not one Object already has.
+  var byName=Object.create(null), order=[];
   planEntries(dates).forEach(function(e){
     var r=planRecipe(e);
     if(!r) return;
@@ -3160,7 +3179,7 @@ function bodyContent(){
           '<button data-action="watertarget" data-d="1" aria-label="Raise the water target">+</button></div>'+
         '<div class="stepper"><button data-action="water" data-d="-1" aria-label="Less water">-</button><span class="count">'+litres(t.water)+'</span><button class="big" data-action="water" data-d="1" aria-label="More water">+</button></div>'+
         '<div class="dots">'+cupsRow+'</div></div>'+
-      '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+t.workout.type):(t.rest?'Recovery day':(weekN+' of '+state.weekTarget+' sessions in the last 7 days')))+'</div>'+
+      '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+esc(t.workout.type)):(t.rest?'Recovery day':(weekN+' of '+state.weekTarget+' sessions in the last 7 days')))+'</div>'+
         (t.workout.done&&dayHasLog(activeDate())?'<p class="note">From a logged session. Remove it on Progress to clear the day.</p>':'')+
         '<div class="pillgrid">'+typePills+'</div>'+
         '<button class="linklike" data-action="tab" data-tab="training">Or start a guided session &rarr;</button></div>'+
@@ -3231,7 +3250,7 @@ function bodyContent(){
     var rows=meals.map(function(e){
       var r=planRecipe(e);
       return '<div class="mealrow">'+
-        '<span class="slot">'+esc(SLOT_LABEL[e.slot]||e.slot)+'</span>'+
+        '<span class="slot">'+esc(hasOwn(SLOT_LABEL,e.slot)?SLOT_LABEL[e.slot]:e.slot)+'</span>'+
         '<span class="mt">'+esc(r?r.title:'(recipe removed)')+'</span>'+
         '<span class="mp">'+
           '<button data-action="mealportions" data-id="'+esc(e.id)+'" data-d="-1" aria-label="One portion less">-</button>'+
@@ -3327,7 +3346,8 @@ function bodyContent(){
   var inRange=function(d){ return rangeKeys.indexOf(d)>-1; };
 
   // Per-exercise history, newest session first.
-  var histo={}, seq=0;
+  // Keyed by exercise id, which a stored log can hold as any name at all.
+  var histo=Object.create(null), seq=0;
   logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){
     if(!histo[exId]) histo[exId]=[];
     l.logs[exId].forEach(function(s){
@@ -3492,7 +3512,7 @@ function bodyContent(){
       var deltaTxt=pts.length>1?((delta>0?'+':'')+Math.round(delta*10)/10+unit+' since '+pts[0].k):'first session';
       var pbLabel=kind==='load'?'heaviest set':'best set';
       var rows=hist.slice(0,15).map(function(h){
-        return '<tr><td>'+h.date+'</td><td>'+setLabel(def,h)+(h.wu?' &middot; warm-up':'')+'</td></tr>';
+        return '<tr><td>'+h.date+'</td><td>'+esc(setLabel(def,h))+(h.wu?' &middot; warm-up':'')+'</td></tr>';
       }).join('');
       detail='<div class="exdetail">'+
         lineChart(pts,{title:pbLabel+' by session',sub:dates.length+' session'+(dates.length===1?'':'s'),
@@ -3507,8 +3527,8 @@ function bodyContent(){
           '<span>Sets <b>'+hist.filter(function(x){ return !x.wu; }).length+'</b></span></div>'+
         '<table><tr><th>Date</th><th>Set</th></tr>'+rows+'</table></div>';
     }
-    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+exId+'" role="button" tabindex="0" aria-expanded="'+isOpen+'"><h4>'+esc(def.name)+'</h4>'+
-      '<span class="last">'+setLabel(def,last)+' &middot; '+last.date+'<span class="chev">'+(isOpen?'&#9650;':'&#9660;')+'</span></span></div>'+
+    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+esc(exId)+'" role="button" tabindex="0" aria-expanded="'+isOpen+'"><h4>'+esc(def.name)+'</h4>'+
+      '<span class="last">'+esc(setLabel(def,last))+' &middot; '+last.date+'<span class="chev">'+(isOpen?'&#9650;':'&#9660;')+'</span></span></div>'+
       detail+'</div>';
   }).join('') || '<p class="note" style="margin-top:0;">Log a workout to start building exercise history.</p>';
 
@@ -3585,7 +3605,7 @@ function bodyContent(){
         var d=exDef(m); if(!d) return '';
         var mSets=sess.logs[m]||[];
         var mPer=perImplement(m);
-        var mChips=mSets.map(function(x){ return '<span class="setchip">'+setLabel(d,x)+'</span>'; }).join('');
+        var mChips=mSets.map(function(x){ return '<span class="setchip">'+esc(setLabel(d,x))+'</span>'; }).join('');
         var mVal=d.type==='load'?'reps':d.type==='time'?(d.unit==='min'?'mins':'secs'):d.type==='distance'?'metres':d.type==='cardio'?'mins':'reps';
         // A cardio member needs its machine and effort pickers here too: logSet
         // reads them by id, and without them the set is stored as a bare number
@@ -3659,8 +3679,8 @@ function bodyContent(){
       // of PBs, set counts, last time and the prefill.
       var canWu=def2.type==='load';
       var chips=sets.map(function(s,i){ return canWu
-        ? ('<button class="setchip'+(s.wu?' wu':'')+'" data-action="togglewu" data-ex="'+exId+'" data-i="'+i+'" aria-pressed="'+!!s.wu+'">'+(s.wu?'Warm-up ':'')+setLabel(def2,s)+'</button>')
-        : ('<span class="setchip">'+setLabel(def2,s)+'</span>'); }).join('');
+        ? ('<button class="setchip'+(s.wu?' wu':'')+'" data-action="togglewu" data-ex="'+exId+'" data-i="'+i+'" aria-pressed="'+!!s.wu+'">'+(s.wu?'Warm-up ':'')+esc(setLabel(def2,s))+'</button>')
+        : ('<span class="setchip">'+esc(setLabel(def2,s))+'</span>'); }).join('');
       var perImp=perImplement(exId);
       // The boxes start from the last working set, so a repeat is one tap.
       var pre=/^(load|reps|time|distance)$/.test(def2.type)?prefillFor(exId,sess):null;
@@ -3675,7 +3695,7 @@ function bodyContent(){
       var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?(def2.unit==='min'?'mins':'secs'):def2.type==='distance'?'metres':prepIsLoad?'reps':(def2.type==='cardio'||def2.type==='prep')?'mins':'reps';
       var prepRow='', prepHint='';
       if(def2.type==='prep'){
-        var opts=PREP_OPTIONS[exId]||[];
+        var opts=hasOwn(PREP_OPTIONS,exId)?PREP_OPTIONS[exId]:[];
         var picked=prepPick[exId]||'';
         var kind=prepLevelKind(picked);
         var lvlList=kind==='resistance'?RESISTANCE_LEVELS:kind==='speed'?[]:EFFORT_LEVELS;
@@ -4322,9 +4342,13 @@ function onTouchEnd(e){
 // goes out as \u003c, which parses back to the same string. The code gets the
 // same two sequences with the < written as \x3C, which JS strings and regexes
 // read as the same text.
-// build-publish.js reads both helpers out of here, so the two never drift.
+// The state goes in as a string for JSON.parse, not as an object literal: a
+// literal takes a key called __proto__ as the object's prototype, so the key
+// and what it held were gone after one load and save.
+// build-publish.js reads these helpers out of here, so the two never drift.
 function scriptSafe(s){ return s.replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029'); }
 function codeSafe(s){ return s.replace(/<(!--|\/script)/gi,'\\x3C$1'); }
+function seedSafe(s){ return 'JSON.parse('+scriptSafe(JSON.stringify(s))+')'; }
 function fullDocument(data){
   // The parse cache is derived, so it does not belong in saved state on this
   // path either: storing it froze one version of the parser into the data.
@@ -4336,7 +4360,7 @@ function fullDocument(data){
   '<title>Fight Card</title>'+
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">'+
   '</head><body><div id="app"></div>'+
-  '<script>('+codeSafe(App.toString())+')('+scriptSafe(JSON.stringify(data))+');<\/script>'+
+  '<script>('+codeSafe(App.toString())+')('+seedSafe(JSON.stringify(data))+');<\/script>'+
   '</body></html>';
 }
 

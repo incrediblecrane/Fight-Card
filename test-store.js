@@ -19,7 +19,7 @@ function grabVar(decl){
   if(!m) throw new Error('could not find var '+decl);
   return m[0];
 }
-var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
+var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('WORKOUT_TYPES'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
   grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('mergeImport')].join('\n');
@@ -30,7 +30,7 @@ new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this
 var fails=0, pending=[];
 function t(name,fn){ pending.push([name,fn]); }
 
-var seed=JSON.parse(h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>')));
+var seed=require('./test-env.js').seedOf(h);
 // The seed has no plan, extras or session, so give it each, or the round trip
 // compares empty lists.
 function rich(){
@@ -101,6 +101,61 @@ t('a field of the wrong kind is refused, and a real export still passes', functi
    [w(function(o){o.activeSession.logs={press_bench:'x'};}),/activeSession/],
    [w(function(o){o.activeSession.exIds=[1];}),/activeSession/],
    [w(function(o){delete o.activeSession.targets;}),/activeSession/]
+  ].forEach(function(c){
+    var r=box.readImport(c[0]);
+    assert.strictEqual(r.ok,false,'accepted: '+c[1]);
+    assert.ok(c[1].test(r.msg),'message "'+r.msg+'" for '+c[1]);
+  });
+});
+
+// Ids and keys become document paths, attribute values and lookups in plain
+// objects. One named after a built-in (__proto__, constructor, toString) found
+// that name already taken, and one holding markup landed in an attribute.
+t('an id or key that is a built-in name or holds markup is refused for what it is', function(){
+  var good=JSON.parse(box.exportText(rich()));
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  ['__proto__','constructor','toString'].forEach(function(id){
+    var r=box.readImport(w(function(o){ o.library[0].id=id; }));
+    assert.ok(!/twice/.test(r.msg||''),'the id "'+id+'" was said to appear twice: '+r.msg);
+    assert.strictEqual(r.ok,false,'the id "'+id+'" was accepted');
+    assert.ok(r.msg.indexOf(id)>-1,'the message does not name the id: '+r.msg);
+  });
+  // JSON.parse keeps "__proto__" as a key of its own, which no object built
+  // in code can hold, so it is written into the text.
+  var proto=w(function(o){ o.workoutLogs[0].logs={KEYHERE:[{v:5,w:null,t:1}]}; }).replace('"KEYHERE"','"__proto__"');
+  [[proto,/__proto__/],
+   [w(function(o){ o.workoutLogs[0].logs={'x"><img id=pwn src=x onerror=alert(1)>':[{v:5}]}; }),/logs/],
+   [w(function(o){ o.workoutLogs[0].logs={constructor:[{v:5}]}; }),/logs/],
+   [w(function(o){ o.activeSession.exIds=['press_bench','a"b']; }),/activeSession/],
+   [w(function(o){ o.activeSession.targets={'<b>':{sets:3,reps:'8'}}; }),/activeSession/],
+   [w(function(o){ o.activeSession.logs={'<b>':[{v:5}]}; }),/activeSession/],
+   [w(function(o){ o.shopExtras=[{id:'__proto__',text:'Milk'}]; }),/shopExtras/]
+  ].forEach(function(c){
+    var r=box.readImport(c[0]);
+    assert.strictEqual(r.ok,false,'accepted: '+c[0].slice(c[0].indexOf('"logs"'),c[0].indexOf('"logs"')+60));
+    assert.ok(c[1].test(r.msg),'message "'+r.msg+'"');
+  });
+});
+
+// Every field of a set is drawn on a chip, in the history and on the chart,
+// so each has to be what logging a set writes, and the words a day or a
+// session is filed under have to be ones the app has.
+t('set fields, workout types, session tags and meal slots must be ones the app writes', function(){
+  var good=JSON.parse(box.exportText(rich())), day=Object.keys(good.days)[0];
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  var ok=box.readImport(w(function(o){
+    o.workoutLogs[0].logs={warmup:[{v:5,w:null,opt:'<b>Bike</b>',lvl:'6',lvlKind:'resistance',t:1}],
+      cardio_gym_intervals:[{v:10,w:null,machine:'Rower',work:'Hard',rest:'Easy',wu:true,u:'min'}]};
+    o.days[day].workout={done:true,type:'Boxing/MMA'}; o.workoutLogs[0].tag='Custom'; o.plan[0].slot='breakfast'; }));
+  assert.ok(ok.ok,'a real set, type, tag and slot were refused: '+ok.msg);
+  assert.strictEqual(ok.state.workoutLogs[0].logs.warmup[0].opt,'<b>Bike</b>','text in a set was changed rather than kept as text');
+  [[w(function(o){ o.workoutLogs[0].logs={warmup:[{v:5,opt:5}]}; }),/logs/],
+   [w(function(o){ o.workoutLogs[0].logs={cardio_gym_steady:[{v:5,machine:{}}]}; }),/logs/],
+   [w(function(o){ o.workoutLogs[0].logs={press_bench:[{v:5,wu:'yes'}]}; }),/logs/],
+   [w(function(o){ o.days[day].workout={done:true,type:'<img src=x onerror="window.__pwn=1">'}; }),/workout/],
+   [w(function(o){ o.workoutLogs[0].tag='<img src=x>'; }),/tag/],
+   [w(function(o){ o.plan[0].slot='constructor'; }),/meal/],
+   [w(function(o){ delete o.plan[0].slot; }),/meal/]
   ].forEach(function(c){
     var r=box.readImport(c[0]);
     assert.strictEqual(r.ok,false,'accepted: '+c[1]);

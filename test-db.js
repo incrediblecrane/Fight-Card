@@ -96,10 +96,12 @@ var srv=http.createServer(function(q,r){
       // The real store hands documents back with their keys in alphabetical
       // order, observed directly against it. A stub that echoed insertion
       // order would make the diff look correct when it is not.
+      // A key named __proto__ is data to the store, as it is to JSON, so it
+      // has to come back as one rather than as this object's prototype.
       function alphabetise(v){
         if(v===null||typeof v!=='object') return v;
         if(Array.isArray(v)) return v.map(alphabetise);
-        var out={}; Object.keys(v).sort().forEach(function(k){ out[k]=alphabetise(v[k]); });
+        var out=Object.create(null); Object.keys(v).sort().forEach(function(k){ out[k]=alphabetise(v[k]); });
         return out;
       }
       if(op==='get'){ calls.get++;
@@ -1611,6 +1613,106 @@ srv.listen(0,async function(){
     var r=store['recipes/oldr'];
     assert.ok(r && !('inPlan' in r) && !('day' in r),'the recipe went in unconverted: '+JSON.stringify(r));
     assert.ok(Object.keys(store).some(function(k){ return k.indexOf('plan/')===0 && store[k].recipeId==='oldr'; }),'its place in the plan was dropped');
+  });
+
+  console.log('\nIMPORTED TEXT STAYS TEXT');
+  // An import is somebody else's file: whatever it holds is drawn as text,
+  // and an id that could break out of an attribute is not taken at all.
+  var XSS='<img src=x onerror="window.__x=1">';
+  var unpwned=async function(){
+    await p.waitForTimeout(400);
+    assert.strictEqual(await p.evaluate(function(){ return window.__x; }),undefined,'markup from the import ran');
+    assert.strictEqual(await p.evaluate(function(){ return window.__pwn; }),undefined,'markup from the import ran');
+    assert.strictEqual(await p.locator('#pwn, #app img').count(),0,'markup from the import became an element');
+  };
+  await t('markup in an imported set reads as text in the history and on the session slide', async function(){
+    await go(); var day=await today();
+    var wu=[{v:5,w:null,opt:XSS,lvl:'',lvlKind:'effort',t:1}], iv=[{v:10,w:null,machine:XSS,work:XSS,rest:XSS,t:2}];
+    await importing(JSON.stringify({schema:1, days:{}, workoutLogs:[{id:'wlx1',workoutId:'w4',title:'Conditioning circuit',
+      tag:'Conditioning',date:day,logs:{warmup:wu,cardio_gym_intervals:iv}}],
+      activeSession:{id:'sx1',workoutId:'w4',startedAt:day,t0:1,exIds:['warmup','cardio_gym_intervals'],targets:{},
+        logs:{warmup:wu,cardio_gym_intervals:iv}}}));
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    await p.click('[data-action="tab"][data-tab="progress"]');
+    await p.click('[data-action="toggleex"][data-id="warmup"]');
+    await p.click('[data-action="toggleex"][data-id="cardio_gym_intervals"]');
+    var body=await text();
+    assert.ok(body.split(XSS).length>4,'the history does not show the markup as text: '+body.slice(0,400));
+    await unpwned();
+    await resumeIn(p);
+    // The session opens on whichever slide this device was last on, and gets
+    // a cool-down on the end, so start from the warm-up.
+    for(var k=0;k<6 && !(await p.locator('[data-action="prevslide"][disabled]').count());k++){
+      await p.click('[data-action="prevslide"]'); await p.waitForTimeout(80); }
+    for(var i=0;i<2;i++){
+      var chips=await p.locator('.setchip').allTextContents();
+      assert.ok(chips.some(function(c){ return c.indexOf(XSS)>-1; }),
+        'slide '+(i+1)+'\'s set does not show the markup as text: '+chips.join(' | ')+' on '+(await text()).slice(0,300));
+      await unpwned();
+      if(!i){ await p.click('[data-action="nextslide"]'); await p.waitForTimeout(200); }
+    }
+    await toToday(); await p.click('[data-action="tab"][data-tab="training"]');
+    // Its save is on a timer, and has to land before the next check counts writes.
+    await p.click('[data-action="discardsession"]'); await p.waitForTimeout(1600); await settle();
+    await toToday();
+  });
+
+  await t('an imported exercise id holding markup or named __proto__ is refused, and Progress still draws', async function(){
+    await go(); var day=await today(), n=calls.set+calls.del;
+    var log=function(key){ return '{"schema":1,"workoutLogs":[{"id":"wlx2","date":"'+day+'","logs":{'+JSON.stringify(key)+':[{"v":5,"w":null,"t":3}]}}]}'; };
+    var keys=['x"><img id=pwn src=x onerror="window.__x=2">','__proto__'];
+    for(var i=0;i<keys.length;i++){
+      await importing(log(keys[i]));
+      var offered=await p.locator('[data-action="doimport"]').count();
+      if(offered){ await p.click('[data-action="doimport"][data-mode="replace"]'); await settle(); await p.click('[data-action="tab"][data-tab="progress"]'); }
+      await unpwned();
+      assert.ok(!offered,'it offered to import the id '+JSON.stringify(keys[i]));
+      assert.ok(await p.locator('[role="alert"]').count(),'no reason given for '+JSON.stringify(keys[i]));
+    }
+    assert.ok(await p.locator('.stat-row').count(),'Progress did not draw');
+    await p.waitForTimeout(1300);
+    assert.strictEqual(calls.set+calls.del,n,'a refused import wrote to the store');
+  });
+
+  await t('an imported workout type holding markup is refused', async function(){
+    await go(); var day=await today(), d=blank(); d.workout={done:true,type:'<img src=x onerror="window.__pwn=1">'};
+    var o={schema:1, days:{}}; o.days[day]=d;
+    await importing(JSON.stringify(o));
+    var offered=await p.locator('[data-action="doimport"]').count();
+    if(offered){ await p.click('[data-action="doimport"][data-mode="replace"]'); await settle(); await toToday(); }
+    await unpwned();
+    assert.ok(!offered,'it offered to import the workout type');
+  });
+
+  // Saved before any of this was checked, so it is in the store already and
+  // comes back on every load: drawn as text, and no render stopped by it.
+  await t('markup and built-in names already stored draw as text and stop no render', async function(){
+    await go(); var day=await today(), d=blank(), e0=errs.length;
+    d.workout={done:true,type:'<img src=x onerror="window.__pwn=1">'};
+    store['days/'+day]=d;
+    store['workoutLogs/wlproto']=JSON.parse('{"id":"wlproto","workoutId":"w1","title":"Old","tag":"Strength","date":"'+day+'",'+
+      '"logs":{"__proto__":[{"v":5,"w":null,"t":11}],"constructor":[{"v":6,"w":null,"t":12}],"x\\"><img id=pwn src=x>":[{"v":7,"w":null,"t":13}]}}');
+    store['plan/plproto']={id:'plproto',recipeId:'p2',date:day,slot:'constructor',portions:1};
+    try{
+      await go();
+      await p.click('[data-action="tab"][data-tab="today"]');
+      assert.ok((await text()).indexOf('Logged: <img src=x onerror="window.__pwn=1">')>-1,'the stored workout type is not shown as text');
+      await unpwned();
+      await p.click('[data-action="tab"][data-tab="progress"]');
+      assert.ok(await p.locator('.stat-row').count(),'Progress did not draw');
+      var tops=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('[data-action="toggleex"]'),function(e){ return e.getAttribute('data-id'); }); });
+      assert.ok(tops.indexOf('__proto__')>-1 && tops.indexOf('constructor')>-1,'the stored exercises are not listed: '+tops.join(', '));
+      assert.ok(tops.indexOf('x"><img id=pwn src=x>')>-1,'the id holding markup did not stay one attribute');
+      await p.click('[data-action="toggleex"][data-id="__proto__"]');
+      assert.strictEqual(await p.locator('[data-action="toggleex"][data-id="__proto__"]').getAttribute('aria-expanded'),'true','its history does not open');
+      await unpwned();
+      await p.click('[data-action="tab"][data-tab="meals"]');
+      assert.ok(await p.locator('.weekbox.cal').count(),'Meals did not draw');
+      assert.deepStrictEqual(errs.slice(e0),[],'a render stopped');
+    } finally {
+      delete store['workoutLogs/wlproto']; delete store['plan/plproto']; store['days/'+day]=blank();
+      await go();
+    }
   });
 
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');

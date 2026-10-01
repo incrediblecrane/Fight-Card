@@ -23,7 +23,7 @@ new Function(DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\
   grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
   '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
-var seedRaw=h.slice(h.lastIndexOf(')({')+2, h.lastIndexOf(');</'+'script>'));
+var seedRaw=JSON.stringify(require('./test-env.js').seedOf(h));
 var cases=[['the repo seed', JSON.parse(seedRaw)]];
 // The seed carries no hand-added shopping, so the round-trip for it would be a
 // comparison of two empty arrays. Give it some, or the check proves nothing.

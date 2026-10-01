@@ -15,9 +15,8 @@ function key(o){ var d=new Date(); d.setDate(d.getDate()-(o||0));
   var q=function(n){return String(n).padStart(2,'0');};
   return d.getFullYear()+'-'+q(d.getMonth()+1)+'-'+q(d.getDate()); }
 function withSeed(fn){
-  var i=doc.lastIndexOf(')({')+2, j=doc.lastIndexOf(');</'+'script>');
-  var st=JSON.parse(doc.slice(i,j)); fn(st);
-  return doc.slice(0,i)+JSON.stringify(st)+doc.slice(j);
+  var st=env.seedOf(doc); fn(st);
+  return env.withSeed(doc,st);
 }
 var WORLDS={
   plain: withSeed(function(st){ st.activeSession=null; }),

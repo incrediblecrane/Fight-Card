@@ -6,6 +6,8 @@
 var http=require('http'),fs=require('fs'),assert=require('assert');
 var env=require('./test-env.js');
 var doc=env.readDoc();
+// What the app last saved, as the JSON its state is.
+function savedJson(){ return JSON.stringify(env.seedOf(doc)); }
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'
  +'.then(function(){setTimeout(function(){location.reload();},0);});}};'
  +'window.claude={use:function(n){return Promise.resolve(n==="artifact"?ns:null);}};})();<\/script>';
@@ -601,18 +603,19 @@ srv.listen(0,async function(){
     });
     assert.ok(/Sets/.test(detail),'the warm-up detail did not open: '+detail.slice(0,120));
     assert.deepStrictEqual(errs,[],'the progress page threw: '+errs.join(' | '));
-    // `doc` is whatever the app last saved through the publish stub.
-    assert.ok(/"lvlKind":"load"/.test(doc),'the light set was not stored as a weight-and-reps set');
-    assert.ok(/"opt":"Light sets of the first lift"/.test(doc),'the option was not stored');
-    assert.ok(/"w":42.5/.test(doc),'the weight was not stored');
+    // `doc` is whatever the app last saved through the publish stub; its
+    // state is read as JSON, the way the page reads it.
+    assert.ok(/"lvlKind":"load"/.test(savedJson()),'the light set was not stored as a weight-and-reps set');
+    assert.ok(/"opt":"Light sets of the first lift"/.test(savedJson()),'the option was not stored');
+    assert.ok(/"w":42.5/.test(savedJson()),'the weight was not stored');
   });
 
   await t('a light set survives a reload reading as weight by reps', async function(){
     await go();
     // Read straight out of what was saved, so this does not depend on the
     // history table's window at all.
-    assert.ok(/"lvlKind":"load"/.test(doc),'the light set did not survive the reload');
-    assert.ok(/"w":42.5/.test(doc),'the weight did not survive the reload');
+    assert.ok(/"lvlKind":"load"/.test(savedJson()),'the light set did not survive the reload');
+    assert.ok(/"w":42.5/.test(savedJson()),'the weight did not survive the reload');
   });
 
   console.log('\nREVERSE CABLE FLY');
@@ -983,7 +986,7 @@ srv.listen(0,async function(){
     assert.ok(rows.some(function(r){ return /Bicep curl/.test(r) && /Bent-over row/.test(r); }),
       'no session row says what was supersetted:\n        '+rows.join('\n        '));
     // And it has to survive the save, not just the render that made it.
-    assert.ok(/"supersets":\[\{"ex":\["curl_bicep","row_bent"\],"rounds":1\}\]/.test(doc),
+    assert.ok(/"supersets":\[\{"ex":\["curl_bicep","row_bent"\],"rounds":1\}\]/.test(savedJson()),
       'the superset was not written into the finished log');
   });
 
@@ -1189,7 +1192,7 @@ srv.listen(0,async function(){
   });
 
   console.log('\nSKIP, FINISH AND RESUME');
-  var seedOf=function(){ return JSON.parse(doc.slice(doc.lastIndexOf(')({')+2, doc.lastIndexOf(');</'+'script>'))); };
+  var seedOf=function(){ return env.seedOf(doc); };
   var tapIf=function(sel){ return p.evaluate(function(s){ var e=document.querySelector(s); if(!e) return false; e.click(); return true; },sel); };
   var storyPos=function(){ return p.evaluate(function(){ var h=document.querySelector('.story-title'); var m=h&&/(\d+)\/(\d+)\s*$/.exec(h.textContent); return m?[+m[1],+m[2]]:null; }); };
 

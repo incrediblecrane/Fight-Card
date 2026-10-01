@@ -7,18 +7,12 @@
 var fs=require('fs');
 var si=process.argv.indexOf('--src');
 var t=fs.readFileSync(si>-1?process.argv[si+1]:__dirname+'/index.html','utf8');
-// The script is `(function App(DATA){...})(<seed JSON>);`. Find the seed by
-// structure, not by its first key: the first `)(` after App starts whose
-// remainder parses as JSON. Code never parses as JSON, and a `)(` inside the
-// seed's own strings comes after the real one.
-var i=t.indexOf('(function App(DATA){'), end=t.lastIndexOf(');',t.lastIndexOf('</script>'));
-if(i<0||end<0) throw new Error('could not locate the App IIFE in index.html');
-var App=null, data;
-for(var j=t.indexOf(')(',i); j>-1 && j<end; j=t.indexOf(')(',j+1)){
-  try{ data=JSON.parse(t.slice(j+2,end)); }catch(e){ continue; }
-  App=eval('('+t.slice(i+1,j)+')'); break;
-}
-if(typeof App!=='function') throw new Error('could not locate the seed after App in index.html');
+// The script is `(function App(DATA){...})(<seed>);`. seedAt finds the seed by
+// structure, not by its first key, and reads it written either way: as text
+// for JSON.parse, as the app now writes it, or as the JSON itself.
+var env=require('./test-env.js'), at=env.seedAt(t), data=at.data;
+var App=eval('('+t.slice(t.indexOf('(function App(DATA){')+1,at.app)+')');
+if(typeof App!=='function') throw new Error('could not locate App in index.html');
 // Publishing overwrites a live app holding real logged data, so the state that
 // ships is the state read back off the artifact, never the repo's stale copy.
 // --state <file> takes a JSON document pulled from the live artifact.
@@ -46,7 +40,7 @@ function helper(name){
   if(!hm) throw new Error('could not locate '+name+' in App');
   return eval('('+hm[0]+')');
 }
-var scriptSafe=helper('scriptSafe'), codeSafe=helper('codeSafe');
+var scriptSafe=helper('scriptSafe'), codeSafe=helper('codeSafe'), seedSafe=helper('seedSafe');
 
 var m=src.match(/var CSS = "([\s\S]*?)";\r?\n/);
 if(!m) throw new Error('could not locate the CSS string');
@@ -74,9 +68,9 @@ var doc='<!doctype html><html><head><meta charset="utf-8">'+
   '<title>Fight Card</title>'+
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">'+
   '</head><body><div id="app"></div>'+
-  '<script>('+codeSafe(src)+')('+scriptSafe(JSON.stringify(data))+');<\/script></body></html>';
+  '<script>('+codeSafe(src)+')('+seedSafe(JSON.stringify(data))+');<\/script></body></html>';
 // First positional that is neither a flag nor a flag's value.
-var out=require('./test-env.js').PUBLISH;
+var out=env.PUBLISH;
 for(var ai=2;ai<process.argv.length;ai++){
   if(process.argv[ai]==='--state'||process.argv[ai]==='--src'){ ai++; continue; }
   if(process.argv[ai].charAt(0)==='-') continue;

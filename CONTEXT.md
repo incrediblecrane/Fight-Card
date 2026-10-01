@@ -155,8 +155,15 @@ other than `db`.
 **Import** takes pasted JSON. `readImport` only `JSON.parse`s it and checks
 every shape before any of it becomes state: `schema` must be 1, days keyed by
 date, every list entry an object whose id is a safe path segment (ids become
-document paths), no duplicate ids, targets in range. Anything else is refused
-with a reason and nothing is written. A good one shows a summary (days,
+document paths), no duplicate ids, targets in range, every field of a set the
+kind `logSet` writes, a day's workout type and a session's tag one of the
+workout types, a planned meal's slot breakfast, lunch or dinner. Ids, and the
+keys of a session's or a log's sets and targets, are also looked up in plain
+objects and written into attributes, so a name `Object.prototype` already has
+(`constructor`, `toString`) is refused as one, and so is any key called
+`__proto__`, anywhere: JSON keeps it as a key, but code takes it for a
+prototype. Anything else is refused with a reason and nothing is written.
+Everything an import can carry is drawn escaped, as text. A good one shows a summary (days,
 sessions, planned meals, recipes, notes, sauna) and then:
 
 - **Replace** makes it the whole record.
