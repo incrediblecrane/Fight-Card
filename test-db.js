@@ -1715,6 +1715,213 @@ srv.listen(0,async function(){
     }
   });
 
+  console.log('\nNO IMPORT CAN BREAK RENDER');
+  // Each tab draws what it always shows, and nothing threw on the way.
+  var everyTab=async function(why){
+    await toToday();
+    var marks={today:'[data-action="water"]',training:'[data-action="startworkout"]',meals:'.weekbox.cal',progress:'.stat-row'};
+    for(var k in marks){
+      await p.click('[data-action="tab"][data-tab="'+k+'"]'); await p.waitForTimeout(150);
+      assert.ok(await p.locator(marks[k]).count(),k+' did not draw '+why);
+    }
+    await p.click('[data-action="tab"][data-tab="today"]');
+  };
+  // What the store held before, put back whatever the check did to it.
+  var putBack=async function(was){
+    Object.keys(store).forEach(function(k){ delete store[k]; });
+    Object.keys(was).forEach(function(k){ store[k]=was[k]; });
+    await go();
+  };
+  // Refused with a reason, and nothing broken. Before the fix each of these
+  // was offered, so it is put in to show what it did.
+  var refused=async function(o,re){
+    var e0=errs.length;
+    await importing(JSON.stringify(o));
+    var offered=await p.locator('[data-action="doimport"]').count();
+    if(offered){ await p.click('[data-action="doimport"][data-mode="replace"]'); await settle(); }
+    var msg=offered?'':await p.locator('[role="alert"]').first().textContent();
+    await everyTab('after the import');
+    assert.ok(!offered,'it offered to import '+JSON.stringify(o).slice(0,160));
+    assert.ok(re.test(msg),'the reason "'+msg+'" does not name '+re);
+    assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+  };
+  var cleanSession=function(){ store['state/session']={active:null}; };
+
+  await t('a day count of a billion cups, or a fraction or less than none, is refused, and one already stored still draws', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store));
+    try{
+      var o=function(f,v){ var d=blank(); d[f]=v; var x={schema:1,days:{}}; x.days[day]=d; return x; };
+      await refused(o('water',1e9),/water/);
+      await refused(o('alcohol',2.5),/alcohol/);
+      await refused(o('smoking',-1),/smoking/);
+      // Stored before imports were checked: Today still draws, the count says
+      // how much, and the row of cups stops at what fits.
+      var e0=errs.length, d=blank(); d.water=1e9; store['days/'+day]=d;
+      await go(); await everyTab('with a billion cups stored');
+      assert.ok(await p.locator('.dots .cup').count()<=40,'it drew '+(await p.locator('.dots .cup').count())+' cups');
+      assert.ok(/250000000/.test(await waterCount()),'the count does not say how much: '+(await waterCount()));
+      assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+    } finally { await putBack(was); }
+  });
+
+  // A tap past the most an import takes would make an export that does not
+  // go back in.
+  await t('the water and drink counts stop where an import does, so an export always goes back in', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store));
+    try{
+      var d=blank(); d.water=100; d.alcohol=200; store['days/'+day]=d;
+      await go();
+      await p.click('[data-action="water"][data-d="1"]'); await p.click('[data-action="alcohol"][data-d="1"]');
+      await p.waitForTimeout(1600); await settle();
+      assert.strictEqual(store['days/'+day].water,100,'water went past 100 taps');
+      assert.strictEqual(store['days/'+day].alcohol,200,'drinks went past 200');
+      var a=await exported();
+      await importing(JSON.stringify(a));
+      assert.ok(await p.locator('[data-action="doimport"]').count(),'its own export was refused: '+(await text()).slice(-300));
+    } finally { await putBack(was); }
+  });
+
+  await t('a day missing fields is imported whole, draws on every tab and survives a reload', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store)), e0=errs.length;
+    try{
+      var o={schema:1,days:{}}; o.days[day]={water:2};
+      await importing(JSON.stringify(o));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      await everyTab('after importing a day of {water:2}');
+      assert.strictEqual(await waterCount(),'0.5L','the imported water is not shown');
+      var sd=store['days/'+day];
+      assert.ok(sd && sd.workout && sd.workout.done===false && sd.alcohol===0,'the day was stored with fields missing: '+JSON.stringify(sd));
+      await go(); await everyTab('after a reload');
+      assert.strictEqual(await waterCount(),'0.5L','the imported water did not survive a reload');
+      // Stored with the fields missing, by an import before this was checked.
+      store['days/'+day]={water:3};
+      await go(); await everyTab('with {water:3} stored');
+      assert.strictEqual(await waterCount(),'0.75L');
+      await p.click('[data-action="workout"][data-type="Strength"]'); await p.waitForTimeout(1600); await settle();
+      assert.ok(store['days/'+day].workout && store['days/'+day].workout.done,'a workout could not be logged on it');
+      assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+    } finally { await putBack(was); }
+  });
+
+  // 2026/10/01 wrote days/2026/10/01, a document inside another collection
+  // that no read finds; __proto__ and constructor found a value Object
+  // already has, and Finish threw on every tap.
+  await t('a session whose start is not a date is refused, and one already stored finishes on today', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store));
+    try{
+      var sess=function(at){ return {schema:1,activeSession:{id:'sbad',workoutId:'w6',startedAt:at,t0:Date.now()-60000,prep:1,
+        exIds:[BENCH],targets:{},logs:{press_bench:[{v:8,w:60,t:Date.now()-30000}]}}}; };
+      await refused(sess('2026/10/01'),/activeSession/);
+      await refused(sess('__proto__'),/activeSession/);
+      await refused(sess('constructor'),/activeSession/);
+      var e0=errs.length;
+      store['state/session']={active:sess('constructor').activeSession};
+      await go(); await resumeIn(p); await finishIn(p); await p.waitForTimeout(1600); await settle();
+      assert.deepStrictEqual(errs.slice(e0),[],'Finish threw: '+errs.slice(e0).join(' | '));
+      var logs=Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0 && store[k].sessionId==='sbad'; });
+      assert.strictEqual(logs.length,1,'the session was not logged');
+      assert.strictEqual(store[logs[0]].date,day,'it was dated '+store[logs[0]].date);
+      assert.ok(store['days/'+day].workout.done,'today is not marked trained');
+      assert.ok(!Object.keys(store).some(function(k){ return k.split('/').length!==2; }),'a document went somewhere no read finds');
+      await everyTab('after finishing it');
+    } finally { cleanSession(); await putBack(was); }
+  });
+
+  await t('a superset of the wrong shape is refused, and a real one imports, resumes, undoes a round and survives a reload', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store)), now=Date.now();
+    try{
+      var day=await today(), sess=function(box){ return {schema:1,activeSession:{id:'sss',workoutId:'w6',startedAt:day,t0:now-60000,prep:1,
+        exIds:['ss1'],targets:{ss1:{sets:3,reps:'rounds'}},logs:{press_bench:[{v:8,w:60,t:now-30000}],sq_goblet:[{v:10,w:20,t:now-29000}]},supersets:{ss1:box}}}; };
+      await refused(sess({ex:'press_bench',rounds:1}),/activeSession/);
+      await refused(sess({ex:[BENCH],rounds:3e8}),/activeSession/);
+      await refused({schema:1,workoutLogs:[{id:'wlss',workoutId:'w6',title:'Push',tag:'Strength',date:day,
+        logs:{press_bench:[{v:8,w:60,t:1}]},supersets:[{rounds:2}]}]},/supersets/);
+      var e0=errs.length;
+      await importing(JSON.stringify(sess({ex:[BENCH,'sq_goblet'],rounds:1,roundLog:[[BENCH,'sq_goblet']]})));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      await everyTab('after importing a superset');
+      await go(); await resumeIn(p);
+      assert.ok(await p.locator('[data-action="undoround"]').count(),'the superset slide does not offer its round back: '+(await text()).slice(0,300));
+      await p.click('[data-action="undoround"]'); await p.waitForTimeout(1600); await settle();
+      var b=store['state/session'].active.supersets.ss1;
+      assert.strictEqual(b.rounds,0,'the round was not taken back: '+JSON.stringify(b));
+      assert.ok(!(store['state/session'].active.logs||{}).press_bench,'the round\'s sets stayed');
+      await go(); await everyTab('after a reload');
+      assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+    } finally { cleanSession(); await putBack(was); }
+  });
+
+  await t('an exercise this version does not have leaves an imported session, which resumes, skips and reloads', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store)), e0=errs.length;
+    try{
+      var day=await today();
+      await importing(JSON.stringify({schema:1,activeSession:{id:'sv2',workoutId:'w6',startedAt:day,t0:Date.now()-60000,
+        exIds:['press_bench_v2'],targets:{press_bench_v2:{sets:3,reps:'8'}},logs:{}}}));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      await resumeIn(p);
+      for(var k=0;k<6 && !(await p.locator('[data-action="prevslide"][disabled]').count());k++){ await p.click('[data-action="prevslide"]'); await p.waitForTimeout(80); }
+      await p.click('[data-action="skipex"]'); await p.waitForTimeout(200);
+      assert.ok(await p.locator('#slide-card').count(),'the next slide did not draw: '+(await text()).slice(0,300));
+      await p.waitForTimeout(1300); await settle();
+      assert.ok(store['state/session'].active.exIds.indexOf('press_bench_v2')<0,'the unknown exercise was kept');
+      await go();
+      assert.ok(!/loading your data/.test(await text()),'the reload stuck on loading');
+      await everyTab('after a reload');
+      assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+    } finally { cleanSession(); await putBack(was); }
+  });
+
+  // Saved by another version, or by an import before this was checked.
+  await t('a stored session holding an exercise this version does not have shows it as gone, with Remove', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store)), e0=errs.length;
+    try{
+      var day=await today();
+      store['state/session']={active:{id:'sv3',workoutId:'w6',startedAt:day,t0:Date.now()-60000,prep:1,
+        exIds:['press_bench_v2',BENCH],targets:{press_bench_v2:{sets:3,reps:'8'}},logs:{press_bench_v2:[{v:8,w:60,t:Date.now()-30000}]}}};
+      await go(); await resumeIn(p);
+      for(var k=0;k<6 && !(await p.locator('[data-action="prevslide"][disabled]').count());k++){ await p.click('[data-action="prevslide"]'); await p.waitForTimeout(80); }
+      var body=await text();
+      assert.ok(/no longer available/i.test(body),'the slide does not say the exercise has gone: '+body.slice(0,300));
+      await p.click('[data-action="removeex"][data-id="press_bench_v2"]'); await p.waitForTimeout(1600); await settle();
+      assert.deepStrictEqual(store['state/session'].active.exIds,[BENCH],'it was not taken out');
+      assert.ok(await p.locator('#log-v-'+BENCH).count(),'the next exercise did not draw');
+      await go(); await everyTab('after a reload');
+      assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+    } finally { cleanSession(); await putBack(was); }
+  });
+
+  await t('recipe macros that are not four numbers are refused, and stored ones never read undefined', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await refused({schema:1,recipes:[{id:'rm1',title:'Short',ingredients:['Eggs (2)'],macros:[500]}]},/macros/);
+      var e0=errs.length;
+      store['recipes/rm2']={id:'rm2',title:'Short macros',tag:'Recipe',ingredients:['Eggs (2)'],macros:[500,30]};
+      await go(); await everyTab('with short macros stored');
+      await p.click('[data-action="tab"][data-tab="meals"]');
+      assert.ok(/Short macros/.test(await text()),'the recipe is not listed');
+      assert.ok(!/undefined/.test(await text()),'Meals reads undefined');
+      assert.deepStrictEqual(errs.slice(e0),[],'a render threw: '+errs.slice(e0).join(' | '));
+    } finally { await putBack(was); }
+  });
+
+  // The change is in state before the render, so a render that throws must
+  // not take its save with it.
+  await t('a tap is saved even when the render after it throws', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store));
+    try{
+      store['days/'+day]=blank(); await go(); var e0=errs.length;
+      await p.evaluate(function(){
+        var g=document.getElementById;
+        document.getElementById=function(id){ if(id==='app' && window.__boom){ window.__boom=0; throw new Error('render boom'); } return g.apply(document,arguments); };
+        window.__boom=1;
+      });
+      await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1600); await settle();
+      assert.strictEqual(store['days/'+day].water,1,'the tap was not saved');
+      assert.ok(errs.slice(e0).some(function(e){ return /render boom/.test(e); }),'the render did not throw');
+      errs.splice(e0);
+    } finally { await putBack(was); }
+  });
+
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
   await t('a view that cannot run db falls back to publish-to-save', async function(){
     await p.addInitScript(function(){ window.__DB_OFF=true; });

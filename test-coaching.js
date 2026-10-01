@@ -42,6 +42,7 @@ try{
     'var PER_IMPLEMENT='+literal('var PER_IMPLEMENT')+';\n'+
     'var BACKFILL_DAYS='+h.match(/BACKFILL_DAYS=(\d+)/)[1]+';\n'+
     'var XP_PER_WATER='+h.match(/XP_PER_WATER=(\d+)/)[1]+';\n'+
+    'var DAY_MAX='+literal('var DAY_MAX')+';\n'+
     'var state={days:{},workoutLogs:[],activeSession:null};\n'+
     NAMES.map(grab).join('\n')+'\n'+
     'this.state=function(s){ state=s; };\n'+
@@ -287,6 +288,14 @@ if(loaded===true){
     assert.strictEqual(box.waterStep(e,-1,8),-2);
     assert.strictEqual(box.waterStep(e,1,8),2);
     assert.strictEqual(box.waterStep(e,1,8),0);
+  });
+
+  // An import refuses more than this, so a tap stops here and the export goes back in.
+  t('water stops at the most an import takes', function(){
+    var e=day(true); e.water=99;
+    box.waterStep(e,1,8); assert.strictEqual(e.water,100);
+    assert.strictEqual(box.waterStep(e,1,8),0); assert.strictEqual(e.water,100);
+    box.waterStep(e,-1,8); assert.strictEqual(e.water,99);
   });
 
   t('targets step inside their limits', function(){

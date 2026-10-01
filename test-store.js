@@ -19,7 +19,9 @@ function grabVar(decl){
   if(!m) throw new Error('could not find var '+decl);
   return m[0];
 }
+// readImport knows the exercises, so a session can lose one this version does not have.
 var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('WORKOUT_TYPES'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
+  grabVar('DAY_MAX'), h.match(/var EX=\[[\s\S]*?\n\];/)[0], grab('isSuperset'), grab('exDef'), grab('blankDay'), grab('wholeDay'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
   grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('mergeImport')].join('\n');
@@ -163,6 +165,77 @@ t('set fields, workout types, session tags and meal slots must be ones the app w
   });
 });
 
+// Each of these was taken as the right kind and then broke a render, hung
+// one, or wrote a document no read finds: a count of a billion cups, a
+// session dated 2026/10/01 or __proto__, a superset of 3e8 rounds or with no
+// exercises in it, and macros that are not four numbers.
+t('counts, a session\'s date, supersets and macros of the wrong shape are refused', function(){
+  var good=JSON.parse(box.exportText(rich())), day=Object.keys(good.days)[0];
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  function ss(b){ return w(function(o){ o.activeSession.exIds.push('ss1'); o.activeSession.supersets={ss1:b}; }); }
+  [[w(function(o){ o.days[day].water=1e9; }),/water/],
+   [w(function(o){ o.days[day].water=-1; }),/water/],
+   [w(function(o){ o.days[day].alcohol=2.5; }),/alcohol/],
+   [w(function(o){ o.days[day].smoking=201; }),/smoking/],
+   [w(function(o){ o.days[day].weed=-3; }),/weed/],
+   [w(function(o){ o.days[day].wx='x'; }),/wx/],
+   [w(function(o){ o.activeSession.startedAt='2026/10/01'; }),/activeSession/],
+   [w(function(o){ o.activeSession.startedAt='__proto__'; }),/activeSession/],
+   [w(function(o){ o.activeSession.startedAt='constructor'; }),/activeSession/],
+   [ss({ex:['press_bench'],rounds:3e8}),/activeSession/],
+   [ss({ex:['press_bench'],rounds:1.5}),/activeSession/],
+   [ss({ex:'press_bench',rounds:1}),/activeSession/],
+   [ss({rounds:1}),/activeSession/],
+   [ss({ex:['press_bench','ss2'],rounds:0}),/activeSession/],
+   [ss({ex:['press_bench'],rounds:1,roundLog:[['<b>']]}),/activeSession/],
+   [ss({ex:['press_bench'],rounds:1,roundLog:'x'}),/activeSession/],
+   [w(function(o){ o.activeSession.supersets={superset1:{ex:['press_bench'],rounds:0}}; }),/activeSession/],
+   [w(function(o){ o.workoutLogs[0].supersets=[{rounds:2}]; }),/supersets/],
+   [w(function(o){ o.workoutLogs[0].supersets=[{ex:'press_bench',rounds:2}]; }),/supersets/],
+   [w(function(o){ o.workoutLogs[0].supersets=[{ex:['press_bench'],rounds:-1}]; }),/supersets/],
+   [w(function(o){ o.recipes[0].macros=[500]; }),/macros/],
+   [w(function(o){ o.recipes[0].macros=[500,30,40,-1]; }),/macros/],
+   [w(function(o){ o.recipes[0].macros=[500,30,40,10,5]; }),/macros/]
+  ].forEach(function(c){
+    var r=box.readImport(c[0]);
+    assert.strictEqual(r.ok,false,'accepted: '+c[1]+' in '+c[0].slice(-220));
+    assert.ok(c[1].test(r.msg),'message "'+r.msg+'" for '+c[1]);
+  });
+  // What the app itself writes still goes in, a superset saved as a bare
+  // list of its exercises included.
+  [ss({ex:['press_bench','sq_goblet'],rounds:2,roundLog:[['press_bench'],['press_bench','sq_goblet']]}), ss(['press_bench','sq_goblet']),
+   w(function(o){ o.days[day].water=100; o.days[day].alcohol=200; o.days[day].wx=8; o.activeSession.startedAt='2026-10-01';
+     o.workoutLogs[0].supersets=[{ex:['press_bench','sq_goblet'],rounds:3}]; o.recipes[0].macros=[0,0,0,0]; delete o.recipes[1].macros; })
+  ].forEach(function(c,i){ var r=box.readImport(c); assert.ok(r.ok,'case '+i+' was refused: '+r.msg); });
+  assert.deepStrictEqual(box.readImport(ss(['press_bench'])).state.activeSession.supersets.ss1,{ex:['press_bench'],rounds:0});
+});
+
+// fits() lets a missing field through, so a day of {water:2} reached the
+// render without the workout it reads on every draw.
+t('a day with fields left out comes in as a whole day', function(){
+  var r=box.readImport('{"schema":1,"days":{"2026-10-01":{"water":2,"alcohol":null},"2026-09-30":{"workout":{"done":true,"type":"Strength"}}}}');
+  assert.ok(r.ok,r.msg);
+  assert.deepStrictEqual(r.state.days['2026-10-01'],{water:2,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false});
+  assert.deepStrictEqual(r.state.days['2026-09-30'].workout,{done:true,type:'Strength'});
+  assert.strictEqual(r.state.days['2026-09-30'].water,0);
+  r=box.readImport('{"schema":1,"days":{"2026-10-01":{"workout":{"type":"Strength"}}}}'); assert.ok(r.ok,r.msg);
+  assert.deepStrictEqual(r.state.days['2026-10-01'].workout,{done:false,type:'Strength'});
+});
+
+// The session slide reads the exercise's sets, type and figure, so one this
+// version has never heard of stopped it drawing, and the reload with it.
+t('an exercise this version does not know leaves the session, its sets kept for the log', function(){
+  var good=JSON.parse(box.exportText(rich()));
+  var r=box.readImport(JSON.stringify(Object.assign(good,{activeSession:{id:'sv2',workoutId:'w6',startedAt:'2026-10-01',t0:5,
+    exIds:['press_bench_v2','press_bench','ss1'],targets:{press_bench_v2:{sets:3,reps:'8'},press_bench:{sets:3,reps:'8'}},
+    logs:{press_bench_v2:[{v:8,w:60,t:2}]},supersets:{ss1:{ex:['press_bench_v2','sq_goblet'],rounds:0}}}})));
+  assert.ok(r.ok,r.msg);
+  var s=r.state.activeSession;
+  assert.deepStrictEqual(s.exIds,['press_bench','ss1']);
+  assert.deepStrictEqual(Object.keys(s.targets),['press_bench']);
+  assert.deepStrictEqual(s.logs.press_bench_v2,[{v:8,w:60,t:2}],'the sets logged on it were dropped');
+});
+
 t('import only reads data: a script in it stays text', function(){
   var o=JSON.parse(box.exportText(rich()));
   o.library[0].title='<img src=x onerror=alert(1)>'; o.toString='function(){throw 1}'; o.__proto__x=1;
@@ -179,7 +252,7 @@ t('merge by id replaces matches, adds the rest and keeps this view\'s profile', 
   var m=box.mergeImport(cur,r.state);
   assert.strictEqual(m.workoutLogs.length,cur.workoutLogs.length+1);
   assert.strictEqual(m.workoutLogs.filter(function(l){return l.id===inc.workoutLogs[0].id;})[0].title,'Changed');
-  assert.deepStrictEqual(m.days['2026-09-20'],{water:3});
+  assert.deepStrictEqual(m.days['2026-09-20'],{water:3,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false});
   assert.strictEqual(m.totalXp,cur.totalXp); assert.strictEqual(m.weekTarget,cur.weekTarget);
   assert.deepStrictEqual(m.deletedRecipes.sort(),['p3','zz']);
 });

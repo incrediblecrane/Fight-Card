@@ -1034,9 +1034,23 @@ function dbSnapshot(map){
 }
 
 function blankDay(){ return {water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false}; }
+// The most a day's count goes to. An import refuses more, and a tap stops
+// here, so what the app writes always goes back in.
+var DAY_MAX={water:100,alcohol:200,smoking:200,weed:200};
+// Every render reads every field of a day, so one left out, by an import or
+// an older store, is filled as a blank day has it.
+function wholeDay(d){
+  var b=blankDay();
+  Object.keys(b).forEach(function(f){ if(d[f]===undefined||d[f]===null) d[f]=b[f]; });
+  if(typeof d.workout!=='object') d.workout=b.workout;
+  if(d.workout.done===undefined||d.workout.done===null) d.workout.done=false;
+  if(d.workout.type===undefined) d.workout.type=null;
+  return d;
+}
+// Its own key only: a day called constructor would find Object's.
 function ensureDay(k){
-  if(!state.days[k]) state.days[k]=blankDay();
-  return state.days[k];
+  if(!hasOwn(state.days,k)) state.days[k]=blankDay();
+  return wholeDay(state.days[k]);
 }
 function levelInfo(){ var span=150; var level=1+Math.floor(state.totalXp/span); var into=state.totalXp%span; return {level:level,into:into,span:span}; }
 function lastNKeys(n){ var out=[]; for(var i=n-1;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);out.push(dateKey(d));} return out; }
@@ -1281,7 +1295,7 @@ function removeWorkoutLog(id){
   // per trained day, not per session, so it only comes off with the day.
   var still=state.workoutLogs.some(function(x){ return x.date===item.date; });
   var d=state.days[item.date], took=0;
-  if(!still && d && d.workout.done){ d.workout.done=false; d.workout.type=null; took=-addXp(-XP_WORKOUT); }
+  if(!still && d && d.workout && d.workout.done){ d.workout.done=false; d.workout.type=null; took=-addXp(-XP_WORKOUT); }
   parkUndo({kind:'log',item:item,pos:i,xp:took,label:item.title+' on '+item.date});
   return true;
 }
@@ -1352,6 +1366,7 @@ function applyUndo(){
 // earned up to the target, as it was then.
 function waterStep(e,d,tgt){
   var prev=e.water, got=e.wx!==undefined?e.wx:Math.min(prev,tgt), x=0;
+  if(d>0 && prev>=DAY_MAX.water) return 0;
   e.water=Math.max(0,prev+d); if(e.water>0) e.touched=true;
   if(d>0 && prev<tgt){ got++; x=XP_PER_WATER; }
   if(d<0 && e.water<got){ got--; x=-XP_PER_WATER; }
@@ -2028,20 +2043,24 @@ var EXPORT_KEYS=['waterTarget','weekTarget','totalXp','deletedRecipes','days','w
   'library','recipes','plan','shoppingChecked','shopExtras','activeSession'];
 var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
 // What each field holds when it is there: 's' text, 'n' a number, 'b' true or
-// false, 'i' an id, 'o' any object, [t] a list of t, {f:t} an object with
-// those fields, {'*':t} one whose every key is an id and every value a t, and
-// {'|':[..]} one of those values. Null or missing passes; the fields that
-// must be there are checked on their own. Every field of a set is drawn, so
-// every one logSet writes is here.
+// false, 'i' an id, 'd' a date, 'o' any object, [t] a list of t, {f:t} an
+// object with those fields, {'*':t} one whose every key is an id and every
+// value a t, {'|':[..]} one of those values, and {'#':[lo,hi]} a whole number
+// from lo to hi. Null or missing passes; the fields that must be there are
+// checked on their own. Every field of a set is drawn, so every one logSet
+// writes is here. A count is drawn once per unit and a round count rebuilds
+// one entry per round, so those have a top.
 var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',machine:'s',work:'s',rest:'s',wu:'b'}]};
 var IMPORT_FIELDS={
-  days:{water:'n',alcohol:'n',smoking:'n',weed:'n',rest:'b',touched:'b',workout:{done:'b',type:{'|':WORKOUT_TYPES}}},
-  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:{'|':WORKOUT_TYPES},logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['s'],rounds:'n'}]},
+  days:{water:{'#':[0,DAY_MAX.water]},wx:{'#':[0,DAY_MAX.water]},alcohol:{'#':[0,DAY_MAX.alcohol]},smoking:{'#':[0,DAY_MAX.smoking]},
+    weed:{'#':[0,DAY_MAX.weed]},rest:'b',touched:'b',workout:{done:'b',type:{'|':WORKOUT_TYPES}}},
+  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:{'|':WORKOUT_TYPES},logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['i'],rounds:{'#':[0,100]}}]},
   saunaSessions:{mins:'n',temp:'n',position:'s',stints:[{mins:'n',position:'s'}]},
   library:{title:'s',tag:'s',notes:'s'},
   recipes:{title:'s',tag:'s',instructions:'s',ingredients:['s'],macros:['n'],base:'n',portions:'n',inPlan:'b',day:'s'},
   plan:{slot:'s',portions:'n'},
-  activeSession:{id:'s',workoutId:'s',startedAt:'s',t0:'n',exIds:['i'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,supersets:'o'}};
+  activeSession:{id:'s',workoutId:'s',startedAt:'d',t0:'n',exIds:['i'],targets:{'*':{sets:'n',reps:'s'}},logs:IMPORT_SET,
+    supersets:{'*':{ex:['i'],rounds:{'#':[0,100]},roundLog:[['i']]}}}};
 function exportData(st){
   var n=dbApply(dbDocs(st)), out={schema:EXPORT_SCHEMA, exportedAt:new Date().toISOString()};
   EXPORT_KEYS.forEach(function(k){ out[k]=n[k]; });
@@ -2079,8 +2098,10 @@ function readImport(text){
     if(t==='n') return typeof v==='number' && isFinite(v);
     if(t==='o') return obj(v);
     if(t==='i') return isId(v);
+    if(t==='d') return typeof v==='string' && DAY.test(v);
     if(typeof t==='string') return typeof v===(t==='s'?'string':'boolean');
     if(Array.isArray(t)) return Array.isArray(v) && v.every(function(x){ return x!==null && fits(x,t[0]); });
+    if(t['#']) return typeof v==='number' && v%1===0 && v>=t['#'][0] && v<=t['#'][1];
     if(t['|']) return t['|'].indexOf(v)>-1;
     if(t['*']) return obj(v) && Object.keys(v).every(function(f){ return isId(f) && fits(v[f],t['*']); });
     return obj(v) && Object.keys(t).every(function(f){ return fits(v[f],t[f]); });
@@ -2088,6 +2109,7 @@ function readImport(text){
   function odd(x,t){ return Object.keys(t).filter(function(f){ return !fits(x[f],t[f]); })[0]; }
   bad=Object.keys(o.days||{}).filter(function(k){ return odd(o.days[k],IMPORT_FIELDS.days); })[0];
   if(bad!==undefined) return no('The day "'+bad+'" has "'+odd(o.days[bad],IMPORT_FIELDS.days)+'" of the wrong kind.');
+  Object.keys(o.days||{}).forEach(function(k){ wholeDay(o.days[k]); });
   for(var i=0;i<EXPORT_LISTS.length;i++){
     var k=EXPORT_LISTS[i], list=o[k], seen=Object.create(null);
     if(list===undefined) continue;
@@ -2105,6 +2127,12 @@ function readImport(text){
       if(k==='plan' && typeof x.recipeId!=='string') return no('Planned meal "'+x.id+'" names no recipe.');
       if(k==='plan' && SLOTS.indexOf(x.slot)<0) return no('Planned meal "'+x.id+'" is not at breakfast, lunch or dinner.');
       if(odd(x,IMPORT_FIELDS[k])) return no('Entry "'+x.id+'" in "'+k+'" has "'+odd(x,IMPORT_FIELDS[k])+'" of the wrong kind.');
+      // A superset is drawn as the exercises it paired, so it has to have them.
+      if(k==='workoutLogs' && (x.supersets||[]).some(function(b){ return !Array.isArray(b.ex); }))
+        return no('Session "'+x.id+'" has "supersets" with no exercises in one.');
+      // A recipe card reads kcal, protein, carbs and fat, in that order.
+      if(k==='recipes' && x.macros!==undefined && x.macros!==null && !(x.macros.length===4 && x.macros.every(function(n){ return n>=0; })))
+        return no('Recipe "'+x.id+'" has "macros" that are not four amounts: kcal, protein, carbs and fat.');
     }
   }
   function strings(v){ return v===undefined || (Array.isArray(v) && v.every(function(s){ return typeof s==='string'; })); }
@@ -2117,7 +2145,22 @@ function readImport(text){
   if(!whole(o.weekTarget,1,7)) return no('"weekTarget" should be 1 to 7 sessions.');
   if(!whole(o.totalXp,0,1e9)) return no('"totalXp" should be a whole number.');
   var s=o.activeSession;
-  if(s!==undefined && s!==null && !(obj(s) && Array.isArray(s.exIds) && obj(s.targets) && !odd(s,IMPORT_FIELDS.activeSession))) return no('"activeSession" is not a session.');
+  if(s!==undefined && s!==null && !(obj(s) && Array.isArray(s.exIds) && obj(s.targets))) return no('"activeSession" is not a session.');
+  if(s){
+    // A superset saved as a bare list of its exercises, as supersetBox reads one.
+    if(obj(s.supersets)) Object.keys(s.supersets).forEach(function(k){
+      if(Array.isArray(s.supersets[k])) s.supersets[k]={ex:s.supersets[k], rounds:0}; });
+    bad=odd(s,IMPORT_FIELDS.activeSession);
+    if(bad) return no('"activeSession" has "'+bad+'" of the wrong kind.');
+    // Its slide is ss and a number, and it pairs exercises, none of them a superset.
+    bad=Object.keys(s.supersets||{}).filter(function(k){ var b=s.supersets[k];
+      return !isSuperset(k) || !Array.isArray(b.ex) || b.ex.some(isSuperset); })[0];
+    if(bad!==undefined) return no('"activeSession" has the superset "'+bad+'", which is not one this app can draw.');
+    // An exercise this version does not have has no slide to draw. Its sets
+    // stay, for the finished log, which lists them under their id as it does
+    // an older log's.
+    s.exIds=s.exIds.filter(function(id){ if(isSuperset(id)||exDef(id)) return true; delete s.targets[id]; return false; });
+  }
   var st={};
   EXPORT_KEYS.forEach(function(key){ if(o[key]!==undefined) st[key]=o[key]; });
   // dbApply supplies a default for anything left out, as it does for a store.
@@ -2479,7 +2522,7 @@ function shoppingList(dates){
   return order;
 }
 function macroLine(r){
-  var m=r.macros; if(!m) return '';
+  var m=r.macros; if(!Array.isArray(m) || m.length!==4) return '';
   return '<div class="macros"><span><b>'+m[0]+'</b> kcal</span><span><b>'+m[1]+'g</b> protein</span>'+
     '<span><b>'+m[2]+'g</b> carbs</span><span><b>'+m[3]+'g</b> fat</span>'+
     '<span class="per">per portion</span></div>';
@@ -2623,7 +2666,7 @@ function supersetSummary(l){
   var rounds=ss.reduce(function(a,x){ return a+(x.rounds||0); },0);
   if(ss.length>2) return ss.length+' supersets &middot; '+rounds+' rounds';
   return ss.map(function(x){
-    return x.ex.map(function(id){ var d=exDef(id); return esc(d?d.name:id); }).join(' + ')+
+    return (x.ex||[]).map(function(id){ var d=exDef(id); return esc(d?d.name:id); }).join(' + ')+
       ' &times;'+x.rounds;
   }).join(' &middot; ');
 }
@@ -2644,6 +2687,9 @@ function finishWorkout(){
   var n=0; Object.keys(sess.logs||{}).forEach(function(k){ n+=(sess.logs[k]||[]).length; });
   if(!n){ discardSession(); return; }
   var sid=sessId(sess), lid=sessLogId(sess)||'wl'+Date.now();
+  // Dated by when it started, when that is a date: anything else would be a
+  // day document no read finds, or a name Object already has.
+  var on=/^\d{4}-\d{2}-\d{2}$/.test(sess.startedAt||'')?sess.startedAt:activeDate();
   // Finished already, in another view: its sets go onto that log rather than
   // into a second one, and the day and its XP were seen to there.
   var had=state.workoutLogs.filter(function(l){ return l.sessionId===sid||l.id===lid; })[0];
@@ -2652,11 +2698,11 @@ function finishWorkout(){
   var title=w?w.title:'Workout', tag=w?w.tag:'Strength';
   // An exercise with no sets left on it is not part of what was done.
   var done={}; Object.keys(sess.logs||{}).forEach(function(k){ if((sess.logs[k]||[]).length) done[k]=sess.logs[k]; });
-  var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:sess.startedAt||activeDate(),logs:done};
+  var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:on,logs:done};
   var ss=supersetRecord(sess); if(ss.length) log.supersets=ss;
   var mins=sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
   state.workoutLogs.push(log);
-  var today=ensureDay(sess.startedAt||activeDate()), paid=0;
+  var today=ensureDay(on), paid=0;
   if(!today.workout.done){ paid+=addXp(XP_WORKOUT); if(today.rest) paid+=addXp(-XP_REST); }
   if(paid) finishPaid[lid]=paid;
   today.workout.done=true; today.workout.type=tag; today.rest=false; today.touched=true;
@@ -3158,7 +3204,10 @@ function bodyContent(){
     return '<div class="'+cls+(pickable?' pickable':'')+'"'+(pickable?' data-action="pickday" data-k="'+k+'" role="button" tabindex="0" aria-label="Log for '+esc(prettyKey(k))+'"':'')+
       (k===activeDate()?' aria-current="date"':'')+' title="'+k+(pickable?': tap to log for this day':'')+'">'+dd+'</div>';
   }).join('');
-  var cupsRow=''; for(var i=0;i<Math.max(state.waterTarget,t.water);i++){ cupsRow+='<div class="cup'+(i<t.water?' on':'')+'"></div>'; }
+  // A cup a tap, past the target too, but no more than a row holds: the count
+  // above says how much.
+  var cupsRow='', cupsN=Math.min(Math.max(state.waterTarget,t.water),40);
+  for(var i=0;i<cupsN;i++){ cupsRow+='<div class="cup'+(i<t.water?' on':'')+'"></div>'; }
   var typePills=WORKOUT_TYPES.map(function(wt){
     var on=!!(t.workout.done && t.workout.type===wt);
     return '<button class="pill'+(on?' on':'')+'" data-action="workout" data-type="'+wt+'" aria-pressed="'+on+'">'+wt+'</button>';
@@ -3580,6 +3629,15 @@ function bodyContent(){
     var w2=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
     var n=sess.exIds.length;
     if(slide>=n) slide=Math.max(0,n-1);
+    var logged=0; Object.keys(sess.logs).forEach(function(k){ logged+=sess.logs[k].length; });
+    var storyNav=function(id){ return '<div class="storynav">'+
+      '<button data-action="prevslide"'+(slide===0?' disabled':'')+'>&larr; Prev</button>'+
+      (slide<n-1?'<button class="skip" data-action="skipex" data-ex="'+esc(id)+'">Skip</button>':'')+
+      (slide<n-1?'<button class="next" data-action="nextslide">Next &rarr;</button>':'<button class="finish" data-action="finishworkout">Finish ('+logged+' set'+(logged===1?'':'s')+')</button>')+
+      '</div>'; };
+    var storyBar=function(){ return '<div class="story-bar">'+sess.exIds.map(function(id,i){
+      return '<i class="'+(i===slide?'now':(slideLogged(sess,id)?'done':''))+'"><b></b></i>'; }).join('')+'</div>'; };
+    var storyHead='<div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>';
 
     if(addingExercise){
       // The results live in their own container so typing can replace just
@@ -3597,8 +3655,6 @@ function bodyContent(){
       var ssId=sess.exIds[slide];
       var members=supersetMembers(ssId);
       var ssTgt=sess.targets[ssId]||{sets:3,reps:'rounds'};
-      var ssBar=sess.exIds.map(function(id,i){ var cls=i===slide?'now':(slideLogged(sess,id)?'done':''); return '<i class="'+cls+'"><b></b></i>'; }).join('');
-      var ssTotal=0; Object.keys(sess.logs).forEach(function(k){ ssTotal+=sess.logs[k].length; });
       var roundsDone=supersetRounds(ssId);
 
       var memberRows=members.map(function(m){
@@ -3648,9 +3704,7 @@ function bodyContent(){
         }).join('')+'</optgroup>';
       }).join('');
 
-      sessionHtml='<div class="story">'+
-        '<div class="story-bar">'+ssBar+'</div>'+
-        '<div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>'+
+      sessionHtml='<div class="story">'+storyBar()+storyHead+
         '<div class="slide">'+
           '<span class="cat">Rounds</span>'+
           '<h4>Superset</h4>'+
@@ -3661,13 +3715,23 @@ function bodyContent(){
             '<button data-action="ssadd" data-ss="'+ssId+'">Add</button></div>'+
           (members.length?'<button class="loground" data-action="loground" data-ss="'+ssId+'">Log round '+(roundsDone+1)+'</button>':'')+
           (roundsDone?'<button class="discard-btn" data-action="undoround" data-ss="'+ssId+'">Undo round '+roundsDone+'</button>':'')+
-          '<div class="storynav">'+
-            '<button data-action="prevslide"'+(slide===0?' disabled':'')+'>&larr; Prev</button>'+
-            (slide<n-1?'<button class="skip" data-action="skipex" data-ex="'+ssId+'">Skip</button>':'')+
-            (slide<n-1?'<button class="next" data-action="nextslide">Next &rarr;</button>':'<button class="finish" data-action="finishworkout">Finish ('+ssTotal+' set'+(ssTotal===1?'':'s')+')</button>')+
-          '</div>'+
+          storyNav(ssId)+
           '<button class="addex-btn" data-action="openpicker">+ Add exercise to this session</button>'+
           '<button class="discard-btn" data-action="removeex" data-id="'+ssId+'">Remove this superset from today&#39;s session</button>'+
+        '</div>'+
+      '</div>';
+    } else if(!exDef(sess.exIds[slide])){
+      // Saved by a version that has this exercise and this one does not:
+      // nothing to draw or log, so it says so and can be taken out. Its sets
+      // stay with the session for the log.
+      var goneId=sess.exIds[slide], goneN=(sess.logs[goneId]||[]).length;
+      sessionHtml='<div class="story">'+storyBar()+storyHead+
+        '<div class="slide">'+
+          '<h4>'+esc(goneId)+'</h4>'+
+          '<p class="note">This exercise is no longer available in this version of the app'+
+            (goneN?(', so it cannot be logged here. Its '+goneN+' set'+(goneN===1?' is':'s are')+' kept for the log.'):'.')+'</p>'+
+          storyNav(goneId)+
+          '<button class="discard-btn" data-action="removeex" data-id="'+esc(goneId)+'">Remove it from today&#39;s session</button>'+
         '</div>'+
       '</div>';
     } else {
@@ -3736,11 +3800,7 @@ function bodyContent(){
         '<select id="log-rest-'+exId+'" class="cardio-select"><option value="">Rest effort&hellip;</option>'+EFFORT_LEVELS.map(function(l){return '<option value="'+l+'">'+l+'</option>';}).join('')+'</select>'
       ):'';
       var cardioRow=(machineSelect||effortSelects)?('<div class="cardio-row">'+machineSelect+effortSelects+'</div>'):'';
-      var totalLogged=0; Object.keys(sess.logs).forEach(function(k){totalLogged+=sess.logs[k].length;});
-      var bar=sess.exIds.map(function(id,i){ var has=slideLogged(sess,id); var cls=i===slide?'now':(has?'done':''); return '<i class="'+cls+'"><b></b></i>'; }).join('');
-      sessionHtml='<div class="story">'+
-        '<div class="story-bar">'+bar+'</div>'+
-        '<div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>'+
+      sessionHtml='<div class="story">'+storyBar()+storyHead+
         '<div class="slide" id="slide-card" data-pose="'+def2.pose+'">'+
           // No figure on a prep slide: what the movement looks like depends
           // entirely on which option you pick, and drawing one arbitrary
@@ -3771,11 +3831,7 @@ function bodyContent(){
             '<button data-action="logset" data-ex="'+exId+'" data-type="'+def2.type+'">Log set</button>'+
             (sets.length?'<button class="undo" data-action="undoset" data-ex="'+exId+'">Undo</button>':'')+
           '</div>'+
-          '<div class="storynav">'+
-            '<button data-action="prevslide"'+(slide===0?' disabled':'')+'>&larr; Prev</button>'+
-            (slide<n-1?'<button class="skip" data-action="skipex" data-ex="'+exId+'">Skip</button>':'')+
-            (slide<n-1?'<button class="next" data-action="nextslide">Next &rarr;</button>':'<button class="finish" data-action="finishworkout">Finish ('+totalLogged+' set'+(totalLogged===1?'':'s')+')</button>')+
-          '</div>'+
+          storyNav(exId)+
           '<button class="addex-btn" data-action="openpicker">+ Add exercise to this session</button>'+
           '<button class="discard-btn" data-action="removeex" data-id="'+exId+'">Remove this exercise from today&#39;s session</button>'+
         '</div>'+
@@ -4118,7 +4174,9 @@ function onClick(e){
     today.touched=true;
   }
   else if(action==='alcohol'||action==='smoking'||action==='weed'){
-    var dd=parseInt(t.getAttribute('data-d'),10); today[action]=Math.max(0,today[action]+dd); today.touched=true;
+    var dd=parseInt(t.getAttribute('data-d'),10);
+    if(!(dd>0 && today[action]>=DAY_MAX[action])) today[action]=Math.max(0,today[action]+dd);
+    today.touched=true;
   }
   else if(action==='addlib'){
     var titleEl=document.getElementById('lib-title'); var tagEl=document.getElementById('lib-tag'); var notesEl=document.getElementById('lib-notes');
@@ -4247,8 +4305,9 @@ function onClick(e){
     state.shoppingChecked=[];
   }
 
-  render();
-  if(!uiOnly) scheduleSave();
+  // The change is in state already: a render that throws must not take its
+  // save with it, or the reload that could draw it never sees it.
+  try{ render(); } finally { if(!uiOnly) scheduleSave(); }
 }
 
 function onChange(e){
@@ -4278,7 +4337,7 @@ function onChange(e){
     (planPick[id]=planPick[id]||{}).date=t.value; return; }
   else if(action==='planslot'){ var id2=t.getAttribute('data-id');
     (planPick[id2]=planPick[id2]||{}).slot=t.value; return; }
-  render(); scheduleSave();
+  try{ render(); } finally { scheduleSave(); }
 }
 
 function onInput(e){
