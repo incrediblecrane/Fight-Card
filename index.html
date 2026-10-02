@@ -147,7 +147,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .story-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}\
 .story-head button{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap;}\
 .story-title{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:0.95rem;color:var(--text-faint);margin:0;}\
-.slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y;}\
+.slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y pinch-zoom;}\
+#fig-live svg,#fig-live-front svg{pointer-events:none;}\
 .fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;}\
 .fig-wrap svg{width:155px;height:172px;}\
 .fig-wrap svg line,.fig-wrap svg circle{transition:all .7s cubic-bezier(.4,0,.2,1);}\
@@ -4721,25 +4722,43 @@ function watchDay(){
   render();
 }
 
-var swipeX=null, swipeId=null;
+// One touch at a time, followed by its identifier: a second finger is a pinch,
+// a touch starting in a field is a caret drag or a selection, and a cancelled
+// touch is dropped, so none of them leaves a start behind for the next tap.
+var swipeX=null, swipeId=null, touchY=null, touchId=null;
+function touchReset(){ swipeX=swipeId=touchX=touchY=touchId=null; }
 function onTouchStart(e){
-  var row=e.target.closest('[data-swipe]');
-  if(row){ swipeX=e.touches[0].clientX; swipeId=row.getAttribute('data-swipe'); return; }
-  if(e.target.closest('.slide')){ touchX=e.touches[0].clientX; }
+  touchReset();
+  if(e.touches.length>1) return;
+  var t=e.touches[0], el=e.target;
+  if(!t || !el || !el.closest || el.closest('input,select,textarea')) return;
+  var row=el.closest('[data-swipe]');
+  if(row){ touchId=t.identifier; swipeX=t.clientX; touchY=t.clientY; swipeId=row.getAttribute('data-swipe'); return; }
+  if(el.closest('.slide')){ touchId=t.identifier; touchX=t.clientX; touchY=t.clientY; }
 }
+// Sideways only when it is clearly more sideways than up or down: a thumb
+// scrolling the page drifts, and that drift used to turn the slide and lose
+// the kg and reps typed on it.
+function sideways(dx,dy){ return Math.abs(dx)>1.5*Math.abs(dy); }
 function onTouchEnd(e){
-  if(swipeX!==null){
-    var sdx=e.changedTouches[0].clientX-swipeX, id=swipeId;
-    swipeX=null; swipeId=null;
+  if(touchId===null) return;
+  var t=null;
+  for(var i=0;i<e.changedTouches.length;i++) if(e.changedTouches[i].identifier===touchId) t=e.changedTouches[i];
+  if(!t) return;
+  var sx=swipeX, id=swipeId, tx=touchX, dy=t.clientY-touchY;
+  touchReset();
+  if(sx!==null){
+    var sdx=t.clientX-sx;
+    if(Math.abs(sdx)<=45 || !sideways(sdx,dy)) return;
     // Left reveals Remove, right closes it again. One row open at a time, so a
     // Remove button is never sitting under your thumb by accident.
-    if(sdx<-45){ swipeOpen=id; render(); }
-    else if(sdx>45 && swipeOpen===id){ swipeOpen=null; render(); }
+    if(sdx<0){ swipeOpen=id; render(); }
+    else if(swipeOpen===id){ swipeOpen=null; render(); }
     return;
   }
-  if(touchX===null) return;
-  var dx=e.changedTouches[0].clientX-touchX; touchX=null;
-  if(Math.abs(dx)<50) return;
+  if(tx===null) return;
+  var dx=t.clientX-tx;
+  if(Math.abs(dx)<50 || !sideways(dx,dy)) return;
   if(!state.activeSession) return;
   var n=state.activeSession.exIds.length;
   if(dx<0 && slide<n-1){ slide++; render(); }
@@ -4790,6 +4809,7 @@ function boot(){
   setInterval(watchDay,30000);
   document.addEventListener('touchstart',onTouchStart,{passive:true});
   document.addEventListener('touchend',onTouchEnd,{passive:true});
+  document.addEventListener('touchcancel',touchReset,{passive:true});
   // Hidden or closing: a save still waiting on its timer goes now, because the
   // page may never run it. Looked at again: another view may have written in
   // the meantime, so re-read and merge.
