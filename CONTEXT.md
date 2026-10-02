@@ -37,13 +37,38 @@ embedded in the document, so shipping code never touches logged data. Absent
 means seed the store from that embedded copy, marker written last so a half
 migration is retried rather than believed.
 
-A view that cannot run `db` falls back to the old publish-to-save path, which
-still works. Declaring `db` makes the artifact organization-internal: it cannot
-be shared publicly. The fallback is only for a view with no store at all (`use('db')` is
-missing or answers null). A store that is there but fails to answer at load is
-`dbState='error'`: nothing can be changed, nothing is published, and the load is
-retried once on its own and then from a Retry button, because editing the
-embedded seed would be thrown away by the next load, which reads the store.
+Declaring `db` makes the artifact organization-internal: it cannot be shared
+publicly. The app is always published with `db` declared, so a view without a
+store is not a reason to save some other way. `dbState` is one of:
+
+- `loading`: until the store answers. Taps that change data are held.
+- `db`: the store answered and holds the truth.
+- `local`: there is no store to read, so the old publish-to-save path is
+  right. Only when the page is open outside the artifact runtime (no
+  `window.claude.use`), or its embedded seed carries `localOnly: true`, the
+  mark of a copy never moved into a store (the browser suites with no db stub
+  use it, through `env.localOnly`).
+- `error`: the store failed to answer at load, `use('db')` answered null (or
+  rejected), or the whole load took longer than `DB_BOOT_MS` (12s; the code
+  is then `timeout`). Nothing can be changed and nothing is published, because
+  editing the embedded seed would be thrown away by the next load, which reads
+  the store. The load is retried once on its own, then from the Retry button
+  or when the page is looked at again. Each load has a generation (`bootGen`),
+  so one given up on that answers late changes nothing.
+- `paused`: the store refused this view for good (`DB_LOST`: `revoked`,
+  `not_granted`, `capability_disabled`, `capability_removed`), at load or on a
+  save. Nothing more is taken or saved for this page load; a banner says
+  changes are no longer saved and offers Reload, without saying why access
+  went.
+
+A save that fails shows on the saving pill fixed to the bottom of the screen
+("Not saved, retrying", or "Not saved" when retrying cannot help) until a save
+lands, so a phone scrolled far down still sees it. The pill lives outside
+`#app`, is never rebuilt by a render, and is a polite live region, so a screen
+reader hears each change once. A change refused for good (`DB_HARD`:
+`invalid_argument`, `quota_exceeded`, `transform_error`) is named in the
+banner (`docLabel`: "your log for Fri 2 Oct", "the meal plan") and goes again
+with the next change.
 
 Which tab, slide and chart range a view is on, and which exercise histories
 and recipe cards are unfolded, is that device's, not the record's: it lives in
@@ -123,8 +148,9 @@ views' changes before each save and with `readAll` when it is looked at again.
 `MemoryStore(init)` is the same contract over a plain object, used by the
 headless suite (`test-store.js`). `dbDocs`/`dbApply` stay the serialisation
 layer either side: state in, `{path: body}` out, and back. A rejection carries
-`{code}`; `dbSave` treats the codes in `DB_HARD` as final and anything else as
-transient.
+`{code}`; `dbSave` treats the codes in `DB_HARD` as final for that change,
+those in `DB_LOST` as the end of saving for the page load (`paused`), and
+anything else as transient.
 
 A self-hosted backend would be a third Store, with the same paths as REST
 resources:
@@ -399,7 +425,8 @@ set's margins against the rig's limits while it is being authored.
   migration off the old `inPlan`/`day` pair.
 - `test-removal.js` — swipe-to-remove and undo.
 - `test-session.js` — prep steps, per-implement weights, sauna stints, search.
-- `test-db.js` — seeding, small saves, reload survival, and the fallback.
+- `test-db.js`: seeding, small saves, reload survival, how a failed save and
+  every `dbState` are shown, and the fallback.
 - `test-roundtrip.js` — state survives the trip through documents unchanged.
 - `test-store.js`: the Store contract over `MemoryStore`, and export then
   import reproducing the record exactly; malformed imports refused.

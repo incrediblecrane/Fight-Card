@@ -17,6 +17,9 @@ var inflight=0, peak=0, slowGetMs=0;
 // for `ms` and only lands in the store when it completes, which is what makes
 // an overlapping save observable.
 var failNext=[], setDelays=[];
+// failAll: every store request of those ops (all of them when ops is unset) is
+// refused with that code until it is cleared, as a store that has gone away is.
+var failAll=null;
 function take(list,op,path){
   for(var i=0;i<list.length;i++){ var f=list[i];
     if((!f.op||f.op===op) && String(path||'').indexOf(f.match||'')>-1){ list.splice(i,1); return f; } }
@@ -25,6 +28,8 @@ function take(list,op,path){
 function srvJson(r,body){ var b=JSON.stringify(body); r.setHeader('content-type','application/json'); r.setHeader('content-length',Buffer.byteLength(b)); r.end(b); }
 
 var SHIM=`<script>(function(){
+  // A page opened outside the artifact runtime has no window.claude at all.
+  if(window.__NO_CLAUDE) return;
   // The contract says delivered snapshots and their data() are FROZEN. A stub
   // that hands back mutable objects lets in-place mutation look like it works
   // when against the real store it is a silent no-op.
@@ -79,6 +84,9 @@ var SHIM=`<script>(function(){
   var ART={publish:function(h){ return fetch('/publish',{method:'POST',body:h})
       .then(function(){ setTimeout(function(){location.reload();},0); }); }};
   window.claude={use:function(n){
+    if(n==='db') window.__dbUses=(window.__dbUses||0)+1;
+    // A runtime that never answers at all, not even with null.
+    if(window.__DB_HANG && n==='db') return new Promise(function(){});
     if(window.__DB_OFF && n==='db') return Promise.resolve(null);
     return Promise.resolve(n==='db'?DB:(n==='artifact'?ART:null));
   }};
@@ -91,6 +99,8 @@ var srv=http.createServer(function(q,r){
       var raw=Buffer.concat(c).toString();
       if(q.url==='/publish'){ calls.publish++; doc=raw; return r.end('ok'); }
       var body=JSON.parse(raw||'{}'), op=q.url.slice(4);
+      if(failAll && op!=='slow' && (!failAll.ops||failAll.ops.indexOf(op)>-1)){
+        if(op==='set'||op==='update') calls.set++; return srvJson(r,{err:failAll.code}); }
       var f=take(failNext,op,body.path);
       if(f){ if(op==='set'||op==='update') calls.set++; return srvJson(r,{err:f.code}); }
       // The real store hands documents back with their keys in alphabetical
@@ -175,7 +185,7 @@ srv.listen(0,async function(){
     for(var n=-1,k=0; k<40 && n!==calls.set+calls.del; k++){ n=calls.set+calls.del; await p.waitForTimeout(250); }
   };
   // Scripted trouble never outlives the check that set it up.
-  var go=async function(){ failNext.length=0; setDelays.length=0; await p.goto(url); await settle(); await toToday(); };
+  var go=async function(){ failNext.length=0; setDelays.length=0; failAll=null; await p.goto(url); await settle(); await toToday(); };
   // The day the APP is on: local to the page, which runs in a timezone of its
   // own, so never the harness's UTC date.
   var today=function(){ return p.evaluate(function(){
@@ -2202,16 +2212,177 @@ srv.listen(0,async function(){
     } finally { await p.evaluate(function(){ localStorage.removeItem('fc.backup'); }); await putBack(was); }
   });
 
-  console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
-  await t('a view that cannot run db falls back to publish-to-save', async function(){
-    await p.addInitScript(function(){ window.__DB_OFF=true; });
-    var docBefore2=doc;
+  console.log('\nA SAVE THAT FAILS SAYS SO WHERE IT IS SEEN AND HEARD');
+  // A view of its own, on a phone-sized screen, so what it is opened with
+  // never carries over to the next check.
+  var fresh=async function(init){
+    var ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,
+      timezoneId:process.env.FC_TZ||'Pacific/Kiritimati'});
+    var q=await ctx.newPage(); q.setDefaultTimeout(8000);
+    q.on('pageerror',function(e){errs.push('own view: '+e.message);});
+    if(init) await q.addInitScript(init);
+    await q.goto(url); await q.waitForTimeout(400);
+    return q;
+  };
+  var qToday=async function(q){
+    if(await q.locator('[data-action="cancelsession"]').count()){ await q.click('[data-action="cancelsession"]'); await q.waitForTimeout(300); }
+    if(await q.locator('[data-action="tab"][data-tab="today"]').count()){ await q.click('[data-action="tab"][data-tab="today"]'); await q.waitForTimeout(300); }
+  };
+  var qWater=function(q){ return q.evaluate(function(){
+    var cards=[].slice.call(document.querySelectorAll('.card'));
+    for(var i=0;i<cards.length;i++){ var h=cards[i].querySelector('h3');
+      if(h&&/Water/i.test(h.textContent)) return cards[i].querySelector('.count').textContent.trim(); }
+    return null; }); };
+  // What on screen, right now, says the change was not saved: in view, not
+  // faded out, and a live region a screen reader announces.
+  var notSaved=function(q){ return q.evaluate(function(){
+    var out=[];
+    [].forEach.call(document.querySelectorAll('body *'),function(el){
+      if(!/not saved/i.test(el.textContent)||el.children.length) return;
+      var r=el.getBoundingClientRect(), cs=getComputedStyle(el);
+      if(!r.width||!r.height||r.bottom<=0||r.top>=innerHeight||+cs.opacity<1||cs.visibility!=='visible') return;
+      var live=null; for(var a=el;a&&a!==document.body;a=a.parentElement){
+        if(a.getAttribute('aria-live')||/^(alert|status)$/.test(a.getAttribute('role')||'')){ live=a; break; } }
+      if(!live) return;
+      out.push({text:el.textContent.trim(), inApp:!!el.closest('#app'), top:Math.round(r.top)});
+    });
+    return out; }); };
+  await t('a refused save on a page scrolled far down is shown and announced until a save lands', async function(){
+    // A long list of recipes to scroll, whatever the checks before left.
+    var was=JSON.parse(JSON.stringify(store));
+    (env.seedOf(doc).recipes||[]).forEach(function(r){ if(!store['recipes/'+r.id]) store['recipes/'+r.id]=r; });
     await go();
+    var q=await fresh();
+    try{
+      await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); });
+      await qToday(q);
+      await q.click('[data-action="tab"][data-tab="meals"]');
+      await q.waitForSelector('[data-action="addmeal"]',{timeout:4000}).catch(async function(){
+        console.log('        Meals had no recipes: '+(await q.evaluate(function(){ return document.body.innerText.slice(0,400); })).replace(/\n/g,' | ')); });
+      var adds=q.locator('[data-action="addmeal"]'), n=await adds.count();
+      assert.ok(n>5,'too few recipes on Meals to scroll: '+n);
+      failAll={code:'unavailable',ops:['set','update']};
+      var add=adds.nth(Math.min(20,n-1)); await add.scrollIntoViewIfNeeded(); await add.tap();
+      await q.waitForTimeout(2500);
+      assert.ok(await q.evaluate(function(){ return scrollY>400; }),'the page was not scrolled down, so this proves nothing');
+      var seen=await notSaved(q);
+      assert.ok(seen.length,'nothing in view says the change was not saved');
+      assert.ok(seen.some(function(s){ return /retrying/i.test(s.text); }),'it does not say it is trying again: '+JSON.stringify(seen));
+      assert.ok(seen.every(function(s){ return !s.inApp; }),'the notice is redrawn with the page, so it is announced afresh or not at all');
+      // Moving around does not take it away: only a save that lands does.
+      await q.evaluate(function(){ window.scrollTo(0,0); });
+      await q.click('[data-action="tab"][data-tab="today"]'); await q.waitForTimeout(400);
+      assert.ok((await notSaved(q)).length,'the notice went away while nothing was saved');
+      failAll=null;
+      for(var k=0;k<60 && (await notSaved(q)).length;k++) await q.waitForTimeout(250);
+      assert.ok(!(await notSaved(q)).length,'the notice stayed up after the store took the save again');
+      // Refused for good: no promise of another try.
+      await q.click('[data-action="tab"][data-tab="meals"]'); await q.waitForTimeout(400);
+      failAll={code:'invalid_argument',ops:['set','update']};
+      await q.locator('[data-action="addmeal"]').first().tap(); await q.waitForTimeout(2500);
+      seen=await notSaved(q);
+      assert.ok(seen.length && seen.every(function(s){ return !/retrying/i.test(s.text); }),'a refusal for good is not shown as one: '+JSON.stringify(seen));
+      failAll=null;
+      await q.locator('[data-action="addmeal"]').first().tap(); await q.waitForTimeout(2500);
+      assert.ok(!(await notSaved(q)).length,'the notice stayed up after a save landed');
+    } finally { failAll=null; await q.context().close();
+      Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); }
+    await go();
+  });
+
+  await t('a change refused for good names what it was', async function(){
+    await go();
+    failNext.push({op:'set',match:'days/',code:'invalid_argument'});
+    await p.click(W); await p.waitForTimeout(2500);
+    assert.strictEqual(failNext.length,0,'the save was never refused, so this proves nothing');
     var body=await text();
-    assert.ok(!/loading your data/.test(body),'it never left the loading state');
-    await p.click('[data-action="water"][data-d="1"]');
-    await p.waitForTimeout(2200);
-    assert.notStrictEqual(doc,docBefore2,'nothing was saved at all without db');
+    assert.ok(/could not be saved/i.test(body),'nothing says the change was not saved');
+    assert.ok(/log for /i.test(body),'it does not say which change failed: '+body.slice(0,300));
+    await p.click(W); await p.waitForTimeout(1800);
+    await p.click('[data-action="water"][data-d="-1"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="water"][data-d="-1"]'); await settle();
+  });
+
+  await t('once the store refuses this view for good, taps are held and it says changes are not saved', async function(){
+    await go();
+    failAll={code:'revoked'};
+    try{
+      await p.click(W); await p.waitForTimeout(2500);
+      var shown=await waterCount(), sets=calls.set;
+      await p.click(W); await p.waitForTimeout(200); await p.click(W); await p.waitForTimeout(2000);
+      assert.strictEqual(await waterCount(),shown,'taps were still taken after the store refused this view for good');
+      assert.strictEqual(calls.set,sets,'it went on writing to a store that refused it for good');
+      var body=await text();
+      assert.ok(/no longer being saved/i.test(body),'nothing says changes are no longer saved: '+body.slice(0,300));
+      assert.ok(!/revoked/i.test(body),'it explains why access was lost');
+      assert.ok(await p.locator('[data-action="reload"]').count(),'Reload is not offered');
+      failAll=null;
+      await Promise.all([p.waitForNavigation(),p.click('[data-action="reload"]')]); await settle();
+      assert.ok(!/no longer being saved/i.test(await text()),'the paused message is still up after a reload');
+    } finally { failAll=null; }
+    await go();
+  });
+
+  await t('a view whose store answers null pauses changes and never republishes over it', async function(){
+    await go(); var pubs=calls.publish, docBefore=doc, day=await today(), held0=dayWater(day);
+    var q=await fresh('window.__DB_OFF=true;');
+    try{
+      await q.waitForSelector('[data-action="retryload"]');
+      var uses=await q.evaluate(function(){ return window.__dbUses; });
+      await qToday(q);
+      var shown=await qWater(q);
+      if(await q.locator(W).count()){ await q.click(W); await q.waitForTimeout(2200); }
+      assert.strictEqual(calls.publish,pubs,'the page republished itself over the store');
+      assert.strictEqual(doc,docBefore,'the document was rewritten');
+      assert.strictEqual(await qWater(q),shown,'a tap was taken with no store to save it in');
+      // It asks again on its own, and Retry asks again when told.
+      await q.waitForFunction(function(u){ return window.__dbUses>u; },uses,{timeout:4000});
+      await q.waitForSelector('[data-action="retryload"]');
+      await q.evaluate(function(){ window.__DB_OFF=false; });
+      await q.click('[data-action="retryload"]');
+      await q.waitForFunction(function(){ return !/loading your data|Could not load/.test(document.body.innerText); });
+      assert.strictEqual(dayWater(day),held0,'the store changed');
+    } finally { await q.context().close(); }
+  });
+
+  await t('a store that never answers ends in Retry, and looking at the page again tries once more', async function(){
+    await go();
+    var q=await fresh('window.__DB_HANG=true;');
+    try{
+      assert.ok(/loading your data/.test(await q.evaluate(function(){ return document.body.innerText; })),'no loading state was shown');
+      await q.waitForSelector('[data-action="retryload"]',{timeout:20000});
+      // The one retry of its own hangs as well and ends the same way.
+      await q.waitForFunction(function(){ return window.__dbUses>=2; },null,{timeout:5000});
+      await q.waitForSelector('[data-action="retryload"]',{timeout:20000});
+      await q.evaluate(function(){ window.__DB_HANG=false; document.dispatchEvent(new Event('visibilitychange')); });
+      await q.waitForFunction(function(){ return !/loading your data|Could not load/.test(document.body.innerText); });
+    } finally { await q.context().close(); }
+  });
+
+  await t('opened outside the artifact runtime it says so at once, and not that it is loading', async function(){
+    var q=await fresh('window.__NO_CLAUDE=true;');
+    try{
+      await q.waitForTimeout(600);
+      var bs=await q.evaluate(function(){ return [].map.call(document.querySelectorAll('.banner'),function(x){ return x.textContent; }); });
+      assert.strictEqual(bs.length,1,'banners shown: '+JSON.stringify(bs));
+      assert.ok(/artifact link/.test(bs[0]),'the one banner is not the local one: '+bs[0]);
+    } finally { await q.context().close(); }
+  });
+
+  console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
+  await t('a copy never moved into a store falls back to publish-to-save', async function(){
+    var docBefore2=doc;
+    doc=env.localOnly(doc);
+    var docLocal=doc, q=await fresh('window.__DB_OFF=true;');
+    try{
+      await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); });
+      assert.ok(!(await q.locator('[data-action="retryload"]').count()),'a copy with no store to read is offered Retry');
+      await qToday(q);
+      await q.click('[data-action="water"][data-d="1"]');
+      await q.waitForTimeout(2200);
+      assert.notStrictEqual(doc,docLocal,'nothing was saved at all without db');
+      assert.ok(env.seedOf(doc).localOnly,'the saved copy no longer says it was never moved into a store');
+    } finally { await q.context().close(); doc=docBefore2; }
   });
 
   await t('no page errors throughout', function(){

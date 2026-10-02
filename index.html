@@ -125,6 +125,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .banner{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--warn);text-align:center;margin-bottom:10px;}\
 .savepill{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:20;pointer-events:none;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);background:var(--surface-raised);border:1px solid var(--line);border-radius:999px;padding:4px 12px;opacity:0;transition:opacity .2s;}\
 .savepill.on{opacity:1;}\
+.savepill.fail{background:var(--warn);border-color:var(--warn);color:var(--warn-ink);font-weight:600;}\
 .banner button{font:inherit;color:inherit;background:none;border:1px solid currentColor;border-radius:999px;padding:2px 10px;margin-left:6px;cursor:pointer;}\
 .resume-banner{background:var(--surface-raised);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.86rem;}\
 .resume-banner .btns{display:flex;gap:8px;flex-shrink:0;}\
@@ -916,13 +917,27 @@ var artifactApi=null;
 // once it has taken more than half a second: a note in the page flow pushed
 // everything down and back up after every tap. The pill is updated in place,
 // so saving never costs a render.
-var savingShown=false, savingTimer=null;
+// A save that failed stays on it until one lands. A banner at the top of the
+// page was the only sign before, and a phone scrolled down to a recipe never
+// showed it, while the pill going off looked like the save had worked. The
+// pill sits outside #app, so a render never rebuilds it and a screen reader
+// hears each change to it once.
+var savingShown=false, savingTimer=null, pillClear=null;
 function setSaving(on){
   if(savingTimer){ clearTimeout(savingTimer); savingTimer=null; }
   if(on) savingTimer=setTimeout(function(){ savingTimer=null; savingShown=true; paintSaving(); },500);
   else { savingShown=false; paintSaving(); }
 }
-function paintSaving(){ var el=document.getElementById('savepill'); if(el) el.className='savepill'+(savingShown?' on':''); }
+function paintSaving(){
+  var el=document.getElementById('savepill'); if(!el) return;
+  var fail=!!dbErr&&(dbState==='db'||dbState==='paused'), txt=fail?(dbState==='db'&&!dbErrHard?'Not saved, retrying':'Not saved'):savingShown?'saving\u2026':'';
+  el.className='savepill'+(fail||savingShown?' on':'')+(fail?' fail':'');
+  if(pillClear){ clearTimeout(pillClear); pillClear=null; }
+  // Faded out with its words still on it, then emptied, so nothing is read
+  // out of a pill that is not showing.
+  if(txt){ if(el.textContent!==txt) el.textContent=txt; }
+  else pillClear=setTimeout(function(){ pillClear=null; if(el.className==='savepill') el.textContent=''; },250);
+}
 // Ids of fields a tap has just read and acted on, which the next render draws
 // afresh instead of putting back what was typed in them.
 var clearOnRender={};
@@ -1530,25 +1545,52 @@ function dbSeed(st){
     .then(function(){ return docs; });
 }
 
-/* 'local' means there is no store: use() is missing or answered null, and
-   publish-to-save is right. A store that is there but failed to answer is
-   'error', which is not the same thing at all. Falling back to the seed then
+/* 'local' means there is no store to read: this page is open outside the
+   artifact runtime, or its seed says it was never moved into one (localOnly),
+   and publish-to-save is right. Anything else is 'error'. A store that is there
+   but failed to answer is, and so is a runtime that answers null, since this
+   app is only ever published with db declared: falling back to the seed then
    meant editing a stale copy and republishing it, and every one of those taps
    was lost on the next load, which reads the store. So in 'error' nothing is
    changed or published, and the load is retried: once on its own, then from
-   the Retry button. */
-var booting=false, bootRetried=false;
+   the Retry button or on the page being looked at again. A load that has not
+   finished in DB_BOOT_MS is 'error' too, and whatever it was waiting on is
+   ignored if it answers later: bootGen moves on, and each step checks it.
+   'paused' is a store that has refused this view for good (DB_LOST): nothing
+   can be saved for the rest of this page load, so nothing is taken. */
+var booting=false, bootRetried=false, bootGen=0, DB_BOOT_MS=12000;
+var DB_LOST={revoked:1, not_granted:1, capability_disabled:1, capability_removed:1};
+function dbHeld(){ return dbState==='loading'||dbState==='error'||dbState==='paused'; }
+function retryBoot(){
+  if(booting||(dbState!=='error'&&dbState!=='loading')) return;
+  dbState='loading'; render(); dbBoot();
+}
+function bootFailed(e){
+  dbErr=(e&&e.code)||'unavailable';
+  if(DB_LOST[dbErr]){ dbState='paused'; render(); return; }
+  dbState='error'; render();
+  if(!bootRetried){ bootRetried=true; setTimeout(function(){
+    if(dbState==='error') retryBoot(); },1000+Math.random()*500); }
+}
 function dbBoot(){
-  if(!window.claude || !window.claude.use){ dbState='local'; return; }
-  if(booting||dbState==='db') return;
+  if(!window.claude || !window.claude.use){ dbState='local'; render(); return; }
+  if(booting||dbState==='db'||dbState==='paused'||dbState==='local') return;
   booting=true;
-  claude.use('db').then(function(db){
-    if(!db){ dbState='local'; render(); return; }
+  var gen=++bootGen, STALE={};
+  // Every step of a load that was given up on stops where it is.
+  function live(f){ return function(v){ if(gen!==bootGen) throw STALE; return f(v); }; }
+  var timer=setTimeout(function(){ if(gen!==bootGen) return; bootGen++; booting=false; bootFailed({code:'timeout'}); },DB_BOOT_MS);
+  // A use() that rejects is read as the null it should have answered.
+  claude.use('db').then(null,function(){ return null; }).then(live(function(db){
+    if(!db){
+      if(DATA.localOnly){ dbState='local'; render(); return; }
+      throw {code:'unavailable'};
+    }
     dbStore=DbStore(db);
     var resume=null;
-    return dbStore.get('state/meta').then(function(meta){
+    return dbStore.get('state/meta').then(live(function(meta){
       dbMeta=meta||null;
-      if(meta) return dbStore.readAll().then(function(map){
+      if(meta) return dbStore.readAll().then(live(function(map){
         map=dbUnpendAll(map);
         state=dbApply(map);
         lastSaved=dbSnapshot(map);
@@ -1576,23 +1618,21 @@ function dbBoot(){
           if(meta.importing) importStuck=true;
         }
         if(moved) scheduleSave();
-      });
+      }));
       // First run on this store: the document's own seed is the truth, and
       // no import left on this device can be about it.
       clearPending();
-      return dbSeed(state).then(function(docs){ lastSaved=dbSnapshot(docs); });
-    }).then(function(){
+      return dbSeed(state).then(live(function(docs){ lastSaved=dbSnapshot(docs); }));
+    })).then(live(function(){
       dbState='db'; dbErr=null;
       syncFromState();
       if(resume){ importBusy=true; importNote='The import that was cut off is finished.'; saveNow=resume; persist(); }
       render();
-    });
-  }).catch(function(e){
-    if(!dbStore){ dbState='local'; render(); return; }
-    dbErr=(e&&e.code)||'unavailable'; dbState='error'; render();
-    if(!bootRetried){ bootRetried=true; setTimeout(function(){
-      if(dbState!=='error') return; dbState='loading'; render(); dbBoot(); },1000+Math.random()*500); }
-  }).then(function(){ booting=false; });
+    }));
+  })).then(function(){ if(gen===bootGen){ clearTimeout(timer); booting=false; } },function(e){
+    if(gen!==bootGen) return;
+    clearTimeout(timer); booting=false; bootFailed(e);
+  });
 }
 
 /* The store replaces state wholesale, and a session loaded from it may
@@ -1967,14 +2007,27 @@ function dbFold(replace){
    because the document it had to remove was still being created. A save
    asked for meanwhile runs when this one is done, and lastSaved moves one
    document at a time, as each write lands. */
-var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, saveNow=false, saveSync=false;
+var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, dbErrPath=null, saveNow=false, saveSync=false;
 // Which save last recorded each document in lastSaved, so a write from an
 // older save landing late can never put back a snapshot a newer one replaced.
 var saveGen=0, savedGen={};
-// Retrying cannot fix these; anything else, unknown codes included, is
-// treated as transient, as the store's contract says to.
-var DB_HARD={invalid_argument:1, quota_exceeded:1, revoked:1, not_granted:1,
-  capability_disabled:1, capability_removed:1, transform_error:1};
+// Retrying cannot fix these, for the change that was refused; the next change
+// still gets its go. Those in DB_LOST end saving for the page load. Anything
+// else, unknown codes included, is treated as transient, as the store's
+// contract says to.
+var DB_HARD={invalid_argument:1, quota_exceeded:1, transform_error:1};
+// What a document is, in words, for saying which change was refused.
+function docLabel(path){
+  var i=path.indexOf('/'), kind=path.slice(0,i), id=path.slice(i+1);
+  if(kind==='days') return 'your log for '+prettyKey(id);
+  if(kind==='recipes'){ var r=(state.recipes||[]).filter(function(x){ return x.id===id; })[0]; return r?'the recipe '+r.title:'a recipe'; }
+  return ({workoutLogs:'a finished session', sauna:'a sauna visit', library:'a note', plan:'the meal plan',
+    'state/profile':'your XP and targets', 'state/shopping':'the shopping list', 'state/session':'the session in progress',
+    'state/meta':'the import'})[kind==='state'?path:kind]||'your data';
+}
+// A refusal carries the document it was for, so it can be named.
+function forDoc(path,run){ return function(){ return run().then(null,function(e){
+  throw {code:(e&&e.code)||'unavailable', message:e&&e.message, path:path}; }); }; }
 /* Every job runs to the end, and the first refusal is reported only once all
    of them have. Rejecting on the first one let the next save start while
    its siblings were still out, and one of those could then land last. */
@@ -1989,7 +2042,9 @@ function dbSettle(list){
    'put' and 'replace' write an import as whole documents, after reading the
    whole store (see dbFold); 'replace' then deletes whatever it leaves out. */
 function dbSave(){
-  if(!dbStore) return;
+  // Not while held: a save asked for before the store refused this view for
+  // good would otherwise still go once the one in flight was refused.
+  if(!dbStore||dbState!=='db') return;
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
   var retrying=false, mode=saveNow, all=!mode&&saveSync, gen=++saveGen; saveNow=false; if(all) saveSync=false;
@@ -2037,17 +2092,17 @@ function dbSave(){
       }
       else job=put;
       function put(){ return dbStore.put(path,docs[path]).then(function(){ landed(path,next[path]); }); }
-      if(ending&&path.indexOf('workoutLogs/')===0) logs.push(function(){ var pr=job(); landing.push(pr); return pr; });
-      else if(ending&&path==='state/session') session=function(){ return Promise.all(landing).then(job); };
-      else jobs.push(job);
+      if(ending&&path.indexOf('workoutLogs/')===0) logs.push(forDoc(path,function(){ var pr=job(); landing.push(pr); return pr; }));
+      else if(ending&&path==='state/session') session=forDoc(path,function(){ return Promise.all(landing).then(job); });
+      else jobs.push(forDoc(path,job));
     });
     Object.keys(lastSaved).forEach(function(path){
       // A blank day the store holds is left there and forgotten: it is no
       // record, and deleting it unread could take a tap another view just made.
       if(next[path]===undefined && mode!=='put' && mode!=='replace' && path.indexOf('days/')===0 && isBlankDay(savedBody(path))){
         delete lastSaved[path]; savedGen[path]=gen; return; }
-      if(next[path]===undefined) jobs.push(function(){
-        return dbStore.remove(path).then(function(){ landed(path,undefined); }); });
+      if(next[path]===undefined) jobs.push(forDoc(path,function(){
+        return dbStore.remove(path).then(function(){ landed(path,undefined); }); }));
     });
     // Logs first and the session straight after, so it waits on nothing else:
     // a write of anything else that is slow or refused never holds it back.
@@ -2073,19 +2128,23 @@ function dbSave(){
       setSaving(false); importBusy=false; importStuck=false; importResume=null; importProg=null; dataMsg=importNote; importNote=''; render(); });
   }).then(function(){
     saveAttempt=0;
-    if(dbErr){ dbErr=null; dbErrHard=false; render(); }
+    if(dbErr){ dbErr=null; dbErrHard=false; dbErrPath=null; paintSaving(); render(); }
   }, function(e){
     // Whatever did not land is still different from lastSaved, so the next
     // save carries it. A transient refusal gets that next save on its own,
     // backing off 2s, 4s, 8s up to 30s; one that retrying cannot fix waits
     // for the next change and says so.
-    setSaving(false); dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr];
+    dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr]||!!DB_LOST[dbErr]; dbErrPath=(e&&e.path)||null;
+    // Refused for good: held like a load that failed, with Reload offered.
+    if(DB_LOST[dbErr]){ dbState='paused'; if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; } }
+    setSaving(false);
     // An import still owed goes the same way next time: a re-read and merge
     // would put the old days back over it.
     if((mode==='put'||mode==='replace') && !saveNow) saveNow=mode;
     // One that retrying cannot fix is unfinished until the next change carries
     // it, so Put back and Leave it are offered again, as for one cut off.
     if((mode==='put'||mode==='replace') && dbErrHard){ importBusy=false; importStuck=true; importProg=null; }
+    if(dbState==='paused'){ render(); return; }
     if(!dbErrHard){
       retrying=true;
       if(saveTimer) clearTimeout(saveTimer);
@@ -2104,9 +2163,10 @@ function persist(){
   // Once the store is live it is the only place data goes; republishing the
   // whole document would put a stale copy of it back inside the code.
   if(dbState==='db'){ dbSave(); return; }
-  // Loading: dbBoot will settle and save from there. Error: there is a store
-  // and it holds the truth, so publishing the seed would be the worst answer.
-  if(dbState==='loading'||dbState==='error') return;
+  // Loading: dbBoot will settle and save from there. Error and paused: there
+  // is a store and it holds the truth, so publishing the seed would be the
+  // worst answer.
+  if(dbHeld()) return;
   if(!window.claude || !window.claude.use){ render(); return; }
   setSaving(true);
   claude.use('artifact').then(function(ns){
@@ -4057,12 +4117,13 @@ function bodyContent(){
   return '<div class="wrap'+(offDay?' backfilling':'')+'">'+
       (dbState==='loading'?'<div class="banner">loading your data&hellip;</div>':'')+
       (dbState==='error'?'<div class="banner">Could not load your saved data ('+esc(dbErr||'unavailable')+'). Changes are paused until it loads. <button data-action="retryload">Retry</button></div>':'')+
-      '<div id="savepill" class="savepill'+(savingShown?' on':'')+'" role="status">saving&hellip;</div>'+
+      // Why access went is the platform's to say, not this page's.
+      (dbState==='paused'?'<div class="banner">Changes are no longer being saved, so they are paused. <button data-action="reload">Reload</button></div>':'')+
       (dbErr&&dbState==='db'?'<div class="banner">'+(dbErrHard?
-        'Your last change could not be saved ('+esc(dbErr)+').':
+        (dbErrPath?'A change to '+esc(docLabel(dbErrPath)):'Your last change')+' could not be saved ('+esc(dbErr)+'). It goes again with your next change.':
         'Trouble reaching your saved data ('+esc(dbErr)+'). Trying again.')+'</div>':'')+
       (importBusy?'<div class="banner importprog" role="status">'+esc(importText())+'</div>':'')+
-      (importStuck&&!importBusy?'<div class="banner" role="alert">An import did not finish, so your data may be part old and part new.'+
+      (importStuck&&!importBusy&&dbState!=='paused'?'<div class="banner" role="alert">An import did not finish, so your data may be part old and part new.'+
         (importResume?' <button data-action="importfinish">Finish the import started '+esc(whenKept(importResume.at))+'</button>':'')+
         // The copy is from before that import only if it was this device's.
         (readBackup()?' <button data-action="restorebackup">'+(hasPending()?'Put back the data from before':
@@ -4235,7 +4296,9 @@ function onClick(e){
     closepicker:1,prange:1,cancelsession:1,resumesession:1,dismissundo:1};
   // A store that failed to answer is held off the same way, and Retry is the
   // one thing that can move it on.
-  if(action==='retryload'){ if(dbState==='error'){ dbState='loading'; render(); dbBoot(); } return; }
+  if(action==='retryload'){ if(dbState==='error') retryBoot(); return; }
+  // Once the store has refused this view for good only a fresh load can reach it.
+  if(action==='reload'){ location.reload(); return; }
   // A chart mark only changes the words above its own chart. Rendering would
   // put the head line straight back, so this writes it and stops.
   if(action==='charttip'){ var ch=t.closest('.chart'), sub=ch&&ch.querySelector('.chart-head .sub');
@@ -4243,7 +4306,7 @@ function onClick(e){
   // The desktop × on a history row only shows on hover. On touch it is never
   // seen, so a tap that reaches it anyway must not delete the row.
   if(t.classList.contains('swipe-x') && window.matchMedia && !matchMedia('(hover:hover)').matches) return;
-  if((dbState==='loading'||dbState==='error') && !UI_ONLY_WHILE_LOADING[action]) return;
+  if(dbHeld() && !UI_ONLY_WHILE_LOADING[action]) return;
   if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
   else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
   else if(action==='pickday'){ setLogDate(t.getAttribute('data-k')); tab='today'; render(); return; }
@@ -4590,7 +4653,7 @@ function onChange(e){
   }
   // Same reason as onClick: state is about to be replaced by the store, so a
   // change applied now would be thrown away rather than saved.
-  else if(dbState==='loading'||dbState==='error'){ render(); return; }
+  else if(dbHeld()){ render(); return; }
   // Picking a day or a slot plans nothing on its own, so there is nothing to
   // save and nothing to redraw: it is remembered until Add is pressed.
   else if(action==='planday'){ var id=t.getAttribute('data-id');
@@ -4654,7 +4717,7 @@ function onPointerUp(){ pointerDown=false; if(renderOnUp) setTimeout(function(){
    page has to catch up. Meals for the day just gone are spent then, too. */
 function watchDay(){
   if(realToday()===drawnDay) return;
-  if(dbState!=='loading' && dbState!=='error' && prunePlan()) scheduleSave();
+  if(!dbHeld() && prunePlan()) scheduleSave();
   render();
 }
 
@@ -4733,7 +4796,8 @@ function boot(){
   document.addEventListener('visibilitychange',function(){
     if(document.visibilityState==='hidden') flushSave();
     // The day may have turned while nobody was looking, so draw it again.
-    else { render(); if(dbState==='db'){ saveSync=true; dbSave(); } }
+    // A load that failed or is stuck gets another go too.
+    else { render(); if(dbState==='db'){ saveSync=true; dbSave(); } else retryBoot(); }
   });
   window.addEventListener('pagehide',flushSave);
   // A session already in flight when this shipped has no prep steps; give it
@@ -4743,6 +4807,12 @@ function boot(){
   // Everything this file declares has been assigned by now, which is why the
   // plan migration is here rather than beside the other state fix-ups.
   migratePlan(); prunePlan(); migrateMinutes();
+  var pill=document.createElement('div'); pill.id='savepill'; pill.className='savepill';
+  pill.setAttribute('role','status'); pill.setAttribute('aria-live','polite'); pill.setAttribute('aria-atomic','true');
+  document.body.appendChild(pill);
+  // Opened outside the artifact runtime there is nothing to wait for, so the
+  // first frame says so rather than that it is loading.
+  if(!window.claude || !window.claude.use) dbState='local';
   render();
   dbBoot();
   if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); }); }

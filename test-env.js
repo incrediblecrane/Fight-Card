@@ -38,4 +38,9 @@ function withSeed(doc,data){
   var s=seedAt(doc);
   return doc.slice(0,s.at)+'JSON.parse('+JSON.stringify(JSON.stringify(data)).replace(/</g,'\\u003c')+')'+doc.slice(s.end);
 }
-module.exports={PUBLISH:PUBLISH, readDoc:readDoc, launch:launch, seedAt:seedAt, seedOf:seedOf, withSeed:withSeed};
+// The document marked as a copy never moved into a store. The app treats a
+// runtime that answers null for db as a store it cannot reach, and pauses;
+// only a copy marked this way saves by republishing itself, which is the path
+// the suites with no db stub drive.
+function localOnly(doc){ var st=seedOf(doc); st.localOnly=true; return withSeed(doc,st); }
+module.exports={PUBLISH:PUBLISH, readDoc:readDoc, launch:launch, seedAt:seedAt, seedOf:seedOf, withSeed:withSeed, localOnly:localOnly};

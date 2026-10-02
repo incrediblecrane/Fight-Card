@@ -5,7 +5,7 @@
 // AND reloads, which is the thing that used to lose state silently.
 var http=require('http'),fs=require('fs'),assert=require('assert');
 var env=require('./test-env.js');
-var doc=env.readDoc();
+var doc=env.localOnly(env.readDoc());
 // What the app last saved, as the JSON its state is.
 function savedJson(){ return JSON.stringify(env.seedOf(doc)); }
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'

@@ -4,7 +4,7 @@
 // Everything below is a thing the old shape could not do.
 var http=require('http'),fs=require('fs'),assert=require('assert');
 var env=require('./test-env.js');
-var doc=env.readDoc();
+var doc=env.localOnly(env.readDoc());
 
 /* The seed ships with every recipe inPlan:false, so nothing in it exercises
    the migration off the old shape. Tick one before the page ever loads, which

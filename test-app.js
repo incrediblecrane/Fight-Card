@@ -10,7 +10,7 @@
 var http=require('http'), fs=require('fs'), assert=require('assert');
 var env=require('./test-env.js');
 
-var doc=(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
+var doc=env.localOnly(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
 
 /* A warm-up whose ONLY entries are light sets at a weight. There is nothing to
    plot on a minutes chart, and reading the personal best off an empty series

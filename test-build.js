@@ -55,7 +55,7 @@ async function t(name,fn){
   await t('index.html as it sits in the repo', async function(){ await load(h); await one('index.html'); });
   await t('the document the app writes when it saves itself', async function(){
     // No db, so a tap goes the old way: the app regenerates its own document.
-    await load(env.readDoc());
+    await load(env.localOnly(env.readDoc()));
     await p.click('[data-action="tab"][data-tab="today"]');
     await p.click('[data-action="water"][data-d="1"]');
     await p.waitForFunction(function(){ return !!window.__pub; });
@@ -92,7 +92,7 @@ async function t(name,fn){
   });
   await t('the document the app writes for itself keeps them too', async function(){
     // Typed in on a clean page, so only the app's own fullDocument writes them.
-    await loadQuick(env.readDoc());
+    await loadQuick(env.localOnly(env.readDoc()));
     await p.click('[data-action="tab"][data-tab="training"]');
     for(var ni=0;ni<NOTES.length;ni++){
       await p.fill('#lib-title','Note '+ni); await p.fill('#lib-notes',NOTES[ni]);
@@ -109,6 +109,8 @@ async function t(name,fn){
   await t('a key named __proto__ survives the document, a load and the next save', async function(){
     var seed=env.seedOf(h);
     seed.library=[{id:'n1',title:'Proto',tag:'Note',notes:'KEEP'}];
+    // Saved by republishing, which only a copy never moved into a store does.
+    seed.localOnly=true;
     fs.writeFileSync(tmp+'/proto.json',JSON.stringify(seed).replace('"notes":"KEEP"','"notes":"KEEP","__proto__":{"kept":1}'));
     build([tmp+'/proto.html','--state',tmp+'/proto.json']);
     var own=function(d,where){ var l=env.seedOf(d).library[0];
