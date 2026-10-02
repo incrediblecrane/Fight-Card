@@ -24,6 +24,8 @@ var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grab
   grabVar('DAY_MAX'), h.match(/var EX=\[[\s\S]*?\n\];/)[0], grab('isSuperset'), grab('exDef'), grab('blankDay'), grab('wholeDay'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
   grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('isBlankDay'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
+  grab('stableJson'), grab('mergeKeyed'), grab('setKey'), grab('mergeSetLogs'), grab('mergeSession'), grab('mergeActive'), grab('mergeSessionDoc'), grab('dbMerge'), grab('foldPend'),
+  h.match(/var DUMP_COLL=[^\n]*\n/)[0], grab('readDump'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
 var box={};
 new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this.exportText=exportText;'+
@@ -283,6 +285,99 @@ t('MemoryStore keeps the db contract: copies out, update needs the document', as
   await s.remove('state/profile'); off(); await s.put('state/profile',{});
   assert.strictEqual(await s.get('nope/x'),undefined);
   assert.deepStrictEqual(heard,['state/profile','state/profile']);
+});
+
+/* A dump of the old artifact's store, as ArtifactData reads it out: every
+   document under its path. OLD_DOCS is dbDocs as it was at 5aba0f6, the
+   handoff, verbatim, so the documents are shaped exactly as that version
+   wrote them: the profile carrying the view's tab and slide, no week target,
+   a session with no id or ended list, recipes holding a render cache and the
+   old inPlan/day, drills in seconds. */
+var OLD_DOCS=function dbDocs(st){
+  var out={};
+  out['state/profile']={waterTarget:st.waterTarget, totalXp:st.totalXp,
+    uiTab:st.uiTab||'today', uiSlide:st.uiSlide||0, uiProgRange:st.uiProgRange||14,
+    uiViewingSession:!!st.uiViewingSession};
+  // A document body is an object, so a list or a nullable session is wrapped.
+  out['state/shopping']={checked:(st.shoppingChecked||[]).slice(), extras:(st.shopExtras||[]).slice()};
+  out['state/session']={active:st.activeSession||null};
+  Object.keys(st.days||{}).forEach(function(k){ out['days/'+k]=st.days[k]; });
+  (st.workoutLogs||[]).forEach(function(l){ if(l&&l.id) out['workoutLogs/'+l.id]=l; });
+  (st.saunaSessions||[]).forEach(function(x){ if(x&&x.id) out['sauna/'+x.id]=x; });
+  (st.library||[]).forEach(function(x){ if(x&&x.id) out['library/'+x.id]=x; });
+  (st.recipes||[]).forEach(function(x){ if(x&&x.id) out['recipes/'+x.id]=box.stripDerived(x); });
+  (st.plan||[]).forEach(function(x){ if(x&&x.id) out['plan/'+x.id]=x; });
+  return out;
+};
+box.stripDerived=function(r){
+  if(!r||(r._ings===undefined&&r._ingsFor===undefined)) return r;
+  var out={}; Object.keys(r).forEach(function(k){ if(k!=='_ings'&&k!=='_ingsFor') out[k]=r[k]; });
+  return out;
+};
+// State as 5aba0f6 held it, each entry as that version's code made it.
+function oldState(){
+  return {waterTarget:10, totalXp:420, uiTab:'progress', uiSlide:3, uiProgRange:30, uiViewingSession:true,
+    days:{'2026-08-29':{water:6,workout:{done:true,type:'Conditioning'},rest:false,alcohol:2,smoking:0,weed:0,touched:true},
+          '2026-08-30':{water:0,workout:{done:false,type:null},rest:true,alcohol:0,smoking:3,weed:1,touched:true}},
+    workoutLogs:[{id:'wl1788070912139',workoutId:'w12',title:'Cardio \u2014 gym',tag:'Conditioning',date:'2026-08-30',
+        logs:{cardio_gym_warmup:[{v:5,w:null}],cardio_gym_intervals:[{v:15,w:null}]}},
+      {id:'wl1788000000000',workoutId:'w1',title:'Boxing technical',tag:'Boxing/MMA',date:'2026-08-29',
+        logs:{technique:[{v:1500,w:null}],press_bench:[{v:8,w:60},{v:6,w:62.5}]},supersets:[{ex:['press_bench','sq_goblet'],rounds:3}]}],
+    saunaSessions:[{date:'2026-09-01',mins:20,temp:70,position:'Top',id:'sa0-2026-09-01-20'},
+      {id:'sa1788200000000',date:'2026-09-02',mins:25,temp:null,position:'Middle',stints:[{mins:10,position:'Top'},{mins:15,position:'Middle'}]}],
+    library:[{id:'t1',title:'Weekly training template',tag:'Overview',notes:'Mon: Boxing.\nSun: Full rest.'}],
+    recipes:[{id:'r1',title:'Overnight oats',tag:'Breakfast',ingredients:['Porridge oats (80g)','Honey (drizzle)'],instructions:'Stir.',
+        inPlan:true,day:'Mon',base:1,macros:[620,24,78,22],portions:6,_ings:[{n:'Porridge oats',q:80,u:'g',raw:'Porridge oats (80g)'}]},
+      {id:'r1788300000000',title:'Chilli',tag:'Recipe',ingredients:['Beef mince (500g)'],base:4,portions:4,instructions:''}],
+    plan:[{id:'pl1788400000000-ab12',recipeId:'r1788300000000',date:'2026-09-03',slot:'dinner',portions:4}],
+    shoppingChecked:['beef mince|g'], shopExtras:[{id:'x1788500000000',text:'Bin bags'}],
+    activeSession:{workoutId:'w6',startedAt:'2026-09-03',exIds:['press_bench','ss1'],targets:{press_bench:{sets:3,reps:'8'}},
+      logs:{press_bench:[{v:8,w:60}]},supersets:{ss1:['press_bench','sq_goblet']}}};
+}
+function oldDump(){ return JSON.parse(JSON.stringify(OLD_DOCS(oldState()))); }
+t('a dump of the old artifact\'s store reads as a load of that store does', function(){
+  var d=oldDump(); d['state/meta']={seeded:true,seededAt:'2026-08-29T10:00:00.000Z',docs:12};
+  var r=box.readImport(JSON.stringify(d)); assert.ok(r.ok,r.msg);
+  var st=r.state, want=box.dbApply(oldDump());
+  assert.deepStrictEqual(Object.keys(st.days).sort(),['2026-08-29','2026-08-30']);
+  assert.deepStrictEqual(st.days['2026-08-30'],want.days['2026-08-30']);
+  assert.deepStrictEqual(st.workoutLogs.map(function(l){ return l.id; }),['wl1788000000000','wl1788070912139'],'sessions are not in the order they happened');
+  assert.strictEqual(st.waterTarget,10); assert.strictEqual(st.totalXp,420); assert.strictEqual(st.weekTarget,3);
+  assert.ok(!('uiTab' in st) && !('uiSlide' in st),'the old view state came in as data');
+  assert.ok(!('_ings' in st.recipes[0]) && st.recipes[0].inPlan===true,'the recipe was not read as a load reads it');
+  assert.deepStrictEqual(st.activeSession.supersets.ss1,{ex:['press_bench','sq_goblet'],rounds:0},'the old superset shape was not converted');
+  assert.deepStrictEqual(st.shopExtras,[{id:'x1788500000000',text:'Bin bags'}]);
+  assert.deepStrictEqual(r.summary,{days:2,sessions:2,meals:1,recipes:2,notes:1,sauna:2,exportedAt:'',docs:13,unused:0});
+});
+t('a dump as a list of {path, data} or of {collection, doc_id, data} reads the same', function(){
+  var d=oldDump(), want=box.readImport(JSON.stringify(d));
+  var byPath=Object.keys(d).map(function(p){ return {path:p, data:d[p]}; });
+  var byColl=Object.keys(d).map(function(p){ var c=p.lastIndexOf('/');
+    return {collection:p.slice(0,c), doc_id:p.slice(c+1), version:3, data:d[p]}; });
+  [byPath,byColl].forEach(function(list,i){
+    var r=box.readImport(JSON.stringify(list)); assert.ok(r.ok,'shape '+i+' was refused: '+r.msg);
+    assert.deepStrictEqual(r.state,want.state,'shape '+i+' read differently');
+    assert.deepStrictEqual(r.summary,want.summary);
+  });
+});
+t('a dump folds in what a closed view sent beside a document, and fills an id from its path', function(){
+  var d=oldDump();
+  d['state/profile'].pend_abc={b:{totalXp:420},m:{totalXp:450}};
+  delete d['library/t1'].id;
+  d['notes/x']={a:1};
+  var r=box.readImport(JSON.stringify(d)); assert.ok(r.ok,r.msg);
+  assert.strictEqual(r.state.totalXp,450,'the XP sent beside the profile was lost');
+  assert.strictEqual(r.state.library[0].id,'t1');
+  assert.strictEqual(r.summary.unused,1,'a document this app does not use was not counted as left out');
+});
+t('a dump that cannot be read is refused with a reason', function(){
+  var d=oldDump();
+  [[JSON.stringify([{path:'days/2026-08-29'}]),/Entry 1 in that list/],
+   [JSON.stringify([{collection:'days',data:{water:1}}]),/Entry 1 in that list/],
+   [JSON.stringify({'state/meta':{seeded:true}}),/holds no Fight Card documents/],
+   [JSON.stringify(Object.assign(d,{'days/2026-08-31/x':{water:1}})),/is not a date/],
+   [JSON.stringify({'days/2026-08-29':{water:'lots'}}),/wrong kind/]
+  ].forEach(function(c){ var r=box.readImport(c[0]); assert.ok(!r.ok,'took '+c[0].slice(0,80)); assert.ok(c[1].test(r.msg),r.msg); });
 });
 
 (async function(){

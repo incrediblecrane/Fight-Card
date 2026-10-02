@@ -1640,6 +1640,40 @@ srv.listen(0,async function(){
     assert.ok(Object.keys(store).some(function(k){ return k.indexOf('plan/')===0 && store[k].recipeId==='oldr'; }),'its place in the plan was dropped');
   });
 
+  // The owner's data comes over from the old artifact as a dump of its store,
+  // documents as 5aba0f6 wrote them (see test-store.js for that dbDocs). It
+  // is read as that store would be on load and lands in the new shape.
+  await t('a dump of the old artifact\'s store is imported, converted as a load converts it', async function(){
+    await go();
+    var dump={'state/meta':{seeded:true,seededAt:'2026-08-29T10:00:00.000Z',docs:9},
+      'state/profile':{waterTarget:10,totalXp:420,uiTab:'progress',uiSlide:3,uiProgRange:30,uiViewingSession:true},
+      'state/shopping':{checked:['beef mince|g'],extras:[{id:'x1788500000000',text:'Bin bags'}]},
+      'state/session':{active:{workoutId:'w6',startedAt:'2026-09-03',exIds:['press_bench'],targets:{press_bench:{sets:3,reps:'8'}},logs:{press_bench:[{v:8,w:60}]}}},
+      'days/2026-08-29':{water:6,workout:{done:true,type:'Boxing/MMA'},rest:false,alcohol:2,smoking:0,weed:0,touched:true},
+      'workoutLogs/wl1788000000000':{id:'wl1788000000000',workoutId:'w1',title:'Boxing technical',tag:'Boxing/MMA',date:'2026-08-29',
+        logs:{technique:[{v:1500,w:null}]}},
+      'sauna/sa0-2026-09-01-20':{date:'2026-09-01',mins:20,temp:70,position:'Top',id:'sa0-2026-09-01-20'},
+      'library/t1':{id:'t1',title:'Weekly training template',tag:'Overview',notes:'Mon: Boxing.'},
+      'recipes/r1':{id:'r1',title:'Overnight oats',tag:'Breakfast',ingredients:['Porridge oats (80g)'],instructions:'Stir.',inPlan:true,day:'Mon',base:1,portions:6}};
+    await importing(JSON.stringify(dump));
+    var body=await text();
+    assert.ok(/A database dump of 8 documents: 1 day, 1 session, 0 planned meals, 1 recipe, 1 note, 1 sauna visit/.test(body),
+      'the summary does not describe the dump: '+body.slice(-500));
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    var pr=store['state/profile'];
+    assert.ok(pr && pr.waterTarget===10 && pr.totalXp===420 && pr.weekTarget===3 && !('uiTab' in pr),'the profile went in unconverted: '+JSON.stringify(pr));
+    assert.ok(store['recipes/r1'] && !('inPlan' in store['recipes/r1']),'the recipe went in unconverted');
+    assert.ok(Object.keys(store).some(function(k){ return k.indexOf('plan/')===0 && store[k].recipeId==='r1'; }),'its place in the plan was dropped');
+    assert.deepStrictEqual(store['workoutLogs/wl1788000000000'].logs.technique,[{v:25,w:null,u:'min'}],'the drill in seconds was not converted');
+    assert.ok(store['state/session'].active && store['state/session'].active.workoutId==='w6','the session in progress was dropped');
+    assert.ok(store['sauna/sa0-2026-09-01-20'] && store['library/t1'] && store['days/2026-08-29'],'a document was dropped');
+    await go();
+    assert.ok(await p.locator('[data-action="water"]').count(),'Today did not draw after the import');
+    await p.click('[data-action="tab"][data-tab="progress"]');
+    assert.ok(await p.locator('.stat-row').count(),'Progress did not draw after the import');
+    await toToday();
+  });
+
   console.log('\nIMPORTED TEXT STAYS TEXT');
   // An import is somebody else's file: whatever it holds is drawn as text,
   // and an id that could break out of an attribute is not taken at all.

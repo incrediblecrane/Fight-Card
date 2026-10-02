@@ -189,6 +189,11 @@ objects and written into attributes, so a name `Object.prototype` already has
 (`constructor`, `toString`) is refused as one, and so is any key called
 `__proto__`, anywhere: JSON keeps it as a key, but code takes it for a
 prototype. Anything else is refused with a reason and nothing is written.
+It also takes a **dump** of a store (`readDump`): `{path: document}`, or a
+list of `{path, data}` or `{collection, doc_id, data}`, which is how data
+comes over from the old artifact (see MIGRATION.md). Its `pend_` fields are
+folded in, it goes through `dbApply` as a load does, and the result is then
+checked as an export; the summary counts its documents and any it left out.
 Everything an import can carry is drawn escaped, as text. A good one shows a summary (days,
 sessions, planned meals, recipes, notes, sauna) and then:
 

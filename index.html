@@ -2247,6 +2247,40 @@ function exportData(st){
   return out;
 }
 function exportText(st){ return JSON.stringify(exportData(st),null,1); }
+/* A dump of the store itself, as the old artifact's documents read out one by
+   one: {path: document}, or a list of {path, data} or {collection, doc_id,
+   data}. Answers null when it is none of those, {msg} when it is one that
+   cannot be read, or {map, docs, unused}: every document, with what a view
+   that closed straight after a change sent beside it folded in, as a load does. */
+var DUMP_COLL=/^(days|workoutLogs|sauna|library|recipes|plan|state)\//;
+function readDump(o){
+  function obj(v){ return !!v && typeof v==='object' && !Array.isArray(v); }
+  var map={}, bad=-1;
+  if(Array.isArray(o)){
+    if(!o.some(function(x){ return obj(x)&&(x.path!==undefined||x.collection!==undefined); })) return null;
+    o.forEach(function(x,i){
+      var id=obj(x)&&(x.doc_id!==undefined?x.doc_id:x.id), p=!obj(x)?null:typeof x.path==='string'?x.path:
+        typeof x.collection==='string'&&typeof id==='string'?x.collection+'/'+id:null;
+      if(p===null||!obj(x.data)){ if(bad<0) bad=i; return; }
+      map[p]=x.data;
+    });
+    if(bad>-1) return {msg:'Entry '+(bad+1)+' in that list is not a document with a path and data, so nothing was read.'};
+  }
+  else if(obj(o) && o.schema===undefined && Object.keys(o).some(function(k){ return DUMP_COLL.test(k); })) map=o;
+  else return null;
+  var out={}, unused=0, docs=0;
+  Object.keys(map).forEach(function(p){
+    var b=map[p], cut=p.indexOf('/'), c=p.slice(0,cut), id=p.slice(cut+1);
+    if(!(c==='days'||DB_LISTS[c]||p==='state/profile'||p==='state/shopping'||p==='state/session')){ if(p!=='state/meta') unused++; return; }
+    docs++;
+    if(obj(b) && Object.keys(b).some(function(k){ return k.indexOf('pend_')===0; })) b=foldPend(p,b,'');
+    // A list entry's id is in its body; one written without it takes its path's.
+    if(DB_LISTS[c] && obj(b) && b.id===undefined){ b=dbClone(b); b.id=id; }
+    out[p]=b;
+  });
+  if(!docs) return {msg:'That dump holds no Fight Card documents, so nothing was read.'};
+  return {map:out, docs:docs, unused:unused};
+}
 /* Answers {ok:true, state, summary} or {ok:false, msg}. Ids become document
    paths, so one with a slash in it would be a different document, or none.
    They and the keys of a map are also looked up in plain objects and written
@@ -2264,6 +2298,11 @@ function readImport(text){
   try{ o=JSON.parse(text,function(k,v){ if(k==='__proto__') proto=true; return v; }); }
   catch(e){ return no('That is not valid JSON, so nothing was read. Paste the whole export, from the first { to the last }.'); }
   if(proto) return no('That export has something named "__proto__", which this app cannot keep, so nothing was read.');
+  // A dump goes through dbApply as a load does, then is checked as an export.
+  var dump=readDump(o);
+  if(dump&&dump.msg) return no(dump.msg);
+  if(dump){ var ds=dbApply(dump.map); o={schema:EXPORT_SCHEMA};
+    EXPORT_KEYS.forEach(function(k){ o[k]=ds[k]; }); }
   if(!obj(o)) return no('That JSON is not a Fight Card export.');
   if(o.schema===undefined) return no('That JSON has no schema number, so it is not a Fight Card export.');
   if(o.schema!==EXPORT_SCHEMA) return no('That export is schema '+String(o.schema).slice(0,10)+'; this version reads schema '+EXPORT_SCHEMA+' only.');
@@ -2347,7 +2386,7 @@ function readImport(text){
   st=dbApply(dbDocs(st));
   return {ok:true, state:st, summary:{days:Object.keys(st.days).length, sessions:st.workoutLogs.length,
     meals:st.plan.length, recipes:st.recipes.length, notes:st.library.length, sauna:st.saunaSessions.length,
-    exportedAt:typeof o.exportedAt==='string'?o.exportedAt.slice(0,40):''}};
+    exportedAt:typeof o.exportedAt==='string'?o.exportedAt.slice(0,40):'', docs:dump?dump.docs:0, unused:dump?dump.unused:0}};
 }
 /* Merging adds what the import has and replaces anything with the same id or
    date; everything else here is kept, along with this view's targets, XP
@@ -2435,10 +2474,11 @@ function dataCard(){
       '<textarea id="export-json" readonly rows="8" aria-label="Your data as JSON">'+esc(exportSnap)+'</textarea>'+
       '<div class="datarow"><button data-action="copyexport">Copy to clipboard</button><button data-action="downloadexport">Download file</button></div>':'')+
     (dataPane==='import'?
-      '<textarea id="import-json" rows="6" placeholder="Paste an export here" aria-label="Export to import">'+esc(importRaw)+'</textarea>'+
+      '<textarea id="import-json" rows="6" placeholder="Paste an export or a database dump here" aria-label="Export or database dump to import">'+esc(importRaw)+'</textarea>'+
       '<div class="datarow"><button data-action="checkimport">Check</button></div>'+
       (r&&!r.ok?'<p class="note bad" role="alert">'+esc(r.msg)+'</p>':'')+
       (sm?'<p class="note" role="status">'+(sm.exportedAt?'Exported '+esc(sm.exportedAt.slice(0,10))+': ':'')+
+        (sm.docs?'A database dump of '+n(sm.docs,'document')+(sm.unused?' ('+sm.unused+' more this app does not use, left out)':'')+': ':'')+
         n(sm.days,'day')+', '+n(sm.sessions,'session')+', '+n(sm.meals,'planned meal')+', '+n(sm.recipes,'recipe')+', '+
         n(sm.notes,'note')+', '+n(sm.sauna,'sauna visit')+'.</p>'+
         (canKeep()?'':'<p class="note bad" role="alert">Could not keep a copy on this device. Download an export first.</p>'+
