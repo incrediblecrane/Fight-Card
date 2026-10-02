@@ -316,13 +316,22 @@ was paid.
 - **Per implement** — a logged weight is one dumbbell, not the pair. Declared
   in `PER_IMPLEMENT`; drives the "kg each" input, the note, the "ea" in a set
   label, and doubling in total volume.
-- **Undo**: one slot, in `sessionStorage` so it survives the reload a save can
-  cause and ends with the tab. Every one-tap removal parks what it took there:
-  a sauna visit or finished session, a note, a recipe with its planned meals, a
-  planned meal, a cleared week with its ticks, a discarded session, or one
-  exercise taken out of a session. It is offered as a toast fixed to the bottom
-  of every view, and not offered once the item is back by some other route, so
-  it can never put back a second copy.
+- **Undo**: one slot, held in a variable (`undoMem`) and copied to
+  `sessionStorage` so it survives the reload a save can cause and ends with
+  the tab; with storage blocked it still works, it just does not survive that
+  reload. Every one-tap removal parks what it took there: a sauna visit or
+  finished session, a note, a recipe with its planned meals, a planned meal,
+  one of your own shopping items with its tick, a cleared week with its ticks,
+  a discarded session, or one exercise taken out of a session. A list removal
+  made within five seconds of another joins it (`kind: 'many'`), so one Undo
+  puts back everything a quick run of taps took; a second tap on the same spot
+  within 400ms is ignored. It is offered as a toast fixed to the bottom of
+  every view, shrinks to its two buttons after nine seconds, and the page
+  keeps room below its end for it. It is announced once, from a live region
+  outside `#app`, not by the toast. It is not offered once the item is back by
+  some other route, so it can never put back a second copy, and an exercise
+  taken out of a session goes with that session (`t0`), not with the next one
+  of the same workout.
 - **Round log**: `roundLog` on a superset box: the members each logged round
   actually recorded a set for, so Undo round takes back exactly that round.
 - **Stint** — one continuous spell at one bench height inside a sauna visit.
@@ -424,6 +433,9 @@ set's margins against the rig's limits while it is being authored.
 - `test-planmodel.js` — the plan model headless, including the one-way
   migration off the old `inPlan`/`day` pair.
 - `test-removal.js` — swipe-to-remove and undo.
+- `test-undo.js` — the undo offer on a phone: removals in quick succession,
+  blocked storage, a shopping item, which session an undo belongs to, the
+  announcement, and the toast staying clear of the page.
 - `test-session.js` — prep steps, per-implement weights, sauna stints, search.
 - `test-db.js`: seeding, small saves, reload survival, how a failed save and
   every `dbState` are shown, and the fallback.

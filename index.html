@@ -23,7 +23,7 @@ var CSS = "\
   color-scheme:dark;\
 }\
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}\
-.wrap{max-width:680px;margin:0 auto;padding:18px 16px 90px;}\
+.wrap{max-width:680px;margin:0 auto;padding:18px 16px max(90px,calc(var(--undo-h,0px) + 60px + env(safe-area-inset-bottom)));}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}\
 .hud{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;}\
 .hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}\
 .brand{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:0.02em;font-size:1.5rem;text-transform:uppercase;margin:0;}\
@@ -239,7 +239,7 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 .recent-log .d{color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:0.74rem;white-space:nowrap;}\
 .ssnote{display:block;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);margin-top:2px;}\
 @media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}\
-.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--line);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;}.swipe-x{border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:0 2px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-faint);border-color:var(--line);}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{margin-left:auto;text-transform:uppercase;letter-spacing:0.06em;font-size:0.62rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 13px;font-size:0.76rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick button{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:6px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--line);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;}.swipe-x{border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:0 2px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-faint);border-color:var(--line);}.undo-bar .msg{flex:1 1 auto;min-width:0;}.undo-bar .btns{flex:0 0 auto;white-space:nowrap;}.undo-bar.mini{left:auto;padding:6px 8px;}.undo-bar.mini .msg{display:none;}.undo-bar.mini button:first-child{margin-left:0;}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{margin-left:auto;text-transform:uppercase;letter-spacing:0.06em;font-size:0.62rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 13px;font-size:0.76rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick button{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:6px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
 ";
 
 var WORKOUT_TYPES=["Boxing/MMA","Strength","Power/Speed","Flexibility","Conditioning","Custom"];
@@ -1307,17 +1307,38 @@ function computeStreaks(){
   return {dayStreak:dayStreak,cleanStreak:cleanStreak};
 }
 // Removing an entry is destructive and the app has no history, so every
-// removal parks the item where it can be put back. It cannot live in a
-// variable: a save republishes and reloads the page, which would wipe the undo
-// about a second after it appeared. sessionStorage survives that reload and
-// clears when the app closes, which is exactly the lifetime an undo wants.
-var UNDO_KEY='fc.undo', UNDO_TTL=600000;
-function parkUndo(o){ try{ o.at=Date.now(); sessionStorage.setItem(UNDO_KEY,JSON.stringify(o)); }catch(e){} }
-function readUndo(){
-  try{ var v=JSON.parse(sessionStorage.getItem(UNDO_KEY)||'null');
-    return (v && Date.now()-v.at<UNDO_TTL) ? v : null; }catch(e){ return null; }
+// removal parks the item where it can be put back. The variable is what is
+// read; a copy goes to sessionStorage because a save on a copy with no store
+// republishes and reloads the page, which would wipe the undo about a second
+// after it appeared. sessionStorage survives that reload and clears when the
+// app closes, which is exactly the lifetime an undo wants. Blocked storage
+// only loses that reload, not the undo.
+// A removal within UNDO_JOIN of the last one joins it, so a finger that lands
+// twice (the next row's x slides under it) gets both back from one Undo.
+var UNDO_KEY='fc.undo', UNDO_TTL=600000, UNDO_JOIN=5000, UNDO_SHOW=9000, undoMem=null, undoHide=null;
+var UNDO_JOINS={sauna:1,log:1,recipe:1,lib:1,meal:1,extra:1,many:1};
+function parkUndo(o){
+  o.at=Date.now();
+  var cur=readUndo();
+  if(cur && UNDO_JOINS[cur.kind] && UNDO_JOINS[o.kind] && o.at-cur.at<UNDO_JOIN && !undoMoot(cur)){
+    var parts=(cur.kind==='many'?cur.parts:[cur]).concat([o]);
+    o={kind:'many',parts:parts,at:o.at,label:parts.length===2?parts[0].label+' and '+parts[1].label:o.label+' and '+(parts.length-1)+' more'};
+  }
+  undoMem=o;
+  try{ sessionStorage.setItem(UNDO_KEY,JSON.stringify(o)); }catch(e){}
+  undoSay((o.text||'Removed '+o.label)+'. Undo available.');
 }
-function clearUndo(){ try{ sessionStorage.removeItem(UNDO_KEY); }catch(e){} }
+function readUndo(){
+  var v=undoMem;
+  if(!v){ try{ v=JSON.parse(sessionStorage.getItem(UNDO_KEY)||'null'); }catch(e){ v=null; } }
+  if(v && Date.now()-v.at<UNDO_TTL) return (undoMem=v);
+  if(v) clearUndo();
+  return null;
+}
+function clearUndo(){ undoMem=null; undoSay(''); try{ sessionStorage.removeItem(UNDO_KEY); }catch(e){} }
+// Said once, when the removal happens, from a node outside #app: the toast is
+// drawn again on every render, and a live region inside it would repeat.
+function undoSay(txt){ var n=document.getElementById('undolive'); if(n && n.textContent!==txt) n.textContent=txt; }
 
 function removeSauna(id){
   var i=-1; state.saunaSessions.forEach(function(x,k){ if(x.id===id) i=k; });
@@ -1352,7 +1373,9 @@ function removeWorkoutLog(id){
   return true;
 }
 function hasId(list,id){ return (list||[]).some(function(x){ return x.id===id; }); }
-function sameSession(a,b){ return !!(a && b && a.workoutId===b.workoutId && a.startedAt===b.startedAt); }
+// The same workout started again on the same day is another session: t0 tells
+// them apart, and startedAt is all an older session has.
+function sameSession(a,b){ return !!(a && b && a.workoutId===b.workoutId && (a.t0&&b.t0?a.t0===b.t0:a.startedAt===b.startedAt)); }
 /* True when putting this back would do nothing or do it twice: a reload that
    read the store before the removal was saved has already brought the item
    back, and a second copy (and its XP again) is what undo would add. */
@@ -1363,6 +1386,8 @@ function undoMoot(u){
   if(u.kind==='recipe') return hasId(state.recipes,u.item.id);
   if(u.kind==='lib') return hasId(state.library,u.item.id);
   if(u.kind==='meal') return hasId(state.plan,u.item.id);
+  if(u.kind==='extra') return hasId(state.shopExtras,u.item.id);
+  if(u.kind==='many') return u.parts.every(undoMoot);
   if(u.kind==='week') return u.plan.every(function(e){ return hasId(state.plan,e.id); }) && !u.checked.some(function(k){ return state.shoppingChecked.indexOf(k)<0; });
   // A session started since, with nothing logged yet, gives way to it.
   if(u.kind==='session') return !!s && (sessId(s)===sessId(u.item) || setCount(s.logs)>0);
@@ -1371,7 +1396,12 @@ function undoMoot(u){
 }
 function applyUndo(){
   var u=readUndo(); if(!u) return;
-  if(undoMoot(u)){ clearUndo(); return; }
+  if(!undoMoot(u)) undoOne(u);
+  clearUndo();
+}
+function undoOne(u){
+  // Newest first, so each goes back where it was before the next was taken.
+  if(u.kind==='many'){ u.parts.slice().reverse().forEach(function(x){ if(!undoMoot(x)) undoOne(x); }); return; }
   // An undo parked before positions were recorded has no pos, so it goes on
   // the end the way it always did.
   function putBack(list,item,pos){
@@ -1411,7 +1441,8 @@ function applyUndo(){
     if(u.box){ if(!s.supersets) s.supersets={}; s.supersets[u.exId]=u.box; }
     slide=at;
   }
-  clearUndo();
+  else if(u.kind==='extra'){ putBack(state.shopExtras,u.item,u.pos);
+    if(u.checked && state.shoppingChecked.indexOf('x|'+u.item.id)<0) state.shoppingChecked.push('x|'+u.item.id); }
 }
 
 // Returns what actually changed, which the clamp at zero can make less than n.
@@ -2924,14 +2955,18 @@ function sessionTitle(sess){
   var w=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
   return w?w.title:'Workout';
 }
+// An exercise taken out of a session ends with it.
+function dropSessionExUndo(){ var u=readUndo(); if(u && u.kind==='sessionEx') clearUndo(); }
 // Parked so a discarded session can be put back, sets and all.
 function discardSession(){
   var sess=state.activeSession; if(!sess) return;
+  dropSessionExUndo();
   parkUndo({kind:'session',item:sess,label:'the '+sessionTitle(sess)+' session'});
   endSession(sess); state.activeSession=null; viewingSession=false; addingExercise=false; clearPrep();
 }
 function finishWorkout(){
   var sess=state.activeSession; if(!sess) return;
+  dropSessionExUndo();
   var sid=sessId(sess), lid=sessLogId(sess)||'wl'+Date.now();
   var on=sessionDay(sess);
   clearPrep();
@@ -2991,7 +3026,7 @@ function removeExFromSession(exId){
   var s=state.activeSession; if(!s) return;
   var pos=s.exIds.indexOf(exId); if(pos<0) return;
   var d=exDef(exId), u={kind:'sessionEx',exId:exId,pos:pos,target:s.targets[exId],
-    sess:{workoutId:s.workoutId,startedAt:s.startedAt},label:(isSuperset(exId)?'the superset':(d?d.name:exId))+' from the session'};
+    sess:{workoutId:s.workoutId,startedAt:s.startedAt,t0:s.t0},label:(isSuperset(exId)?'the superset':(d?d.name:exId))+' from the session'};
   s.exIds=s.exIds.filter(function(x){return x!==exId;});
   // Otherwise the membership outlives the slide and comes back if an id is
   // ever reused. The sets already logged stay: they belong to the exercises.
@@ -4150,13 +4185,29 @@ function bodyContent(){
 }
 /* Fixed to the bottom of the screen on every view, so the offer is where the
    removal happened rather than at the top of Progress. An offer whose item is
-   already back is not shown; applyUndo refuses it anyway. */
+   already back is not shown; applyUndo refuses it anyway.
+   After UNDO_SHOW it shrinks to its two buttons in the corner rather than going:
+   the undo stays good for UNDO_TTL, and a bar of words over the bottom of the
+   page for ten minutes is in the way. Not a live region: undoSay announces it
+   once, and this is drawn again on every render. */
 function undoToast(){
   var u=readUndo();
   if(!u || undoMoot(u)) return '';
-  return '<div class="undo-bar" role="status"><span>'+esc(u.text||'Removed '+u.label)+'</span>'+
-    '<span><button data-action="undo">Undo</button>'+
+  return '<div class="undo-bar'+(Date.now()-u.at>=UNDO_SHOW?' mini':'')+'"><span class="msg">'+esc(u.text||'Removed '+u.label)+'</span>'+
+    '<span class="btns"><button data-action="undo">Undo</button>'+
     '<button class="ghost" data-action="dismissundo">Dismiss</button></span></div>';
+}
+// The page keeps room below its end for the toast, whatever height its words
+// wrap to, so the last controls can always be scrolled clear of it. And the
+// full toast is shrunk when its time is up without drawing the page again.
+function undoFit(){
+  var app=document.getElementById('app'); if(!app) return;
+  var bar=app.querySelector('.undo-bar'), u=bar&&readUndo();
+  if(undoHide){ clearTimeout(undoHide); undoHide=null; }
+  if(u && !bar.classList.contains('mini')) undoHide=setTimeout(function(){
+    undoHide=null; var b=document.querySelector('#app .undo-bar'); if(b){ b.classList.add('mini'); undoFit(); }
+  },Math.max(0,UNDO_SHOW-(Date.now()-u.at)));
+  app.style.setProperty('--undo-h',bar?bar.offsetHeight+'px':'0px');
 }
 
 function syncUi(){
@@ -4272,12 +4323,14 @@ function drawPage(){
       }catch(err){}
     }
   }
+  undoFit();
   if(restTimer){ clearInterval(restTimer); restTimer=null; }
   if(document.getElementById('restline')) restTimer=setInterval(restTick,1000);
   stopPoseLoop();
   if(viewingSession && state.activeSession && !addingExercise && state.activeSession.exIds.length){ startPoseLoop(); }
 }
 
+var lastCut=null;
 function onClick(e){
   var t=e.target.closest('[data-action]');
   if(!t) return;
@@ -4308,6 +4361,14 @@ function onClick(e){
   // seen, so a tap that reaches it anyway must not delete the row.
   if(t.classList.contains('swipe-x') && window.matchMedia && !matchMedia('(hover:hover)').matches) return;
   if(dbHeld() && !UI_ONLY_WHILE_LOADING[action]) return;
+  // A removal moves the next row's x under the finger. A second tap on the
+  // same spot straight after is that finger again, not a choice. Only a real
+  // pointer has a spot (detail is 0 for a key or a script).
+  if({delsauna:1,dellog:1,dellib:1,delrecipe:1,delextra:1,delmeal:1,removeex:1}[action] && e.detail){
+    var cutAt=Date.now();
+    if(lastCut && cutAt-lastCut.t<400 && Math.abs(e.clientX-lastCut.x)<32 && Math.abs(e.clientY-lastCut.y)<32) return;
+    lastCut={t:cutAt,x:e.clientX,y:e.clientY};
+  }
   if(action==='tab'){ tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; render(); return; }
   else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
   else if(action==='pickday'){ setLogDate(t.getAttribute('data-k')); tab='today'; render(); return; }
@@ -4506,8 +4567,11 @@ function onClick(e){
     shopDraft=''; consumed(['shop-add']);
   }
   else if(action==='delextra'){
-    var xid=t.getAttribute('data-id');
-    state.shopExtras=state.shopExtras.filter(function(x){return x.id!==xid;});
+    var xid=t.getAttribute('data-id'), xi=-1;
+    state.shopExtras.forEach(function(x,k){ if(x.id===xid) xi=k; });
+    if(xi<0) return;
+    var xGone=state.shopExtras.splice(xi,1)[0];
+    parkUndo({kind:'extra',item:xGone,pos:xi,checked:state.shoppingChecked.indexOf('x|'+xid)>-1,label:xGone.text});
     state.shoppingChecked=state.shoppingChecked.filter(function(k){return k!=='x|'+xid;});
   }
   else if(action==='addmeal'){
@@ -4830,6 +4894,9 @@ function boot(){
   var pill=document.createElement('div'); pill.id='savepill'; pill.className='savepill';
   pill.setAttribute('role','status'); pill.setAttribute('aria-live','polite'); pill.setAttribute('aria-atomic','true');
   document.body.appendChild(pill);
+  var said=document.createElement('div'); said.id='undolive'; said.className='sr-only';
+  said.setAttribute('aria-live','polite'); said.setAttribute('aria-atomic','true');
+  document.body.appendChild(said);
   // Opened outside the artifact runtime there is nothing to wait for, so the
   // first frame says so rather than that it is loading.
   if(!window.claude || !window.claude.use) dbState='local';
