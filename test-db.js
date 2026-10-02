@@ -1495,6 +1495,26 @@ srv.listen(0,async function(){
     store['state/profile'].weekTarget=3; await go();
   });
 
+  await t('and when the other view is hidden straight after its tap', async function(){
+    await go();
+    var pr={}; Object.keys(store['state/profile']).forEach(function(k){ if(k!=='weekTarget') pr[k]=store['state/profile'][k]; });
+    store['state/profile']=pr;
+    await go();
+    var q=await openView();
+    try{
+      await q.click('[data-action="tab"][data-tab="training"]'); await q.waitForTimeout(300);
+      await q.click('[data-action="weektarget"][data-d="1"]'); await q.waitForTimeout(200);
+      await q.click('[data-action="weektarget"][data-d="1"]'); await q.waitForTimeout(1800);
+      assert.strictEqual(store['state/profile'].weekTarget,5,'the second view did not save its target');
+      await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(100);
+      await hideIn(p); await p.waitForTimeout(1500);
+      assert.strictEqual(store['state/profile'].weekTarget,5,'the target went back to '+store['state/profile'].weekTarget);
+      await showIn(p); await p.waitForTimeout(1500);
+      assert.strictEqual(store['state/profile'].weekTarget,5,'after looking again the target is '+store['state/profile'].weekTarget);
+    } finally { await q.context().close(); }
+    store['state/profile'].weekTarget=3; await go();
+  });
+
   console.log('\nAN EXERCISE TAKEN OUT OF A SESSION');
   var startPush=async function(){
     var day=await today();

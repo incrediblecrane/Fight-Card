@@ -1810,9 +1810,12 @@ function mergeDay(base,mine,theirs){
     var v=stableJson(mine[k])!==stableJson(base[k])?mine[k]:theirs[k]; if(v!==undefined) out[k]=v;
   });
   DAY_COUNTS.forEach(function(k){ out[k]=Math.min(DAY_MAX[k],Math.max(0,(+theirs[k]||0)+(+mine[k]||0)-(+base[k]||0))); });
-  // A day saved before wx existed has none, and it stays without one.
-  if(base.wx!=null||mine.wx!=null||theirs.wx!=null)
-    out.wx=Math.min(DAY_MAX.water,Math.max(0,dayWx(theirs,tgt)+dayWx(mine,tgt)-dayWx(base,tgt)));
+  // A day saved before wx existed has none, and it stays without one. Taps
+  // in both views pay no cups past the target, nor more cups than there are.
+  if(base.wx!=null||mine.wx!=null||theirs.wx!=null){
+    var wb=dayWx(base,tgt), wm=dayWx(mine,tgt), wt=dayWx(theirs,tgt), same=function(d,w){ return w===wb&&(+d.water||0)===(+base.water||0); };
+    out.wx=same(mine,wm)?wt:same(theirs,wt)?wm:Math.min(out.water,Math.max(tgt,wm,wt),Math.max(0,wt+wm-wb));
+  }
   var p=dayPair(mine)!==dayPair(base)?mine:theirs;
   out.rest=!!p.rest; out.workout=p.workout&&typeof p.workout==='object'?p.workout:{done:false,type:null};
   return out;
@@ -2259,6 +2262,8 @@ function dbSave(){
       if(mode==='flush'&&was===undefined&&path.indexOf('days/')===0){ was=blankDay(); fresh=true; }
       // So may a finished session's log, by a view that finished it first.
       else if(mode==='flush'&&was===undefined&&path.indexOf('workoutLogs/')===0){ was={}; fresh=true; }
+      // An older profile read with its defaults filled in, as dbMerge reads it.
+      if(was&&path==='state/profile') was=profShape(was);
       if(was){
         // What the store holds is unknown, so lastSaved stays as it was: the
         // next save re-reads this document and merges it, our fields included.

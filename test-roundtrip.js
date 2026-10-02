@@ -275,6 +275,15 @@ function mergeSandbox(extra,out){
     dn.day.water===0 && dn.day.wx===0 && dn.xp===98, dn);
   var odd=day({water:4,wx:8,alcohol:2}), same=m.dbMerge('days/d',odd,odd,day({water:4,wx:8,alcohol:3}));
   check('a day not changed here comes back as the store holds it', same.water===4 && same.wx===8 && same.alcohol===3, same);
+  var cap=xpAfter(day({water:7,wx:7}),day({water:8,wx:8}),day({water:8,wx:8}),100);
+  check('a cup tapped in each of two views at the target pays no xp past the target',
+    cap.day.water===9 && cap.day.wx===8 && cap.xp===102, cap);
+  var down=xpAfter(day({water:10,wx:8}),day({water:7,wx:7}),day({water:7,wx:7}),100);
+  check('cups taken back in both views leave no more cups of xp than cups',
+    down.day.water===4 && down.day.wx===4 && down.xp===92, down);
+  var held=xpAfter(day({water:10,wx:8}),day({water:9,wx:8}),day({water:7,wx:7}),100);
+  check('and so when one view took back fewer cups than the other',
+    held.day.water===6 && held.day.wx===6 && held.xp===96, held);
   var pr=m.dbMerge('state/profile',{totalXp:10,waterTarget:8},{totalXp:12,waterTarget:8,weekTarget:3},{totalXp:10,waterTarget:8,weekTarget:5});
   check('a weekly target set elsewhere is kept over the default an older profile is read with',
     pr.weekTarget===5 && pr.totalXp===12, pr);

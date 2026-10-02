@@ -437,10 +437,14 @@ re-read and merged field by field against `lastSaved`:
   cups in `wx`, a trained day, a rest day) less what this view and the store
   each paid for their own copy goes onto XP. So a flag dropped by the pair, or
   a count held at zero, gives back what it paid, and a session finished in two
-  views pays once, through its day.
+  views pays once, through its day. When both views changed the water, `wx`
+  is held to no more than the merged cups and no more than the water target
+  (or what either view had already earned, if more), as one view tapping
+  twice would be.
 - A profile an older version wrote lacks the settings it had none for
   (`weekTarget`): it is read with the defaults this view fills in, so a
-  default is never taken for a change made here.
+  default is never taken for a change made here. That holds for a page going
+  hidden too, which sends only what changed without reading first.
 - A whole write that answered with an error may still have landed. Until the
   document is next read, this view keeps what it tried to write; read back
   exactly, it is the base of the merge, so XP and counts are not added twice
