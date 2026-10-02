@@ -60,7 +60,16 @@ WORLDS.ss=withSeed(function(st){ recent(st);
     targets:{warmup:{sets:1,reps:'5-10 min'},ss1:{sets:3,reps:'rounds'},cooldown:{sets:1,reps:'5-10 min'}},
     supersets:{ss1:{ex:['press_bench','row_bent'],rounds:1,roundLog:[['press_bench','row_bent']]}},
     logs:{press_bench:[{v:8,w:60,t:NOW-30000}],row_bent:[{v:10,w:50,t:NOW-20000}]}}; });
-var UI={plain:'{"tab":"today"}', meal:'{"tab":"meals"}', recent:'{"tab":"progress"}', empty:'{"tab":"progress"}',
+// Every set of the last bench session hit the top of the range, so the line
+// says to add weight.
+WORLDS.benchtop=withSeed(function(st){ recent(st);
+  st.workoutLogs.forEach(function(l){ if(l.logs.press_bench) l.logs.press_bench=[{v:8,w:60},{v:8,w:60},{v:8,w:60},{v:8,w:60}]; });
+  st.activeSession={workoutId:'w6', startedAt:key(0), t0:NOW-600000, exIds:['warmup','press_bench','cooldown'],
+    targets:{warmup:{sets:1,reps:'5-10 min'},press_bench:{sets:4,reps:'8'},cooldown:{sets:1,reps:'5-10 min'}}, logs:{}}; });
+// 45 sauna visits over the last 90 days: more than the chart used to keep.
+WORLDS.sauna=withSeed(function(st){ st.activeSession=null; st.saunaSessions=[];
+  for(var i=1;i<=45;i++) st.saunaSessions.push({date:key(i*2-1), mins:15, temp:80, position:'Top', id:'sa-t'+i}); });
+var UI={benchtop:'{"tab":"today","viewingSession":true,"slide":1}', sauna:'{"tab":"progress"}', plain:'{"tab":"today"}', meal:'{"tab":"meals"}', recent:'{"tab":"progress"}', empty:'{"tab":"progress"}',
   press:'{"tab":"today","viewingSession":true,"slide":1}', bench:'{"tab":"today","viewingSession":true,"slide":1}',
   bench0:'{"tab":"today","viewingSession":true,"slide":1}', ss:'{"tab":"today","viewingSession":true,"slide":1}'};
 // A runtime whose store answers null: the page cannot load and says so.
@@ -186,16 +195,16 @@ srv.listen(0,async function(){
   });
 
   console.log('\nLAYOUT AND STATE');
-  await t('the side and front figures fit inside the slide on a 320px phone', async function(){
-    var p=await open('press',{viewport:{width:320,height:700}});
+  for(var fw of ['press','bench']) await (function(fw){ return t('the side and front figures fit inside the slide on a 320px phone ('+fw+')', async function(){
+    var p=await open(fw,{viewport:{width:320,height:700}});
     var r=await p.evaluate(function(){ var s=document.querySelector('.slide').getBoundingClientRect();
       var f=document.querySelectorAll('.fig-pair .fig-wrap');
       return {sw:document.documentElement.scrollWidth, n:f.length, right:f.length?f[f.length-1].getBoundingClientRect().right:0, slide:s.right}; });
     await close(p);
-    assert.strictEqual(r.n,2,'Push press did not draw the figure pair');
+    assert.strictEqual(r.n,2,fw+' did not draw the figure pair');
     assert.ok(r.sw<=320,'the page is '+r.sw+'px wide');
     assert.ok(r.right<=r.slide+0.5,'the front figure ends at '+r.right+', the slide at '+r.slide);
-  });
+  }); })(fw);
   await t('the story bar tells the current slide from a done one', async function(){
     var p=await open('press');
     var r=await p.evaluate(function(){ var f=function(s){ var e=document.querySelector(s), b=e.querySelector('b'),
@@ -289,6 +298,41 @@ srv.listen(0,async function(){
     assert.ok(r.every(function(x){ return x.t===r[0].t; }),'the tabs sit at '+r.map(function(x){ return x.t; }).join(', '));
     assert.ok(sw<=360,'the page is '+sw+'px wide');
   });
+  await t('the tab labels fit whole on a 320px phone', async function(){
+    var p=await open('plain',{viewport:{width:320,height:640},touch:true});
+    var r=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.tab'),function(e){ return e.textContent+' '+e.scrollWidth+'/'+e.clientWidth; })
+      .filter(function(x,i,a){ var n=x.split(' ')[1].split('/'); return +n[0]>+n[1]; }); });
+    await close(p);
+    assert.deepStrictEqual(r,[],'cut off (content/box width)');
+  });
+  await t('the sauna chart draws every visit in the range and its count says so', async function(){
+    var p=await open('sauna');
+    await p.click('[data-action="prange"][data-n="90"]'); await p.waitForTimeout(150);
+    var r=await p.evaluate(function(){ var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Minutes per session/.test(x.textContent); })[0];
+      return c?{n:c.querySelectorAll('.mark').length, sub:c.querySelector('.chart-head .sub').textContent}:null; });
+    await close(p);
+    assert.ok(r,'no sauna chart');
+    assert.strictEqual(r.n,45,'the 90 day chart draws '+r.n+' of 45 visits');
+    assert.ok(/^45 in 90 days/.test(r.sub),'the head says "'+r.sub+'"');
+    assert.ok(/675 min/.test(r.sub),'the head lost the minutes: "'+r.sub+'"');
+  });
+  await t('a long chart tip wraps whole inside the room kept for it', async function(){
+    var p=await open('recent',{touch:true,viewport:{width:360,height:740}});
+    var box=await p.evaluate(function(){ var ms=[].slice.call(document.querySelectorAll('.chart [data-tip]'));
+      if(!ms.length) return null;
+      var m=ms.sort(function(a,b){ return b.getAttribute('data-tip').length-a.getAttribute('data-tip').length; })[0];
+      m.scrollIntoView({block:'center'}); var ch=m.closest('.chart'); ch.setAttribute('data-probe','1');
+      var r=m.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2,tip:m.getAttribute('data-tip'),h0:ch.querySelector('.c-tip').getBoundingClientRect().height}; });
+    assert.ok(box && box.tip.length>40,'no long tip to try: '+(box&&box.tip));
+    await p.touchscreen.tap(box.x,box.y); await p.waitForTimeout(150);
+    var r=await p.evaluate(function(){ var e=document.querySelector('[data-probe] .c-tip');
+      return {txt:e.textContent, sw:e.scrollWidth, cw:e.clientWidth, h:e.getBoundingClientRect().height, lh:parseFloat(getComputedStyle(e).lineHeight)}; });
+    await close(p);
+    assert.strictEqual(r.txt,box.tip);
+    assert.ok(r.sw<=r.cw,'the tip is cut: '+r.sw+'px of text in '+r.cw+'px');
+    assert.ok(r.h<=r.lh*2+1 ? r.h===box.h0 : true,'the tip went from '+box.h0+' to '+r.h+'px tall');
+    assert.ok(box.h0>=r.lh*2-1,'only '+box.h0+'px kept for the tip');
+  });
   await t('the water + stays under the thumb as the amount grows', async function(){
     var p=await open('plain',{viewport:{width:360,height:740}});
     var at=[], plus='[data-action="water"][data-d="1"]';
@@ -370,8 +414,15 @@ srv.listen(0,async function(){
     await close(p);
     assert.strictEqual(r.w,'kg'); assert.strictEqual(r.v,'reps');
     var m=r.aim.match(/Aim for (\d+) on every set at ([\d.]+)kg/);
-    if(m) assert.deepStrictEqual([r.wv,r.vv],[m[2],m[1]],'the boxes say '+r.wv+' x '+r.vv+' under "'+r.aim+'"');
+    assert.ok(m,'no aim line to check the prefill against: "'+r.aim+'"');
+    assert.deepStrictEqual([r.wv,r.vv],[m[2],m[1]],'the boxes say '+r.wv+' x '+r.vv+' under "'+r.aim+'"');
     assert.ok(r.nw>0,'the last-time sets are not kept whole on a line');
+    p=await open('benchtop');
+    var top=await p.evaluate(function(){ return {aim:(document.querySelector('.slide .lasttime')||{}).textContent||'',
+      wv:document.getElementById('log-w-press_bench').value, vv:document.getElementById('log-v-press_bench').value}; });
+    await close(p);
+    assert.ok(/try \+2\.5kg/.test(top.aim),'the line after a top-of-range session: "'+top.aim+'"');
+    assert.deepStrictEqual([top.wv,top.vv],['62.5','8'],'the boxes say '+top.wv+' x '+top.vv+' under "'+top.aim+'"');
     p=await open('meal',{ui:'{"tab":"meals"}'});
     var pl=await p.evaluate(function(){ var l=document.querySelector('label[for="rec-portions"]'); return l?l.getBoundingClientRect().height>0&&l.textContent:''; });
     await close(p);
@@ -392,6 +443,19 @@ srv.listen(0,async function(){
     assert.ok(!/\(\w+\)/.test(r.txt) && !/unavailable|quota_exceeded/.test(r.txt),'a raw code is shown: '+r.txt);
     assert.ok(+r.dim<1,'water + looks usable while nothing can be changed');
   });
+  await t('the store status bar covers no control, nor the brand or the session header', async function(){
+    for(var w of ['press','plain']){
+      var p=await open(w,{q:'?nostore',viewport:{width:360,height:740},touch:true}); await p.waitForTimeout(400);
+      var r=await p.evaluate(function(){ var sb=document.querySelector('.statusbar'); if(!sb) return null; var s=sb.getBoundingClientRect();
+        var hit=[].slice.call(document.querySelectorAll('button,input,select,textarea,[data-action],.hud,.story-bar')).filter(function(e){
+          if(sb.contains(e)) return false; var q=e.getBoundingClientRect();
+          return q.width>0 && q.height>0 && q.bottom>s.top && q.top<s.bottom && q.right>s.left && q.left<s.right; });
+        return {h:s.height, hit:hit.map(function(e){ return (e.getAttribute('data-action')||e.className)+'@'+Math.round(e.getBoundingClientRect().top); })}; });
+      await close(p);
+      assert.ok(r && r.h>20,w+': no status bar');
+      assert.deepStrictEqual(r.hit.slice(0,6),[],w+': these sit under the '+Math.round(r.h)+'px status bar');
+    }
+  });
   await t('the shrunk undo offer is one button inside the column, and Dismiss reads clearly', async function(){
     var p=await open('recent',{viewport:{width:820,height:1180}});
     await p.evaluate(function(){ document.querySelector('.swipe-del[data-action="delsauna"]').click(); }); await p.waitForTimeout(200);
@@ -399,12 +463,15 @@ srv.listen(0,async function(){
     await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(200);
     var r=await p.evaluate(function(){ var b=document.querySelector('.undo-bar'), w=document.querySelector('.wrap').getBoundingClientRect();
       var vis=[].slice.call(b.querySelectorAll('button')).filter(function(x){ return x.getBoundingClientRect().width>0; });
-      return {mini:b.classList.contains('mini'), n:vis.length, right:b.getBoundingClientRect().right, col:w.right-16}; });
+      return {mini:b.classList.contains('mini'), n:vis.length, right:b.getBoundingClientRect().right, col:w.right-16,
+        txt:b.innerText.replace(/\s+/g,' ').trim(), name:vis[0]&&vis[0].getAttribute('aria-label')}; });
     await close(p);
     assert.ok(full.c>=4.5,'Dismiss text is '+full.c.toFixed(2)+':1');
     assert.ok(r.mini,'changing tab left the full offer over the next screen');
     assert.strictEqual(r.n,1,'the shrunk offer shows '+r.n+' buttons');
     assert.ok(r.right<=r.col+1,'it ends at '+r.right+', the column at '+r.col);
+    assert.strictEqual(r.txt,'Undo remove','the shrunk offer reads "'+r.txt+'"');
+    assert.ok(/sauna/.test(r.name||''),'the shrunk Undo is named "'+r.name+'"');
   });
   await t('Export and Import show which is open, and Replace looks unlike the safe choices', async function(){
     var p=await open('plain',{ui:'{"tab":"progress"}'});
@@ -427,14 +494,13 @@ srv.listen(0,async function(){
       var p=await open(w);
       var r=await p.evaluate(function(){ var f=[].slice.call(document.querySelectorAll('.fig-pair svg'));
         return f.map(function(s){ var b=s.getBoundingClientRect(), vb=s.viewBox.baseVal, g=s.querySelector('line');
-          return {h:Math.round(b.height), scale:Math.min(b.width/vb.width,b.height/vb.height), floor:g?Math.round(g.getBoundingClientRect().top):null}; }); });
+          return {h:Math.round(b.height), vbw:vb.width, scale:Math.min(b.width/vb.width,b.height/vb.height), floor:g?Math.round(g.getBoundingClientRect().top):null}; }); });
       await close(p);
       assert.strictEqual(r.length,2,w+' did not draw the pair');
       assert.strictEqual(r[0].h,r[1].h,w+': panels '+r[0].h+' and '+r[1].h+'px tall');
-      if(w==='press'){
-        assert.ok(Math.abs(r[0].scale-r[1].scale)<0.02,w+': side drawn at '+r[0].scale.toFixed(2)+'x, front at '+r[1].scale.toFixed(2)+'x');
-        assert.ok(Math.abs(r[0].floor-r[1].floor)<=2,w+': floors at '+r[0].floor+' and '+r[1].floor);
-      }
+      assert.ok(Math.abs(r[0].scale-r[1].scale)<0.02,w+': side drawn at '+r[0].scale.toFixed(2)+'x, front at '+r[1].scale.toFixed(2)+'x');
+      if(r[1].floor!==null) assert.ok(Math.abs(r[0].floor-r[1].floor)<=2,w+': floors at '+r[0].floor+' and '+r[1].floor);
+      assert.ok(w!=='bench' || r[0].vbw>100,'the bench side crop is '+r[0].vbw+' wide, so this does not test a wide crop');
     }
     p=await open('bench');
     var bench=await p.evaluate(function(){ return document.querySelectorAll('#fig-live-front svg rect').length; });

@@ -32,7 +32,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 
 var box={};
 var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','isSuperset','supersetMembers',
-  'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','lastTimeLine','prefillFor',
+  'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','aimFor','lastTimeLine','prefillFor',
   'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','minLogDate','unloggedYesterday'];
 var loaded=null;
 try{
@@ -158,6 +158,18 @@ if(loaded===true){
     box.state({days:{},workoutLogs:logs,activeSession:null});
     assert.ok(/Aim for 8 on every set at 80kg/.test(line),line);
     assert.deepStrictEqual([p.w,p.v],[80,8]);
+  });
+
+  t('every set at the top last time prefills the weight up a step, at the bottom of the range', function(){
+    var l=[{id:'r',workoutId:'w6',date:keyAgo(1),logs:{press_bench:[{v:10,w:60},{v:10,w:60},{v:10,w:60}],curl_bicep:[{v:12,w:12},{v:12,w:12},{v:12,w:12}]}}];
+    box.state({days:{},workoutLogs:l,activeSession:null});
+    var line=box.lastTimeLine(box.exDef('press_bench'),{sets:3,reps:'8-10'},box.lastSetsFor('press_bench'));
+    var p=box.prefillFor('press_bench',{logs:{}},{sets:3,reps:'8-10'});
+    var q=box.prefillFor('curl_bicep',{logs:{}},{sets:3,reps:'10-12'});
+    box.state({days:{},workoutLogs:logs,activeSession:null});
+    assert.ok(/try \+2\.5kg/.test(line),line);
+    assert.deepStrictEqual([p.w,p.v],[62.5,8]);
+    assert.deepStrictEqual([q.w,q.v],[14,10],'dumbbells go up 2kg each');
   });
 
   t('then from the previous set in this session', function(){

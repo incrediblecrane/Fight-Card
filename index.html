@@ -23,7 +23,7 @@ var CSS = "\
   color-scheme:dark;\
 }\
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}\
-.wrap{max-width:680px;margin:0 auto;padding:18px 16px max(90px,calc(var(--undo-h,0px) + 60px + env(safe-area-inset-bottom)));}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}\
+.wrap{max-width:680px;margin:0 auto;padding:max(18px,calc(var(--status-h,0px) + 10px)) 16px max(90px,calc(var(--undo-h,0px) + 60px + env(safe-area-inset-bottom)));}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}\
 .hud{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;}\
 .hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}\
 .brand{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:0.02em;font-size:1.5rem;text-transform:uppercase;margin:0;}\
@@ -50,7 +50,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .dot.clean{background:var(--good);border-color:var(--good);color:var(--good-ink);}\
 .dot.used{background:var(--surface-raised);border-color:var(--text-faint);color:var(--text);}\
 .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:14px;}\
-.tab{min-width:0;min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.03em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\
+.tab{min-width:0;min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.03em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}@media (max-width:359px){.tab{font-size:0.7rem;letter-spacing:0;padding:8px 2px;}}\
 .tab.active{background:var(--text);color:var(--bg);border-color:var(--text);}\
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}\
 @media (max-width:420px){.grid{grid-template-columns:1fr;}}\
@@ -263,7 +263,7 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 .recent-log>span:first-child{min-width:0;}\
 .ssnote{display:block;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);margin-top:2px;}\
 @media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}\
-.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.c-tip{min-height:1.5em;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--field-border);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.exrow .top .last time{font:inherit;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;aspect-ratio:100/168;}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;opacity:0;transition:opacity .18s ease;}.swipe.open .swipe-del,.swipe-del:focus-visible{opacity:1;}.swipe-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:4px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe .recent-log{padding-right:36px;}.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-soft);border-color:var(--field-border);}.undo-bar .msg{flex:1 1 auto;min-width:0;}.undo-bar .btns{flex:0 0 auto;white-space:nowrap;}.undo-bar.mini{left:auto;right:max(16px,calc((100vw - 648px) / 2));padding:4px;border-radius:999px;}.undo-bar.mini .msg,.undo-bar.mini .ghost{display:none;}.undo-bar.mini button:first-child{margin-left:0;}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{font-size:0.66rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{position:sticky;top:0;z-index:15;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:6px 8px 6px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{min-height:44px;background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 14px;font-size:0.72rem;font-weight:600;text-transform:uppercase;cursor:pointer;font-family:'IBM Plex Mono',monospace;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.c-tip{min-height:3em;line-height:1.5;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);overflow-wrap:anywhere;}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--field-border);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.exrow .top .last time{font:inherit;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap:first-child>div{max-width:var(--fig-max,155px);}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;aspect-ratio:100/168;}.fig-pair .fig-wrap:first-child svg{aspect-ratio:var(--fig-ar,100/168);}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;opacity:0;transition:opacity .18s ease;}.swipe.open .swipe-del,.swipe-del:focus-visible{opacity:1;}.swipe-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:4px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe .recent-log{padding-right:36px;}.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-soft);border-color:var(--field-border);}.undo-bar .msg{flex:1 1 auto;min-width:0;}.undo-bar .btns{flex:0 0 auto;white-space:nowrap;}.undo-bar.mini{left:auto;right:max(16px,calc((100vw - 648px) / 2));padding:4px;border-radius:999px;}.undo-bar.mini .msg,.undo-bar.mini .ghost,.undo-bar:not(.mini) .what{display:none;}.undo-bar.mini button:first-child{margin-left:0;}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{font-size:0.66rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{position:sticky;top:var(--status-h,0px);z-index:15;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:6px 8px 6px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{min-height:44px;background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 14px;font-size:0.72rem;font-weight:600;text-transform:uppercase;cursor:pointer;font-family:'IBM Plex Mono',monospace;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
 .plainlist{list-style:none;padding:0;margin:8px 0 0;font-size:0.86rem;color:var(--text-soft);}.plainlist li{margin:3px 0;}.libitem .plainlist+p{margin-top:12px;}\
 @media (min-width:1100px){.wrap{max-width:1000px;}.grid{grid-template-columns:repeat(3,minmax(0,1fr));}.shoplist{columns:2;column-gap:28px;}.shoplist .shop{break-inside:avoid;}.libgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}.libgrid .libitem{margin-bottom:0;}.undo-bar,.statusbar{max-width:968px;}.undo-bar.mini{right:max(16px,calc((100vw - 968px) / 2));}}\
 ";
@@ -1272,28 +1272,35 @@ function topReps(reps){
   return m?+(m[2]||m[1]):null;
 }
 /* Double progression: build every set to the top of the range, then add
-   weight and build again. One line, so it reads at a glance between sets. */
+   weight and build again from the bottom of it. aimFor is the next session's
+   weight and reps by that rule, so the line and the boxes under it agree. */
+function aimFor(def,tgt,last){
+  if(!def || def.type!=='load' || !last || !last.sets.length) return null;
+  var top=topReps(tgt&&tgt.reps), w=Math.max.apply(null,last.sets.map(function(s){ return s.w||0; }));
+  if(!top || !w) return null;
+  var work=last.sets.filter(function(s){ return (s.w||0)===w; });
+  var n=(tgt&&tgt.sets)||work.length;
+  if(work.length<n || !work.every(function(s){ return s.v>=top; })) return {w:w, v:top};
+  var step=perImplement(def.id)?2:2.5;
+  return {w:Math.round((w+step)*100)/100, v:+String(tgt.reps).match(/\d+/)[0], n:n, top:top, step:step};
+}
 function lastTimeLine(def,tgt,last){
   if(!def || !last || !last.sets.length) return '';
   var line='Last time: '+last.sets.map(function(s){ return setLabel(def,s); }).join(', ')+'.';
-  var top=topReps(tgt&&tgt.reps);
-  if(def.type!=='load' || !top) return line;
-  var w=Math.max.apply(null,last.sets.map(function(s){ return s.w||0; }));
-  if(!w) return line;
-  var work=last.sets.filter(function(s){ return (s.w||0)===w; });
-  var n=(tgt&&tgt.sets)||work.length;
-  if(work.length>=n && work.every(function(s){ return s.v>=top; }))
-    return line+' Hit '+n+'×'+top+': try '+(perImplement(def.id)?'+2kg ea':'+2.5kg')+'.';
-  return line+' Aim for '+top+' on every set at '+w+'kg.';
+  var a=aimFor(def,tgt,last);
+  if(!a) return line;
+  if(a.step) return line+' Hit '+a.n+'×'+a.top+': try '+(a.step===2?'+2kg ea':'+2.5kg')+'.';
+  return line+' Aim for '+a.v+' on every set at '+a.w+'kg.';
 }
 // What the boxes start with: the previous working set this session, or else
-// the working weight last time (the heaviest, which the "Aim for" line names)
-// at the reps that line aims for, so a repeat set is one tap and the boxes
-// never contradict the line above them.
+// what the line above them aims for (the working weight at the top of the
+// range, or the weight up a step once that was hit), so a repeat set is one
+// tap and the boxes never contradict the line.
 function prefillFor(exId,sess,tgt){
   var mine=((sess&&sess.logs||{})[exId]||[]).filter(function(x){ return !x.wu; });
   if(mine.length) return mine[mine.length-1];
   var last=lastSetsFor(exId); if(!last) return null;
+  var a=aimFor(exDef(exId),tgt,last); if(a) return {w:a.w, v:a.v};
   var w=Math.max.apply(null,last.sets.map(function(s){ return s.w||0; }));
   var work=w?last.sets.filter(function(s){ return (s.w||0)===w; })[0]:last.sets[0];
   var top=w?topReps(tgt&&tgt.reps):null;
@@ -3528,6 +3535,13 @@ function rigBox(exId){
   var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2;
   return (rigBoxes[exId]={x:Math.round(vx*10)/10, w:Math.round(w*10)/10});
 }
+// The front view is 100 wide. Beside it the side panel gets a column, a cap
+// and a shape in proportion to its own crop, so a wide crop is drawn at the
+// front view's scale rather than shrunk to fit a panel of the same width.
+function figPairStyle(exId){
+  var w=rigBox(exId).w;
+  return 'grid-template-columns:minmax(0,'+w+'fr) minmax(0,100fr);--fig-ar:'+w+'/168;--fig-max:'+Math.round(155*w/100)+'px';
+}
 function rigSVG(exId,u){
   var ex=rigFor(exId); if(!ex) return '';
   var s=rSolve(rPoseAt(ex,u));
@@ -3952,7 +3966,7 @@ function bodyContent(){
   var saunaAll=state.saunaSessions.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
   // The chart follows the range like every other chart; the list under it is
   // the latest visits whenever they were.
-  var saunaRows=saunaAll.filter(function(x){ return inRange(x.date); }).slice(0,30).reverse().map(function(x){
+  var saunaRows=saunaAll.filter(function(x){ return inRange(x.date); }).reverse().map(function(x){
     return {k:shortDay(x.date), v:saunaTotal(x), lbl:saunaTotal(x)+' min',
             tip:rowDate(x.date)+': '+saunaTotal(x)+' min'+(x.temp?' at '+x.temp+'°C':'')+' · '+saunaStintText(x)};
   });
@@ -4082,7 +4096,7 @@ function bodyContent(){
       '<div class="pbrow"><span>Current streak <b>'+pStreaks.cleanStreak+' day'+(pStreaks.cleanStreak===1?'':'s')+'</b></span>'+
         '<span>Day streak <b>'+pStreaks.dayStreak+'</b></span></div></div>'+
     '<div class="sectiontitle">Sauna</div>'+
-    (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaRows.length+' in '+progRange+' days',
+    (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaRows.length+' in '+progRange+' days · '+saunaRows.reduce(function(a,r){ return a+r.v; },0)+' min',
       empty:'No sauna visits in the last '+progRange+' days.',hint:'Tap a bar for that visit',
       aria:'Sauna minutes per session over the last '+progRange+' days'}):'')+saunaHtml+
     '<div class="sectiontitle">Exercise progression</div>'+
@@ -4276,7 +4290,7 @@ function bodyContent(){
           // option would be a picture of the wrong exercise.
           (def2.type==='prep' ? ''
             : rigFor(def2.id)&&rigFor(def2.id).front
-            ? ('<div class="fig-pair"><div class="fig-wrap"><span class="vlbl">Side</span>'+
+            ? ('<div class="fig-pair" style="'+figPairStyle(def2.id)+'"><div class="fig-wrap"><span class="vlbl">Side</span>'+
                '<div id="fig-live" data-rig="'+def2.id+'">'+rigSVG(def2.id,0)+'</div></div>'+
                '<div class="fig-wrap"><span class="vlbl">'+(rigFor(def2.id).frontPlan?'Above':'Front')+'</span>'+
                '<div id="fig-live-front" data-rig="'+def2.id+'">'+rigFrontSVG(def2.id,0)+'</div></div></div>')
@@ -4330,9 +4344,9 @@ function bodyContent(){
     ? ('<div class="backfill-bar"><span>Logging for <strong>'+esc(prettyKey(activeDate()))+'</strong></span>'+
        '<button data-action="today">Back to today</button></div>')
     : '';
-  // The store's state sits over the top of the page rather than in it, so
-  // the page does not jump under a thumb when it comes or goes, and it stays
-  // in view however far down the page is. The code is for a tooltip only.
+  // The store's state is fixed at the top of the screen, so it stays in view
+  // however far down the page is, and the page starts below it (undoFit), so
+  // it never sits over a control at the top. The code is for a tooltip only.
   var status=(dbState==='loading'?'<div class="banner" role="status">loading your data&hellip;</div>':'')+
       (dbState==='error'?'<div class="banner" role="alert" title="'+esc(dbErr||'unavailable')+'">Could not load your saved data: '+esc(errWords(dbErr||'unavailable'))+'. Changes are paused until it loads. <button data-action="retryload">Retry</button></div>':'')+
       // Why access went is the platform's to say, not this page's.
@@ -4370,15 +4384,19 @@ function bodyContent(){
 /* Fixed to the bottom of the screen on every view, so the offer is where the
    removal happened rather than at the top of Progress. An offer whose item is
    already back is not shown; applyUndo refuses it anyway.
-   After UNDO_SHOW it shrinks to its two buttons in the corner rather than going:
+   After UNDO_SHOW it shrinks to one labelled button in the corner rather than going:
    the undo stays good for UNDO_TTL, and a bar of words over the bottom of the
    page for ten minutes is in the way. Not a live region: undoSay announces it
    once, and this is drawn again on every render. */
+// The shrunk offer has no room for its message, so its button says what kind
+// of thing it undoes, and its name says the rest.
+var UNDO_WHAT={week:'clear',session:'session'};
 function undoToast(){
   var u=readUndo();
   if(!u || undoMoot(u)) return '';
-  return '<div class="undo-bar'+(Date.now()-u.at>=UNDO_SHOW||undoMini===u.at?' mini':'')+'"><span class="msg">'+esc(u.text||'Removed '+u.label)+'</span>'+
-    '<span class="btns"><button data-action="undo">Undo</button>'+
+  var msg=u.text||'Removed '+u.label;
+  return '<div class="undo-bar'+(Date.now()-u.at>=UNDO_SHOW||undoMini===u.at?' mini':'')+'"><span class="msg">'+esc(msg)+'</span>'+
+    '<span class="btns"><button data-action="undo" aria-label="Undo: '+esc(msg)+'">Undo<span class="what"> '+(UNDO_WHAT[u.kind]||'remove')+'</span></button>'+
     '<button class="ghost" data-action="dismissundo">Dismiss</button></span></div>';
 }
 // The page keeps room below its end for the toast, whatever height its words
@@ -4386,6 +4404,11 @@ function undoToast(){
 // full toast is shrunk when its time is up without drawing the page again.
 function undoFit(){
   var app=document.getElementById('app'); if(!app) return;
+  // The same for the store's bar at the top: the page starts below it, so it
+  // covers nothing until the page is scrolled, and the backfill bar sticks
+  // under it rather than behind it.
+  var sb=app.querySelector('.statusbar');
+  app.style.setProperty('--status-h',sb?Math.ceil(sb.getBoundingClientRect().bottom)+'px':'0px');
   var bar=app.querySelector('.undo-bar'), u=bar&&readUndo();
   if(undoHide){ clearTimeout(undoHide); undoHide=null; }
   if(u && !bar.classList.contains('mini')) undoHide=setTimeout(function(){
@@ -5089,7 +5112,7 @@ function boot(){
   });
   window.addEventListener('pagehide',flushSave);
   // Turned or resized: charts follow the width they are shown at.
-  window.addEventListener('resize',function(){ if(fitCharts()) render(); });
+  window.addEventListener('resize',function(){ if(fitCharts()) render(); else undoFit(); });
   // A session already in flight when this shipped has no prep steps; give it
   // them here, since viewingSession persists and such a session never goes
   // back through startWorkout.
