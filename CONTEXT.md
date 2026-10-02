@@ -190,7 +190,9 @@ Fractions ("1 1/2", "½") and ranges ("2-3", bought at the top end) are read; a
 line with no number ("Honey (drizzle)") keeps its name and invents no
 quantity; any name is allowed, `constructor` included. The bracket is found
 by index, not a pattern, so a long line cannot freeze the page; a line is
-kept to 500 characters (`ING_MAX`) by the Add recipe form and by an import.
+kept to 500 characters (`ING_MAX`) by the Add recipe form. An import is not
+held to it: older forms took any length, so that is data the app already
+holds, and refusing it would refuse the owner's own export and Put back.
 
 **Planned meal**:
 One entry in `state.plan`: a recipe, a real date, a slot (breakfast, lunch,

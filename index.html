@@ -2242,7 +2242,8 @@ function ownCode(fn){ return function(x){ try{ return fn(x); }catch(e){ throw ow
 // A store code in words. The code itself is for the banner's tooltip.
 var ERR_WORDS={quota_exceeded:'storage is full', unavailable:'storage cannot be reached right now', timeout:'it took too long to answer',
   deadline_exceeded:'it took too long to answer', permission_denied:'this page is not allowed to save', not_granted:'this page is not allowed to save',
-  revoked:'access to storage was taken away', invalid_argument:'storage refused the change', aborted:'two saves crossed', unknown:'something went wrong'};
+  revoked:'access to storage was taken away', invalid_argument:'storage refused the change', aborted:'two saves crossed', unknown:'something went wrong',
+  transform_error:'it holds something this app cannot store'};
 function errWords(code){ return hasOwn(ERR_WORDS,code)?ERR_WORDS[code]:'something went wrong'; }
 function docLabel(path){
   var i=path.indexOf('/'), kind=path.slice(0,i), id=path.slice(i+1);
@@ -2514,7 +2515,9 @@ function jsonDepth(text){
   }
   return top;
 }
-// The longest ingredient line a recipe takes. A line is a name and an amount.
+// The longest ingredient line the Add recipe form takes. A line is a name and
+// an amount. An import is not held to it: older forms took any length, and
+// parseIng reads one in linear time.
 var ING_MAX=500;
 // The entry a document holds, in words, for saying which one will not fit.
 function importLabel(path,body){
@@ -2623,8 +2626,6 @@ function readImportOf(text){
     // an older log's.
     s.exIds=s.exIds.filter(function(id){ if(isSuperset(id)||exDef(id)) return true; delete s.targets[id]; return false; });
   }
-  bad=(o.recipes||[]).filter(function(r){ return r.ingredients.some(function(l){ return l.length>ING_MAX; }); })[0];
-  if(bad) return no('The recipe "'+bad.title.slice(0,60)+'" has an ingredient line over '+ING_MAX+' characters. A line is a name and an amount, so nothing was read.');
   var st={};
   EXPORT_KEYS.forEach(function(key){ if(o[key]!==undefined) st[key]=o[key]; });
   // dbApply supplies a default for anything left out, as it does for a store.
@@ -2703,9 +2704,10 @@ function whenKept(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return 'an e
 /* Putting the backup back replaces everything here, so it asks first, naming
    when the copy is from and what goes. The question is where Put back was,
    so a second tap on the same spot does nothing. */
+function restoreNo(msg){ return 'The copy kept on this device could not be put back. '+msg; }
 function restoreAskHtml(b){
   var r=readImport(b), sm=r.ok&&r.summary, nd=Object.keys(state.days).length, ns=state.workoutLogs.length;
-  if(!sm) return '';
+  if(!sm) return '<p class="note bad" role="alert">'+esc(restoreNo(r.msg))+'</p>';
   return '<p class="note" role="status">Put back the data as it was on '+esc(whenKept(sm.exportedAt))+'? Everything here now ('+
     nd+' day'+(nd===1?'':'s')+', '+ns+' session'+(ns===1?'':'s')+') is replaced, and becomes the copy kept on this device.</p>'+
     '<div class="datarow"><button class="ghost" data-action="restorecancel">Keep what is here</button>'+
@@ -5054,7 +5056,8 @@ function onClick(e){
     // One tap only: the button is gone until the writes have landed, and Put
     // back is a swap, so a second one would take it all away again.
     if(importBusy||!restoreAsk) return;
-    var back=readImport(readBackup()); restoreAsk=false; if(!back.ok){ render(); return; }
+    var back=readImport(readBackup()); restoreAsk=false;
+    if(!back.ok){ importRes={ok:false, msg:restoreNo(back.msg)}; dataMsg=''; render(); return; }
     var kb=applyImport(back.state,'replace'); importRes=null;
     importNote='Put back.'+(kb===true?' What it replaced is now the one kept.':kb==='held'?'':' What it replaced could not be kept on this device.');
     dataMsg=''; if(!importBusy){ dataMsg=importNote; importNote=''; }

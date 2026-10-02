@@ -434,14 +434,14 @@ t('an entry too large for the store is refused at Check, by name', function(){
   assert.strictEqual(box.docFault({a:'x'.repeat(262144-7)}),'large');
   assert.strictEqual(box.docFault({a:'x'.repeat(262144-8)}),'');
 });
-t('an ingredient line over 500 characters is refused at Check', function(){
+// The Add recipe form took any length before it kept lines to ING_MAX, so a
+// longer one is data the app already holds: it reads, in linear time.
+t('an ingredient line over 500 characters, from older data, is read at Check', function(){
   var good=JSON.parse(box.exportText(rich()));
   function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
   var r=box.readImport(w(function(o){ o.recipes[0].title='Soup'; o.recipes[0].ingredients.push('x'+'('.repeat(600)); }));
-  assert.strictEqual(r.ok,false,'a 601 character line was accepted');
-  assert.ok(/The recipe "Soup" has an ingredient line over 500/.test(r.msg),r.msg);
-  r=box.readImport(w(function(o){ o.recipes[0].ingredients.push('y'.repeat(500)); }));
-  assert.ok(r.ok,'a 500 character line was refused: '+r.msg);
+  assert.ok(r.ok,'a 601 character line was refused: '+r.msg);
+  assert.ok(r.state.recipes[0].ingredients.indexOf('x'+'('.repeat(600))>-1,'the line was not kept');
 });
 // The db throws a TypeError as the reference to a bad path is made. Thrown
 // out of a batch, it stopped the rest of it, and with no code it was retried

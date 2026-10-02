@@ -1717,6 +1717,39 @@ srv.listen(0,async function(){
     assert.deepStrictEqual(await exported(),a,'putting the backup back did not restore the data');
   });
 
+  // The Add recipe form took any length of ingredient line before it kept
+  // them to ING_MAX, so data already stored can hold a longer one: its own
+  // export imports, and Put back after an import restores it.
+  await t('a long ingredient line stored by older code still exports, imports and is put back', async function(){
+    var line='Stock '+'(a long note) '.repeat(60);
+    store['recipes/longr']={id:'longr',title:'Long stew',tag:'Recipe',ingredients:['Eggs (2)',line]};
+    await go(); var a=await exported();
+    await importing(JSON.stringify(a));
+    assert.strictEqual(await p.locator('[data-action="doimport"]').count()>0,true,'its own export was refused: '+(await text()).slice(-300));
+    await importing(JSON.stringify({schema:1}));
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+    assert.ok(!store['recipes/longr'],'the empty import left the recipe');
+    await p.click('[data-action="restorebackup"]'); await p.click('[data-action="restoreconfirm"]'); await settle();
+    assert.ok(store['recipes/longr'] && store['recipes/longr'].ingredients[1]===line,'Put back did not restore the recipe: '+JSON.stringify(store['recipes/longr']));
+    await go();
+    assert.deepStrictEqual(await exported(),a,'putting the backup back did not restore the data');
+  });
+  await t('a kept copy that cannot be read says why when put back', async function(){
+    await go();
+    await p.evaluate(function(){ localStorage.setItem('fc.backup','{"schema":1,"days":{"tomorrow":{}}}'); });
+    await go(); var n=calls.set+calls.del;
+    await p.click('[data-action="tab"][data-tab="progress"]');
+    if(!(await p.locator('[data-action="restorebackup"]').count())) await p.click('[data-action="datapane"][data-p="import"]');
+    await p.click('[data-action="restorebackup"]'); await p.waitForTimeout(300);
+    var msg=await p.locator('[role="alert"]').allTextContents();
+    assert.ok(msg.some(function(m){ return /could not be put back/.test(m) && /not a date/.test(m); }),'no reason given: '+JSON.stringify(msg));
+    assert.strictEqual(await p.locator('[data-action="restoreconfirm"]').count(),0,'it offered to put back a copy it cannot read');
+    await p.waitForTimeout(1300);
+    assert.strictEqual(calls.set+calls.del,n,'a copy that cannot be read wrote to the store');
+    await p.evaluate(function(){ localStorage.removeItem('fc.backup'); });
+    await go();
+  });
+
   // Another device saves after this view loaded, so this view never heard of
   // what it saved; replacing everything still has to take it away.
   await t('replacing everything also removes what another view saved after this one loaded', async function(){
@@ -2623,6 +2656,8 @@ srv.listen(0,async function(){
       var seen=await notSaved(q);
       assert.ok(seen.length,'nothing says the change was not saved');
       assert.ok(seen.every(function(x){ return !/retrying/i.test(x.text); }),'it is shown as one to retry: '+JSON.stringify(seen));
+      var why=(await q.locator('.banner[role="alert"]').allTextContents()).join(' | ');
+      assert.ok(/could not be saved: it holds something this app cannot store/.test(why),'it does not say why the change cannot be saved: '+why);
       await q.waitForTimeout(5000);
       assert.strictEqual(calls.set,n,'it was tried again on its own');
       assert.deepStrictEqual(errs.slice(e0),[],'it threw out of the page');
