@@ -1459,6 +1459,21 @@ srv.listen(0,async function(){
     } finally { clearEmpty(); await go(); await toToday(); }
   });
 
+  // Here nothing reloads after a save, so what the page holds in memory lasts.
+  await t('a warm-up option and minutes picked but not logged do not carry into the next session', async function(){
+    await startPush();
+    await p.selectOption('#log-opt-warmup','Treadmill walk/jog'); await p.waitForTimeout(300);
+    await p.fill('#log-v-warmup','12'); await p.fill('#log-lvl-warmup','6');
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="discardsession"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="startworkout"][data-id="w8"]'); await p.waitForTimeout(400);
+    try{
+      var got=await p.evaluate(function(){ var o=document.getElementById('log-opt-warmup'), v=document.getElementById('log-v-warmup');
+        return [o?o.value:null, v?v.value:null, !!document.getElementById('log-lvl-warmup')]; });
+      assert.deepStrictEqual(got,['','',false],'the Legs warm-up opened with '+JSON.stringify(got));
+    } finally { await p.waitForTimeout(1800); store['state/session']={active:null}; await go(); await toToday(); }
+  });
+
   console.log('\nWHAT OTHER VIEWS ADD OR DELETE REACHES THIS ONE');
   await t('a sauna visit logged in another view shows here once the page is looked at again', async function(){
     await go();

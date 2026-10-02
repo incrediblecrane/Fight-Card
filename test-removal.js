@@ -114,9 +114,15 @@ srv.listen(0,async function(){
   var t=async function(name,fn){ try{ await fn(); ok(name); }catch(e){ bad(name,e); } };
   var dayKey=function(){ return p.evaluate(function(){ var a=document.querySelector('.week .dot.active'); return a?a.getAttribute('data-k'):''; }); };
   // A session with one set in it, finished. The warm-up is the first slide.
-  var finishOne=async function(){
+  // A warm-up alone is no session, so the set goes on the slide after it.
+  var finishOne=async function(title){
     await tabTo('training');
-    await p.locator('[data-action="startworkout"]').first().click(); await p.waitForTimeout(500);
+    if(title) assert.ok(await p.evaluate(function(want){
+      var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h4').textContent.trim()===want; })[0];
+      var b=c&&c.querySelector('[data-action="startworkout"]'); if(b) b.click(); return !!b; },title),'no card for '+title);
+    else await p.locator('[data-action="startworkout"]').first().click();
+    await p.waitForTimeout(500);
+    await tap('[data-action="nextslide"]'); await p.waitForTimeout(200);
     await p.fill('input[id^="log-v-"]','5');
     await p.locator('[data-action="logset"]').first().click(); await p.waitForTimeout(300);
     for(var k=0;k<30;k++){ if(!(await tap('[data-action="nextslide"]'))) break; await p.waitForTimeout(60); }
@@ -180,6 +186,63 @@ srv.listen(0,async function(){
     await delLog(only.id);
     assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
     assert.strictEqual(await hudXp(),5,'XP after remove and undo');
+  });
+
+  console.log('\nTAKING A SESSION OFF A DAY LEAVES THE DAY AS THE REST OF IT SAYS');
+  var clearToday=function(){ setSeed(function(st){
+    st.workoutLogs=st.workoutLogs.filter(function(l){ return l.date!==todayK; }); st.activeSession=null;
+    if(st.days[todayK]){ st.days[todayK].workout={done:false,type:null}; st.days[todayK].rest=false; } }); };
+  var workoutLine=function(){ return p.evaluate(function(){
+    var c=[].slice.call(document.querySelectorAll('.card')).filter(function(x){ var h=x.querySelector('h3'); return h&&h.textContent==='Workout'; })[0];
+    var s=c&&c.querySelector('.sub'); return s?s.textContent:''; }); };
+
+  await t('a session removed from a day quick-logged before it leaves the day trained and its XP', async function(){
+    clearToday(); await go(); await tabTo('today');
+    await tap('[data-action="workout"][data-type="Conditioning"]'); await settle();
+    var x1=await hudXp();
+    await finishOne('Push');
+    assert.strictEqual(await hudXp(),x1,'the session paid again for a day already trained');
+    var ids=logIdsOn(todayK); assert.strictEqual(ids.length,1,'expected one log, found '+ids.length);
+    await go(); await tabTo('progress'); await delLog(ids[0]);
+    var d=seedOf().days[todayK];
+    assert.ok(d.workout.done,'the quick-logged day was cleared');
+    assert.strictEqual(d.workout.type,'Conditioning','the day reads '+d.workout.type);
+    assert.strictEqual(await hudXp(),x1,'XP went from '+x1+' to '+(await hudXp()));
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
+    assert.strictEqual(await hudXp(),x1,'XP after undo');
+    await tabTo('today');
+    assert.strictEqual(await workoutLine(),'Logged: Strength','after undo the day reads '+(await workoutLine()));
+  });
+
+  await t('the quick log stays with the day whichever of its sessions goes first', async function(){
+    clearToday(); await go(); await tabTo('today');
+    await tap('[data-action="workout"][data-type="Conditioning"]'); await settle();
+    var x1=await hudXp();
+    await finishOne('Push'); await finishOne('Boxing/MMA technical');
+    var ids=logIdsOn(todayK); assert.strictEqual(ids.length,2,'expected two logs, found '+ids.length);
+    await go(); await tabTo('progress'); await delLog(ids[0]); await delLog(ids[1]);
+    var d=seedOf().days[todayK];
+    assert.ok(d.workout.done,'the quick-logged day was cleared');
+    assert.strictEqual(d.workout.type,'Conditioning','the day reads '+d.workout.type);
+    assert.strictEqual(await hudXp(),x1,'XP went from '+x1+' to '+(await hudXp()));
+    await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300);
+  });
+
+  await t('removing one of two sessions on a day names the day after the one left', async function(){
+    clearToday(); await go(); var x0=await hudXp();
+    await finishOne('Strength — functional full body'); await finishOne('Boxing/MMA technical');
+    await go(); await tabTo('today');
+    assert.strictEqual(await workoutLine(),'Logged: Boxing/MMA');
+    var box=seedOf().workoutLogs.filter(function(l){ return l.date===todayK && l.tag==='Boxing/MMA'; })[0];
+    assert.ok(box,'no Boxing log');
+    await tabTo('progress'); await delLog(box.id); await tabTo('today');
+    assert.strictEqual(await workoutLine(),'Logged: Strength','the day reads "'+(await workoutLine())+'"');
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
+    assert.strictEqual(await workoutLine(),'Logged: Boxing/MMA','after undo the day reads "'+(await workoutLine())+'"');
+    var ids=logIdsOn(todayK); await tabTo('progress');
+    for(var i=0;i<ids.length;i++) await delLog(ids[i]);
+    assert.strictEqual(await hudXp(),x0,'XP did not come back to where it started');
+    await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300);
   });
 
   console.log('\nAN UNDO THAT WOULD PUT BACK SOMETHING ALREADY THERE');

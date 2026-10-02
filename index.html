@@ -874,6 +874,13 @@ var exSearch='';
 // survive the re-render that swaps that field; the minutes have to survive it
 // too, or picking the option would wipe what was already typed.
 var prepPick={}, prepMins={};
+// They belong to the session they were picked in: one started, finished or
+// discarded takes them, and what was typed into their boxes, with it.
+function clearPrep(){
+  var ids=[]; Object.keys(prepPick).concat(Object.keys(prepMins)).forEach(function(x){
+    ids.push('log-v-'+x,'log-opt-'+x,'log-w-'+x,'log-lvl-'+x); });
+  consumed(ids); prepPick={}; prepMins={};
+}
 // Stints already added to the sauna session being logged, plus the temperature
 // so it does not have to be retyped for each one. UI-only: nothing is written
 // to state until the session is logged.
@@ -1154,6 +1161,8 @@ function countsAsSet(id,st){
   // A warm-up or cool-down step is not a set, unless it was light sets at a weight.
   return !(d && d.type==='prep') || st.lvlKind==='load';
 }
+function countedSets(logs){ var n=0; Object.keys(logs||{}).forEach(function(k){
+  (logs[k]||[]).forEach(function(st){ if(countsAsSet(k,st)) n++; }); }); return n; }
 function lastSetsFor(exId){
   var best=null;
   state.workoutLogs.forEach(function(l){
@@ -1290,12 +1299,19 @@ function removeWorkoutLog(id){
   var i=-1; state.workoutLogs.forEach(function(x,k){ if(x.id===id) i=k; });
   if(i<0) return false;
   var item=state.workoutLogs.splice(i,1)[0];
-  // The day was marked trained by finishing this session. If it was the only
-  // one that day, the day is no longer a training day. The XP was paid once
-  // per trained day, not per session, so it only comes off with the day.
-  var still=state.workoutLogs.some(function(x){ return x.date===item.date; });
+  // The day was marked trained by finishing this session, unless a quick log
+  // had marked it first (dayWas). If it was the only one that day, the day is
+  // no longer a training day. The XP was paid once per trained day, not per
+  // session, so it only comes off with the day. With others left, the day
+  // reads as the newest of them, and keeps any quick log this one recorded.
+  var left=state.workoutLogs.filter(function(x){ return x.date===item.date; });
   var d=state.days[item.date], took=0;
-  if(!still && d && d.workout && d.workout.done){ d.workout.done=false; d.workout.type=null; took=-addXp(-XP_WORKOUT); }
+  if(d && d.workout && d.workout.done){
+    if(left.length){ d.workout.type=left[left.length-1].tag||null;
+      if(item.dayWas && !left.some(function(x){ return x.dayWas; })) left[0].dayWas=item.dayWas; }
+    else if(item.dayWas) d.workout.type=item.dayWas.type||null;
+    else { d.workout.done=false; d.workout.type=null; took=-addXp(-XP_WORKOUT); }
+  }
   parkUndo({kind:'log',item:item,pos:i,xp:took,label:item.title+' on '+item.date});
   return true;
 }
@@ -1337,6 +1353,7 @@ function applyUndo(){
     // Only a day this makes trained again earns its XP back, and a rest day
     // marked since gives its own back as it is replaced.
     if(!d.workout.done){ if(d.rest) addXp(-XP_REST); d.workout.done=true; d.workout.type=u.item.tag||null; d.rest=false; addXp(u.xp); }
+    else { var same=state.workoutLogs.filter(function(x){ return x.date===u.item.date; }); d.workout.type=same[same.length-1].tag||null; }
     d.touched=true;
   }
   else if(u.kind==='recipe'){ putBack(state.recipes,u.item,u.pos); planBack(u.plan);
@@ -1630,7 +1647,7 @@ function mergeSetLogs(base,mine,theirs){
   var out={};
   Object.keys(mine).concat(Object.keys(theirs)).forEach(function(ex){
     if(out.hasOwnProperty(ex)) return;
-    if(stableJson(mine[ex])===stableJson(base[ex])){ if(theirs[ex]!==undefined) out[ex]=theirs[ex]; return; }
+    if(stableJson(mine[ex])===stableJson(base[ex])){ if((theirs[ex]||[]).length) out[ex]=theirs[ex]; return; }
     var l=mergeKeyed(base[ex],mine[ex],theirs[ex],setKey);
     if(l.every(function(s){ return s && typeof s.t==='number'; })) l.sort(function(a,b){ return a.t-b.t; });
     if(l.length) out[ex]=l;
@@ -2089,7 +2106,7 @@ var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',machin
 var IMPORT_FIELDS={
   days:{water:{'#':[0,DAY_MAX.water]},wx:{'#':[0,DAY_MAX.water]},alcohol:{'#':[0,DAY_MAX.alcohol]},smoking:{'#':[0,DAY_MAX.smoking]},
     weed:{'#':[0,DAY_MAX.weed]},rest:'b',touched:'b',workout:{done:'b',type:{'|':WORKOUT_TYPES}}},
-  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:{'|':WORKOUT_TYPES},logs:IMPORT_SET,durationMin:'n',supersets:[{ex:['i'],rounds:{'#':[0,100]}}]},
+  workoutLogs:{sessionId:'s',workoutId:'s',title:'s',tag:{'|':WORKOUT_TYPES},logs:IMPORT_SET,durationMin:'n',dayWas:{type:{'|':WORKOUT_TYPES}},supersets:[{ex:['i'],rounds:{'#':[0,100]}}]},
   saunaSessions:{mins:'n',temp:'n',position:'s',stints:[{mins:'n',position:'s'}]},
   library:{title:'s',tag:'s',notes:'s'},
   recipes:{title:'s',tag:'s',instructions:'s',ingredients:['s'],macros:['n'],base:'n',portions:'n',inPlan:'b',day:'s'},
@@ -2714,7 +2731,7 @@ function startWorkout(id){
       endSession(old);
     }
     state.activeSession=newSession(w,Date.now());
-    slide=0; addingExercise=false;
+    slide=0; addingExercise=false; clearPrep();
   }
   ensurePrep(state.activeSession);
   viewingSession=true;
@@ -2814,20 +2831,20 @@ function sessionTitle(sess){
 function discardSession(){
   var sess=state.activeSession; if(!sess) return;
   parkUndo({kind:'session',item:sess,label:'the '+sessionTitle(sess)+' session'});
-  endSession(sess); state.activeSession=null; viewingSession=false; addingExercise=false;
+  endSession(sess); state.activeSession=null; viewingSession=false; addingExercise=false; clearPrep();
 }
 function finishWorkout(){
   var sess=state.activeSession; if(!sess) return;
-  // Nothing logged is nothing done: no log, no XP, no trained day. It goes the
-  // way a discard does, so a Finish tapped by mistake can be undone.
-  var n=0; Object.keys(sess.logs||{}).forEach(function(k){ n+=(sess.logs[k]||[]).length; });
-  if(!n){ discardSession(); return; }
   var sid=sessId(sess), lid=sessLogId(sess)||'wl'+Date.now();
   var on=sessionDay(sess);
+  clearPrep();
   // Finished already, in another view: its sets go onto that log rather than
   // into a second one, and the day and its XP were seen to there.
   var had=state.workoutLogs.filter(function(l){ return l.sessionId===sid||l.id===lid; })[0];
   if(had){ had.logs=mergeSetLogs(null,sess.logs,had.logs); endSession(sess); state.activeSession=null; viewingSession=false; tab='progress'; return; }
+  // Nothing counted is nothing done: a warm-up alone is no session, no XP and
+  // no trained day. It goes the way a discard does, so it can be undone.
+  if(!countedSets(sess.logs)){ discardSession(); return; }
   var w=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
   var title=w?w.title:'Workout', tag=w?w.tag:'Strength';
   // An exercise with no sets left on it is not part of what was done.
@@ -2835,8 +2852,11 @@ function finishWorkout(){
   var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:on,logs:done};
   var ss=supersetRecord(sess); if(ss.length) log.supersets=ss;
   var mins=sessionLive(sess)&&sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
-  state.workoutLogs.push(log);
   var today=ensureDay(on), paid=0;
+  // A day already trained by a quick log, not a session: taking this session
+  // away later leaves the day as it was, and its XP with it.
+  if(today.workout.done && !dayHasLog(on)) log.dayWas={type:today.workout.type||null};
+  state.workoutLogs.push(log);
   if(!today.workout.done){ paid+=addXp(XP_WORKOUT); if(today.rest) paid+=addXp(-XP_REST); }
   if(paid) finishPaid[lid]=paid;
   today.workout.done=true; today.workout.type=tag; today.rest=false; today.touched=true;
@@ -3534,8 +3554,8 @@ function bodyContent(){
   // Keyed by exercise id, which a stored log can hold as any name at all.
   var histo=Object.create(null), seq=0;
   logs.forEach(function(l){ Object.keys(l.logs).forEach(function(exId){
-    if(!histo[exId]) histo[exId]=[];
-    l.logs[exId].forEach(function(s){
+    (l.logs[exId]||[]).forEach(function(s){
+      if(!histo[exId]) histo[exId]=[];
       /* Copy the whole set, not a hand-written list of fields. Naming them
          meant a prep step arrived here without its option, its level or the
          fact that it was sets at a weight, so a warm-up read "10 min" with no
@@ -3765,7 +3785,7 @@ function bodyContent(){
     var w2=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
     var n=sess.exIds.length;
     if(slide>=n) slide=Math.max(0,n-1);
-    var logged=0; Object.keys(sess.logs).forEach(function(k){ logged+=sess.logs[k].length; });
+    var logged=countedSets(sess.logs);
     var storyNav=function(id){ return '<div class="storynav">'+
       '<button data-action="prevslide"'+(slide===0?' disabled':'')+'>&larr; Prev</button>'+
       (slide<n-1?'<button class="skip" data-action="skipex" data-ex="'+esc(id)+'">Skip</button>':'')+

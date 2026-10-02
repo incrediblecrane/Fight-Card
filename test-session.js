@@ -1612,6 +1612,57 @@ srv.listen(0,async function(){
     await leaveSession();
   });
 
+  console.log('\nFINISHING A SESSION');
+
+  await t('a set undone on an exercise, then another logged, finishes and is stored', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    var e0=errs.length, n0=seedOf().workoutLogs.length;
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','goblet'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="sq_goblet"]'); await settle();
+    await p.fill('#log-w-sq_goblet','20'); await p.fill('#log-v-sq_goblet','8');
+    await p.click('[data-action="logset"]'); await settle();
+    await p.click('[data-action="undoset"][data-ex="sq_goblet"]'); await settle();
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','hip thrust'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="hipthrust"]'); await settle();
+    await p.fill('#log-w-hipthrust','60'); await p.fill('#log-v-hipthrust','10');
+    await p.click('[data-action="logset"]'); await settle();
+    await finishNow();
+    assert.deepStrictEqual(errs.slice(e0),[],'the finish threw');
+    var l=lastLog();
+    assert.strictEqual(seedOf().workoutLogs.length,n0+1,'the finished session was not stored');
+    assert.deepStrictEqual(Object.keys(l.logs),['hipthrust'],'the log holds '+JSON.stringify(l.logs));
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
+    assert.ok(/Hip thrust/.test(await text()),'Progress does not show the hip thrust');
+    assert.deepStrictEqual(errs.slice(e0),[],'Progress threw');
+  });
+
+  await t('a warm-up alone reads as no sets, and Finish logs nothing and leaves the day untrained', async function(){
+    await go(); await leaveSession();
+    var today=await dayKey(0), st=seedOf();
+    st.workoutLogs=st.workoutLogs.filter(function(l){ return l.date!==today; });
+    if(st.days[today]){ st.days[today].workout={done:false,type:null}; st.days[today].rest=false; }
+    doc=env.withSeed(doc,st); await go(); await leaveSession();
+    var x0=seedOf().totalXp, n0=seedOf().workoutLogs.length;
+    await startWorkout('Push');
+    await p.selectOption('#log-opt-warmup','Bike'); await p.waitForTimeout(300);
+    await p.fill('#log-v-warmup','6'); await p.click('[data-action="logset"]'); await settle();
+    assert.strictEqual(setCount(seedOf().activeSession.logs),1,'the warm-up was not logged');
+    for(var k=0;k<30;k++){ if(!(await tapIf('[data-action="nextslide"]'))) break; await p.waitForTimeout(120); }
+    var label=await p.evaluate(function(){ var b=document.querySelector('[data-action="finishworkout"]'); return b?b.textContent:''; });
+    assert.strictEqual(label,'Finish (0 sets)','the button reads '+label);
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var after=seedOf(), d=after.days[today];
+    assert.strictEqual(after.workoutLogs.length,n0,'a session with no sets was logged');
+    assert.ok(!(d && d.workout && d.workout.done),'the day was marked trained: '+JSON.stringify(d));
+    assert.strictEqual(after.totalXp,x0,'XP moved from '+x0+' to '+after.totalXp);
+    assert.ok(await p.$('.undo-bar [data-action="undo"]'),'no Undo for the warm-up');
+    await p.click('.undo-bar [data-action="undo"]'); await settle();
+    assert.strictEqual(setCount(seedOf().activeSession.logs),1,'Undo did not bring the warm-up back');
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

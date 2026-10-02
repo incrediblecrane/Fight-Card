@@ -316,6 +316,8 @@ server.listen(0, async function(){
     await pick(start);
     await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(300);
     await p.click('[data-action="startworkout"]'); await p.waitForTimeout(450);
+    // Past the warm-up: a warm-up alone is no session.
+    await p.click('[data-action="nextslide"]'); await p.waitForTimeout(250);
     await p.fill('input[id^="log-v-"]','10');
     var w=await p.$('input[id^="log-w-"]'); if(w) await w.fill('40');
     await p.click('[data-action="logset"]'); await p.waitForTimeout(300);

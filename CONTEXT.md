@@ -241,6 +241,15 @@ was paid.
   does Start after a discard until the new session has sets. A session
   started while logging an earlier day has no rest clock and its log no
   `durationMin`: its times are when it was typed in.
+  Finish counts sets the way everything else does (`countsAsSet`): a session
+  holding only a warm-up or warm-up sets is no session, and Finish discards
+  it, with Undo. A warm-up option and minutes picked but not logged belong to
+  that session and go when it starts, finishes or is discarded.
+- **A day's sessions**: the day's workout type reads as its newest session.
+  A log finished on a day a quick log had already marked trained carries
+  `dayWas` (that day's type then); removing it leaves the day trained, its XP
+  kept, and the quick log's type back. Removing one of several sessions passes
+  `dayWas` on to one that is left.
 - **Set** — one logged effort. Its shape follows the exercise's `type`:
   `load` (weight and reps), `time`, `distance`, `reps`, `cardio` (minutes,
   machine, work/rest effort), `prep` (minutes, option, level).
