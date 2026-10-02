@@ -128,12 +128,24 @@ cases.forEach(function(pair){
 });
 function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
 
+// What dbMerge needs beside the session helpers: the day and profile merges,
+// the XP a day pays, and the constants they read. Found only if present, so
+// these checks fail on code without them rather than throwing.
+function grabAny(name){ try{ return grab(name); }catch(e){ return ''; } }
+function constOf(re){ var x=h.match(re); return x?x[0]:''; }
+var MERGE_FNS=['stableJson','dbMerge','mergeKeyed','setKey','mergeSetLogs','sessId','liveSession','mergeSessionDoc','mergeActive','mergeSession',
+  'mergeDay','profShape','dayPair','dayWx','dayXp','waterTgt'];
+var MERGE_PRE=['var SESS_ENDED_KEEP=20;', constOf(/var XP_PER_WATER=[^;]*;/), constOf(/var DAY_MAX=\{[^}]*\};/),
+  constOf(/var DAY_COUNTS=\[[^\]]*\];/), 'var state={waterTarget:8,totalXp:0}, pendFix=0;'].join('\n');
+function mergeSandbox(extra,out){
+  var m={}; new Function(MERGE_PRE+'\n'+MERGE_FNS.concat(extra||[]).map(grabAny).join('\n')+'\n'+out).call(m); return m;
+}
+
 // Two views of the app, each merging what the store holds into its own copy
 // before it saves. A field one view changed keeps that view's value, the rest
 // take the store's, and xp adds both views' changes rather than picking one.
 (function(){
-  var m={}; new Function(['stableJson','dbMerge','mergeKeyed','setKey','mergeSetLogs','sessId','liveSession','mergeSessionDoc','mergeActive','mergeSession'].map(grab).join('\n')+
-    '\nvar SESS_ENDED_KEEP=20;\nthis.dbMerge=dbMerge;').call(m);
+  var m=mergeSandbox([],'this.dbMerge=dbMerge;');
   var got=m.dbMerge('days/2026-09-30',{water:0,smoking:0,workout:{done:false,type:null}},
     {water:0,smoking:1,workout:{done:false,type:null}},
     {water:3,smoking:0,workout:{done:true,type:'Strength'}});
@@ -207,8 +219,7 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
 // merges beside the document (pend_ and the view), not over it. A read folds
 // another view's in as that view's change and leaves its own out.
 (function(){
-  var m={}; new Function(['stableJson','dbMerge','mergeKeyed','setKey','mergeSetLogs','sessId','liveSession','mergeSessionDoc','mergeActive','mergeSession','foldPend'].map(grab).join('\n')+
-    '\nvar SESS_ENDED_KEEP=20;\nthis.foldPend=foldPend;this.liveSession=liveSession;').call(m);
+  var m=mergeSandbox(['foldPend'],'this.foldPend=foldPend;this.liveSession=liveSession;');
   function check(label,ok,got){ if(ok) console.log('  PASS  '+label); else { fails++; console.log('  FAIL  '+label+'\n        got '+JSON.stringify(got)); } }
   var sh=m.foldPend('state/shopping',{checked:['a','b'],extras:[],pend_v2:{b:{checked:['a']},m:{checked:['a','c']}}},'pend_v1');
   check('a tick sent beside the list keeps the ticks stored since, and goes in once',
@@ -231,6 +242,48 @@ function byId(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }
     !m.liveSession(en) && en.active && en.active.logs.press_bench.length===2 && en.ended[0]==='s1', en);
   var st=m.foldPend('state/session',{active:null,pend_v2:{b:{active:null},m:{active:S([])}}},'pend_v1');
   check('a session started in a view hidden at once is live for whoever reads it', m.liveSession(st) && m.liveSession(st).id==='s1', st);
+})();
+
+// A day merged from two views pays the XP its records earn, once: both views'
+// cups count, rest and trained stay one or the other, and the XP the two
+// views paid is settled against what the merged day pays.
+(function(){
+  var m=mergeSandbox([],'this.dbMerge=dbMerge;this.dayXp=typeof dayXp==="function"?dayXp:null;');
+  function check(label,ok,got){ if(ok) console.log('  PASS  '+label); else { fails++; console.log('  FAIL  '+label+'\n        got '+JSON.stringify(got)); } }
+  function day(o){ var d={water:0,wx:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true}; Object.keys(o||{}).forEach(function(k){ d[k]=o[k]; }); return d; }
+  // What the caller settles: the merged day's XP less what each side paid.
+  function settle(b,mi,t,r){ return m.dayXp? m.dayXp(r,8)-m.dayXp(mi,8)-m.dayXp(t,8)+m.dayXp(b,8) : 0; }
+  function xpAfter(b,mi,t,xp0){
+    var paidM=m.dayXp?m.dayXp(mi,8)-m.dayXp(b,8):0, paidT=m.dayXp?m.dayXp(t,8)-m.dayXp(b,8):0;
+    var r=m.dbMerge('days/d',b,mi,t), p=m.dbMerge('state/profile',{totalXp:xp0},{totalXp:xp0+paidM},{totalXp:xp0+paidT});
+    return {day:r, xp:p.totalXp+settle(b,mi,t,r)};
+  }
+  var b=day({water:3,wx:3}), w=xpAfter(b,day({water:4,wx:4}),day({water:4,wx:4}),100);
+  check('a cup tapped in each of two views is two cups, and two cups of xp',
+    w.day.water===5 && w.day.wx===5 && w.xp===104, w);
+  var rw=xpAfter(day(),day({workout:{done:true,type:'Strength'}}),day({rest:true}),100);
+  check('a day trained in one view and rested in the other is one of them, and pays for that one only',
+    rw.day.workout.done===true && rw.day.rest===false && rw.xp===115, rw);
+  var wr=xpAfter(day(),day({rest:true}),day({workout:{done:true,type:'Strength'}}),100);
+  check('and rested here, trained there: this view\'s choice, its xp only',
+    wr.day.rest===true && wr.day.workout.done===false && wr.xp===106, wr);
+  var cs=m.dbMerge('days/d',day({alcohol:1,smoking:2}),day({alcohol:2,smoking:2,weed:1}),day({alcohol:2,smoking:3}));
+  check('a drink, a smoke and the rest added in two views are all counted',
+    cs.alcohol===3 && cs.smoking===3 && cs.weed===1, cs);
+  var dn=xpAfter(day({water:1,wx:1}),day(),day(),100);
+  check('a cup taken back in both views takes back one cup of xp, not two',
+    dn.day.water===0 && dn.day.wx===0 && dn.xp===98, dn);
+  var odd=day({water:4,wx:8,alcohol:2}), same=m.dbMerge('days/d',odd,odd,day({water:4,wx:8,alcohol:3}));
+  check('a day not changed here comes back as the store holds it', same.water===4 && same.wx===8 && same.alcohol===3, same);
+  var pr=m.dbMerge('state/profile',{totalXp:10,waterTarget:8},{totalXp:12,waterTarget:8,weekTarget:3},{totalXp:10,waterTarget:8,weekTarget:5});
+  check('a weekly target set elsewhere is kept over the default an older profile is read with',
+    pr.weekTarget===5 && pr.totalXp===12, pr);
+  // Another view's day sent beside the store, folded in on reading it.
+  var f=mergeSandbox(['foldPend'],'this.foldPend=foldPend;this.fix=function(){ return pendFix; };');
+  var fd=f.foldPend('days/d',{water:0,wx:0,workout:{done:false,type:null},rest:true,alcohol:0,smoking:0,weed:0,
+    pend_v2:{b:{rest:false,workout:{done:false,type:null}},m:{rest:false,workout:{done:true,type:'Strength'}}}},'pend_v1');
+  check('a workout sent beside a day rested since replaces the rest, and gives back the rest\'s xp',
+    fd.workout.done===true && fd.rest===false && f.fix()===-6, {day:fd,fix:f.fix()});
 })();
 
 // A merged profile is put back into this view's state. Anything dbApply reads

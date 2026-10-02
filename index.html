@@ -1760,7 +1760,8 @@ function syncFromState(){
    field changed here keeps this view's value, every other field takes the
    store's. So water tapped in one view and smoking in the other both survive,
    where writing whole documents kept only the last. XP is a running total
-   both views add to, so it merges as the sum of the two changes. */
+   both views add to, so it merges as the sum of the two changes, and so do a
+   day's counts (see mergeDay). */
 function dbHot(){
   var k=activeDate(), r=realToday(), out=DB_STATE_DOCS.concat(['days/'+k]);
   if(r!==k) out.push('days/'+r);
@@ -1768,6 +1769,10 @@ function dbHot(){
 }
 function dbMerge(path,base,mine,theirs){
   if(path==='state/session') return mergeSessionDoc(base,mine,theirs);
+  if(path.indexOf('days/')===0) return mergeDay(base,mine,theirs);
+  // A profile an older version wrote lacks what it had no setting for, and
+  // this view fills that in as a default: the default is not a change.
+  if(path==='state/profile'){ base=profShape(base); mine=profShape(mine); theirs=profShape(theirs); }
   var keys={}, out={};
   [base,mine,theirs].forEach(function(o){ Object.keys(o).forEach(function(k){ keys[k]=1; }); });
   Object.keys(keys).forEach(function(k){
@@ -1784,6 +1789,41 @@ function dbMerge(path,base,mine,theirs){
   });
   return out;
 }
+function profShape(p){
+  var o={}; Object.keys(p||{}).forEach(function(k){ o[k]=p[k]; });
+  if(!o.waterTarget) o.waterTarget=8; if(!o.weekTarget) o.weekTarget=3; if(!o.totalXp) o.totalXp=0;
+  return o;
+}
+/* A day. Its counts are tapped up and down in both views, so each merges as
+   the sum of both views' changes, as XP does: two cups are two cups. Rest and
+   trained are one choice, never both, so the two merge as a pair: this
+   view's if it changed either, else the store's. Every other field keeps this
+   view's value if it changed it here. What the merged day pays in XP can then
+   differ from what the two views paid for (a flag dropped, a count held at
+   zero), and the caller settles that with dayXp. */
+var DAY_COUNTS=['water','alcohol','smoking','weed'];
+function mergeDay(base,mine,theirs){
+  var keys={}, out={}, tgt=waterTgt();
+  [base,mine,theirs].forEach(function(o){ Object.keys(o).forEach(function(k){ keys[k]=1; }); });
+  Object.keys(keys).forEach(function(k){
+    if(k==='rest'||k==='workout'||k==='wx'||DAY_COUNTS.indexOf(k)>-1) return;
+    var v=stableJson(mine[k])!==stableJson(base[k])?mine[k]:theirs[k]; if(v!==undefined) out[k]=v;
+  });
+  DAY_COUNTS.forEach(function(k){ out[k]=Math.min(DAY_MAX[k],Math.max(0,(+theirs[k]||0)+(+mine[k]||0)-(+base[k]||0))); });
+  // A day saved before wx existed has none, and it stays without one.
+  if(base.wx!=null||mine.wx!=null||theirs.wx!=null)
+    out.wx=Math.min(DAY_MAX.water,Math.max(0,dayWx(theirs,tgt)+dayWx(mine,tgt)-dayWx(base,tgt)));
+  var p=dayPair(mine)!==dayPair(base)?mine:theirs;
+  out.rest=!!p.rest; out.workout=p.workout&&typeof p.workout==='object'?p.workout:{done:false,type:null};
+  return out;
+}
+function dayPair(d){ var w=d.workout||{}; return stableJson([!!d.rest,!!w.done,w.type||null]); }
+// The cups that earned XP. A day saved before wx existed earned up to the target.
+function dayWx(d,tgt){ return d.wx!=null?+d.wx||0:Math.min(+d.water||0,tgt); }
+// What a day pays in XP, as the taps that made it paid it.
+function dayXp(d,tgt){ if(!d) return 0;
+  return dayWx(d,tgt)*XP_PER_WATER+(d.workout&&d.workout.done?XP_WORKOUT:0)+(d.rest?XP_REST:0); }
+function waterTgt(){ return state&&state.waterTarget||8; }
 /* A list merged three ways as a set: theirs, less what this view took out
    since base, plus what it added, each added entry after the one it follows
    here. An entry changed here keeps this view's copy; one deleted elsewhere
@@ -1881,24 +1921,13 @@ function setsSince(base,logs){
 }
 function setCount(logs){ var n=0; Object.keys(logs||{}).forEach(function(k){ n+=(logs[k]||[]).length; }); return n; }
 /* A session is one thing however many views hold it. Before the merge, with
-   what was just read in at:
-   - a log this view wrote for a session another view had finished first gives
-     back the XP its finish paid, since that was paid there. One stored just as
-     this view wrote it is its own write, landed though it answered with an
-     error, and keeps it;
+   what was just read in at (a session finished in two views pays once
+   through its day, which both trained: see dayXp in dbRefresh):
    - sets logged elsewhere on a session finished here go onto this view's log;
    - sets logged here on a session ended elsewhere go onto its log, or, when
      there is none (it was discarded), the session is offered back by Undo. */
-var finishPaid={};
 function dbSettleSession(at){
   var moved=false;
-  Object.keys(finishPaid).forEach(function(id){
-    var path='workoutLogs/'+id;
-    if(!(path in at)) return;
-    var own=state.workoutLogs.filter(function(l){ return l.id===id; })[0];
-    if(at[path]!==undefined && lastSaved[path]===undefined && stableJson(at[path])!==stableJson(own)){ addXp(-finishPaid[id]); moved=true; }
-    delete finishPaid[id];
-  });
   var tdoc=at['state/session']; if(!tdoc) return moved;
   var sb=savedBody('state/session'), b=liveSession(sb), t=liveSession(tdoc), m=state.activeSession;
   var B=sessId(b), lid=sessLogId(b), log=lid&&at['workoutLogs/'+lid], extra, tr=tdoc.active, R=sessId(tr);
@@ -1970,10 +1999,13 @@ function dbGetAll(paths){
    state, against the base it was sent from. */
 var DB_VIEW='pend_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 var DB_MERGED={'state/profile':['totalXp','deletedRecipes'], 'state/shopping':['checked','extras'], 'state/session':['active','ended']};
-function mergedKeys(path){ return DB_MERGED[path]||(path.indexOf('workoutLogs/')===0?['logs']:[]); }
+// A day's rest or trained pair merges too (see mergeDay). Its counts go
+// over the store's, so the tap is there at once for anyone reading it.
+var DAY_MERGED=['rest','workout'];
+function mergedKeys(path){ return DB_MERGED[path]||(path.indexOf('workoutLogs/')===0?['logs']:path.indexOf('days/')===0?DAY_MERGED:[]); }
 // Documents read with a pend_ field in them, which the next save puts back
 // clean, and this view's own sent and not yet put back by this view.
-var pendSeen={}, pendSent={};
+var pendSeen={}, pendSent={}, pendFix=0;
 function foldPend(path,raw,own){
   var body={}, ks=[];
   Object.keys(raw).forEach(function(k){ if(k.indexOf('pend_')!==0) body[k]=raw[k]; else if(k!==own) ks.push(k); });
@@ -1983,6 +2015,7 @@ function foldPend(path,raw,own){
     Object.keys(P.b||{}).forEach(function(f){ b[f]=P.b[f]; });
     Object.keys(P.m||{}).forEach(function(f){ m[f]=P.m[f]; });
     var r=dbMerge(path,b,m,body), a=P.m&&P.m.active;
+    if(path.indexOf('days/')===0){ var tgt=waterTgt(); pendFix+=dayXp(r,tgt)-dayXp(m,tgt)-dayXp(body,tgt)+dayXp(b,tgt); }
     // Sets logged on a session that ended elsewhere stay with it, not live,
     // so dbSettleSession takes them to its log.
     if(path==='state/session' && !r.active && a && (r.ended||[]).indexOf(sessId(a))>-1) r.active=a;
@@ -1997,14 +2030,31 @@ function dbUnpend(path,raw){
   // Ours is gone: another view folded it in and put the document back. A
   // list or a session merged with it again comes out the same, but XP is a
   // sum, so what this view sent is now part of what it last heard.
+  // A day's rest or trained pair it sent is then the store's.
   if(sent && !raw[DB_VIEW]){
-    var sb=savedBody(path);
-    if(sb && sent.m.totalXp!==undefined){ sb.totalXp=(sb.totalXp||0)+(sent.m.totalXp||0)-(sent.b.totalXp||0); lastSaved[path]=stableJson(sb); }
+    var isDay=path.indexOf('days/')===0, sb=savedBody(path), M=sent.m;
+    if(sb===undefined && isDay) sb=blankDay();
+    if(sb && M.totalXp!==undefined) sb.totalXp=Math.max(0,(sb.totalXp||0)+(M.totalXp||0)-(sent.b.totalXp||0));
+    if(sb && isDay){ sb.rest=M.rest; sb.workout=M.workout; }
+    if(sb && (isDay || M.totalXp!==undefined)) lastSaved[path]=stableJson(sb);
     delete pendSent[path];
   }
   return any?foldPend(path,raw,DB_VIEW):raw;
 }
-function dbUnpendAll(map){ var out={}; Object.keys(map).forEach(function(p){ out[p]=dbUnpend(p,map[p]); }); return out; }
+/* What another view's day beside the store pays can differ from what that
+   view paid for it, as in dbRefresh, and the XP read with it is settled
+   here, so every view reading the two gets the same, and the next save puts
+   the profile back with it. */
+function dbUnpendAll(map){
+  var out={}; pendFix=0;
+  Object.keys(map).forEach(function(p){ out[p]=dbUnpend(p,map[p]); });
+  if(pendFix && out['state/profile']){
+    var pr=dbClone(out['state/profile']); pr.totalXp=Math.max(0,(pr.totalXp||0)+pendFix);
+    out['state/profile']=pr; pendSeen['state/profile']=1;
+  }
+  pendFix=0;
+  return out;
+}
 /* Read back what is about to be written, not only what is likely: removing a
    session or putting one back changes the day it was on, which can be any
    day, and a whole stale copy of it would undo what another view logged
@@ -2045,11 +2095,12 @@ function dbRefresh(all){
       var at={}; paths.forEach(function(p,i){ at[p]=got[i]; }); return at; }); })(uniq(want));
   return read.then(function(at){
     at=dbUnpendAll(at);
-    var moved=dbSettleSession(at);
+    var moved=dbSettleSession(at), fix=0, tgt=waterTgt();
     // Taken after the read, so a tap made while it was out counts as ours.
     var mine=saveDocs();
     Object.keys(at).forEach(function(path){
       var theirs=at[path], m=mine[path], coll=path.slice(0,path.indexOf('/')), isDay=coll==='days', entry=!!DB_LISTS[coll];
+      var tried=dbTried[path]; delete dbTried[path];
       // A day held blank is still this view's, to merge with what is there.
       if(m===undefined && isDay && hasOwn(state.days,path.slice(5))) m=state.days[path.slice(5)];
       if(theirs===undefined){
@@ -2075,10 +2126,20 @@ function dbRefresh(all){
       // both; anything else stands as ours. Unreadable is treated as never
       // heard, rather than failing every save.
       var base=savedBody(path); if(!base) base=isDay?blankDay():coll==='workoutLogs'?{}:theirs;
+      // A write of ours that answered with an error can still have landed.
+      // The store holding just what it wrote says it did, and it is then the
+      // base: merged against the old one, XP and counts went in twice.
+      if(typeof tried==='string' && tried===stableJson(theirs)) base=theirs;
+      else if(tried && typeof tried==='object' && Object.keys(tried).every(function(k){
+        return stableJson(tried[k]===null?undefined:tried[k])===stableJson(theirs[k]); })) base=overlay(base,tried);
       var r=dbMerge(path,base,m,theirs);
+      // XP follows the day: what the merged day pays, less what this view
+      // and the store each paid for their own copy of it.
+      if(isDay) fix+=dayXp(r,tgt)-dayXp(m,tgt)-dayXp(theirs,tgt)+dayXp(base,tgt);
       lastSaved[path]=stableJson(theirs); savedGen[path]=saveGen;
       if(stableJson(r)!==stableJson(m)){ dbPlace(path,r); moved=true; }
     });
+    if(fix && addXp(fix)) moved=true;
     return moved;
   });
 }
@@ -2123,6 +2184,16 @@ var saveBusy=false, saveAgain=false, saveAttempt=0, dbErrHard=false, dbErrPath=n
 // Which save last recorded each document in lastSaved, so a write from an
 // older save landing late can never put back a snapshot a newer one replaced.
 var saveGen=0, savedGen={};
+// What each whole write not yet known to have landed put, until the store is
+// next read: a write can land and still answer with an error.
+var dbTried={};
+// A partial write, as tried: its fields other than pend_, and those laid over a body.
+function plainOf(o){ var out={}; Object.keys(o).forEach(function(k){ if(k.indexOf('pend_')!==0) out[k]=o[k]; }); return out; }
+function overlay(body,fields){
+  var out={}; Object.keys(body||{}).forEach(function(k){ out[k]=body[k]; });
+  Object.keys(fields).forEach(function(k){ if(fields[k]===null) delete out[k]; else out[k]=fields[k]; });
+  return out;
+}
 // Retrying cannot fix these, for the change that was refused; the next change
 // still gets its go. Those in DB_LOST end saving for the page load. Anything
 // else, unknown codes included, is treated as transient, as the store's
@@ -2172,7 +2243,7 @@ function dbSave(){
     // then, and only then, the session waits, and only for those logs.
     var ending=docs['state/session'].active===null && lastSaved['state/session']!==next['state/session'];
     function landed(path,json){
-      delete pendSeen[path]; delete pendSent[path];
+      delete pendSeen[path]; delete pendSent[path]; delete dbTried[path];
       if(gen<(savedGen[path]||0)) return;
       savedGen[path]=gen;
       if(json===undefined) delete lastSaved[path]; else lastSaved[path]=json;
@@ -2192,23 +2263,33 @@ function dbSave(){
         // What the store holds is unknown, so lastSaved stays as it was: the
         // next save re-reads this document and merges it, our fields included.
         // A field that merges goes beside the document, not over it (see DB_VIEW).
-        var changed={}, body=docs[path], mk=mergedKeys(path), pend=null;
+        var changed={}, body=docs[path], mk=mergedKeys(path), pend=null, isDayPath=path.indexOf('days/')===0;
         var note=function(k,v){
           if(mk.indexOf(k)<0){ changed[k]=v; return; }
           pend=pend||{b:{},m:{}}; pend.b[k]=was[k]===undefined?null:was[k]; pend.m[k]=v;
         };
         Object.keys(body).forEach(function(k){ if(stableJson(body[k])!==stableJson(was[k])&&stableJson(body[k])!==undefined) note(k,body[k]); });
         if(!fresh) Object.keys(was).forEach(function(k){ if(stableJson(body[k])===undefined) note(k,null); });
+        // Rest and trained go as the pair they are, or a reader would pair
+        // this view's one with the store's other.
+        if(pend && ('rest' in pend.m || 'workout' in pend.m)) ['rest','workout'].forEach(function(k){
+          if(!(k in pend.m)){ pend.b[k]=was[k]===undefined?null:was[k]; pend.m[k]=body[k]===undefined?null:body[k]; } });
         if(pend) changed[DB_VIEW]=pend;
         if(!Object.keys(changed).length) return;
-        job=function(){ var pr=dbStore.update(path,changed);
+        // A day's counts go over the store's (a page going away has no time
+        // to read them), so what this view sent is then what the store holds
+        // of them: merged as a sum against the old base, they counted twice.
+        var sent=isDayPath?plainOf(changed):null;
+        job=function(){ if(sent) dbTried[path]=sent; var pr=dbStore.update(path,changed);
+          if(sent) pr=pr.then(function(){ delete dbTried[path]; if(gen<(savedGen[path]||0)) return;
+            savedGen[path]=gen; lastSaved[path]=stableJson(overlay(savedBody(path)||blankDay(),sent)); });
           if(pend) pr=pr.then(function(){ pendSent[path]=pend; });
           return fresh?pr.then(null,function(e){
             if(!e||(e.code!=='invalid_argument'&&e.code!=='not_found')) throw e;
             return put(); }):pr; };
       }
       else job=put;
-      function put(){ return dbStore.put(path,docs[path]).then(function(){ landed(path,next[path]); }); }
+      function put(){ dbTried[path]=next[path]; return dbStore.put(path,docs[path]).then(function(){ landed(path,next[path]); }); }
       if(ending&&path.indexOf('workoutLogs/')===0) logs.push(forDoc(path,function(){ var pr=job(); landing.push(pr); return pr; }));
       else if(ending&&path==='state/session') session=forDoc(path,function(){ return Promise.all(landing).then(job); });
       else jobs.push(forDoc(path,job));
@@ -2481,10 +2562,7 @@ function mergeImport(cur,inc){
   // XP is paid as things are logged and taken back as they are removed, so a
   // day or a visit merged in brings its XP, and a day it replaces takes its
   // own away: otherwise removing it later takes XP that was never paid.
-  function dayXp(d){ if(!d) return 0;
-    var w=d.wx!==undefined?d.wx:Math.min(d.water||0,st.waterTarget);
-    return w*XP_PER_WATER+(d.workout&&d.workout.done?XP_WORKOUT:0)+(d.rest?XP_REST:0); }
-  Object.keys(inc.days).forEach(function(k){ xp+=dayXp(inc.days[k])-dayXp(st.days[k]); st.days[k]=inc.days[k]; });
+  Object.keys(inc.days).forEach(function(k){ xp+=dayXp(inc.days[k],st.waterTarget)-dayXp(st.days[k],st.waterTarget); st.days[k]=inc.days[k]; });
   inc.saunaSessions.forEach(function(x){ if(!hasId(st.saunaSessions,x.id)) xp+=XP_SAUNA; });
   st.totalXp=Math.max(0,(st.totalXp||0)+xp);
   EXPORT_LISTS.forEach(function(k){
@@ -3112,13 +3190,12 @@ function finishWorkout(){
   var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:on,logs:done};
   var ss=supersetRecord(sess); if(ss.length) log.supersets=ss;
   var mins=sessionLive(sess)&&sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
-  var today=ensureDay(on), paid=0;
+  var today=ensureDay(on);
   // A day already trained by a quick log, not a session: taking this session
   // away later leaves the day as it was, and its XP with it.
   if(today.workout.done && !dayHasLog(on)) log.dayWas={type:today.workout.type||null};
   state.workoutLogs.push(log);
-  if(!today.workout.done){ paid+=addXp(XP_WORKOUT); if(today.rest) paid+=addXp(-XP_REST); }
-  if(paid) finishPaid[lid]=paid;
+  if(!today.workout.done){ addXp(XP_WORKOUT); if(today.rest) addXp(-XP_REST); }
   today.workout.done=true; today.workout.type=tag; today.rest=false; today.touched=true;
   endSession(sess); state.activeSession=null; viewingSession=false; tab='progress';
 }

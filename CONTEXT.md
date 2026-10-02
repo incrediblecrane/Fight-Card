@@ -428,6 +428,23 @@ re-read and merged field by field against `lastSaved`:
 - A field changed here keeps this view's value; every other field takes the
   store's.
 - XP merges as the sum of both views' changes.
+- A day's counts (water, the cups that earned XP `wx`, alcohol, smoking,
+  weed) merge the same way, as the sum of both views' changes, held between 0
+  and the most a day goes to: a cup tapped in each view is two cups. Rest and
+  trained are one choice, never both, so `rest` and `workout` merge as a pair:
+  this view's if it changed either, else the store's.
+- XP follows the records: after a day is merged, what it pays (`dayXp`: the
+  cups in `wx`, a trained day, a rest day) less what this view and the store
+  each paid for their own copy goes onto XP. So a flag dropped by the pair, or
+  a count held at zero, gives back what it paid, and a session finished in two
+  views pays once, through its day.
+- A profile an older version wrote lacks the settings it had none for
+  (`weekTarget`): it is read with the defaults this view fills in, so a
+  default is never taken for a change made here.
+- A whole write that answered with an error may still have landed. Until the
+  document is next read, this view keeps what it tried to write; read back
+  exactly, it is the base of the merge, so XP and counts are not added twice
+  when the save is retried.
 - Shopping ticks, extras and deleted built-in recipes merge as sets: the
   store's, less what this view took out since, plus what it added.
 - The session in flight merges exercise by exercise: sets as a union keyed by
@@ -443,13 +460,20 @@ this view has not changed takes the store's copy, or goes when the store's has
 gone, and one new elsewhere is added.
 
 A merging field (XP, deleted recipes, ticks, extras, the session and `ended`, a
-log's sets) is never sent over the store's copy without a re-read, which would
+log's sets, a day's rest or trained pair) is never sent over the store's copy without a re-read, which would
 take away what another view added and count this view's change twice. A save
 going away puts it beside the document as **pending fields**. Every read (load,
 the re-read before a save, an import) folds another view's `pend_` in as that
 view's change and leaves its own out, since its own is still in its state; the
-next save puts the document back without it. When a view's own has been folded
-and cleared by another view, the XP it sent counts as heard.
+next save puts the document back without it. A day's pair always goes beside
+it whole. Folding another view's day settles the XP read with it the way a
+merge does, and the profile is then put back too. When a view's own has been
+folded and cleared by another view, the XP it sent counts as heard, and its
+rest or trained pair as the store's. A day's counts are the exception: they go
+over the store's at once, so the tap is there for anyone reading it, and once
+the store takes them they are this view's base, so the next merge does not
+add them again. A count another view saved in the moment before is lost to
+that write, as before.
 
 ## Export and import
 

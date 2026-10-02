@@ -25,6 +25,7 @@ var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grab
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
   grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('isBlankDay'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
   grab('stableJson'), grab('mergeKeyed'), grab('setKey'), grab('mergeSetLogs'), grab('mergeSession'), grab('mergeActive'), grab('mergeSessionDoc'), grab('dbMerge'), grab('foldPend'),
+  grabVar('DAY_COUNTS'), grab('mergeDay'), grab('profShape'), grab('dayPair'), grab('dayWx'), grab('dayXp'), grab('waterTgt'), 'var state=null, pendFix=0;',
   h.match(/var DUMP_COLL=[^\n]*\n/)[0], grab('readDump'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
 var box={};

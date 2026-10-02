@@ -102,7 +102,12 @@ var srv=http.createServer(function(q,r){
       if(failAll && op!=='slow' && (!failAll.ops||failAll.ops.indexOf(op)>-1)){
         if(op==='set'||op==='update') calls.set++; return srvJson(r,{err:failAll.code}); }
       var f=take(failNext,op,body.path);
-      if(f){ if(op==='set'||op==='update') calls.set++; return srvJson(r,{err:f.code}); }
+      // land: the write goes into the store and is still answered with the
+      // error, as a write whose answer was lost on the way back is.
+      if(f){ if(op==='set'||op==='update') calls.set++;
+        if(f.land && op==='set') store[body.path]=body.data;
+        if(f.land && op==='update' && Object.prototype.hasOwnProperty.call(store,body.path)) store[body.path]=Object.assign({},store[body.path],body.data);
+        return srvJson(r,{err:f.code}); }
       // The real store hands documents back with their keys in alphabetical
       // order, observed directly against it. A stub that echoed insertion
       // order would make the diff look correct when it is not.
@@ -1393,6 +1398,101 @@ srv.listen(0,async function(){
     assert.deepStrictEqual(pending(),[],'what the closed view sent was never folded in');
     store['state/shopping']={checked:[],extras:[]};
     await toToday();
+  });
+
+  console.log('\nA DAY LOGGED IN TWO VIEWS PAYS ITS XP ONCE');
+  var xpNow=function(){ return store['state/profile'].totalXp; };
+  // A day with a session logged on it cannot be made a rest day.
+  var noLogsOn=function(day){ Object.keys(store).forEach(function(k){ if(k.indexOf('workoutLogs/')===0 && store[k].date===day) delete store[k]; }); };
+  await t('a cup tapped in each of two views is two cups, and pays for two', async function(){
+    await go(); var day=await today();
+    var d0=blank(); d0.water=3; d0.wx=3; store['days/'+day]=d0;
+    var q=await openView();
+    try{
+      await go(); var xp0=xpNow();
+      await water(1);
+      assert.strictEqual(store['days/'+day].water,4,'the first view did not save its cup');
+      await q.click('[data-action="water"][data-d="1"]'); await q.waitForTimeout(1800);
+      var d=store['days/'+day];
+      assert.ok(d.water===5 && d.wx===5,'the second view\'s cup was lost: '+JSON.stringify(d));
+      assert.strictEqual(xpNow()-xp0,4,'two cups paid '+(xpNow()-xp0)+' xp');
+    } finally { await q.context().close(); }
+  });
+
+  await t('a day rested in one view and trained in another is one of them, and pays for that one', async function(){
+    await go(); var day=await today(); store['days/'+day]=blank(); noLogsOn(day);
+    var q=await openView();
+    try{
+      await go(); var xp0=xpNow();
+      await p.click('[data-action="rest"]'); await p.waitForTimeout(1800);
+      assert.strictEqual(store['days/'+day].rest,true,'the rest day was not saved');
+      await q.click('[data-action="workout"]'); await q.waitForTimeout(1800);
+      var d=store['days/'+day];
+      assert.ok(d.workout.done && !d.rest,'the day is '+JSON.stringify(d));
+      assert.strictEqual(xpNow()-xp0,15,'one trained day paid '+(xpNow()-xp0)+' xp');
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1500);
+      assert.strictEqual(await p.locator('[data-action="rest"][aria-pressed="true"]').count(),0,'the first view still shows a rest day');
+      assert.strictEqual(xpNow()-xp0,15,'looking again moved xp to '+(xpNow()-xp0));
+    } finally { await q.context().close(); }
+  });
+
+  await t('and so it is when the view that trains is hidden straight after', async function(){
+    await go(); var day=await today(); store['days/'+day]=blank(); noLogsOn(day);
+    var q=await openView();
+    try{
+      await go(); var xp0=xpNow();
+      await p.click('[data-action="rest"]'); await p.waitForTimeout(1800);
+      await q.click('[data-action="workout"]'); await q.waitForTimeout(200);
+      await hideIn(q); await q.waitForTimeout(1200); await showIn(q); await q.waitForTimeout(1800);
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1800);
+      var d=store['days/'+day];
+      assert.ok(d.workout.done && !d.rest,'the day is '+JSON.stringify(d));
+      assert.strictEqual(xpNow()-xp0,15,'one trained day paid '+(xpNow()-xp0)+' xp');
+      assert.deepStrictEqual(pending(),[],'what the hidden view sent is still beside the day');
+    } finally { await q.context().close(); }
+  });
+
+  await t('a profile write that lands but answers with an error is not counted again on the retry', async function(){
+    await go(); var day=await today(); store['days/'+day]=blank();
+    await go(); var xp0=xpNow();
+    failNext.push({op:'set',match:'state/profile',code:'unavailable',land:true});
+    await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1500);
+    assert.strictEqual(xpNow()-xp0,2,'the write did not land, so this proves nothing');
+    await p.waitForTimeout(4500);
+    assert.ok(!(await p.locator('.banner').count()) || !/cannot be reached/.test(await text()),'the retry never went');
+    assert.strictEqual(xpNow()-xp0,2,'one cup paid '+(xpNow()-xp0)+' xp after the retry');
+    await go();
+    assert.strictEqual(xpNow()-xp0,2,'one cup paid '+(xpNow()-xp0)+' xp after a reload');
+  });
+
+  await t('and a day write that does the same is not counted twice either', async function(){
+    await go(); var day=await today(); store['days/'+day]=blank();
+    await go(); var xp0=xpNow();
+    failNext.push({op:'set',match:'days/',code:'unavailable',land:true});
+    await water(2); await p.waitForTimeout(4500);
+    var d=store['days/'+day];
+    assert.ok(d.water===2 && d.wx===2,'two cups became '+JSON.stringify(d));
+    assert.strictEqual(xpNow()-xp0,4,'two cups paid '+(xpNow()-xp0)+' xp');
+  });
+
+  await t('a weekly target set in one view stays when another saves over a profile from before it existed', async function(){
+    await go();
+    var pr={}; Object.keys(store['state/profile']).forEach(function(k){ if(k!=='weekTarget') pr[k]=store['state/profile'][k]; });
+    store['state/profile']=pr;
+    await go();
+    var q=await openView();
+    try{
+      await q.click('[data-action="tab"][data-tab="training"]'); await q.waitForTimeout(300);
+      await q.click('[data-action="weektarget"][data-d="1"]'); await q.waitForTimeout(200);
+      await q.click('[data-action="weektarget"][data-d="1"]'); await q.waitForTimeout(1800);
+      assert.strictEqual(store['state/profile'].weekTarget,5,'the second view did not save its target');
+      await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1800);
+      assert.strictEqual(store['state/profile'].weekTarget,5,'the target went back to '+store['state/profile'].weekTarget);
+      await hideIn(p); await showIn(p); await p.waitForTimeout(1200);
+      await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(300);
+      assert.ok(/of 5 sessions|target 5 hit/.test(await text()),'the first view does not show the target of 5');
+    } finally { await q.context().close(); }
+    store['state/profile'].weekTarget=3; await go();
   });
 
   console.log('\nAN EXERCISE TAKEN OUT OF A SESSION');
