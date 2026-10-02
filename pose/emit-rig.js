@@ -28,7 +28,10 @@ function checkReachable(html){
 
 var line='var RIGFRAMES='+JSON.stringify(out);
 var file=path.join(__dirname,'..','index.html');
-var lines=fs.readFileSync(file,'utf8').split('\n');
+// An editor may have turned index.html to CRLF: compare without the CR and
+// write back with the file's own ending, never a mix of the two.
+var src=fs.readFileSync(file,'utf8'), EOL=/\r\n/.test(src)?'\r\n':'\n';
+var lines=src.split(/\r?\n/);
 var i=lines.findIndex(function(l){ return l.indexOf('var RIGFRAMES=')===0; });
 if(i<0) throw new Error('index.html has no RIGFRAMES line');
 var orphans=checkReachable(lines.join('\n'));
@@ -45,5 +48,5 @@ if(process.argv.indexOf('--check')>-1){
 }
 if(same){ console.log('RIGFRAMES already in sync ('+EX.length+' rigs)'); process.exit(0); }
 lines[i]=line;
-fs.writeFileSync(file,lines.join('\n'));
+fs.writeFileSync(file,lines.join(EOL));
 console.log('rewrote RIGFRAMES in index.html ('+EX.length+' rigs)');
