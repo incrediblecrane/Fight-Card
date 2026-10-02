@@ -230,6 +230,17 @@ was paid.
 - **Session**: a workout in progress, with an id, an ordered list of exercise
   ids, a target per exercise, and the sets logged so far. Dated by when it
   STARTED, so a session crossing midnight lands on the right day.
+  Start on a workout's card resumes its session in progress (the card says
+  Resume, on the slide it was left at), unless that session is from an
+  earlier day that is not the one being logged and has no sets: then a new
+  one starts on the day being logged. A session from another day is named
+  with its date on the resume banner and in its title, and while one is open
+  the log date bar is not shown, since Finish writes the session's own day
+  whatever the log date says. Replacing a session that was built (sets,
+  exercises, targets or supersets changed) offers it back by Undo, and so
+  does Start after a discard until the new session has sets. A session
+  started while logging an earlier day has no rest clock and its log no
+  `durationMin`: its times are when it was typed in.
 - **Set** — one logged effort. Its shape follows the exercise's `type`:
   `load` (weight and reps), `time`, `distance`, `reps`, `cardio` (minutes,
   machine, work/rest effort), `prep` (minutes, option, level).

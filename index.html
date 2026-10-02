@@ -1312,7 +1312,8 @@ function undoMoot(u){
   if(u.kind==='lib') return hasId(state.library,u.item.id);
   if(u.kind==='meal') return hasId(state.plan,u.item.id);
   if(u.kind==='week') return u.plan.every(function(e){ return hasId(state.plan,e.id); }) && !u.checked.some(function(k){ return state.shoppingChecked.indexOf(k)<0; });
-  if(u.kind==='session') return !!s;
+  // A session started since, with nothing logged yet, gives way to it.
+  if(u.kind==='session') return !!s && (sessId(s)===sessId(u.item) || setCount(s.logs)>0);
   if(u.kind==='sessionEx') return !sameSession(s,u.sess) || s.exIds.indexOf(u.exId)>-1;
   return true;
 }
@@ -1346,7 +1347,8 @@ function applyUndo(){
     planBack(u.plan);
     u.checked.forEach(function(k){ if(state.shoppingChecked.indexOf(k)<0) state.shoppingChecked.push(k); });
   }
-  else if(u.kind==='session'){ state.activeSession=u.item; var uid=sessId(u.item);
+  else if(u.kind==='session'){ if(state.activeSession) endSession(state.activeSession);
+    state.activeSession=u.item; var uid=sessId(u.item);
     state.endedSessions=(state.endedSessions||[]).filter(function(x){ return x!==uid; }); }
   else if(u.kind==='sessionEx'){
     var s=state.activeSession, at=Math.min(u.pos,s.exIds.length);
@@ -2682,16 +2684,51 @@ function sessionBusy(id){
   var s=state.activeSession; if(!s || s.workoutId===id) return false;
   return Object.keys(s.logs||{}).some(function(k){ return s.logs[k].length>0; });
 }
+function newSession(w,t0){
+  var s={id:'s'+t0,workoutId:w.id,startedAt:activeDate(),t0:t0,exIds:w.plan.map(function(p){return p.ex;}),targets:{},logs:{}};
+  w.plan.forEach(function(p){ s.targets[p.ex]={sets:p.sets,reps:p.reps}; });
+  ensurePrep(s); return s;
+}
+// Start goes back into the session in progress for this workout, unless it is
+// from an earlier day that is not the one being logged and holds no sets: a
+// session left open days ago would put today's sets on that day. Sets are
+// never dropped by Start, so one that has them is resumed, and says its date.
+function resumesOnStart(id){
+  var s=state.activeSession;
+  return !!s && s.workoutId===id && (!(s.startedAt<realToday()) || s.startedAt===activeDate() || setCount(s.logs)>0);
+}
+// Anything done to it beyond starting it: sets, or exercises, targets or
+// supersets changed. Only that is worth an Undo when it is replaced.
+function sessionBuilt(s){
+  var w=WORKOUTS.filter(function(x){return x.id===s.workoutId;})[0], f=w&&newSession(w,1);
+  return setCount(s.logs)>0 || Object.keys(s.supersets||{}).length>0 || !f ||
+    JSON.stringify(s.exIds)!==JSON.stringify(f.exIds) || stableJson(s.targets)!==stableJson(f.targets);
+}
 function startWorkout(id){
-  var w=WORKOUTS.filter(function(x){return x.id===id;})[0];
+  var w=WORKOUTS.filter(function(x){return x.id===id;})[0], old=state.activeSession;
   if(!w || sessionBusy(id)) return;
-  if(!state.activeSession || state.activeSession.workoutId!==id){
-    var t0=Date.now();
-    state.activeSession={id:'s'+t0,workoutId:id,startedAt:activeDate(),t0:t0,exIds:w.plan.map(function(p){return p.ex;}),targets:{},logs:{}};
-    w.plan.forEach(function(p){ state.activeSession.targets[p.ex]={sets:p.sets,reps:p.reps}; });
+  if(!resumesOnStart(id)){
+    if(old){
+      if(sessionBuilt(old)) parkUndo({kind:'session',item:old,label:'the '+sessionTitle(old)+' session'+
+        sessionFor(old).replace(' for ',' from ')});
+      endSession(old);
+    }
+    state.activeSession=newSession(w,Date.now());
+    slide=0; addingExercise=false;
   }
   ensurePrep(state.activeSession);
-  slide=0; addingExercise=false; viewingSession=true;
+  viewingSession=true;
+}
+// The day Finish writes a session to: when it started, when that is a date.
+// Anything else would be a day document no read finds, or a name Object
+// already has.
+function sessionDay(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s.startedAt||'')?s.startedAt:activeDate(); }
+// ' for Mon 28 Sep' when that is not today, so the screen names it.
+function sessionFor(s){ var k=sessionDay(s); return k===realToday()?'':' for '+prettyKey(k); }
+// A session belongs to the day it started. One started while logging an
+// earlier day is being typed in after the fact, so its clock means nothing.
+function sessionLive(s){
+  return s.t0 ? dateKey(new Date(s.t0))===s.startedAt : s.startedAt===realToday();
 }
 /* Returns whether a set was logged. A box holding something that is not a
    number refuses the set and is marked; so is an empty value box, unless
@@ -2786,9 +2823,7 @@ function finishWorkout(){
   var n=0; Object.keys(sess.logs||{}).forEach(function(k){ n+=(sess.logs[k]||[]).length; });
   if(!n){ discardSession(); return; }
   var sid=sessId(sess), lid=sessLogId(sess)||'wl'+Date.now();
-  // Dated by when it started, when that is a date: anything else would be a
-  // day document no read finds, or a name Object already has.
-  var on=/^\d{4}-\d{2}-\d{2}$/.test(sess.startedAt||'')?sess.startedAt:activeDate();
+  var on=sessionDay(sess);
   // Finished already, in another view: its sets go onto that log rather than
   // into a second one, and the day and its XP were seen to there.
   var had=state.workoutLogs.filter(function(l){ return l.sessionId===sid||l.id===lid; })[0];
@@ -2799,7 +2834,7 @@ function finishWorkout(){
   var done={}; Object.keys(sess.logs||{}).forEach(function(k){ if((sess.logs[k]||[]).length) done[k]=sess.logs[k]; });
   var log={id:lid,sessionId:sid,workoutId:sess.workoutId,title:title,tag:tag,date:on,logs:done};
   var ss=supersetRecord(sess); if(ss.length) log.supersets=ss;
-  var mins=sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
+  var mins=sessionLive(sess)&&sessionMinutes(sess,Date.now()); if(mins) log.durationMin=mins;
   state.workoutLogs.push(log);
   var today=ensureDay(on), paid=0;
   if(!today.workout.done){ paid+=addXp(XP_WORKOUT); if(today.rest) paid+=addXp(-XP_REST); }
@@ -3362,7 +3397,9 @@ function bodyContent(){
   if(state.activeSession){
     var aw=WORKOUTS.filter(function(x){return x.id===state.activeSession.workoutId;})[0];
     var cnt=0; Object.keys(state.activeSession.logs).forEach(function(k){cnt+=state.activeSession.logs[k].length;});
-    resumeBanner='<div class="resume-banner"><span>In progress: <strong>'+(aw?esc(aw.title):'Workout')+'</strong> ('+cnt+' sets logged)</span>'+
+    var from=sessionDay(state.activeSession);
+    resumeBanner='<div class="resume-banner"><span>In progress: <strong>'+(aw?esc(aw.title):'Workout')+'</strong>'+
+      (from!==realToday()?' from '+esc(prettyKey(from)):'')+' ('+cnt+' sets logged)</span>'+
       '<span class="btns"><button class="go" data-action="resumesession">Resume</button><button class="x" data-action="discardsession" title="Discard" aria-label="Discard this session">&times;</button></span></div>';
   }
   var workoutCards=WORKOUTS.map(function(w){
@@ -3371,7 +3408,7 @@ function bodyContent(){
     // Logged sets are never swapped out silently: finish or discard them first.
     var busy=sessionBusy(w.id);
     var start='<button class="start" data-action="startworkout" data-id="'+w.id+'"'+
-      (busy?' disabled title="Finish or discard the session in progress first">Finish current first':'>Start')+'</button>';
+      (busy?' disabled title="Finish or discard the session in progress first">Finish current first':resumesOnStart(w.id)?'>Resume':'>Start')+'</button>';
     return '<div class="wcard"><div class="row"><div><h4>'+esc(w.title)+'</h4><div class="meta">'+meta+' &middot; '+esc(w.tag)+'</div></div>'+
       start+'</div></div>';
   }).join('');
@@ -3736,7 +3773,7 @@ function bodyContent(){
       '</div>'; };
     var storyBar=function(){ return '<div class="story-bar">'+sess.exIds.map(function(id,i){
       return '<i class="'+(i===slide?'now':(slideLogged(sess,id)?'done':''))+'"><b></b></i>'; }).join('')+'</div>'; };
-    var storyHead='<div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>';
+    var storyHead='<div class="story-head"><h2 class="story-title">'+esc((w2?w2.title:'Workout')+sessionFor(sess))+' &middot; '+(slide+1)+'/'+n+'</h2><button data-action="cancelsession">Back, keep progress</button></div>';
 
     if(addingExercise){
       // The results live in their own container so typing can replace just
@@ -3747,7 +3784,7 @@ function bodyContent(){
           'placeholder="Search by name, area or category (try &#39;grip&#39; or &#39;dead hang&#39;)" value="'+esc(exSearch)+'">'+
           '<div id="pick-results">'+pickerResults()+'</div></div></div>';
     } else if(n===0){
-      sessionHtml='<div class="story"><div class="story-head"><h2 class="story-title">'+esc(w2?w2.title:'Workout')+'</h2><button data-action="cancelsession">Back</button></div>'+
+      sessionHtml='<div class="story"><div class="story-head"><h2 class="story-title">'+esc((w2?w2.title:'Workout')+sessionFor(sess))+'</h2><button data-action="cancelsession">Back</button></div>'+
         '<div class="slide"><p class="note" style="margin-top:0;">No exercises in this session. Add one to get going.</p>'+
         '<button class="addex-btn" data-action="openpicker">+ Add exercise</button></div></div>';
     } else if(isSuperset(sess.exIds[slide])){
@@ -3851,7 +3888,7 @@ function bodyContent(){
       var lastLine=lastTimeLine(def2,tgt,lastSetsFor(exId));
       var goal=restGoal(def2,tgt), lastT=0;
       Object.keys(sess.logs).forEach(function(k){ (sess.logs[k]||[]).forEach(function(x){ if(x.t>lastT) lastT=x.t; }); });
-      var restLine=(goal&&lastT&&Date.now()-lastT<REST_SHOW)?('<div class="restline" id="restline" data-t="'+lastT+'" data-goal="'+goal+'">'+restText(lastT,goal)+'</div>'):'';
+      var restLine=(goal&&lastT&&sessionLive(sess)&&Date.now()-lastT<REST_SHOW)?('<div class="restline" id="restline" data-t="'+lastT+'" data-goal="'+goal+'">'+restText(lastT,goal)+'</div>'):'';
       var weightInput=def2.type==='load'?('<input id="log-w-'+exId+'" type="text" inputmode="decimal" placeholder="'+(perImp?'kg each':'kg')+'"'+(pre&&pre.w?' value="'+pre.w+'"':'')+'>'):'';
       var perImpNote=(def2.type==='load'&&perImp)?('<div class="perimp">'+esc(perImplementNote(exId))+'</div>'):'';
       var prepIsLoad=def2.type==='prep' && prepLevelKind(prepPick[exId]||'')==='load';
@@ -3954,11 +3991,14 @@ function bodyContent(){
       '<button class="tab'+(tab==='progress'?' active':'')+'" data-action="tab" data-tab="progress" aria-pressed="'+(tab==='progress')+'">Progress</button>'+
     '</div>';
 
-  var backfillBar = backfilling()
+  // In a session the day is the session's, named in its title: the log date
+  // can move while it is open, and Finish never follows it.
+  var offDay=inSession?sessionDay(state.activeSession)!==realToday():backfilling();
+  var backfillBar = backfilling() && !inSession
     ? ('<div class="backfill-bar"><span>Logging for <strong>'+esc(prettyKey(activeDate()))+'</strong></span>'+
        '<button data-action="today">Back to today</button></div>')
     : '';
-  return '<div class="wrap'+(backfilling()?' backfilling':'')+'">'+
+  return '<div class="wrap'+(offDay?' backfilling':'')+'">'+
       (dbState==='loading'?'<div class="banner">loading your data&hellip;</div>':'')+
       (dbState==='error'?'<div class="banner">Could not load your saved data ('+esc(dbErr||'unavailable')+'). Changes are paused until it loads. <button data-action="retryload">Retry</button></div>':'')+
       '<div id="savepill" class="savepill'+(savingShown?' on':'')+'" role="status">saving&hellip;</div>'+

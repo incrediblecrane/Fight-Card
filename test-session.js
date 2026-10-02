@@ -1471,6 +1471,147 @@ srv.listen(0,async function(){
     assert.ok(!/resets/.test(note),'the reset copy is still there');
   });
 
+  console.log('\nSTARTING, RESUMING AND THE DAY A SESSION IS FOR');
+  var dayKey=function(o){ return p.evaluate(function(oo){ var d=new Date(); d.setDate(d.getDate()-oo);
+    return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); },o); };
+  var pretty=function(k){ return p.evaluate(function(kk){ return new Date(kk+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); },k); };
+  var storyTitle=function(){ return p.evaluate(function(){ var h=document.querySelector('.story-title'); return h?h.textContent:''; }); };
+  var banner=function(){ return p.evaluate(function(){ var b=document.querySelector('.resume-banner'); return b?b.textContent:''; }); };
+  var cardButton=function(title){ return p.evaluate(function(want){
+    var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h4').textContent.trim()===want; })[0];
+    var b=c&&c.querySelector('[data-action="startworkout"]'); return b?b.textContent.trim():''; },title); };
+  var logBench=async function(n){
+    assert.ok(await toSlide('Bench press'),'never reached the bench press');
+    for(var i=0;i<n;i++){ await p.fill('#log-w-press_bench','40'); await p.fill('#log-v-press_bench','8');
+      await p.click('[data-action="logset"]'); await settle(); }
+  };
+  var lastLog=function(){ var l=seedOf().workoutLogs; return l[l.length-1]; };
+  var toTraining=async function(){ await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350); };
+
+  await t('Start on a workout left open days ago starts it today, and the banner said when it was from', async function(){
+    await go(); await leaveSession();
+    var today=await dayKey(0), old=await dayKey(4), st=seedOf();
+    st.activeSession={workoutId:'w6',startedAt:old,t0:new Date(old+'T18:00:00').getTime(),exIds:['press_bench','press_ohp'],
+      targets:{press_bench:{sets:4,reps:'8'},press_ohp:{sets:3,reps:'8'}},logs:{}};
+    st.workoutLogs=st.workoutLogs.filter(function(l){ return l.date!==today; });
+    if(st.days[today]) st.days[today].workout={done:false,type:null};
+    var oldDay=JSON.stringify(st.days[old]||null);
+    doc=env.withSeed(doc,st); await go();
+    var back=await p.$('[data-action="cancelsession"]'); if(back){ await back.click(); await p.waitForTimeout(400); }
+    await toTraining();
+    var bn=await banner();
+    await startWorkout('Push');
+    assert.ok(!/ for /.test(await storyTitle()),'the new session is not for today: '+(await storyTitle()));
+    await logBench(1); await finishNow();
+    var l=lastLog();
+    assert.strictEqual(l.date,today,'the sets were logged on '+l.date);
+    assert.ok(seedOf().days[today].workout.done,'today is not marked trained');
+    assert.strictEqual(JSON.stringify(seedOf().days[old]||null),oldDay,'the old day changed');
+    assert.ok(bn.indexOf('from '+(await pretty(old)))>-1,'the banner did not say the session was from '+old+': '+bn);
+  });
+
+  await t('a session resumed after picking another day names the day Finish writes, not the picked one', async function(){
+    await go(); await leaveSession();
+    var today=await dayKey(0), yk=await dayKey(1);
+    await startWorkout('Push'); await logBench(1);
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="pickday"][data-k="'+yk+'"]'); await p.waitForTimeout(350);
+    await toTraining(); await p.click('[data-action="resumesession"]'); await p.waitForTimeout(400);
+    var shown=await p.evaluate(function(){ var b=document.querySelector('.backfill-bar'); return b?b.textContent:''; });
+    assert.strictEqual(shown,'','the session says: '+shown);
+    assert.ok(!/ for /.test(await storyTitle()),'title: '+(await storyTitle()));
+    var n0=seedOf().workoutLogs.length;
+    await finishNow();
+    assert.strictEqual(seedOf().workoutLogs.length,n0+1,'no log written');
+    assert.strictEqual(lastLog().date,today,'Finish wrote '+lastLog().date);
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(300);
+    var tb=await p.$('.backfill-bar [data-action="today"]'); if(tb){ await tb.click(); await p.waitForTimeout(300); }
+  });
+
+  await t('a session started for an earlier day keeps naming that day after Back to today', async function(){
+    await go(); await leaveSession();
+    var yk=await dayKey(1), py=await pretty(yk);
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="pickday"][data-k="'+yk+'"]'); await p.waitForTimeout(350);
+    await startWorkout('Push');
+    assert.ok((await storyTitle()).indexOf('for '+py)>-1,'title: '+(await storyTitle()));
+    assert.strictEqual(await p.$('.backfill-bar'),null,'a Back to today that cannot move the session is offered in it');
+    await logBench(2);
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await p.click('.backfill-bar [data-action="today"]'); await p.waitForTimeout(350);
+    await toTraining();
+    assert.ok((await banner()).indexOf('from '+py)>-1,'banner: '+(await banner()));
+    await p.click('[data-action="resumesession"]'); await p.waitForTimeout(400);
+    assert.ok((await storyTitle()).indexOf('for '+py)>-1,'after Back to today the title is: '+(await storyTitle()));
+    await finishNow();
+    assert.strictEqual(lastLog().date,yk,'Finish wrote '+lastLog().date);
+  });
+
+  await t('a session typed in for an earlier day records no length', async function(){
+    await go(); await leaveSession();
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="pickday"][data-k="'+(await dayKey(1))+'"]'); await p.waitForTimeout(350);
+    await startWorkout('Push'); await logBench(2); await finishNow();
+    var tb=await p.$('.backfill-bar [data-action="today"]'); if(tb){ await tb.click(); await p.waitForTimeout(300); }
+    var l=lastLog();
+    assert.strictEqual(l.date,await dayKey(1),'logged on '+l.date);
+    assert.strictEqual(l.durationMin,undefined,'the data-entry time was kept as its length: '+l.durationMin);
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
+    var row=await p.evaluate(function(d){ var r=[].slice.call(document.querySelectorAll('.swipe')).filter(function(x){ return x.textContent.indexOf(d)>-1 && /Push/.test(x.textContent); })[0];
+      return r?r.innerText:''; },l.date);
+    assert.ok(row,'no Recent sessions row for '+l.date);
+    assert.ok(!/\d+ min/.test(row),'the row shows minutes: '+row);
+  });
+
+  await t('Start after discarding a session by mistake still offers Undo, and Undo brings its sets back', async function(){
+    await go(); await leaveSession(); await startWorkout('Push'); await logBench(3);
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await toTraining();
+    await p.click('[data-action="discardsession"]'); await settle();
+    await startWorkout('Push');
+    assert.ok(await p.$('.undo-bar [data-action="undo"]'),'Undo went when the card was started');
+    await p.click('.undo-bar [data-action="undo"]'); await settle();
+    var s=seedOf().activeSession;
+    assert.strictEqual(s&&setCount(s.logs),3,'the session came back as '+JSON.stringify(s&&s.logs));
+    await leaveSession();
+  });
+  function setCount(logs){ var n=0; Object.keys(logs||{}).forEach(function(k){ n+=logs[k].length; }); return n; }
+
+  await t('Start on another workout keeps a built session it replaces for Undo', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','cable fly'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="fly_cable"]'); await settle();
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search'); await p.type('#ex-search','superset',{delay:35}); await p.waitForTimeout(500);
+    await p.click('[data-action="addex"][data-id="superset"]'); await settle();
+    await p.selectOption('.ssadd select','press_bench'); await p.click('[data-action="ssadd"]'); await settle();
+    var built=seedOf().activeSession;
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await startWorkout('Push');
+    assert.strictEqual(seedOf().activeSession.workoutId,'w6','Push did not start');
+    assert.ok(await p.$('.undo-bar [data-action="undo"]'),'no Undo for the session it replaced');
+    await p.click('.undo-bar [data-action="undo"]'); await settle();
+    var s=seedOf().activeSession;
+    assert.strictEqual(s.workoutId,'w17','Undo left '+s.workoutId);
+    assert.deepStrictEqual(s.exIds,built.exIds); assert.deepStrictEqual(s.supersets,built.supersets);
+    await leaveSession();
+  });
+
+  await t('the card of the workout in progress says Resume and keeps the slide', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    for(var k=0;k<3;k++) await next();
+    assert.strictEqual((await storyPos())[0],4,'could not get to slide 4');
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
+    await toTraining();
+    assert.strictEqual(await cardButton('Push'),'Resume');
+    assert.strictEqual(await cardButton('Pull'),'Start');
+    await startWorkout('Push');
+    assert.strictEqual((await storyPos())[0],4,'the card opened slide '+(await storyPos())[0]);
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });
