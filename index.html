@@ -1524,17 +1524,23 @@ function dbBoot(){
         if(Object.keys(pendSeen).length) moved=true;
         // An import this device was writing when it was closed is finished
         // now: a replace from its own copy, a merge laid over what is stored.
+        // Only while the store is still marked by that same import, and only
+        // straight away: a copy from a while ago would undo what was done
+        // since on another device, so that one is finished only when asked.
         // With no copy here, all that can be done is to say so.
-        var pend=readPending();
-        if(pend){
-          var over={}; if(pend.mode==='put') Object.keys(map).forEach(function(p){ over[p]=map[p]; });
-          Object.keys(pend.docs).forEach(function(p){ over[p]=pend.docs[p]; });
-          state=dbApply(over); resume=pend.mode; moved=false;
+        var pend=readPending(), ours=pend&&meta.importing===pend.at;
+        if(ours&&Date.now()-pend.at<IMPORT_RESUME_MS){
+          state=dbApply(pendOver(pend,map)); resume=pend.mode; pendAt=pend.at; moved=false;
         }
-        else if(meta.importing) importStuck=true;
+        else{
+          if(ours) importResume=pend; else if(pend) clearPending();
+          if(meta.importing) importStuck=true;
+        }
         if(moved) scheduleSave();
       });
-      // First run on this store: the document's own seed is the truth.
+      // First run on this store: the document's own seed is the truth, and
+      // no import left on this device can be about it.
+      clearPending();
       return dbSeed(state).then(function(docs){ lastSaved=dbSnapshot(docs); });
     }).then(function(){
       dbState='db'; dbErr=null;
@@ -2009,7 +2015,7 @@ function dbSave(){
     importProg={done:0,total:jobs.length}; paintImport();
     return metaPut(true).then(function(){ return batch(jobs,0); }).then(function(){
       clearPending(); return metaPut(false); }).then(function(){
-      setSaving(false); importBusy=false; importProg=null; dataMsg=importNote; importNote=''; render(); });
+      setSaving(false); importBusy=false; importStuck=false; importResume=null; importProg=null; dataMsg=importNote; importNote=''; render(); });
   }).then(function(){
     saveAttempt=0;
     if(dbErr){ dbErr=null; dbErrHard=false; render(); }
@@ -2022,6 +2028,9 @@ function dbSave(){
     // An import still owed goes the same way next time: a re-read and merge
     // would put the old days back over it.
     if((mode==='put'||mode==='replace') && !saveNow) saveNow=mode;
+    // One that retrying cannot fix is unfinished until the next change carries
+    // it, so Put back and Leave it are offered again, as for one cut off.
+    if((mode==='put'||mode==='replace') && dbErrHard){ importBusy=false; importStuck=true; importProg=null; }
     if(!dbErrHard){
       retrying=true;
       if(saveTimer) clearTimeout(saveTimer);
@@ -2231,14 +2240,22 @@ function canKeep(){ try{ localStorage.setItem('fc.probe','1'); localStorage.remo
    finish. While one is unfinished the copy from before it is never
    replaced: that would keep the half-imported mix instead. */
 var PENDING_KEY='fc.importing', importBusy=false, importStuck=false, importProg=null, importNote='', restoreAsk=false, dbMeta=null;
+// The store's mark is the time the copy here was taken, so a load can tell
+// its own import from another one. Finished on a load only this soon after.
+var pendAt=0, importResume=null, IMPORT_RESUME_MS=15*60*1000;
 function readPending(){ try{ var v=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); return v&&v.docs&&v.mode?v:null; }catch(e){ return null; } }
-function writePending(mode){ try{ localStorage.setItem(PENDING_KEY,JSON.stringify({mode:mode,at:Date.now(),docs:dbDocs(state)})); }catch(e){} }
+function writePending(mode){ pendAt=Date.now(); try{ localStorage.setItem(PENDING_KEY,JSON.stringify({mode:mode,at:pendAt,docs:dbDocs(state)})); }catch(e){} }
+function pendOver(pend,map){
+  var over={}; if(pend.mode==='put') Object.keys(map).forEach(function(p){ over[p]=map[p]; });
+  Object.keys(pend.docs).forEach(function(p){ over[p]=pend.docs[p]; });
+  return over;
+}
 function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} }
 function hasPending(){ try{ return localStorage.getItem(PENDING_KEY)!==null; }catch(e){ return false; } }
 function importUnfinished(){ return importBusy||importStuck||hasPending(); }
 function metaPut(importing){
   var m={}; Object.keys(dbMeta||{seeded:true}).forEach(function(k){ if(k!=='importing') m[k]=(dbMeta||{seeded:true})[k]; });
-  if(importing) m.importing=true;
+  if(importing) m.importing=pendAt||true;
   return dbStore.put('state/meta',m).then(function(){ dbMeta=m; });
 }
 function importText(){
@@ -2247,6 +2264,7 @@ function importText(){
   return 'Importing'+at+', keep this open.';
 }
 function paintImport(){ [].forEach.call(document.querySelectorAll('.importprog'),function(el){ el.textContent=importText(); }); }
+function backupAt(){ try{ return JSON.parse(readBackup()).exportedAt; }catch(e){ return ''; } }
 function whenKept(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return 'an earlier time';
   return prettyKey(dateKey(d))+' at '+pad(d.getHours())+':'+pad(d.getMinutes()); }
 /* Putting the backup back replaces everything here, so it asks first, naming
@@ -2296,7 +2314,7 @@ function applyImport(st,mode){
   if(!importUnfinished()){ kept=writeBackup(exportText(state)); importPrev=dbState==='db'?dbDocs(state):null; }
   else importPrev=null;
   // An undo parked before this would put the old record's item into the new one.
-  clearUndo(); restoreAsk=false;
+  clearUndo(); restoreAsk=false; importResume=null;
   var ended=state.endedSessions||[], was=sessId(state.activeSession);
   state=mode==='merge'?mergeImport(state,st):st;
   // A session this replaces is over in every view; the one it brings is live.
@@ -3949,7 +3967,10 @@ function bodyContent(){
         'Trouble reaching your saved data ('+esc(dbErr)+'). Trying again.')+'</div>':'')+
       (importBusy?'<div class="banner importprog" role="status">'+esc(importText())+'</div>':'')+
       (importStuck&&!importBusy?'<div class="banner" role="alert">An import did not finish, so your data may be part old and part new.'+
-        (readBackup()?' <button data-action="restorebackup">Put back the data from before</button>':'')+
+        (importResume?' <button data-action="importfinish">Finish the import started '+esc(whenKept(importResume.at))+'</button>':'')+
+        // The copy is from before that import only if it was this device's.
+        (readBackup()?' <button data-action="restorebackup">'+(hasPending()?'Put back the data from before':
+          'Put back your copy from '+esc(whenKept(backupAt())))+'</button>':'')+
         ' <button data-action="importleave">Leave it as it is</button></div>':'')+
       backfillBar+
       (window.claude && window.claude.use ? '' : '<div class="banner">Open this from your artifact link to sync across devices &mdash; changes here are local to this tab only.</div>')+
@@ -4398,8 +4419,18 @@ function onClick(e){
     render(); return;
   }
   else if(action==='importleave'){
-    importStuck=false; uiOnly=true;
+    // Left means left: not finished on the next change or the next load.
+    importStuck=false; importResume=null; clearPending(); uiOnly=true;
+    if(saveNow==='put'||saveNow==='replace') saveNow=false;
     if(dbState==='db') metaPut(false).then(null,function(){});
+  }
+  else if(action==='importfinish'){
+    if(importBusy||!importResume||dbState!=='db') return;
+    var pf=importResume; importResume=null; clearUndo(); restoreAsk=false;
+    state=dbApply(pendOver(pf,dbDocs(state))); syncFromState(); viewingSession=false; addingExercise=false;
+    if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+    pendAt=pf.at; importBusy=true; importStuck=false; importProg=null; importNote='The import that was cut off is finished.';
+    saveNow=pf.mode; persist(); render(); return;
   }
   else if(action==='shoprange'){ shopRange=parseInt(t.getAttribute('data-n'),10)||7; uiOnly=true; }
   else if(action==='clearweek'){

@@ -193,14 +193,23 @@ import clears any undo offered before it.
 
 An import is many writes (a year is about 700), so it is made safe to cut
 off. Before the first write, what it is writing is kept in `localStorage`
-under `fc.importing` and `state/meta` gets `importing: true`; both are
-cleared only once the last write and delete have landed, and until then the
-app says "Importing 140/736, keep this open" rather than "Imported". A load
-that finds `fc.importing` finishes the import (a Replace from that copy, a
-Merge laid over what is stored); one that finds only the store's mark says the
-import did not finish and offers the backup or to leave it. While an import is
-unfinished `fc.backup` is never replaced, so it stays the data from before
-the first one.
+under `fc.importing` and `state/meta` gets `importing` set to the time that
+copy was taken; both are cleared only once the last write and delete have
+landed, and until then the app says "Importing 140/736, keep this open" rather
+than "Imported". A load that finds `fc.importing` while the store still carries
+that same mark finishes the import (a Replace from that copy, a Merge laid over
+what is stored) if the copy is under 15 minutes old; an older one is offered
+("Finish the import started ...") rather than replayed, since it would undo
+what another device did since. A copy the store is no longer marked by (left,
+finished or replaced elsewhere), or one on a store that is seeded afresh, is
+dropped. A load that finds only the store's mark says the import did not
+finish and offers the backup or to leave it; the backup is called "the data
+from before" only on the device that ran the import, and named by its date
+elsewhere. An import refused for good (quota, invalid argument and the like)
+is unfinished in the same way: Put back and Leave it are offered, and Leave it
+drops the copy and the mark, so it is not replayed on the next change or load.
+While an import is unfinished `fc.backup` is never replaced, so it stays the
+data from before the first one.
 
 Merge pays the XP of what it brings in, as if it had been logged here: per
 date, the cups (`wx`), trained day and rest day of the incoming day less those

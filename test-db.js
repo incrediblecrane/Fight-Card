@@ -2075,6 +2075,118 @@ srv.listen(0,async function(){
     } finally { await putBack(was); }
   });
 
+  console.log('\nAN IMPORT THAT CANNOT FINISH HAS A WAY OUT');
+  // The app closed: a page on the same origin, so its localStorage is there.
+  var away=async function(){
+    await p.route('**/away',function(r){ r.fulfill({contentType:'text/html',body:'<p>away</p>'}); });
+    await p.goto(url+'away'); await p.unroute('**/away'); await p.waitForTimeout(2500);
+  };
+  await t('an import refused for good offers Put back and Leave it, and Leave it stops it coming back on every open', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await importing(JSON.stringify(yearish()));
+      failNext.push({op:'set',match:'days/',code:'quota_exceeded'});
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      var body=await text();
+      assert.ok(/An import did not finish/.test(body),'nothing says the import did not finish: '+body.slice(0,300));
+      assert.ok(await p.locator('[data-action="importleave"]').count(),'Leave it is not offered');
+      assert.ok(await p.locator('#app .datacard [data-action="restorebackup"]').count(),'Put back is gone after the import was refused');
+      await p.click('[data-action="importleave"]'); await settle();
+      assert.strictEqual(await ls('fc.importing'),null,'the refused import is still kept to be replayed');
+      assert.ok(!store['state/meta'].importing,'the store is still marked as importing');
+      var mid=JSON.stringify(held());
+      await go(); await p.waitForTimeout(800); await settle();
+      assert.strictEqual(JSON.stringify(held()),mid,'opening the app again replayed the import that was left');
+      assert.ok(!/An import did not finish/.test(await text()),'it still says the import did not finish');
+    } finally { await putBack(was); }
+  });
+
+  await t('an import finished on opening the app that is refused for good offers Put back and Leave it', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await cutOff(yearish());
+      failNext.length=0; failNext.push({op:'set',match:'days/',code:'quota_exceeded'});
+      await p.goto(url); await p.waitForTimeout(2500); await settle();
+      var body=await text();
+      assert.ok(/An import did not finish/.test(body) && await p.locator('[data-action="importleave"]').count(),'no way out once the import is refused: '+body.slice(0,300));
+      await p.click('[data-action="tab"][data-tab="progress"]');
+      if(!(await p.locator('#app .datacard [data-action="restorebackup"]').count())) await p.click('[data-action="datapane"][data-p="import"]');
+      assert.ok(await p.locator('#app .datacard [data-action="restorebackup"]').count(),'Put back is gone after the import was refused');
+    } finally { await putBack(was); }
+  });
+
+  await t('a copy of a cut-off import is not replayed once the store is no longer marked by it', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await cutOff(yearish());
+      assert.ok(await ls('fc.importing'),'no copy of the import was kept');
+      await away();
+      // Another device left it as it is, then logged a day.
+      var m=Object.assign({},store['state/meta']); delete m.importing; store['state/meta']=m;
+      store['days/2025-09-09']=blank();
+      await go(); await p.waitForTimeout(800); await settle();
+      assert.ok(store['days/2025-09-09'],'an old copy of an import wiped a day logged since on another device');
+      assert.strictEqual(await ls('fc.importing'),null,'the old copy is still kept');
+      assert.ok(!/An import did not finish/.test(await text()),'it says an import did not finish');
+    } finally { await putBack(was); }
+  });
+
+  await t('a copy of a cut-off import from a while ago is finished only when asked', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      var o=yearish(); await cutOff(o);
+      var pend=JSON.parse(await ls('fc.importing')), mark=store['state/meta'].importing;
+      await away();
+      assert.ok(pend && mark,'the import was not kept and marked');
+      // Two hours ago, and marked the same way.
+      var old=pend.at-2*3600*1000; pend.at=old;
+      await p.evaluate(function(v){ localStorage.setItem('fc.importing',v); },JSON.stringify(pend));
+      store['state/meta']=Object.assign({},store['state/meta'],{importing:mark===true?true:old});
+      store['days/2025-09-09']=blank();
+      await go(); await p.waitForTimeout(800); await settle();
+      assert.ok(store['days/2025-09-09'],'an import from two hours ago was replayed without asking');
+      var body=await text();
+      assert.ok(/An import did not finish/.test(body),'nothing says the import did not finish: '+body.slice(0,300));
+      assert.ok(await p.locator('[data-action="importfinish"]').count(),'finishing it is not offered');
+      await p.click('[data-action="importfinish"]'); await p.waitForTimeout(800); await settle();
+      var day=await today();
+      assert.deepStrictEqual(held().filter(function(k){ return k!=='days/'+day; }),imported(o),'finishing it did not finish the import');
+      assert.ok(!store['state/meta'].importing,'the store is still marked as importing');
+      assert.strictEqual(await ls('fc.importing'),null,'the copy is still kept');
+    } finally { await putBack(was); }
+  });
+
+  await t('a copy of an import left behind on a store that starts afresh is dropped, and the next import keeps a backup', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await p.evaluate(function(){ localStorage.setItem('fc.importing',JSON.stringify({mode:'replace',at:Date.now(),docs:{}})); });
+      Object.keys(store).forEach(function(k){ delete store[k]; });
+      await go(); await water(1);
+      assert.strictEqual(await ls('fc.importing'),null,'the copy left behind is still kept');
+      var a=await exported();
+      await importing(JSON.stringify({schema:1,days:{'2025-06-01':blank()}}));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      assert.ok(!/still the data from before the import that did not finish/.test(await text()),'it speaks of an import that did not finish');
+      var back=JSON.parse(await ls('fc.backup')||'{}');
+      assert.deepStrictEqual([Object.keys(back.days||{}).sort(),(back.workoutLogs||[]).length],[Object.keys(a.days).sort(),a.workoutLogs.length],
+        'no backup of the data the import replaced was kept');
+    } finally { await putBack(was); }
+  });
+
+  await t('a backup from an older import is offered by its date, not as the data from before the one that did not finish', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await p.evaluate(function(){ localStorage.removeItem('fc.importing');
+        localStorage.setItem('fc.backup',JSON.stringify({schema:1,exportedAt:'2025-03-04T10:20:00.000Z'})); });
+      store['state/meta']=Object.assign({},store['state/meta'],{importing:true});
+      await go();
+      var body=await text();
+      assert.ok(/An import did not finish/.test(body),'nothing says the import did not finish');
+      assert.ok(!/Put back the data from before/.test(body),'an older backup is offered as the data from before this import');
+      assert.ok(/Put back your copy from [^.]*[345] Mar/.test(body),'the backup offered is not named by its date: '+body.slice(0,300));
+    } finally { await p.evaluate(function(){ localStorage.removeItem('fc.backup'); }); await putBack(was); }
+  });
+
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
   await t('a view that cannot run db falls back to publish-to-save', async function(){
     await p.addInitScript(function(){ window.__DB_OFF=true; });
