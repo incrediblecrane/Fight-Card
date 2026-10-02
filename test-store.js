@@ -23,7 +23,7 @@ function grabVar(decl){
 var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('WORKOUT_TYPES'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
   grabVar('DAY_MAX'), h.match(/var EX=\[[\s\S]*?\n\];/)[0], grab('isSuperset'), grab('exDef'), grab('blankDay'), grab('wholeDay'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
-  grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
+  grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('isBlankDay'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
   grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
 var box={};
 new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this.exportText=exportText;'+

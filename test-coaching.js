@@ -309,7 +309,7 @@ if(loaded===true){
 console.log('\nTHE WEEKLY TARGET IS SAVED');
 t('the profile document carries the weekly target and reads it back', function(){
   var b={};
-  new Function('function planOrder(){ return 0; }\nvar DB_LISTS='+literal('var DB_LISTS')+';\n'+grab('stableJson')+'\n'+grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
+  new Function('function planOrder(){ return 0; }\nvar DB_LISTS='+literal('var DB_LISTS')+';\n'+grab('stableJson')+'\n'+grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('isBlankDay')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
     '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(b);
   var docs=b.dbDocs({waterTarget:10,weekTarget:4,totalXp:0,days:{}});
   assert.strictEqual(docs['state/profile'].weekTarget,4);

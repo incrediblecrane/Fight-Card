@@ -220,7 +220,11 @@ was paid.
 ## Vocabulary
 
 - **Day** — one dated record. `touched` distinguishes "nothing happened" from
-  "not logged", which is what streaks count.
+  "not logged", which is what streaks count. A blank day (untouched, nothing
+  on it) is no record: looking at a day draws it blank without making one,
+  only a tap that logs something does, and a blank day is neither saved nor
+  exported. One the store already holds is left there, never deleted unread,
+  and the water averages start at the first day that is not blank.
 - **Streaks** are forgiving. The clean streak counts touched days with nothing
   used and steps over a day not logged; only a touched day with something used
   ends it. The day streak lets one untouched day go and ends on two in a row.
@@ -298,7 +302,13 @@ was paid.
 - **Stint** — one continuous spell at one bench height inside a sauna visit.
   A visit has many; its `mins` is their total.
 - **Backfill date** — the day being logged to, when it is not today. Lives in
-  `sessionStorage` so it survives a reload but not closing the app.
+  `sessionStorage` so it survives a reload but not closing the app, as
+  `{k, on}`: the day picked and the day it was picked on, so it is dropped
+  once the day turns. Typed or arrowed from a keyboard it is taken only as a
+  whole date in the window, and drawn on Enter or on leaving the box.
+- **The day turning**: a view left open is checked every half minute and
+  redrawn on the new day at midnight without a tap, and the planned meals
+  for the day just gone are pruned then.
 - **Planned meal** — one entry in `state.plan`: a recipe, a real date, a slot
   (breakfast, lunch, dinner) and its own portion count. It is its own thing,
   not a flag on the recipe, which is what lets the same recipe be planned twice
@@ -374,6 +384,9 @@ set's margins against the rig's limits while it is being authored.
 - `npm test` — five rig suites: movement criteria, adversarial geometry,
   continuous motion, views, and rendering.
 - `test-app.js` — backfill dates and session dating.
+- `test-dates.js`: the log date picked by a real tap and typed from a
+  keyboard, a backfill left over from yesterday, a view open across midnight,
+  and a past day looked at without leaving a blank record.
 - `test-meals.js` — recipe portions and the shopping list.
 - `test-plan.js` — the meal planner in the browser: the same meal twice, slots,
   partial-week shopping.

@@ -652,21 +652,32 @@ function minLogDate(){ var d=new Date(); d.setDate(d.getDate()-(BACKFILL_DAYS-1)
 // closing the tab clears.
 // It deliberately does not go in state: a backdate is this device's editing
 // position, not part of the record, and it must never sync to another device.
-var LOGDATE_KEY='fc.logDate';
-function readStoredDate(){ try{ return sessionStorage.getItem(LOGDATE_KEY); }catch(e){ return null; } }
-function writeStoredDate(v){ try{ if(v) sessionStorage.setItem(LOGDATE_KEY,v); else sessionStorage.removeItem(LOGDATE_KEY); }catch(e){} }
+// It is kept as {k, on}: the day picked and the day it was picked on. A day
+// picked yesterday is not today's choice, however long the tab stays open.
+var LOGDATE_KEY='fc.logDate', logDateOn;
+function readStoredDate(){
+  var v=null; try{ v=sessionStorage.getItem(LOGDATE_KEY); }catch(e){}
+  if(!v) return null;
+  // Kept before it carried its day: as picked today, so nothing is lost.
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return {k:v, on:realToday()};
+  try{ v=JSON.parse(v); }catch(e){ return null; }
+  return v && typeof v.k==='string' && typeof v.on==='string' ? v : null;
+}
+function writeStoredDate(v){ try{ if(v) sessionStorage.setItem(LOGDATE_KEY,JSON.stringify(v)); else sessionStorage.removeItem(LOGDATE_KEY); }catch(e){} }
+function inLogWindow(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v||'') && v>=minLogDate() && v<=realToday(); }
 // '' means today mode: follow the clock. It must not hold today's date as a
 // string, or a tab left open past midnight keeps logging to yesterday.
 function setLogDate(v){
-  logDate=(v && v>=minLogDate() && v<realToday()) ? v : '';
-  writeStoredDate(logDate||null);
+  logDate=(v && inLogWindow(v) && v<realToday()) ? v : ''; logDateOn=logDate?realToday():'';
+  writeStoredDate(logDate?{k:logDate, on:logDateOn}:null);
   return activeDate();
 }
 function activeDate(){
-  if(logDate===undefined) logDate=readStoredDate()||'';
+  if(logDate===undefined){ var sd=readStoredDate(); logDate=sd?sd.k:''; logDateOn=sd?sd.on:''; }
   // Re-check the bounds every time: a tab left open for weeks must not keep
-  // writing to a day that has fallen outside the backfill window.
-  if(logDate && (logDate>=realToday() || logDate<minLogDate())) setLogDate('');
+  // writing to a day that has fallen outside the backfill window, nor one
+  // left open overnight to the day picked yesterday.
+  if(logDate && (logDate>=realToday() || logDate<minLogDate() || logDateOn!==realToday())) setLogDate('');
   return logDate||realToday();
 }
 function backfilling(){ return activeDate()!==realToday(); }
@@ -948,7 +959,9 @@ function dbDocs(st){
   out['state/shopping']={checked:(st.shoppingChecked||[]).slice(), extras:(st.shopExtras||[]).slice()};
   out['state/session']={active:st.activeSession||null};
   if((st.endedSessions||[]).length) out['state/session'].ended=st.endedSessions.slice(-SESS_ENDED_KEEP);
-  Object.keys(st.days||{}).forEach(function(k){ out['days/'+k]=st.days[k]; });
+  // A blank day is no record: looking at a day, or a minus with nothing to
+  // take away, writes nothing (see dbSave for one the store already holds).
+  Object.keys(st.days||{}).forEach(function(k){ if(!isBlankDay(st.days[k])) out['days/'+k]=st.days[k]; });
   (st.workoutLogs||[]).forEach(function(l){ if(l&&l.id) out['workoutLogs/'+l.id]=l; });
   (st.saunaSessions||[]).forEach(function(x){ if(x&&x.id) out['sauna/'+x.id]=x; });
   (st.library||[]).forEach(function(x){ if(x&&x.id) out['library/'+x.id]=x; });
@@ -1058,6 +1071,13 @@ function wholeDay(d){
 function ensureDay(k){
   if(!hasOwn(state.days,k)) state.days[k]=blankDay();
   return wholeDay(state.days[k]);
+}
+// Looking at a day is not logging it: a day nobody logged is drawn blank and
+// left out of the record, so the days before the first one logged stay out
+// of every average.
+function peekDay(k){ return hasOwn(state.days,k)?wholeDay(state.days[k]):blankDay(); }
+function isBlankDay(d){
+  return !!d && Object.keys(d).every(function(f){ return f==='workout'?!d.workout||(!d.workout.done&&!d.workout.type):!d[f]; });
 }
 function levelInfo(){ var span=150; var level=1+Math.floor(state.totalXp/span); var into=state.totalXp%span; return {level:level,into:into,span:span}; }
 function lastNKeys(n){ var out=[]; for(var i=n-1;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);out.push(dateKey(d));} return out; }
@@ -1847,8 +1867,18 @@ function dbUnpendAll(map){ var out={}; Object.keys(map).forEach(function(p){ out
    has not changed takes the store's copy, or goes when the store's has gone.
    An entry changed here and deleted elsewhere stays deleted: writing it
    back would undo a deletion nobody here asked to undo. */
+/* What this view would write. A day it holds blank is no record (see dbDocs),
+   except one the store last held with something on it: that was taken away
+   here, so it is written blank, merged field by field like any other change,
+   rather than deleted unread over whatever another view has put there since. */
+function saveDocs(){
+  var docs=dbDocs(state);
+  Object.keys(lastSaved).forEach(function(p){ var k=p.slice(5);
+    if(p.indexOf('days/')===0 && docs[p]===undefined && hasOwn(state.days,k) && !isBlankDay(savedBody(p))) docs[p]=state.days[k]; });
+  return docs;
+}
 function dbRefresh(all){
-  var snap=dbSnapshot(dbDocs(state)), sb=savedBody('state/session'), lid=sessLogId(sb&&sb.active), want=dbHot();
+  var snap=dbSnapshot(saveDocs()), sb=savedBody('state/session'), lid=sessLogId(sb&&sb.active), want=dbHot();
   Object.keys(snap).forEach(function(path){
     if(snap[path]===lastSaved[path]) return;
     if(path.indexOf('days/')===0 || lastSaved[path]!==undefined || path.indexOf('workoutLogs/')===0) want.push(path);
@@ -1865,9 +1895,11 @@ function dbRefresh(all){
     at=dbUnpendAll(at);
     var moved=dbSettleSession(at);
     // Taken after the read, so a tap made while it was out counts as ours.
-    var mine=dbDocs(state);
+    var mine=saveDocs();
     Object.keys(at).forEach(function(path){
       var theirs=at[path], m=mine[path], coll=path.slice(0,path.indexOf('/')), isDay=coll==='days', entry=!!DB_LISTS[coll];
+      // A day held blank is still this view's, to merge with what is there.
+      if(m===undefined && isDay && hasOwn(state.days,path.slice(5))) m=state.days[path.slice(5)];
       if(theirs===undefined){
         // Nothing there and never was: ours stands, and is written if we have one.
         if(lastSaved[path]===undefined) return;
@@ -1962,7 +1994,7 @@ function dbSave(){
   saveBusy=true;
   var retrying=false, mode=saveNow, all=!mode&&saveSync, gen=++saveGen; saveNow=false; if(all) saveSync=false;
   (mode==='put'||mode==='replace'?dbFold(mode==='replace'):mode?Promise.resolve(false):dbRefresh(all)).then(function(moved){
-    var docs=dbDocs(state), next=dbSnapshot(docs), jobs=[], logs=[], landing=[], session=null;
+    var docs=saveDocs(), next=dbSnapshot(docs), jobs=[], logs=[], landing=[], session=null;
     // Finishing clears the session and writes its log in one go, and a
     // cleared session whose log was refused would leave the sets nowhere. So
     // then, and only then, the session waits, and only for those logs.
@@ -2010,6 +2042,10 @@ function dbSave(){
       else jobs.push(job);
     });
     Object.keys(lastSaved).forEach(function(path){
+      // A blank day the store holds is left there and forgotten: it is no
+      // record, and deleting it unread could take a tap another view just made.
+      if(next[path]===undefined && mode!=='put' && mode!=='replace' && path.indexOf('days/')===0 && isBlankDay(savedBody(path))){
+        delete lastSaved[path]; savedGen[path]=gen; return; }
       if(next[path]===undefined) jobs.push(function(){
         return dbStore.remove(path).then(function(){ landed(path,undefined); }); });
     });
@@ -3345,7 +3381,7 @@ function stopPoseLoop(){
 }
 
 function bodyContent(){
-  var t=ensureDay(activeDate());
+  var t=peekDay(activeDate());
   var todaySaunaCount=state.saunaSessions.filter(function(s){return s.date===activeDate();}).length;
   var lvl=levelInfo();
   var streaks=computeStreaks(), weekN=weekSessions();
@@ -3615,7 +3651,7 @@ function bodyContent(){
   // Average over every day since tracking started, not only the days water
   // got logged: dividing by the days you remembered flatters the number, and
   // the point of the figure is to be honest about the habit.
-  var trackedKeys=Object.keys(state.days).sort();
+  var trackedKeys=Object.keys(state.days).filter(function(k){ return !isBlankDay(state.days[k]); }).sort();
   var firstKey=trackedKeys.length?trackedKeys[0]:realToday();
   function waterAvgOver(keys){
     var live=keys.filter(function(k){ return k>=firstKey; });
@@ -4116,7 +4152,18 @@ function pickerResults(){
   }).join('') || '<p class="note" style="margin-top:0;">No matches.</p>';
 }
 
+/* Replacing the page takes focus off whatever had it, and that blur can fire
+   a change or a focusout whose handler renders again in the middle of this
+   one, which throws. A render asked for during one runs once it is done. */
+var rendering=false, renderAgain=false, drawnDay='';
 function render(){
+  if(rendering){ renderAgain=true; return; }
+  rendering=true; renderAgain=false; renderOnUp=false;
+  try{ drawPage(); } finally { rendering=false; }
+  if(renderAgain) render();
+}
+function drawPage(){
+  drawnDay=realToday();
   syncUi();
   var app=document.getElementById('app');
   if(!app) return;
@@ -4173,13 +4220,15 @@ function onClick(e){
   var t=e.target.closest('[data-action]');
   if(!t) return;
   var action=t.getAttribute('data-action');
-  var today=ensureDay(activeDate());
+  // Only a tap that logs something on the day makes a record of it.
+  var today={water:1,logsauna:1,workout:1,rest:1,alcohol:1,smoking:1,weed:1}[action]?ensureDay(activeDate()):null;
   var uiOnly=false;
 
   // Controls whose value onChange reads must not be re-rendered on click: the
   // click handler runs first, and replacing the DOM detaches the element before
   // its change event can reach the document, so the change was silently lost.
-  if(action==='planday'||action==='planslot'||action==='prepopt') return;
+  // The log date box is one of them: a tap opens the native picker on it.
+  if(action==='planday'||action==='planslot'||action==='prepopt'||action==='logdate') return;
   // Until we know where data lives, a tap would be applied to state that is
   // about to be replaced by the store. Reading and moving around is fine.
   var UI_ONLY_WHILE_LOADING={tab:1,prevslide:1,nextslide:1,toggleex:1,openpicker:1,
@@ -4517,7 +4566,17 @@ function onChange(e){
   var action=t.getAttribute('data-action');
   // Its value is in state now, and the render draws it from there.
   if(t.id) consumed([t.id]);
-  if(action==='logdate'){ setLogDate(t.value); render(); return; }
+  if(action==='logdate'){
+    // Typing or arrowing a date changes it a segment at a time, and every
+    // step fires a change. Only a whole date in the window is taken, and
+    // while the keyboard is on the box it is drawn on Enter or on leaving it:
+    // redrawing under the caret sent the next digits to the wrong segment.
+    var keyed=logDateKeyed;
+    // A date outside it is not taken; the box goes back to the day logged to.
+    if(!inLogWindow(t.value)){ if(!keyed) render(); return; }
+    setLogDate(t.value);
+    if(!keyed) render(); return;
+  }
   else if(action==='prepopt'){
     var pex=t.getAttribute('data-ex');
     /* The number is minutes for every option but one: for light sets it is
@@ -4561,9 +4620,16 @@ function onInput(e){
   if(pm) prepMins[pm]=e.target.value;
 }
 
+// The log date box is being driven from the keyboard (see onChange).
+var logDateKeyed=false, pointerDown=false, renderOnUp=false;
 // Enter in the shopping box adds the item. Typing something and then having to
 // reach for a button is exactly the friction that stops a list being used.
 function onKeydown(e){
+  if(e.target && e.target.id==='logdate'){
+    if(e.key==='Enter'){ e.preventDefault(); logDateKeyed=false; consumed(['logdate']); render(); }
+    else if(e.key.length===1||/^(Arrow|Backspace|Delete|Page|Home|End)/.test(e.key)) logDateKeyed=true;
+    return;
+  }
   // A div that stands in for a button answers the keys a button would.
   var rb=e.target && e.target.getAttribute && e.target.getAttribute('role')==='button' && e.target.hasAttribute('data-action');
   if(rb && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); e.target.click(); return; }
@@ -4571,6 +4637,25 @@ function onKeydown(e){
   e.preventDefault();
   var btn=document.querySelector('[data-action="addextra"]');
   if(btn) btn.click();
+}
+
+// Leaving the date box draws what was typed. Not under a finger or a button
+// still held, though: the page would change under it and the tap be lost.
+// The tap draws the page itself, and if it does not, letting go does.
+function onFocusOut(e){
+  if(!e.target || e.target.id!=='logdate' || !logDateKeyed) return;
+  logDateKeyed=false; consumed(['logdate']);
+  if(pointerDown) renderOnUp=true; else setTimeout(render,0);
+}
+function onPointerUp(){ pointerDown=false; if(renderOnUp) setTimeout(function(){ if(renderOnUp) render(); },0); }
+/* The day turns at midnight whether or not anyone taps. Checked every half
+   minute rather than timed to midnight alone: a phone asleep or a tab in the
+   background holds a timer back, and the minute it runs again is when the
+   page has to catch up. Meals for the day just gone are spent then, too. */
+function watchDay(){
+  if(realToday()===drawnDay) return;
+  if(dbState!=='loading' && dbState!=='error' && prunePlan()) scheduleSave();
+  render();
 }
 
 var swipeX=null, swipeId=null;
@@ -4634,6 +4719,12 @@ function boot(){
   document.addEventListener('change',onChange);
   document.addEventListener('input',onInput);
   document.addEventListener('keydown',onKeydown);
+  document.addEventListener('focusout',onFocusOut);
+  // A tap on the date box opens the picker, whose change is drawn at once.
+  document.addEventListener('pointerdown',function(e){ pointerDown=true; if(e.target && e.target.id==='logdate') logDateKeyed=false; },true);
+  document.addEventListener('pointerup',onPointerUp,true);
+  document.addEventListener('pointercancel',onPointerUp,true);
+  setInterval(watchDay,30000);
   document.addEventListener('touchstart',onTouchStart,{passive:true});
   document.addEventListener('touchend',onTouchEnd,{passive:true});
   // Hidden or closing: a save still waiting on its timer goes now, because the

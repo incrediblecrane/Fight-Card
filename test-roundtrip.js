@@ -20,7 +20,7 @@ var DB_LISTS=h.match(/var SESS_ENDED_KEEP=\d+;/)[0]+'\n'+h.match(/var DB_LISTS=\
 var sandbox={};
 var SLOTS=h.match(/var SLOTS=\[[^\]]*\];/)[0];
 new Function(DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+
-  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
+  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('isBlankDay')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
   '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
 var seedRaw=JSON.stringify(require('./test-env.js').seedOf(h));
