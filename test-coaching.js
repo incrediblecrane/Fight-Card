@@ -150,6 +150,16 @@ if(loaded===true){
     assert.deepStrictEqual([p.w,p.v],[60,8]);
   });
 
+  t('a ramp last time prefills the working weight at the reps the aim line asks for', function(){
+    var l=[{id:'r',workoutId:'w6',date:keyAgo(1),logs:{press_bench:[{v:12,w:50},{v:6,w:80},{v:7,w:80}]}}];
+    box.state({days:{},workoutLogs:l,activeSession:null});
+    var line=box.lastTimeLine(box.exDef('press_bench'),{sets:3,reps:'8'},box.lastSetsFor('press_bench'));
+    var p=box.prefillFor('press_bench',{logs:{}},{sets:3,reps:'8'});
+    box.state({days:{},workoutLogs:logs,activeSession:null});
+    assert.ok(/Aim for 8 on every set at 80kg/.test(line),line);
+    assert.deepStrictEqual([p.w,p.v],[80,8]);
+  });
+
   t('then from the previous set in this session', function(){
     var p=box.prefillFor('press_bench',{logs:{press_bench:[{v:8,w:62.5},{v:7,w:62.5}]}});
     assert.deepStrictEqual([p.w,p.v],[62.5,7]);

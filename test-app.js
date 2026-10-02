@@ -301,9 +301,12 @@ server.listen(0, async function(){
     await toToday(); await p.click('.backfill-bar button'); await p.waitForTimeout(600);
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
     var tips=await p.$$eval('.chart svg title',function(n){return n.map(function(x){return x.textContent;});});
-    var onBack=tips.filter(function(t){return t.indexOf(back)===0 && t.indexOf('L')>-1;});
+    // Tips name the day the way the rows do ("Tue 29 Sep"), not as ISO.
+    var pretty=function(k){ var d=new Date(k+'T12:00:00');
+      return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]; };
+    var onBack=tips.filter(function(t){return t.indexOf(pretty(back)+':')===0 && t.indexOf('L')>-1;});
     var today=await key(0);
-    var onToday=tips.filter(function(t){return t.indexOf(today)===0 && t.indexOf('L')>-1;});
+    var onToday=tips.filter(function(t){return t.indexOf(pretty(today)+':')===0 && t.indexOf('L')>-1;});
     assert.ok(onBack.length,'backdated water missing from '+back);
     console.log('        '+back+': '+onBack.join(' | '));
     console.log('        '+today+': '+onToday.join(' | '));
@@ -329,8 +332,9 @@ server.listen(0, async function(){
       await n.click(); await p.waitForTimeout(80); }
     var fin=await p.$('[data-action="finishworkout"]'); assert.ok(fin,'never reached Finish');
     await fin.click(); await p.waitForTimeout(2500);
+    // A row shows "Tue 29 Sep" and carries the day itself on its <time>.
     var rows=await p.evaluate(function(){ return Array.prototype.slice.call(
-      document.querySelectorAll('.recent-log')).map(function(e){return e.textContent;}); });
+      document.querySelectorAll('.recent-log')).map(function(e){ var d=e.querySelector('time'); return e.textContent+(d?' '+d.getAttribute('datetime'):''); }); });
     assert.ok(rows.some(function(r){return r.indexOf(start)>-1;}),
       'a session must carry its START date '+start+', got: '+rows.slice(0,4).join(' / '));
     ok('a session is logged against the day it STARTED, not the day it finished');

@@ -145,6 +145,9 @@ function buildFront(ex,host){
   var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
   if(!ex.frontPlan) svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  (ex.planProps||[]).forEach(function(p){
+    svg.appendChild(el('rect',{x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'}));
+  });
   var R={};
   // An arm foreshortened toward the camera lies on top of the torso in the same
   // ink, so it disappears into the silhouette. A surface-coloured outline is

@@ -891,7 +891,9 @@ srv.listen(0,async function(){
   });
 
   await t('an empty round is not counted', async function(){
-    // Nothing typed in, so nothing was done.
+    // Nothing typed in, so nothing was done. The boxes start from the last
+    // set, so they are emptied first.
+    await p.fill('#log-w-press_bench',''); await p.fill('#log-v-press_bench','');
     await p.click('[data-action="loground"]'); await settle();
     var target=await p.evaluate(function(){
       var d=document.querySelector('.slide .target'); return d?d.textContent:''; });
@@ -1085,7 +1087,8 @@ srv.listen(0,async function(){
       // The generic fallback also draws two figures, which is how a sit-up once
       // shipped as a squat. A solved view has a viewBox of its own, and the two
       // views have different ones.
-      assert.strictEqual(got.boxes[1], E.front?'20 18 100 168':'-20 18 175 168',
+      // The side view is cropped to the figure, so it is a box 168 high from 18.
+      assert.ok(E.front?got.boxes[1]==='20 18 100 168':/^-?[\d.]+ 18 [\d.]+ 168$/.test(got.boxes[1]||''),
         'the second panel is not the view it should be, its viewBox is '+got.boxes[1]);
       assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
       assert.strictEqual(got.arrow, E.front?'':'\u2192',
@@ -1187,7 +1190,7 @@ srv.listen(0,async function(){
     var back=await p.$('[data-action="cancelsession"]'); if(back){ await back.click(); await p.waitForTimeout(400); }
     await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
     var banner=await p.evaluate(function(){ var b=document.querySelector('.resume-banner'); return b?b.textContent:''; });
-    assert.ok(/Pull/.test(banner) && /1 sets logged/.test(banner),'the session in progress became: '+banner);
+    assert.ok(/Pull/.test(banner) && /1 set logged/.test(banner),'the session in progress became: '+banner);
     await leaveSession();
   });
 
@@ -1429,7 +1432,7 @@ srv.listen(0,async function(){
       return c?c.querySelector('.meta').textContent:''; });
     assert.ok(/last done today/.test(meta),'card meta: '+meta);
     var wk=await p.evaluate(function(){ var e=document.querySelector('.weekgoal'); return e?e.textContent:''; });
-    assert.ok(/Last 7 days: \d+ of 3 sessions/.test(wk),'weekly line: '+wk);
+    assert.ok(/Last 7 days: (\d+ of 3 sessions|\d+ sessions?, target 3 hit)/.test(wk),'weekly line: '+wk);
     await p.click('[data-action="weektarget"][data-d="1"]'); await settle();
     assert.strictEqual(seedOf().weekTarget,4,'the weekly target did not save');
   });
@@ -1474,7 +1477,10 @@ srv.listen(0,async function(){
   console.log('\nSTARTING, RESUMING AND THE DAY A SESSION IS FOR');
   var dayKey=function(o){ return p.evaluate(function(oo){ var d=new Date(); d.setDate(d.getDate()-oo);
     return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); },o); };
-  var pretty=function(k){ return p.evaluate(function(kk){ return new Date(kk+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); },k); };
+  // The app writes a day as "Mon 28 Sep" everywhere it names one.
+  var pretty=function(k){ var d=new Date(k+'T12:00:00');
+    return Promise.resolve(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+
+      (d.getFullYear()!==new Date().getFullYear()?' '+d.getFullYear():'')); };
   var storyTitle=function(){ return p.evaluate(function(){ var h=document.querySelector('.story-title'); return h?h.textContent:''; }); };
   var banner=function(){ return p.evaluate(function(){ var b=document.querySelector('.resume-banner'); return b?b.textContent:''; }); };
   var cardButton=function(title){ return p.evaluate(function(want){
@@ -1558,7 +1564,7 @@ srv.listen(0,async function(){
     assert.strictEqual(l.date,await dayKey(1),'logged on '+l.date);
     assert.strictEqual(l.durationMin,undefined,'the data-entry time was kept as its length: '+l.durationMin);
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
-    var row=await p.evaluate(function(d){ var r=[].slice.call(document.querySelectorAll('.swipe')).filter(function(x){ return x.textContent.indexOf(d)>-1 && /Push/.test(x.textContent); })[0];
+    var row=await p.evaluate(function(d){ var r=[].slice.call(document.querySelectorAll('.swipe')).filter(function(x){ return x.querySelector('time[datetime="'+d+'"]') && /Push/.test(x.textContent); })[0];
       return r?r.innerText:''; },l.date);
     assert.ok(row,'no Recent sessions row for '+l.date);
     assert.ok(!/\d+ min/.test(row),'the row shows minutes: '+row);

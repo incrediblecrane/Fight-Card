@@ -1662,5 +1662,9 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
   var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.frontPlan=true;
 });
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
+// What a plan view rests on, in the front view's own coordinates, drawn under
+// the body like props. Without the bench the bench press from above is a pair
+// of bent legs and arms, which reads as someone squatting. [x,y,w,h,rx]
+EXERCISES.forEach(function(e){ if(e.id==='bench') e.planProps=[[56,88,28,70,4]]; });
 
 if(typeof module!=='undefined') module.exports=EXERCISES;

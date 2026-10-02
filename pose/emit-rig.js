@@ -7,7 +7,7 @@ var EX=require('./exercises.js');
 // Fixed order so a regeneration is a no-op diff when nothing changed. `floor`
 // is a check-suite hint and `name`/`real`/`changed`/`flag` are authoring notes,
 // so none of them ship.
-var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','front'];
+var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','planProps','front'];
 var out={};
 EX.forEach(function(e){
   var o={};
