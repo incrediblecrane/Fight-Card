@@ -168,7 +168,11 @@ sessions, planned meals, recipes, notes, sauna) and then:
 
 - **Replace** makes it the whole record.
 - **Merge** adds what is new and replaces anything with the same id or date,
-  keeping this view's targets, XP, shopping and session in progress.
+  keeping this view's targets, XP (plus that of what it brings in), shopping
+  and session in progress.
+
+Each takes the text in the box when tapped: text changed since Check is
+checked again and shown, and only the next tap imports it.
 
 Either way it becomes state and is written by `dbSave` through the Store,
 straight away rather than after the usual re-read (which would merge the old
@@ -178,9 +182,31 @@ format, in `localStorage` under `fc.backup`: what the store held, with this
 view's unsaved changes on top, so it includes what another view saved after
 this one loaded. Replace then deletes every document the import does not
 have, those included. "Put back the data before the last import" restores the
-backup as a Replace. A session in progress that an import replaces counts as
+backup as a Replace, after asking: it names when the copy is from (its
+`exportedAt`) and what it replaces, and it is gone until the writes have
+landed, so a second tap cannot swap it back. Where this device cannot keep a
+copy (no `localStorage`), the import says so before and after, and offers an
+export first. A session in progress that an import replaces counts as
 ended in every view: this view's own, and for a Replace the one the store
-holds, which another view may have started since this one last read.
+holds, which another view may have started since this one last read. An
+import clears any undo offered before it.
+
+An import is many writes (a year is about 700), so it is made safe to cut
+off. Before the first write, what it is writing is kept in `localStorage`
+under `fc.importing` and `state/meta` gets `importing: true`; both are
+cleared only once the last write and delete have landed, and until then the
+app says "Importing 140/736, keep this open" rather than "Imported". A load
+that finds `fc.importing` finishes the import (a Replace from that copy, a
+Merge laid over what is stored); one that finds only the store's mark says the
+import did not finish and offers the backup or to leave it. While an import is
+unfinished `fc.backup` is never replaced, so it stays the data from before
+the first one.
+
+Merge pays the XP of what it brings in, as if it had been logged here: per
+date, the cups (`wx`), trained day and rest day of the incoming day less those
+of the day it replaces, and a sauna visit with a new id; clamped at 0. So
+removing a merged session or untapping its water later takes back only XP that
+was paid.
 
 ## Vocabulary
 

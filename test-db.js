@@ -1552,7 +1552,7 @@ srv.listen(0,async function(){
     await importing(JSON.stringify({schema:1}));
     await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
     assert.ok(!Object.keys(store).some(function(k){ return k.indexOf('workoutLogs/')===0; }),'an empty import left sessions behind');
-    await p.click('[data-action="restorebackup"]'); await settle();
+    await p.click('[data-action="restorebackup"]'); await p.click('[data-action="restoreconfirm"]'); await settle();
     await go();
     assert.deepStrictEqual(await exported(),a,'putting the backup back did not restore the data');
   });
@@ -1574,7 +1574,7 @@ srv.listen(0,async function(){
     store['sauna/sa998']={id:'sa998',date:'2026-09-30',mins:9,temp:80,position:'Top',stints:[{mins:9,position:'Top'}]};
     await p.click('[data-action="tab"][data-tab="progress"]');
     if(!(await p.locator('[data-action="restorebackup"]').count())) await p.click('[data-action="datapane"][data-p="import"]');
-    await p.click('[data-action="restorebackup"]'); await settle();
+    await p.click('[data-action="restorebackup"]'); await p.click('[data-action="restoreconfirm"]'); await settle();
     assert.ok(!store['sauna/sa998'],'putting the data back kept a visit it never had');
     assert.ok(store['sauna/sa999'] && store['workoutLogs/wl999'],'putting the data back did not restore what the import replaced');
   });
@@ -1919,6 +1919,159 @@ srv.listen(0,async function(){
       assert.strictEqual(store['days/'+day].water,1,'the tap was not saved');
       assert.ok(errs.slice(e0).some(function(e){ return /render boom/.test(e); }),'the render did not throw');
       errs.splice(e0);
+    } finally { await putBack(was); }
+  });
+
+  console.log('\nAN IMPORT IS SAFE TO START, AND TO CUT OFF');
+  var ls=function(k){ return p.evaluate(function(k){ return localStorage.getItem(k); },k); };
+  var tapAt=async function(sel){ var b=await p.locator(sel).first().boundingBox(); await p.touchscreen.tap(b.x+b.width/2,b.y+b.height/2); return b; };
+  var dellog=function(id){ return p.evaluate(function(id){ var e=document.querySelector('[data-action="dellog"][data-id="'+id+'"]');
+    if(!e) return false; e.click(); return true; },id); };
+  // Forty days and forty sauna visits: ten batches of writes, so a write held
+  // in the first one leaves the rest, and the deletes, still to go.
+  var yearish=function(){
+    var o={schema:1,days:{},saunaSessions:[]};
+    for(var i=0;i<40;i++){ var k=new Date(Date.UTC(2025,0,1+i)).toISOString().slice(0,10), d=blank(); d.water=1; d.wx=1; o.days[k]=d;
+      o.saunaSessions.push({id:'sy'+i,date:k,mins:10,temp:80,position:'Top',stints:[{mins:10,position:'Top'}]}); }
+    return o;
+  };
+  var imported=function(o){ return Object.keys(o.days).map(function(k){ return 'days/'+k; })
+    .concat(o.saunaSessions.map(function(x){ return 'sauna/'+x.id; })).sort(); };
+  var held=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('state/')!==0; }).sort(); };
+  var cutOff=async function(o){
+    await importing(JSON.stringify(o));
+    setDelays.push({op:'set',match:'days/',ms:2500});
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await p.waitForTimeout(700);
+  };
+  await t('an import cut off partway is finished when the app is opened again, and says it is not done until it is', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      assert.ok(Object.keys(store).some(function(k){ return k.indexOf('workoutLogs/')===0; }),'no sessions to replace');
+      var o=yearish(); await cutOff(o);
+      var body=await text();
+      assert.ok(/Importing \d+\/\d+, keep this open/.test(body),'it does not say the import is still going: '+body.slice(0,300));
+      assert.ok(!/Imported\./.test(body),'it says Imported while writes are still out');
+      var back=await ls('fc.backup');
+      assert.ok(back && JSON.parse(back).workoutLogs.length,'no copy of the data from before was kept');
+      assert.ok(store['state/meta'].importing,'the store is not marked as part way through an import');
+      await go(); await p.waitForTimeout(2500); await settle();
+      var day=await today();
+      assert.deepStrictEqual(held().filter(function(k){ return k!=='days/'+day; }),imported(o),'the store is a mix of old and imported data');
+      assert.ok(!store['state/meta'].importing,'the store is still marked as importing');
+      assert.strictEqual(await ls('fc.importing'),null,'the unfinished import is still kept');
+      assert.strictEqual(await ls('fc.backup'),back,'finishing the import wrote over the copy of the data from before');
+    } finally { await putBack(was); }
+  });
+
+  await t('an import that did not finish elsewhere is said so, and a second import keeps the copy from before the first', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await cutOff(yearish());
+      var back=await ls('fc.backup');
+      // Cut off on another device, or here with nowhere to keep the import.
+      await p.evaluate(function(){ localStorage.removeItem('fc.importing'); });
+      await go(); await p.waitForTimeout(2500); await settle();
+      var body=await text();
+      assert.ok(/An import did not finish/.test(body),'nothing says the data may be half imported: '+body.slice(0,300));
+      await importing(JSON.stringify({schema:1,days:{'2025-06-01':blank()}}));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      assert.strictEqual(await ls('fc.backup'),back,'the second import wrote the half-imported mix over the copy from before');
+      assert.ok(!store['state/meta'].importing,'the store is still marked as importing');
+      assert.ok(!/An import did not finish/.test(await text()),'it still says the import did not finish');
+    } finally { await putBack(was); }
+  });
+
+  await t('an undo offered before an import is gone after it, and puts nothing into the new record', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store));
+    try{
+      store['workoutLogs/wlU1']={id:'wlU1',workoutId:'w6',title:'Push',tag:'Strength',date:day,logs:{press_bench:[{v:5,w:100,t:1}]}};
+      await go(); await p.click('[data-action="tab"][data-tab="progress"]');
+      assert.ok(await dellog('wlU1'),'no session to remove'); await p.waitForTimeout(1600); await settle();
+      assert.ok(await p.locator('.undo-bar').count(),'no undo was offered');
+      await importing(JSON.stringify({schema:1}));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      assert.strictEqual(await p.locator('.undo-bar').count(),0,'the undo from before the import is still offered');
+      if(await p.locator('[data-action="undo"]').count()){ await p.click('[data-action="undo"]'); await p.waitForTimeout(1600); await settle(); }
+      assert.ok(!store['workoutLogs/wlU1'],'undo put a session from before the import into the new record');
+    } finally { await putBack(was); }
+  });
+
+  await t('Replace imports what is in the box now, not what was last checked', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await importing(JSON.stringify({schema:1,days:{'2025-02-01':blank()}}));
+      await p.fill('#import-json',JSON.stringify({schema:1,days:{'2025-03-01':blank(),'2025-03-02':blank()}}));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      assert.ok(!store['days/2025-02-01'],'it imported the text checked before, not the text in the box');
+      if(!store['days/2025-03-01']){
+        assert.ok(/2 days/.test(await text()),'the text in the box was not checked again');
+        await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      }
+      assert.ok(store['days/2025-03-01'] && store['days/2025-03-02'],'the text in the box was not imported');
+    } finally { await putBack(was); }
+  });
+
+  await t('two quick taps on Put back leave the data from before the import put back, after saying what it puts back', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      var a=await exported(), n=a.workoutLogs.length, b=JSON.parse(JSON.stringify(a)); b.workoutLogs=[]; b.totalXp=1;
+      assert.ok(n,'no sessions to take out');
+      var logs=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('workoutLogs/')===0; }).length; };
+      await importing(JSON.stringify(b));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      assert.strictEqual(logs(),0,'the import left sessions behind');
+      var at=await tapAt('[data-action="restorebackup"]'); await p.waitForTimeout(120);
+      await p.touchscreen.tap(at.x+at.width/2,at.y+at.height/2); await settle();
+      assert.strictEqual(logs(),0,'two taps on Put back put back something without asking');
+      if(!(await p.locator('[data-action="restoreconfirm"]').count())) await tapAt('[data-action="restorebackup"]');
+      var body=await text(), when=new Date(JSON.parse(await ls('fc.backup')).exportedAt);
+      assert.ok(/Put back the data as it was on/.test(body) && body.indexOf(when.getDate()+'')>-1,'it does not say when the data it puts back is from: '+body.slice(-400));
+      assert.ok(/replaced/.test(body),'it does not say what is replaced');
+      at=await tapAt('[data-action="restoreconfirm"]'); await p.waitForTimeout(120);
+      await p.touchscreen.tap(at.x+at.width/2,at.y+at.height/2); await settle();
+      assert.strictEqual(logs(),n,'two taps put the data back and took it away again');
+      assert.strictEqual(store['state/profile'].totalXp,a.totalXp,'the XP from before was not put back');
+    } finally { await putBack(was); }
+  });
+
+  await t('with nowhere on this device to keep a copy, the import says so and offers an export first', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await p.evaluate(function(){ Storage.prototype.setItem=function(){ throw new Error('blocked'); }; });
+      await importing(JSON.stringify({schema:1,days:{'2025-04-01':blank()}}));
+      var body=await text();
+      assert.ok(/Could not keep a copy on this device\. Download an export first/.test(body),'nothing warns that no copy can be kept: '+body.slice(-400));
+      assert.ok(await p.locator('#app .datacard [data-action="downloadexport"]').count(),'no export is offered before importing');
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      body=await text();
+      assert.ok(!/kept on this device until the next import/.test(body),'it says the data from before is kept when it is not');
+      assert.ok(/Could not keep a copy/.test(body),'it does not say the copy could not be kept: '+body.slice(-300));
+    } finally { await putBack(was); }
+  });
+
+  await t('a merge pays the XP of what it brings in, so taking it out again takes back no more than it gave', async function(){
+    await go(); var day=await today(), was=JSON.parse(JSON.stringify(store));
+    try{
+      Object.keys(store).forEach(function(k){ if(k.indexOf('workoutLogs/')===0 && store[k].date===day) delete store[k]; });
+      var mine=blank(); mine.water=4; mine.wx=4; store['days/'+day]=mine;
+      store['state/profile']=Object.assign({},store['state/profile'],{totalXp:500});
+      await go();
+      var inc=blank(); inc.water=8; inc.wx=8; inc.workout={done:true,type:'Strength'};
+      var o={schema:1,days:{},workoutLogs:[{id:'wlM1',workoutId:'w6',title:'Push',tag:'Strength',date:day,logs:{press_bench:[{v:8,w:60,t:5}]}}],
+        saunaSessions:[{id:'saM1',date:day,mins:10,temp:80,position:'Top',stints:[{mins:10,position:'Top'}]}]};
+      o.days[day]=inc;
+      await importing(JSON.stringify(o));
+      await p.click('[data-action="doimport"][data-mode="merge"]'); await settle();
+      // 8 cups, a trained day and a sauna visit in; the 4 cups they replace out.
+      assert.strictEqual(store['state/profile'].totalXp,500+16+15+5-8,'the merge did not pay for what it brought in');
+      await p.click('[data-action="tab"][data-tab="progress"]');
+      assert.ok(await dellog('wlM1'),'the merged session is not listed'); await p.waitForTimeout(300);
+      await p.evaluate(function(){ var e=document.querySelector('[data-action="delsauna"][data-id="saM1"]'); if(e) e.click(); });
+      await p.waitForTimeout(300); await toToday();
+      for(var i=0;i<8;i++){ await p.click('[data-action="water"][data-d="-1"]'); await p.waitForTimeout(80); }
+      await p.waitForTimeout(1600); await settle();
+      assert.ok(!store['sauna/saM1'],'the merged visit was not removed');
+      assert.strictEqual(store['state/profile'].totalXp,500-8,'taking out what the merge brought in took more XP than it paid');
     } finally { await putBack(was); }
   });
 

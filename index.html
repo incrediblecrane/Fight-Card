@@ -1380,7 +1380,9 @@ function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTim
 // that normally goes first. Unread, it must not put whole documents: another
 // view may have written fields this copy has never seen. So it sends only the
 // fields this view changed, and the next save, on being looked at again, merges.
-function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=null; saveNow=dbState==='db'?'flush':false; persist(); }
+function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=null;
+  // An import still owed stays one: a flush sends fields, not the deletes it needs.
+  saveNow=dbState==='db'?(saveNow==='put'||saveNow==='replace'?saveNow:'flush'):false; persist(); }
 
 var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
@@ -1504,7 +1506,9 @@ function dbBoot(){
   claude.use('db').then(function(db){
     if(!db){ dbState='local'; render(); return; }
     dbStore=DbStore(db);
+    var resume=null;
     return dbStore.get('state/meta').then(function(meta){
+      dbMeta=meta||null;
       if(meta) return dbStore.readAll().then(function(map){
         map=dbUnpendAll(map);
         state=dbApply(map);
@@ -1518,6 +1522,16 @@ function dbBoot(){
         // A change a closed view sent beside a document is folded in above
         // and goes into the document itself now.
         if(Object.keys(pendSeen).length) moved=true;
+        // An import this device was writing when it was closed is finished
+        // now: a replace from its own copy, a merge laid over what is stored.
+        // With no copy here, all that can be done is to say so.
+        var pend=readPending();
+        if(pend){
+          var over={}; if(pend.mode==='put') Object.keys(map).forEach(function(p){ over[p]=map[p]; });
+          Object.keys(pend.docs).forEach(function(p){ over[p]=pend.docs[p]; });
+          state=dbApply(over); resume=pend.mode; moved=false;
+        }
+        else if(meta.importing) importStuck=true;
         if(moved) scheduleSave();
       });
       // First run on this store: the document's own seed is the truth.
@@ -1525,6 +1539,7 @@ function dbBoot(){
     }).then(function(){
       dbState='db'; dbErr=null;
       syncFromState();
+      if(resume){ importBusy=true; importNote='The import that was cut off is finished.'; saveNow=resume; persist(); }
       render();
     });
   }).catch(function(e){
@@ -1976,16 +1991,25 @@ function dbSave(){
     // Logs first and the session straight after, so it waits on nothing else:
     // a write of anything else that is slow or refused never holds it back.
     jobs=logs.concat(session?[session]:[],jobs);
-    if(!jobs.length){ if(moved) render(); return; }
+    var imp=mode==='put'||mode==='replace';
+    if(!jobs.length&&!imp){ if(moved) render(); return; }
     setSaving(true); if(moved) render();
     // Almost every save is one or two documents, but a migration dirties every
     // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
     // avoid, and a save has no more right to that burst than seeding does.
     function batch(list,i){
       if(i>=list.length) return Promise.resolve();
-      return dbSettle(list.slice(i,i+DB_SEED_BATCH)).then(function(){ return batch(list,i+DB_SEED_BATCH); });
+      return dbSettle(list.slice(i,i+DB_SEED_BATCH)).then(function(){
+        if(imp){ importProg={done:Math.min(list.length,i+DB_SEED_BATCH),total:list.length}; paintImport(); }
+        return batch(list,i+DB_SEED_BATCH); });
     }
-    return batch(jobs,0).then(function(){ setSaving(false); });
+    // An import marks the store before its first write and clears the mark
+    // only once the last write and delete have landed (see PENDING_KEY).
+    if(!imp) return batch(jobs,0).then(function(){ setSaving(false); });
+    importProg={done:0,total:jobs.length}; paintImport();
+    return metaPut(true).then(function(){ return batch(jobs,0); }).then(function(){
+      clearPending(); return metaPut(false); }).then(function(){
+      setSaving(false); importBusy=false; importProg=null; dataMsg=importNote; importNote=''; render(); });
   }).then(function(){
     saveAttempt=0;
     if(dbErr){ dbErr=null; dbErrHard=false; render(); }
@@ -2170,11 +2194,19 @@ function readImport(text){
     exportedAt:typeof o.exportedAt==='string'?o.exportedAt.slice(0,40):''}};
 }
 /* Merging adds what the import has and replaces anything with the same id or
-   date; everything else here is kept, along with this view's targets, XP,
-   shopping ticks and the session in progress. */
+   date; everything else here is kept, along with this view's targets, XP
+   (plus that of what comes in), shopping ticks and the session in progress. */
 function mergeImport(cur,inc){
-  var st=dbApply(dbDocs(cur));
-  Object.keys(inc.days).forEach(function(k){ st.days[k]=inc.days[k]; });
+  var st=dbApply(dbDocs(cur)), xp=0;
+  // XP is paid as things are logged and taken back as they are removed, so a
+  // day or a visit merged in brings its XP, and a day it replaces takes its
+  // own away: otherwise removing it later takes XP that was never paid.
+  function dayXp(d){ if(!d) return 0;
+    var w=d.wx!==undefined?d.wx:Math.min(d.water||0,st.waterTarget);
+    return w*XP_PER_WATER+(d.workout&&d.workout.done?XP_WORKOUT:0)+(d.rest?XP_REST:0); }
+  Object.keys(inc.days).forEach(function(k){ xp+=dayXp(inc.days[k])-dayXp(st.days[k]); st.days[k]=inc.days[k]; });
+  inc.saunaSessions.forEach(function(x){ if(!hasId(st.saunaSessions,x.id)) xp+=XP_SAUNA; });
+  st.totalXp=Math.max(0,(st.totalXp||0)+xp);
   EXPORT_LISTS.forEach(function(k){
     var at=Object.create(null); st[k].forEach(function(x,i){ at[x.id]=i; });
     inc[k].forEach(function(x){ if(at[x.id]!==undefined) st[k][at[x.id]]=x; else st[k].push(x); });
@@ -2189,7 +2221,45 @@ var dataPane=null, exportSnap='', importRaw='', importRes=null, dataMsg='', BACK
 // The copy in memory is the newest; one left in localStorage by an earlier
 // import, when this one could not be written there, is gone rather than kept.
 function readBackup(){ if(backupMem) return backupMem; try{ return localStorage.getItem(BACKUP_KEY); }catch(e){} return null; }
-function writeBackup(v){ backupMem=v; try{ localStorage.setItem(BACKUP_KEY,v); }catch(e){ try{ localStorage.removeItem(BACKUP_KEY); }catch(e2){} } }
+// True when the copy outlives this view, which a copy only in memory does not.
+function writeBackup(v){ backupMem=v; try{ localStorage.setItem(BACKUP_KEY,v); return true; }catch(e){ try{ localStorage.removeItem(BACKUP_KEY); }catch(e2){} } return false; }
+function canKeep(){ try{ localStorage.setItem('fc.probe','1'); localStorage.removeItem('fc.probe'); return true; }catch(e){ return false; } }
+/* An import is many writes, and the app can be closed before the last. What
+   it is writing is kept on this device until every write and delete has
+   landed, and the store is marked (state/meta importing) for the same span,
+   so the next load finishes it, or, with no copy here, says it did not
+   finish. While one is unfinished the copy from before it is never
+   replaced: that would keep the half-imported mix instead. */
+var PENDING_KEY='fc.importing', importBusy=false, importStuck=false, importProg=null, importNote='', restoreAsk=false, dbMeta=null;
+function readPending(){ try{ var v=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); return v&&v.docs&&v.mode?v:null; }catch(e){ return null; } }
+function writePending(mode){ try{ localStorage.setItem(PENDING_KEY,JSON.stringify({mode:mode,at:Date.now(),docs:dbDocs(state)})); }catch(e){} }
+function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} }
+function hasPending(){ try{ return localStorage.getItem(PENDING_KEY)!==null; }catch(e){ return false; } }
+function importUnfinished(){ return importBusy||importStuck||hasPending(); }
+function metaPut(importing){
+  var m={}; Object.keys(dbMeta||{seeded:true}).forEach(function(k){ if(k!=='importing') m[k]=(dbMeta||{seeded:true})[k]; });
+  if(importing) m.importing=true;
+  return dbStore.put('state/meta',m).then(function(){ dbMeta=m; });
+}
+function importText(){
+  var at=importProg?' '+importProg.done+'/'+importProg.total:'';
+  if(dbErr) return 'The import is not finished'+(at?' ('+at.slice(1)+')':'')+'. '+(dbErrHard?'It carries on with your next change.':'Trying again, keep this open.');
+  return 'Importing'+at+', keep this open.';
+}
+function paintImport(){ [].forEach.call(document.querySelectorAll('.importprog'),function(el){ el.textContent=importText(); }); }
+function whenKept(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return 'an earlier time';
+  return prettyKey(dateKey(d))+' at '+pad(d.getHours())+':'+pad(d.getMinutes()); }
+/* Putting the backup back replaces everything here, so it asks first, naming
+   when the copy is from and what goes. The question is where Put back was,
+   so a second tap on the same spot does nothing. */
+function restoreAskHtml(b){
+  var r=readImport(b), sm=r.ok&&r.summary, nd=Object.keys(state.days).length, ns=state.workoutLogs.length;
+  if(!sm) return '';
+  return '<p class="note" role="status">Put back the data as it was on '+esc(whenKept(sm.exportedAt))+'? Everything here now ('+
+    nd+' day'+(nd===1?'':'s')+', '+ns+' session'+(ns===1?'':'s')+') is replaced, and becomes the copy kept on this device.</p>'+
+    '<div class="datarow"><button data-action="restorecancel">Keep what is here</button>'+
+    '<button data-action="restoreconfirm">Put it back</button></div>';
+}
 function dataCard(){
   var b=readBackup(), r=importRes, sm=r&&r.ok&&r.summary;
   function n(x,one){ return x+' '+one+(x===1?'':'s'); }
@@ -2206,11 +2276,13 @@ function dataCard(){
       (sm?'<p class="note" role="status">'+(sm.exportedAt?'Exported '+esc(sm.exportedAt.slice(0,10))+': ':'')+
         n(sm.days,'day')+', '+n(sm.sessions,'session')+', '+n(sm.meals,'planned meal')+', '+n(sm.recipes,'recipe')+', '+
         n(sm.notes,'note')+', '+n(sm.sauna,'sauna visit')+'.</p>'+
-        '<div class="datarow"><button data-action="doimport" data-mode="replace">Replace everything with this</button>'+
-        '<button data-action="doimport" data-mode="merge">Merge in by id</button></div>'+
-        '<p class="note">Merge adds what is new and replaces anything with the same id or date, and keeps your targets, XP, shopping and the session in progress.</p>':'')+
-      (b?'<div class="datarow"><button data-action="restorebackup">Put back the data before the last import</button></div>':''):'')+
-    (dataMsg?'<p class="note" role="status">'+esc(dataMsg)+'</p>':'')+
+        (canKeep()?'':'<p class="note bad" role="alert">Could not keep a copy on this device. Download an export first.</p>'+
+          '<div class="datarow"><button data-action="downloadexport">Download an export</button></div>')+
+        (importBusy?'':'<div class="datarow"><button data-action="doimport" data-mode="replace">Replace everything with this</button>'+
+        '<button data-action="doimport" data-mode="merge">Merge in by id</button></div>')+
+        '<p class="note">Merge adds what is new and replaces anything with the same id or date, with the XP of what it brings in, and keeps your targets, shopping and the session in progress.</p>':'')+
+      (b&&!importBusy?(restoreAsk?restoreAskHtml(b):'<div class="datarow"><button data-action="restorebackup">Put back the data before the last import</button></div>'):''):'')+
+    (importBusy?'<p class="note importprog" role="status">'+esc(importText())+'</p>':dataMsg?'<p class="note" role="status">'+esc(dataMsg)+'</p>':'')+
   '</div>';
 }
 /* An import becomes state like any other change, so it is written by the
@@ -2218,7 +2290,13 @@ function dataCard(){
    than after the re-read, because the re-read would merge the old day back
    over the one just imported. */
 function applyImport(st,mode){
-  writeBackup(exportText(state)); importPrev=dbState==='db'?dbDocs(state):null;
+  // Answers whether the copy of what this replaces outlives this view, or
+  // 'held' when the copy from before an unfinished import is kept instead.
+  var kept='held';
+  if(!importUnfinished()){ kept=writeBackup(exportText(state)); importPrev=dbState==='db'?dbDocs(state):null; }
+  else importPrev=null;
+  // An undo parked before this would put the old record's item into the new one.
+  clearUndo(); restoreAsk=false;
   var ended=state.endedSessions||[], was=sessId(state.activeSession);
   state=mode==='merge'?mergeImport(state,st):st;
   // A session this replaces is over in every view; the one it brings is live.
@@ -2229,7 +2307,10 @@ function applyImport(st,mode){
   migratePlan(); prunePlan(); migrateMinutes();
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
-  saveNow=dbState==='db'?(mode==='merge'?'put':'replace'):false; persist();
+  saveNow=dbState==='db'?(mode==='merge'?'put':'replace'):false;
+  if(saveNow){ writePending(saveNow); importBusy=true; importStuck=false; importProg=null; }
+  persist();
+  return kept;
 }
 /* ---------- recipe scaling ---------------------------------------------
    Ingredients are written as "Name (quantity unit)". Parsing that once at
@@ -3866,6 +3947,10 @@ function bodyContent(){
       (dbErr&&dbState==='db'?'<div class="banner">'+(dbErrHard?
         'Your last change could not be saved ('+esc(dbErr)+').':
         'Trouble reaching your saved data ('+esc(dbErr)+'). Trying again.')+'</div>':'')+
+      (importBusy?'<div class="banner importprog" role="status">'+esc(importText())+'</div>':'')+
+      (importStuck&&!importBusy?'<div class="banner" role="alert">An import did not finish, so your data may be part old and part new.'+
+        (readBackup()?' <button data-action="restorebackup">Put back the data from before</button>':'')+
+        ' <button data-action="importleave">Leave it as it is</button></div>':'')+
       backfillBar+
       (window.claude && window.claude.use ? '' : '<div class="banner">Open this from your artifact link to sync across devices &mdash; changes here are local to this tab only.</div>')+
       // A session is the one place the phone screen is short: the level
@@ -4253,7 +4338,7 @@ function onClick(e){
     });
   }
   else if(action==='datapane'){
-    var dp=t.getAttribute('data-p'); dataPane=dataPane===dp?null:dp; dataMsg=''; importRes=null;
+    var dp=t.getAttribute('data-p'); dataPane=dataPane===dp?null:dp; dataMsg=''; importRes=null; restoreAsk=false;
     if(dataPane==='export') exportSnap=exportText(state);
     uiOnly=true;
   }
@@ -4266,6 +4351,8 @@ function onClick(e){
     return;
   }
   else if(action==='downloadexport'){
+    // Offered before an import too, where the export pane is not open.
+    if(dataPane!=='export') exportSnap=exportText(state);
     try{
       var a=document.createElement('a');
       a.href=URL.createObjectURL(new Blob([exportSnap],{type:'application/json'}));
@@ -4280,16 +4367,39 @@ function onClick(e){
     importRes=readImport(importRaw); dataMsg=''; uiOnly=true;
   }
   else if(action==='doimport'){
+    if(importBusy) return;
+    // What is in the box now, not what was last checked: text changed since
+    // is checked again and shown, and only the next tap imports it.
+    var ijn=document.getElementById('import-json');
+    if(ijn && ijn.value!==importRaw){ importRaw=ijn.value; consumed(['import-json']); importRes=readImport(importRaw);
+      dataMsg=importRes.ok?'The text changed since it was checked. This is what it holds now.':''; render(); return; }
     if(!importRes||!importRes.ok) return;
     var mode=t.getAttribute('data-mode')==='merge'?'merge':'replace';
-    applyImport(importRes.state,mode); importRes=null; importRaw='';
-    dataMsg=(mode==='merge'?'Merged.':'Imported.')+' The data from before is kept on this device until the next import.';
+    var kept=applyImport(importRes.state,mode); importRes=null; importRaw='';
+    importNote=(mode==='merge'?'Merged.':'Imported.')+(kept==='held'?' The copy kept on this device is still the data from before the import that did not finish.':
+      kept?' The data from before is kept on this device until the next import.':
+      ' Could not keep a copy of the data from before on this device, so Put back works only until this view is closed.');
+    dataMsg=''; if(!importBusy){ dataMsg=importNote; importNote=''; }
     render(); return;
   }
   else if(action==='restorebackup'){
-    var back=readImport(readBackup()); if(!back.ok) return;
-    applyImport(back.state,'replace'); importRes=null;
-    dataMsg='Put back. What it replaced is now the one kept.'; render(); return;
+    if(importBusy||!readBackup()) return;
+    tab='progress'; dataPane='import'; restoreAsk=true; dataMsg=''; uiOnly=true;
+  }
+  else if(action==='restorecancel'){ restoreAsk=false; uiOnly=true; }
+  else if(action==='restoreconfirm'){
+    // One tap only: the button is gone until the writes have landed, and Put
+    // back is a swap, so a second one would take it all away again.
+    if(importBusy||!restoreAsk) return;
+    var back=readImport(readBackup()); restoreAsk=false; if(!back.ok){ render(); return; }
+    var kb=applyImport(back.state,'replace'); importRes=null;
+    importNote='Put back.'+(kb===true?' What it replaced is now the one kept.':kb==='held'?'':' What it replaced could not be kept on this device.');
+    dataMsg=''; if(!importBusy){ dataMsg=importNote; importNote=''; }
+    render(); return;
+  }
+  else if(action==='importleave'){
+    importStuck=false; uiOnly=true;
+    if(dbState==='db') metaPut(false).then(null,function(){});
   }
   else if(action==='shoprange'){ shopRange=parseInt(t.getAttribute('data-n'),10)||7; uiOnly=true; }
   else if(action==='clearweek'){
@@ -4352,6 +4462,8 @@ function onInput(e){
     return;
   }
   if(e.target && e.target.id==='shop-add'){ shopDraft=e.target.value; return; }
+  // A check is of the text it read; the next render shows no summary for other text.
+  if(e.target && e.target.id==='import-json'){ if(importRes && e.target.value!==importRaw) importRes=null; return; }
   // Deliberately no render: this only has to be remembered for the re-render
   // that swapping the prep option triggers.
   var pm=e.target && e.target.getAttribute && e.target.getAttribute('data-prepmins');

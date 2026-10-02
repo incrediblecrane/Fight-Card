@@ -24,7 +24,7 @@ var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grab
   grabVar('DAY_MAX'), h.match(/var EX=\[[\s\S]*?\n\];/)[0], grab('isSuperset'), grab('exDef'), grab('blankDay'), grab('wholeDay'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
   grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
-  grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('mergeImport')].join('\n');
+  grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
 var box={};
 new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this.exportText=exportText;'+
   'this.readImport=readImport;this.mergeImport=mergeImport;this.dbDocs=dbDocs;this.dbApply=dbApply;').call(box);
@@ -253,7 +253,8 @@ t('merge by id replaces matches, adds the rest and keeps this view\'s profile', 
   assert.strictEqual(m.workoutLogs.length,cur.workoutLogs.length+1);
   assert.strictEqual(m.workoutLogs.filter(function(l){return l.id===inc.workoutLogs[0].id;})[0].title,'Changed');
   assert.deepStrictEqual(m.days['2026-09-20'],{water:3,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:false});
-  assert.strictEqual(m.totalXp,cur.totalXp); assert.strictEqual(m.weekTarget,cur.weekTarget);
+  // The XP of what it brings in, 3 cups on a new day, and nothing for days it replaces with the same.
+  assert.strictEqual(m.totalXp,cur.totalXp+6); assert.strictEqual(m.weekTarget,cur.weekTarget);
   assert.deepStrictEqual(m.deletedRecipes.sort(),['p3','zz']);
 });
 
