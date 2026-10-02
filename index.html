@@ -743,6 +743,9 @@ function parseNum(s){ s=String(s==null?'':s).trim();
   return /^(\d+\.?\d*|\.\d+)$/.test(s)?+s:NaN; }
 // Ids of boxes holding something that is not a number, marked until retyped.
 var badFields={};
+// Why the Add a note or Add a recipe form did not take what was typed.
+var formNote={lib:'',rec:''};
+function formNoteHtml(k){ return formNote[k]?'<p class="note bad" role="alert">'+esc(formNote[k])+'</p>':''; }
 function markBad(el){ if(!el) return; badFields[el.id]=1; el.setAttribute('aria-invalid','true'); }
 // Focus the first marked box of these, in page order, so a refusal points at its cause.
 function focusBad(ids){
@@ -1092,6 +1095,25 @@ function stableJson(v){
     var j=stableJson(v[k]); if(j!==undefined) out.push(JSON.stringify(k)+':'+j);
   });
   return '{'+out.join(',')+'}';
+}
+/* What the store takes in one document: 256 KiB of JSON, nested 32 deep, the
+   body itself the first level. One past either is refused on every save, and
+   one nested thousands deep overflowed stableJson, so a check or a form that
+   lets one in has to measure it first. */
+var DB_DOC_MAX=256*1024, DB_DEPTH=32;
+// At least its UTF-8 size: a unit past ASCII counted as three bytes.
+function docBytes(json){ return json.length+2*json.replace(/[\x00-\x7f]+/g,'').length; }
+// How deep it nests, counted only so far as lim, so a deep one cannot overflow.
+function docDepth(v,lim){
+  if(v===null||typeof v!=='object') return 0;
+  var d=0, ks=Object.keys(v);
+  for(var i=0;i<ks.length&&d<lim;i++) d=Math.max(d,docDepth(v[ks[i]],lim-1));
+  return d+1;
+}
+// '' when it fits, else what is wrong with it. room keeps levels spare.
+function docFault(body,room){
+  if(docDepth(body,DB_DEPTH)>DB_DEPTH-(room||0)) return 'deep';
+  return docBytes(JSON.stringify(body))>DB_DOC_MAX?'large':'';
 }
 // What the store was last known to hold, or null when that cannot be read.
 function savedBody(path){
@@ -1567,11 +1589,19 @@ var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
    object, for tests and anything with no db; a self-hosted backend would be a
    third (see CONTEXT.md). dbDocs/dbApply stay the serialisation either side. */
 function DbStore(db){
-  function get(path){ return db.doc(path).get().then(function(d){ return d.exists?d.data():undefined; }); }
+  // A path the store will not take ('.' or '..' in it) throws as the
+  // reference is made, not as a refusal. Thrown out of a batch it stopped the
+  // rest of that batch and, with no code, was retried for ever; as a refusal
+  // of that one document the others go and it waits for the next change.
+  function at(path,fn){
+    try{ return fn(db.doc(path)); }
+    catch(e){ return Promise.reject({code:'invalid_argument', message:String(e&&e.message||e)}); }
+  }
+  function get(path){ return at(path,function(r){ return r.get(); }).then(function(d){ return d.exists?d.data():undefined; }); }
   var s={get:get,
-    put:function(path,body){ return db.doc(path).set(body); },
-    update:function(path,f){ return db.doc(path).update(f); },
-    remove:function(path){ return db.doc(path).delete(); },
+    put:function(path,body){ return at(path,function(r){ return r.set(body); }); },
+    update:function(path,f){ return at(path,function(r){ return r.update(f); }); },
+    remove:function(path){ return at(path,function(r){ return r.delete(); }); },
     /* Five collection reads and three document reads, once at boot.
        Everything here is small and there are well under a hundred documents,
        so this is one round trip's worth of work, not a paging problem. */
@@ -2096,7 +2126,7 @@ function dbRefresh(all){
       return at;
     }) : (function(paths){ return dbGetAll(paths).then(function(got){
       var at={}; paths.forEach(function(p,i){ at[p]=got[i]; }); return at; }); })(uniq(want));
-  return read.then(function(at){
+  return read.then(ownCode(function(at){
     at=dbUnpendAll(at);
     var moved=dbSettleSession(at), fix=0, tgt=waterTgt();
     // Taken after the read, so a tap made while it was out counts as ours.
@@ -2144,7 +2174,7 @@ function dbRefresh(all){
     });
     if(fix && addXp(fix)) moved=true;
     return moved;
-  });
+  }));
 }
 /* An import is about to be written. What it replaces is kept first, and that
    is what the store holds with this view's unsaved changes on top: this
@@ -2155,7 +2185,7 @@ function dbRefresh(all){
    import. */
 var importPrev=null;
 function dbFold(replace){
-  return dbStore.readAll().then(function(map){
+  return dbStore.readAll().then(ownCode(function(map){
     map=dbUnpendAll(map);
     if(importPrev){
       var docs={}; Object.keys(map).forEach(function(p){ docs[p]=map[p]; });
@@ -2173,7 +2203,7 @@ function dbFold(replace){
       Object.keys(map).forEach(function(p){ lastSaved[p]=stableJson(map[p]); savedGen[p]=saveGen; });
     }
     return false;
-  });
+  }));
 }
 
 /* Save = write the documents that actually changed. Everything else the app
@@ -2202,6 +2232,12 @@ function overlay(body,fields){
 // else, unknown codes included, is treated as transient, as the store's
 // contract says to.
 var DB_HARD={invalid_argument:1, quota_exceeded:1, transform_error:1};
+/* Working out what to write is this code, not the store: a throw there (a
+   document nested past what stableJson can recurse) is the same on every try.
+   With no code it was taken for the store being away and retried for ever, so
+   it is final for that change instead. fn's own promise is left as it is. */
+function ownErr(e){ return {code:'transform_error', message:String(e&&e.message||e)}; }
+function ownCode(fn){ return function(x){ try{ return fn(x); }catch(e){ throw ownErr(e); } }; }
 // What a document is, in words, for saying which change was refused.
 // A store code in words. The code itself is for the banner's tooltip.
 var ERR_WORDS={quota_exceeded:'storage is full', unavailable:'storage cannot be reached right now', timeout:'it took too long to answer',
@@ -2239,7 +2275,40 @@ function dbSave(){
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
   var retrying=false, mode=saveNow, all=!mode&&saveSync, gen=++saveGen; saveNow=false; if(all) saveSync=false;
-  (mode==='put'||mode==='replace'?dbFold(mode==='replace'):mode?Promise.resolve(false):dbRefresh(all)).then(function(moved){
+  var first; try{ first=mode==='put'||mode==='replace'?dbFold(mode==='replace'):mode?Promise.resolve(false):dbRefresh(all); }
+  catch(e){ first=Promise.reject(ownErr(e)); }
+  first.then(ownCode(write)).then(function(){
+    saveAttempt=0;
+    if(dbErr){ dbErr=null; dbErrHard=false; dbErrPath=null; paintSaving(); render(); }
+  }, function(e){
+    // Whatever did not land is still different from lastSaved, so the next
+    // save carries it. A transient refusal gets that next save on its own,
+    // backing off 2s, 4s, 8s up to 30s; one that retrying cannot fix waits
+    // for the next change and says so.
+    dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr]||!!DB_LOST[dbErr]; dbErrPath=(e&&e.path)||null;
+    // Refused for good: held like a load that failed, with Reload offered.
+    if(DB_LOST[dbErr]){ dbState='paused'; if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; } }
+    setSaving(false);
+    // An import still owed goes the same way next time: a re-read and merge
+    // would put the old days back over it.
+    if((mode==='put'||mode==='replace') && !saveNow) saveNow=mode;
+    // One that retrying cannot fix is unfinished until the next change carries
+    // it, so Put back and Leave it are offered again, as for one cut off.
+    if((mode==='put'||mode==='replace') && dbErrHard){ importBusy=false; importStuck=true; importProg=null; }
+    if(dbState==='paused'){ render(); return; }
+    if(!dbErrHard){
+      retrying=true;
+      if(saveTimer) clearTimeout(saveTimer);
+      saveTimer=setTimeout(persist, Math.min(30000,2000*Math.pow(2,saveAttempt++))+Math.random()*500);
+    }
+    render();
+  }).then(done,done);
+  // Either way, even if a render above threw: left busy, nothing saves again.
+  function done(){
+    saveBusy=false;
+    if(saveAgain){ saveAgain=false; if(!retrying) dbSave(); }
+  }
+  function write(moved){
     var docs=saveDocs(), next=dbSnapshot(docs), jobs=[], logs=[], landing=[], session=null;
     // Finishing clears the session and writes its log in one go, and a
     // cleared session whose log was refused would leave the sets nowhere. So
@@ -2329,36 +2398,6 @@ function dbSave(){
     return metaPut(true).then(function(){ return batch(jobs,0); }).then(function(){
       clearPending(); return metaPut(false); }).then(function(){
       setSaving(false); importBusy=false; importStuck=false; importResume=null; importProg=null; dataMsg=importNote; importNote=''; render(); });
-  }).then(function(){
-    saveAttempt=0;
-    if(dbErr){ dbErr=null; dbErrHard=false; dbErrPath=null; paintSaving(); render(); }
-  }, function(e){
-    // Whatever did not land is still different from lastSaved, so the next
-    // save carries it. A transient refusal gets that next save on its own,
-    // backing off 2s, 4s, 8s up to 30s; one that retrying cannot fix waits
-    // for the next change and says so.
-    dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr]||!!DB_LOST[dbErr]; dbErrPath=(e&&e.path)||null;
-    // Refused for good: held like a load that failed, with Reload offered.
-    if(DB_LOST[dbErr]){ dbState='paused'; if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; } }
-    setSaving(false);
-    // An import still owed goes the same way next time: a re-read and merge
-    // would put the old days back over it.
-    if((mode==='put'||mode==='replace') && !saveNow) saveNow=mode;
-    // One that retrying cannot fix is unfinished until the next change carries
-    // it, so Put back and Leave it are offered again, as for one cut off.
-    if((mode==='put'||mode==='replace') && dbErrHard){ importBusy=false; importStuck=true; importProg=null; }
-    if(dbState==='paused'){ render(); return; }
-    if(!dbErrHard){
-      retrying=true;
-      if(saveTimer) clearTimeout(saveTimer);
-      saveTimer=setTimeout(persist, Math.min(30000,2000*Math.pow(2,saveAttempt++))+Math.random()*500);
-    }
-    render();
-  }).then(done,done);
-  // Either way, even if a render above threw: left busy, nothing saves again.
-  function done(){
-    saveBusy=false;
-    if(saveAgain){ saveAgain=false; if(!retrying) dbSave(); }
   }
 }
 function persist(){
@@ -2457,13 +2496,46 @@ function readDump(o){
    They and the keys of a map are also looked up in plain objects and written
    into attributes, so a name Object already has is no id, nor is markup. */
 function readImport(text){
+  // Anything this did not foresee is a file it cannot read, not a Check that
+  // does nothing.
+  try{ return readImportOf(text); }
+  catch(e){ return {ok:false, msg:'That file could not be read ('+String(e&&e.message||e).slice(0,80)+'), so nothing was read.'}; }
+}
+// How deep the brackets of JSON text go, outside its strings, counted in one
+// pass: JSON.parse takes thousands of levels, but what is built from it does not.
+function jsonDepth(text){
+  var d=0, top=0, q=false;
+  for(var i=0;i<text.length;i++){
+    var c=text.charCodeAt(i);
+    if(q){ if(c===92) i++; else if(c===34) q=false; }
+    else if(c===34) q=true;
+    else if(c===123||c===91){ if(++d>top) top=d; }
+    else if(c===125||c===93) d--;
+  }
+  return top;
+}
+// The longest ingredient line a recipe takes. A line is a name and an amount.
+var ING_MAX=500;
+// The entry a document holds, in words, for saying which one will not fit.
+function importLabel(path,body){
+  var i=path.indexOf('/'), kind=path.slice(0,i), id=path.slice(i+1), name=body&&typeof body.title==='string'?body.title.slice(0,60):id;
+  return ({days:'The day '+id, workoutLogs:'The session "'+id+'"', sauna:'The sauna visit "'+id+'"', library:'The note "'+name+'"',
+    recipes:'The recipe "'+name+'"', plan:'The planned meal "'+id+'"'})[kind]||
+    ({'state/profile':'The XP and targets', 'state/shopping':'The shopping list', 'state/session':'The session in progress'})[path]||'An entry';
+}
+function readImportOf(text){
   function no(msg){ return {ok:false, msg:msg}; }
   function obj(v){ return !!v && typeof v==='object' && !Array.isArray(v); }
-  var ID=/^[A-Za-z0-9_.-]{1,80}$/, DAY=/^\d{4}-\d{2}-\d{2}$/, o, proto=false;
+  // '.' and '..' fit the pattern but are no path segment: the store throws on
+  // a path holding one.
+  var ID=/^(?!\.\.?$)[A-Za-z0-9_.-]{1,80}$/, DAY=/^\d{4}-\d{2}-\d{2}$/, o, proto=false;
   function isId(k){ return typeof k==='string' && ID.test(k) && !(k in Object.prototype); }
   text=String(text||'').trim();
   if(!text) return no('Paste an export first.');
   if(text.length>5e6) return no('That is too big to be a Fight Card export.');
+  // An entry sits at most three levels into the file (the file, its list,
+  // the entry), and the store takes 32 inside an entry.
+  if(jsonDepth(text)>DB_DEPTH+2) return no('That file is nested deeper than any Fight Card export, so nothing was read.');
   // JSON keeps a key called __proto__ as a key, but the first object built
   // from it in code takes it as a prototype instead, so it would not last.
   try{ o=JSON.parse(text,function(k,v){ if(k==='__proto__') proto=true; return v; }); }
@@ -2551,10 +2623,17 @@ function readImport(text){
     // an older log's.
     s.exIds=s.exIds.filter(function(id){ if(isSuperset(id)||exDef(id)) return true; delete s.targets[id]; return false; });
   }
+  bad=(o.recipes||[]).filter(function(r){ return r.ingredients.some(function(l){ return l.length>ING_MAX; }); })[0];
+  if(bad) return no('The recipe "'+bad.title.slice(0,60)+'" has an ingredient line over '+ING_MAX+' characters. A line is a name and an amount, so nothing was read.');
   var st={};
   EXPORT_KEYS.forEach(function(key){ if(o[key]!==undefined) st[key]=o[key]; });
   // dbApply supplies a default for anything left out, as it does for a store.
   st=dbApply(dbDocs(st));
+  // The store refuses a document past its size or depth on every save, so an
+  // import that says it worked would never be stored. Two levels are kept
+  // spare for what a view closing sends beside a document (see DB_VIEW).
+  var docs=dbDocs(st), big=Object.keys(docs).filter(function(p){ return docFault(docs[p],2); })[0];
+  if(big) return no(importLabel(big,docs[big])+(docFault(docs[big],2)==='deep'?' is nested too deeply':' is too large')+' to store, so nothing was read.');
   return {ok:true, state:st, summary:{days:Object.keys(st.days).length, sessions:st.workoutLogs.length,
     meals:st.plan.length, recipes:st.recipes.length, notes:st.library.length, sauna:st.saunaSessions.length,
     exportedAt:typeof o.exportedAt==='string'?o.exportedAt.slice(0,40):'', docs:dump?dump.docs:0, unused:dump?dump.unused:0}};
@@ -2693,15 +2772,25 @@ function applyImport(st,mode){
    than given invented precision. */
 var IMPLIED_ONE=/^((tin|can|head|clove|slice|stick|scoop|wedge|sprig|handful|large handful|small handful)s?|bunch(es)?)$/i;
 function parseIng(text){
-  var raw=String(text||'').trim();
-  var m=raw.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
-  if(!m) return {n:raw, q:null, u:'', raw:raw};
-  var name=m[1].trim(), inside=m[2].trim();
+  // The bracket is the first "(" after the last ")" but the closing one. Found
+  // by index, not a pattern: /^(.*?)\s*\(([^)]*)\)$/ backtracked over every
+  // "(" in a long line, and froze the page for seconds on every load.
+  var raw=String(text||'').trim(), c=raw.length-1, at=raw.charAt(c)===')'?raw.indexOf('(',raw.lastIndexOf(')',c-1)+1):-1;
+  if(at<0||at>=c) return {n:raw, q:null, u:'', raw:raw};
+  var name=raw.slice(0,at).trim(), inside=raw.slice(at+1,c).trim();
   // "1/2", "1 1/2", "1½" and "2-3" all appear. A range keeps both ends: the
   // card shows what the recipe says and the shopping list buys the top end.
-  inside=inside.replace(/(\d)?\s*([½¼¾⅓⅔⅛])/g,function(x,d,c){
-    return (d?d+' ':'')+{'½':'1/2','¼':'1/4','¾':'3/4','⅓':'1/3','⅔':'2/3','⅛':'1/8'}[c];
-  });
+  // As /(\d)?\s*([½¼¾⅓⅔⅛])/g would, but that rescans a run of spaces from
+  // each of them, so a long one took seconds: from each fraction back over
+  // the spaces before it to a digit, never past the one before.
+  var FR={'½':'1/2','¼':'1/4','¾':'3/4','⅓':'1/3','⅔':'2/3','⅛':'1/8'}, fr='', from=0;
+  for(var i=0;i<inside.length;i++){
+    if(!FR[inside.charAt(i)]) continue;
+    var j=i; while(j>from&&/\s/.test(inside.charAt(j-1))) j--;
+    var dg=j>from&&/\d/.test(inside.charAt(j-1))?inside.charAt(--j):'';
+    fr+=inside.slice(from,j)+(dg?dg+' ':'')+FR[inside.charAt(i)]; from=i+1;
+  }
+  inside=fr+inside.slice(from);
   var N='\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:\\.\\d+)?';
   var qm=inside.match(new RegExp('^('+N+')(?:\\s*-\\s*('+N+'))?'));
   function val(x){ var p=x.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/); return p ? (+(p[1]||0))+p[2]/p[3] : +x; }
@@ -3831,7 +3920,7 @@ function bodyContent(){
     '<div class="addform"><strong class="formhead">Add a note or adjustment</strong>'+
       '<input id="lib-title" placeholder="Title" maxlength="80">'+
       '<select id="lib-tag"><option>Note</option><option>Adjustment</option><option>Other</option></select>'+
-      '<textarea id="lib-notes" placeholder="Notes"></textarea>'+
+      '<textarea id="lib-notes" placeholder="Notes"></textarea>'+formNoteHtml('lib')+
       '<button data-action="addlib">Add to training plan</button></div>';
 
   // The calendar: seven rolling days, each showing the meals planned on it.
@@ -3931,7 +4020,7 @@ function bodyContent(){
       '<label class="fieldlbl" for="rec-portions">Portions this makes</label>'+
       '<input id="rec-portions" type="number" inputmode="numeric" min="1" max="20" value="1">'+
       '<textarea id="rec-ing" placeholder="Ingredients, one per line"></textarea>'+
-      '<textarea id="rec-inst" placeholder="Method / notes"></textarea>'+
+      '<textarea id="rec-inst" placeholder="Method / notes"></textarea>'+formNoteHtml('rec')+
       '<button data-action="addrecipe">Add recipe</button></div>';
 
   var logs=state.workoutLogs;
@@ -4827,7 +4916,11 @@ function onClick(e){
   else if(action==='addlib'){
     var titleEl=document.getElementById('lib-title'); var tagEl=document.getElementById('lib-tag'); var notesEl=document.getElementById('lib-notes');
     var title=(titleEl.value||'').trim(); if(!title) return;
-    state.library.push({id:'l'+Date.now(),title:title,tag:tagEl.value,notes:(notesEl.value||'').trim()});
+    var note={id:'l'+Date.now(),title:title,tag:tagEl.value,notes:(notesEl.value||'').trim()};
+    // The store refuses a document past its size on every save after.
+    if(docFault(note)){ formNote.lib='That note is too long to store. Shorten it or split it into two.';
+      markBad(notesEl); render(); focusBad(['lib-notes']); return; }
+    formNote.lib=''; state.library.push(note);
     consumed(['lib-title','lib-tag','lib-notes']);
   }
   else if(action==='dellib'){
@@ -4843,8 +4936,13 @@ function onClick(e){
     var ings=(ri.value||'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
     var rp=parseInt((document.getElementById('rec-portions')||{}).value,10);
     if(!(rp>0)) rp=1;
-    state.recipes.push({id:'r'+Date.now(),title:title2,tag:'Recipe',ingredients:ings,base:rp,portions:rp,
-      instructions:(rn.value||'').trim()});
+    var rec={id:'r'+Date.now(),title:title2,tag:'Recipe',ingredients:ings,base:rp,portions:rp,instructions:(rn.value||'').trim()};
+    var longIng=ings.some(function(l){ return l.length>ING_MAX; });
+    if(longIng||docFault(rec)){
+      formNote.rec=longIng?'An ingredient line is over '+ING_MAX+' characters. Keep each to a name and an amount, and put the rest in the method.':
+        'That recipe is too long to store. Shorten the method or the ingredients.';
+      markBad(longIng?ri:rn); render(); focusBad([longIng?'rec-ing':'rec-inst']); return; }
+    formNote.rec=''; state.recipes.push(rec);
     consumed(['rec-title','rec-ing','rec-inst','rec-portions']);
   }
   else if(action==='portions'){

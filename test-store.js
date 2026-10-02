@@ -27,10 +27,11 @@ var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grab
   grab('stableJson'), grab('mergeKeyed'), grab('setKey'), grab('mergeSetLogs'), grab('mergeSession'), grab('mergeActive'), grab('mergeSessionDoc'), grab('dbMerge'), grab('foldPend'),
   grabVar('DAY_COUNTS'), grab('mergeDay'), grab('profShape'), grab('dayPair'), grab('dayWx'), grab('dayXp'), grab('waterTgt'), 'var state=null, pendFix=0;',
   h.match(/var DUMP_COLL=[^\n]*\n/)[0], grab('readDump'),
-  grab('MemoryStore'), grab('exportData'), grab('exportText'), grab('readImport'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
+  grabVar('DB_DOC_MAX'), grab('docBytes'), grab('docDepth'), grab('docFault'), grab('jsonDepth'), grabVar('ING_MAX'), grab('importLabel'),
+  grab('MemoryStore'), grab('DbStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('readImportOf'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
 var box={};
 new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this.exportText=exportText;'+
-  'this.readImport=readImport;this.mergeImport=mergeImport;this.dbDocs=dbDocs;this.dbApply=dbApply;').call(box);
+  'this.readImport=readImport;this.mergeImport=mergeImport;this.dbDocs=dbDocs;this.dbApply=dbApply;this.DbStore=DbStore;this.docFault=docFault;').call(box);
 
 var fails=0, pending=[];
 function t(name,fn){ pending.push([name,fn]); }
@@ -379,6 +380,88 @@ t('a dump that cannot be read is refused with a reason', function(){
    [JSON.stringify(Object.assign(d,{'days/2026-08-31/x':{water:1}})),/is not a date/],
    [JSON.stringify({'days/2026-08-29':{water:'lots'}}),/wrong kind/]
   ].forEach(function(c){ var r=box.readImport(c[0]); assert.ok(!r.ok,'took '+c[0].slice(0,80)); assert.ok(c[1].test(r.msg),r.msg); });
+});
+
+// Ids become document paths, and the store throws on a '.' or '..' segment.
+t('an id that is "." or ".." is refused, and one with dots in it is not', function(){
+  var good=JSON.parse(box.exportText(rich()));
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  [['library','.'],['library','..'],['workoutLogs','..'],['recipes','.'],['plan','..']].forEach(function(c){
+    var r=box.readImport(w(function(o){ o[c[0]][0].id=c[1]; }));
+    assert.strictEqual(r.ok,false,'the id "'+c[1]+'" in '+c[0]+' was accepted');
+    assert.ok(/no usable id/.test(r.msg),r.msg);
+  });
+  ['...','.x','a.b','__x__'].forEach(function(id){
+    var r=box.readImport(w(function(o){ o.library[0].id=id; })); assert.ok(r.ok,'the id "'+id+'" was refused: '+r.msg); });
+});
+// The store refuses a document nested past 32 levels, and stableJson
+// overflowed on one thousands deep: in a field the shape check ignores it got
+// through, and every save after threw. Deeper still, Check itself threw.
+t('a value nested deeper than the store takes is refused at Check, however deep', function(){
+  var good=JSON.parse(box.exportText(rich())), day=Object.keys(good.days)[0];
+  function nest(n){ var t='1'; for(var i=0;i<n;i++) t='{"a":'+t+'}'; return t; }
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  [[w(function(o){ o.days[day].junk='DEEP'; }),3000],[w(function(o){ o.days[day].junk='DEEP'; }),6000],
+   [w(function(o){ o.library[0].extra='DEEP'; }),40],[w(function(o){ o.days[day].junk='DEEP'; }),31],
+   [w(function(o){ o.activeSession.supersets={ss1:{ex:['press_bench'],rounds:0,more:'DEEP'}}; o.activeSession.exIds.push('ss1'); }),40]
+  ].forEach(function(c){
+    var txt=c[0].replace('"DEEP"',nest(c[1])), r;
+    assert.doesNotThrow(function(){ r=box.readImport(txt); },'Check threw at '+c[1]+' levels');
+    assert.strictEqual(r.ok,false,c[1]+' levels were accepted');
+    assert.ok(/nested/.test(r.msg),r.msg);
+  });
+  // As deep as an export goes is fine, with room for what a view closing sends.
+  var r=box.readImport(w(function(o){ o.days[day].junk='DEEP'; }).replace('"DEEP"',nest(20)));
+  assert.ok(r.ok,r.msg);
+});
+// The store takes 256 KiB a document: an import past it said "Imported." and
+// was then refused on every save.
+t('an entry too large for the store is refused at Check, by name', function(){
+  var good=JSON.parse(box.exportText(rich()));
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  var r=box.readImport(w(function(o){ o.recipes[0].title='Big stew'; o.recipes[0].instructions='x'.repeat(300000); }));
+  assert.strictEqual(r.ok,false,'a 300 KB recipe was accepted');
+  assert.ok(/The recipe "Big stew" is too large to store/.test(r.msg),r.msg);
+  // Measured in bytes, not characters: 100k characters of three bytes each.
+  r=box.readImport(w(function(o){ o.library[0].title='Diary'; o.library[0].notes='☃'.repeat(100000); }));
+  assert.strictEqual(r.ok,false,'a 300 KB note was accepted'); assert.ok(/The note "Diary" is too large/.test(r.msg),r.msg);
+  r=box.readImport(w(function(o){ o.library[0].notes='x'.repeat(200000); }));
+  assert.ok(r.ok,'a 200 KB note was refused: '+r.msg);
+  var day=Object.keys(good.days)[0];
+  r=box.readImport(w(function(o){ o.days[day].junk='x'.repeat(270000); }));
+  assert.strictEqual(r.ok,false); assert.ok(r.msg.indexOf('The day '+day+' is too large')===0,r.msg);
+  // {"a":"..."} is eight characters around the text.
+  assert.strictEqual(box.docFault({a:'x'.repeat(262144-7)}),'large');
+  assert.strictEqual(box.docFault({a:'x'.repeat(262144-8)}),'');
+});
+t('an ingredient line over 500 characters is refused at Check', function(){
+  var good=JSON.parse(box.exportText(rich()));
+  function w(f){ var o=JSON.parse(JSON.stringify(good)); f(o); return JSON.stringify(o); }
+  var r=box.readImport(w(function(o){ o.recipes[0].title='Soup'; o.recipes[0].ingredients.push('x'+'('.repeat(600)); }));
+  assert.strictEqual(r.ok,false,'a 601 character line was accepted');
+  assert.ok(/The recipe "Soup" has an ingredient line over 500/.test(r.msg),r.msg);
+  r=box.readImport(w(function(o){ o.recipes[0].ingredients.push('y'.repeat(500)); }));
+  assert.ok(r.ok,'a 500 character line was refused: '+r.msg);
+});
+// The db throws a TypeError as the reference to a bad path is made. Thrown
+// out of a batch, it stopped the rest of it, and with no code it was retried
+// for ever.
+t('a path the store throws on is one refused document, not a throw', async function(){
+  var landed=[];
+  var db={doc:function(path){ if(path.split('/').some(function(x){ return x==='.'||x==='..'; })) throw new TypeError('bad segment in '+path);
+    return {set:function(){ landed.push(path); return Promise.resolve(); }, update:function(){ return Promise.resolve(); },
+      delete:function(){ return Promise.resolve(); }, get:function(){ return Promise.resolve({exists:false}); }}; },
+    collection:function(){ return {get:function(){ return Promise.resolve({docs:[]}); }}; }};
+  var s=box.DbStore(db), errs=[];
+  var jobs=['library/..','library/a','library/.'].map(function(p){
+    var pr; assert.doesNotThrow(function(){ pr=s.put(p,{id:'x'}); },'put threw for '+p);
+    return pr.then(function(){},function(e){ errs.push(e.code); }); });
+  ['update','remove','get'].forEach(function(op){ var pr;
+    assert.doesNotThrow(function(){ pr=op==='update'?s.update('plan/..',{a:1}):s[op]('plan/..'); },op+' threw');
+    jobs.push(pr.then(function(){ errs.push('ok '+op); },function(e){ errs.push(e.code); })); });
+  await Promise.all(jobs);
+  assert.deepStrictEqual(landed,['library/a'],'the good document did not land');
+  assert.deepStrictEqual(errs,['invalid_argument','invalid_argument','invalid_argument','invalid_argument','invalid_argument']);
 });
 
 (async function(){

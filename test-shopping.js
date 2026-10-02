@@ -380,5 +380,36 @@ t('Egg and Eggs are one row on the list, named as first written', function(){
   assert.deepStrictEqual(box.shoppingList().map(function(o){return o.label;}),['Glass noodles (100g)','Hummus (2 tbsp)']);
 });
 
+// A long line full of "(" or spaces froze the page on every load: the
+// patterns backtracked over all of it, about 2s for 40k characters.
+t('a long ingredient line is read in linear time', function(){
+  var box=sandbox({recipes:[], plan:[], shopExtras:[]});
+  ['x'+'('.repeat(40000), 'x ('+'('.repeat(40000)+')', 'x (1'+' '.repeat(40000)+'a)', 'x (½'+' '.repeat(40000)+'a)',
+   'x'+' ('.repeat(20000)+')'].forEach(function(txt,i){
+    var t0=Date.now(); box.parseIng(txt); var ms=Date.now()-t0;
+    assert.ok(ms<50,'line '+i+' took '+ms+'ms');
+  });
+});
+// The bracket is found by index now, so it has to be the same one the old
+// pattern took, and the fractions read the same, on every short line.
+t('the bracket and fractions are read as the old patterns read them', function(){
+  var box=sandbox({recipes:[], plan:[], shopExtras:[]}), A='ab1 ()½¼,', seed=7;
+  function rnd(n){ seed=(seed*1103515245+12345)%2147483648; return seed%n; }
+  function old(text){
+    var raw=String(text||'').trim(), m=raw.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+    if(!m) return [raw,null];
+    return [m[1].trim(), m[2].trim().replace(/(\d)?\s*([½¼¾⅓⅔⅛])/g,function(x,d,c){
+      return (d?d+' ':'')+{'½':'1/2','¼':'1/4','¾':'3/4','⅓':'1/3','⅔':'2/3','⅛':'1/8'}[c]; })];
+  }
+  for(var k=0;k<20000;k++){
+    var txt='', n=rnd(14); for(var q=0;q<n;q++) txt+=A.charAt(rnd(A.length));
+    var g=box.parseIng(txt), want=old(txt);
+    assert.strictEqual(g.n,want[0],'name of '+JSON.stringify(txt));
+    if(want[1]===null) assert.strictEqual(g.q,null,'quantity of '+JSON.stringify(txt));
+    // What is left of the bracket once the amount is read, or all of it.
+    else if(g.q===null && g.u==='') assert.strictEqual(g.d===undefined?'':g.d,want[1]===''?'':want[1],'inside of '+JSON.stringify(txt));
+  }
+});
+
 console.log(fails?('\n'+fails+' FAILING\n'):'\nAll shopping checks pass.\n');
 process.exit(fails?1:0);

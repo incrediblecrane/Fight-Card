@@ -188,7 +188,9 @@ typed as "Name (quantity unit)". Built-in recipes deleted are listed in
 One line of a recipe, read by `parseIng` into a name, a quantity and a unit.
 Fractions ("1 1/2", "½") and ranges ("2-3", bought at the top end) are read; a
 line with no number ("Honey (drizzle)") keeps its name and invents no
-quantity; any name is allowed, `constructor` included.
+quantity; any name is allowed, `constructor` included. The bracket is found
+by index, not a pattern, so a long line cannot freeze the page; a line is
+kept to 500 characters (`ING_MAX`) by the Add recipe form and by an import.
 
 **Planned meal**:
 One entry in `state.plan`: a recipe, a real date, a slot (breakfast, lunch,
@@ -322,6 +324,13 @@ embedded in the document, so shipping code never touches logged data. Absent
 means seed the store from that embedded copy, the marker written last so a
 half migration is retried rather than believed.
 
+The store takes at most 256 KiB of JSON in one document, nested at most 32
+levels (the body is the first), and no `.` or `..` path segment: a write past
+either limit is refused, and a bad path throws as the reference is made.
+`docFault` measures a body against the limits (`DB_DOC_MAX`, `DB_DEPTH`, UTF-8
+counted at three bytes for anything past ASCII); the Add a note and Add a
+recipe forms refuse what would not fit, with a reason, keeping what was typed.
+
 Declaring `db` makes the artifact organization-internal: it cannot be shared
 publicly. The app is always published with `db` declared, so a view without a
 store is not a reason to save some other way.
@@ -370,7 +379,11 @@ layer either side: state in, `{path: body}` out, and back. A rejection carries
 `{code}`; `dbSave` treats the codes in `DB_HARD` (`invalid_argument`,
 `quota_exceeded`, `transform_error`) as final for that change, those in
 `DB_LOST` as the end of saving for the page load (`paused`), and anything else,
-unknown codes included, as transient.
+unknown codes included, as transient. A path `DbStore` cannot make a reference
+to (the db throws a `TypeError` synchronously) is an `invalid_argument`
+rejection of that one document, so the rest of its batch still goes. A throw
+in the app's own code while working out a save (`ownCode`) is `transform_error`,
+final for that change, never retried for ever.
 
 A self-hosted backend would be a third Store, a small object with these six
 calls over `fetch`, with the same paths as REST resources:
@@ -499,7 +512,14 @@ Copy and a download, and uses no capability other than `db`.
   list entry an object whose id is a safe path segment (ids become document
   paths), no duplicate ids, targets in range, every field of a set the kind
   `logSet` writes, a day's workout type and a session's tag one of the workout
-  types, a planned meal's slot breakfast, lunch or dinner. Ids, and the keys of
+  types, a planned meal's slot breakfast, lunch or dinner. An id is never `.`
+  or `..`. Every document the import would write has to fit the store (see
+  Where data lives), with two levels spare for pending fields, and is named
+  when it does not ("The recipe "Big stew" is too large to store"); the text
+  is refused unread when its brackets nest deeper than an export does. A
+  recipe's ingredient line is at most 500 characters. Fields the check does
+  not know are kept, not dropped, so measuring the whole document is what
+  keeps a deep or huge one out. Ids, and the keys of
   a session's or a log's sets and targets, are refused when they are a name
   `Object.prototype` already has (`constructor`, `toString`), and any key
   called `__proto__` is refused anywhere. Anything else is refused with a
@@ -523,6 +543,7 @@ summary (days, sessions, planned meals, recipes, notes, sauna) and then:
   visit with a new id, clamped at 0; so removing a merged session later takes
   back only XP that was paid.
 
+Neither says it is done ("Imported.") until the last write has landed.
 Each takes the text in the box when tapped: text changed since Check is checked
 again and shown, and only the next tap imports it. Either way it becomes state
 and is written by `dbSave` as whole documents, straight away rather than after
@@ -642,7 +663,8 @@ the shipped `index.html`, so they test what ships.
 - `test-tooling.js`: `build-publish.js` and `emit-rig.js` refuse a mistyped
   command rather than overwrite a file.
 - `test-shopping.js`: shopping arithmetic swept over every recipe and pair;
-  countable amounts checked against what you have to BUY. Ingredient parsing.
+  countable amounts checked against what you have to BUY. Ingredient parsing,
+  in linear time on a long line.
 - `test-planmodel.js`: the plan model, including the one-way migration off the
   old `inPlan`/`day` pair.
 - `test-catalog.js`: the exercise and workout catalogues as data: no duplicate
@@ -662,10 +684,13 @@ the shipped `index.html`, so they test what ships.
 - `test-meals.js`: recipe portions and the shopping list in the browser.
 - `test-db.js`: seeding, small saves, reload survival, merge between views,
   save serialization and retry, every store state and how a failed save shows,
-  imports in the browser: the backup, Put back and an unfinished import.
+  imports in the browser: the backup, Put back and an unfinished import; the
+  store's per-document limits, which the stub keeps, and the forms and imports
+  that would pass them.
 - `test-store.js`: the Store contract over `MemoryStore`; export then import
   reproducing the record exactly; raw dumps and state as 5aba0f6 held it;
-  malformed imports refused with a reason.
+  malformed imports refused with a reason, including ids, depth, size and
+  ingredient lines the store or the page could not take.
 - `test-plan.js`: the meal planner in the browser: the same meal twice, slots,
   partial-week shopping.
 - `test-design.js`: computed contrast, tap target sizes, what touch can reach,

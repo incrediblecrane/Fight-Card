@@ -25,6 +25,13 @@ function take(list,op,path){
     if((!f.op||f.op===op) && String(path||'').indexOf(f.match||'')>-1){ list.splice(i,1); return f; } }
   return null;
 }
+// The store's limits on one document: 256 KiB serialized, 32 levels deep
+// with the body the first. A write past either is refused as invalid_argument.
+var DOC_MAX=256*1024, DOC_DEPTH=32;
+function depthOf(v){ if(v===null||typeof v!=='object') return 0;
+  return 1+Object.keys(v).reduce(function(d,k){ return Math.max(d,depthOf(v[k])); },0); }
+function tooBig(v){ return Buffer.byteLength(JSON.stringify(v))>DOC_MAX || depthOf(v)>DOC_DEPTH; }
+var limitRefused=0;
 function srvJson(r,body){ var b=JSON.stringify(body); r.setHeader('content-type','application/json'); r.setHeader('content-length',Buffer.byteLength(b)); r.end(b); }
 
 var SHIM=`<script>(function(){
@@ -52,8 +59,13 @@ var SHIM=`<script>(function(){
       .then(function(r){ if(op==='set'||op==='del') window.__db.inflight--; return r.json(); })
       .then(function(j){ if(j && j.err) throw {code:j.err, message:'stub refused '+op}; return j; });
   }
+  // As the real one does, a path it cannot take throws as the reference is
+  // made, not as a refusal: '.' and '..' are no segment, nor is an empty one.
+  function segsOf(path){ var segs=path.split('/');
+    if(segs.some(function(x){ return x===''||x==='.'||x==='..'; })) throw new TypeError('invalid path segment in '+path);
+    return segs; }
   function docRef(path){
-    var segs=path.split('/');
+    var segs=segsOf(path);
     if(segs.length%2!==0) throw new TypeError('document path needs an even number of segments: '+path);
     return {
       id:segs[segs.length-1], path:path,
@@ -67,7 +79,7 @@ var SHIM=`<script>(function(){
     };
   }
   function collRef(path){
-    var segs=path.split('/');
+    var segs=segsOf(path);
     if(segs.length%2!==1) throw new TypeError('collection path needs an odd number of segments: '+path);
     return {
       path:path,
@@ -124,6 +136,9 @@ var srv=http.createServer(function(q,r){
         if(slowGetMs){ return setTimeout(send,slowGetMs); }
         return send(); }
       if(op==='slow'){ slowGetMs=body.ms||0; return srvJson(r,{ok:1}); }
+      if(op==='set'&&tooBig(body.data)){ calls.set++; limitRefused++; return srvJson(r,{err:'invalid_argument'}); }
+      if(op==='update'&&Object.prototype.hasOwnProperty.call(store,body.path)&&tooBig(Object.assign({},store[body.path],body.data))){
+        calls.set++; limitRefused++; return srvJson(r,{err:'invalid_argument'}); }
       if(op==='set'){ calls.set++; inflight++; peak=Math.max(peak,inflight);
         var held=take(setDelays,op,body.path);
         if(held){ return setTimeout(function(){ store[body.path]=body.data; inflight--; srvJson(r,{ok:1}); },held.ms); }
@@ -2521,6 +2536,103 @@ srv.listen(0,async function(){
       assert.strictEqual(bs.length,1,'banners shown: '+JSON.stringify(bs));
       assert.ok(/artifact link/.test(bs[0]),'the one banner is not the local one: '+bs[0]);
     } finally { await q.context().close(); }
+  });
+
+  console.log('\nWHAT THE STORE TAKES IN ONE DOCUMENT');
+  await t('the stub keeps the store\'s limits: no "." or ".." segment, 256 KiB and 32 levels a document', async function(){
+    await go(); limitRefused=0;
+    var r=await p.evaluate(function(){ return claude.use('db').then(function(db){
+      var out={};
+      ['library/..','library/.','../x'].forEach(function(path){ try{ db.doc(path); out[path]='made'; }catch(e){ out[path]=e instanceof TypeError?'TypeError':String(e); } });
+      var deep={}, at=deep; for(var i=0;i<32;i++){ at.a={}; at=at.a; }
+      return db.doc('library/limit1').set({t:new Array(262200).join('x')}).then(function(){ out.big='took'; },function(e){ out.big=e.code; })
+        .then(function(){ return db.doc('library/limit2').set(deep); }).then(function(){ out.deep='took'; },function(e){ out.deep=e.code; })
+        .then(function(){ return out; }); }); });
+    assert.deepStrictEqual(r,{'library/..':'TypeError','library/.':'TypeError','../x':'TypeError',big:'invalid_argument',deep:'invalid_argument'});
+    assert.strictEqual(limitRefused,2);
+  });
+
+  // An import past the store's limits said "Imported." and was then refused
+  // on every save after.
+  await t('a recipe too large to store is refused at Check, and nothing is written', async function(){
+    await go(); var a=await exported(), n=calls.set+calls.del;
+    a.recipes=(a.recipes||[]).concat([{id:'rbig',title:'Big stew',tag:'Recipe',ingredients:['Beef (500g)'],base:4,portions:4,instructions:new Array(300001).join('x')}]);
+    await importing(JSON.stringify(a));
+    var msg=await p.locator('[role="alert"]').first().textContent();
+    assert.ok(/The recipe "Big stew" is too large to store/.test(msg),'no reason given: '+msg);
+    assert.strictEqual(await p.locator('[data-action="doimport"]').count(),0,'it offered to import it anyway');
+    await p.waitForTimeout(1300);
+    assert.strictEqual(calls.set+calls.del,n,'a refused import wrote to the store');
+  });
+
+  await t('an import says it is done only once the store has taken it', async function(){
+    await go(); var a=await exported();
+    await importing(JSON.stringify(a));
+    failAll={code:'unavailable',ops:['set','update']};
+    await p.click('[data-action="doimport"][data-mode="replace"]'); await p.waitForTimeout(2500);
+    var body=await text();
+    assert.ok(!/Imported\./.test(body),'it said Imported. while the store was refusing it');
+    failAll=null;
+    for(var k=0;k<80 && !/Imported\./.test(await text());k++) await p.waitForTimeout(250);
+    assert.ok(/Imported\./.test(await text()),'it never said Imported. once the store took it');
+  });
+
+  await t('a note or recipe too long to store is refused by its form, and what was typed stays', async function(){
+    await go(); limitRefused=0; var n=calls.set+calls.del, before=Object.keys(store).length;
+    await p.click('[data-action="tab"][data-tab="training"]');
+    await p.fill('#lib-title','Diary'); await p.fill('#lib-notes',new Array(270001).join('x'));
+    await p.click('[data-action="addlib"]'); await p.waitForTimeout(400);
+    assert.ok(/too long to store/.test(await p.locator('.addform [role="alert"]').first().textContent()),'the note form gave no reason');
+    assert.strictEqual(await p.getAttribute('#lib-notes','aria-invalid'),'true','the notes box is not marked');
+    assert.strictEqual((await p.inputValue('#lib-notes')).length,270000,'what was typed was thrown away');
+    await p.click('[data-action="tab"][data-tab="meals"]');
+    await p.fill('#rec-title','Soup'); await p.fill('#rec-ing','Stock (1 l)\n'+'x'+new Array(600).join('('));
+    await p.click('[data-action="addrecipe"]'); await p.waitForTimeout(400);
+    assert.ok(/ingredient line is over 500/.test(await p.locator('.addform [role="alert"]').first().textContent()),'the recipe form took a 600 character line');
+    assert.strictEqual(await p.getAttribute('#rec-ing','aria-invalid'),'true');
+    await p.fill('#rec-ing','Stock (1 l)'); await p.fill('#rec-inst',new Array(300001).join('y'));
+    await p.click('[data-action="addrecipe"]'); await p.waitForTimeout(400);
+    assert.ok(/recipe is too long to store/.test(await p.locator('.addform [role="alert"]').first().textContent()),'the recipe form took 300 KB');
+    assert.strictEqual(await p.getAttribute('#rec-inst','aria-invalid'),'true');
+    await p.waitForTimeout(1300);
+    assert.strictEqual(calls.set+calls.del,n,'a refused form wrote to the store');
+    assert.strictEqual(Object.keys(store).length,before);
+    // Short enough, it goes in, and the reason goes.
+    await p.fill('#rec-inst','Simmer.'); await p.click('[data-action="addrecipe"]');
+    var soup=function(){ return Object.keys(store).some(function(k){ return k.indexOf('recipes/')===0 && store[k].title==='Soup'; }); };
+    for(var k=0;k<40 && !soup();k++) await p.waitForTimeout(250);
+    assert.ok(soup(),'the recipe was not saved');
+    assert.strictEqual(await p.locator('.addform [role="alert"]').count(),0,'the reason stayed up');
+    assert.strictEqual(limitRefused,0,'the store refused a write the app should not have sent');
+  });
+
+  // A throw while working out what to write is the same on every try. With no
+  // code it was taken for the store being away: retried for ever, or, thrown
+  // before the save had begun, it left saving stuck for the page load.
+  await t('a throw while working out a save is refused for good, not retried, and saving goes on after', async function(){
+    await go();
+    var q=await fresh(), e0=errs.length;
+    try{
+      await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); });
+      await qToday(q); await q.click('[data-action="tab"][data-tab="training"]');
+      await q.fill('#lib-title','BOOM marker'); await q.fill('#lib-notes','x');
+      await q.evaluate(function(){ var js=JSON.stringify; window.__js=js;
+        JSON.stringify=function(v){ if(v==='BOOM marker') throw new RangeError('Maximum call stack size exceeded'); return js.apply(JSON,arguments); }; });
+      var n=calls.set;
+      await q.click('[data-action="addlib"]'); await q.waitForTimeout(2500);
+      var seen=await notSaved(q);
+      assert.ok(seen.length,'nothing says the change was not saved');
+      assert.ok(seen.every(function(x){ return !/retrying/i.test(x.text); }),'it is shown as one to retry: '+JSON.stringify(seen));
+      await q.waitForTimeout(5000);
+      assert.strictEqual(calls.set,n,'it was tried again on its own');
+      assert.deepStrictEqual(errs.slice(e0),[],'it threw out of the page');
+      await q.evaluate(function(){ JSON.stringify=window.__js; });
+      await qToday(q); await q.click('[data-action="water"][data-d="1"]');
+      for(var k=0;k<40 && !Object.keys(store).some(function(x){ return store[x]&&store[x].title==='BOOM marker'; });k++) await q.waitForTimeout(250);
+      assert.ok(Object.keys(store).some(function(x){ return store[x]&&store[x].title==='BOOM marker'; }),'the next change did not save it');
+      assert.ok(!(await notSaved(q)).length,'the notice stayed up after a save landed');
+    } finally { errs.splice(e0); await q.context().close(); }
+    await go();
   });
 
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
