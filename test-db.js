@@ -247,6 +247,22 @@ srv.listen(0,async function(){
       if(h&&/Water/i.test(h.textContent)) return cards[i].querySelector('.count').textContent.trim(); }
     return null; }); };
 
+  // Another view saves a sip of water to today, and this page is looked at
+  // again: the re-read merges it, reports it moved, and the page is drawn
+  // afresh around whatever is being typed. drawn() counts each time #app is
+  // rebuilt after redraws() starts counting.
+  var otherSip=async function(){
+    var d=await today();
+    store['days/'+d]=Object.assign({water:0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0},
+      store['days/'+d]||{}); store['days/'+d].water=(store['days/'+d].water||0)+1;
+    await p.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); });
+  };
+  var redraws=function(){ return p.evaluate(function(){ window.__drawn=0;
+    if(window.__drawObs) window.__drawObs.disconnect();
+    window.__drawObs=new MutationObserver(function(){ window.__drawn++; });
+    window.__drawObs.observe(document.getElementById('app'),{childList:true}); }); };
+  var drawn=function(){ return p.evaluate(function(){ return window.__drawn; }); };
+
   console.log('\nSEEDING');
   await go();
 
@@ -273,6 +289,9 @@ srv.listen(0,async function(){
   console.log('\nSAVING IS SMALL AND DOES NOT REPUBLISH');
   var docBefore=doc;
   var before=await waterCount();
+  // What today's document held before the tap: a seed with water on some
+  // day, or on today, would otherwise pass the check below untouched.
+  var tapDay=await today(), tapW0=(store['days/'+tapDay]||{}).water||0;
   calls.set=0; calls.del=0;
   await water(1);
 
@@ -285,9 +304,9 @@ srv.listen(0,async function(){
   });
 
   await t('the tap is in the day document, not the page', function(){
-    var day=Object.keys(store).filter(function(k){return k.indexOf('days/')===0;})
-      .map(function(k){return store[k];}).filter(function(d){return d.water>0;});
-    assert.ok(day.length,'no day document carries water');
+    assert.ok(store['days/'+tapDay],'no document for today at all');
+    assert.strictEqual(store['days/'+tapDay].water,tapW0+1,
+      'today\'s document went from water='+tapW0+' to '+store['days/'+tapDay].water+' on one tap');
   });
 
   await t('a save after a reload writes only what moved, not every document', async function(){
@@ -306,7 +325,7 @@ srv.listen(0,async function(){
     // The store hands back frozen bodies. If the app keeps one as its own
     // state, `today.water = n` is a silent no-op and the tap does nothing.
     await go();
-    var day=await today();
+    var day=await today(), w0=(store['days/'+day]||{}).water||0;
     calls.set=0;
     var moved=await p.evaluate(function(){
       var c=document.querySelectorAll('.card');
@@ -325,8 +344,8 @@ srv.listen(0,async function(){
       'the counter did not move: '+moved.before+' -> '+moved.after+' (a frozen body was mutated in place)');
     await p.waitForTimeout(1800);
     assert.ok(store['days/'+day],'no document for today at all');
-    assert.ok(store['days/'+day].water>0,
-      'the day document in the store still reads water='+store['days/'+day].water);
+    assert.strictEqual(store['days/'+day].water,w0+1,
+      'the day document in the store went from water='+w0+' to '+store['days/'+day].water);
   });
 
   await t('nothing the app holds as state is frozen', async function(){
@@ -336,10 +355,10 @@ srv.listen(0,async function(){
     // State is not reachable from outside the app, so assert the observable
     // consequence instead: every kind of it can still be changed after a load.
     await go();
-    var day=await today();
+    var day=await today(), w0=(store['days/'+day]||{}).water||0;
     calls.set=0;
     await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1700);
-    assert.ok(store['days/'+day] && store['days/'+day].water>0,'a day could not be changed');
+    assert.strictEqual((store['days/'+day]||{}).water,w0+1,'a day could not be changed: water was '+w0);
     await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(500);
     if(await p.locator('[data-action="addmeal"]').count()){
       var planBefore=Object.keys(store).filter(function(k){return k.indexOf('plan/')===0;}).length;
@@ -413,17 +432,22 @@ srv.listen(0,async function(){
   });
 
   await t('a save landing mid-word does not wipe the shopping item being typed', async function(){
-    // Saving re-renders, and an input rebuilt from HTML comes back empty unless
-    // the draft is held outside the DOM. Tick a row to put a save in flight,
-    // then type through it, a character at a time so the gaps are real.
+    // A save that brings in another view's change redraws the page, and an
+    // input rebuilt from HTML comes back empty unless the draft is held
+    // outside the DOM. Tick a row to put a save in flight, then type through
+    // it, a character at a time so the gaps are real, with another view's
+    // change landing mid-word.
     await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(600);
     var ticks0=((store['state/shopping']||{}).checked||[]).length;
     await p.evaluate(function(){ var r=document.querySelector('.shop'); if(r) r.click(); });
-    await p.click('#shop-add');
-    await p.type('#shop-add','Washing up liquid',{delay:40});
+    await p.click('#shop-add'); await redraws();
+    await p.type('#shop-add','Washing u',{delay:40});
+    await otherSip();
+    await p.type('#shop-add','p liquid',{delay:40});
     await p.waitForTimeout(2200);
     var ticks1=((store['state/shopping']||{}).checked||[]).length;
     assert.notStrictEqual(ticks1,ticks0,'no save happened, so this proves nothing');
+    assert.ok(await drawn()>0,'the page was never drawn again while typing, so this proves nothing');
     assert.strictEqual(await p.inputValue('#shop-add'),'Washing up liquid',
       'the save wiped the half-typed item');
     await p.press('#shop-add','Enter'); await p.waitForTimeout(1800);
@@ -560,18 +584,26 @@ srv.listen(0,async function(){
 
   console.log('\nNOTHING IS ACCEPTED BEFORE THE STORE HAS ANSWERED');
   await t('a tap during the load is refused rather than silently dropped', async function(){
+    // What the store's day shows once loaded, untapped.
+    await go(); var stored=await waterCount();
     // Hold the store's first answer so the loading window is observable.
     await p.evaluate(function(u){ return fetch('/db/slow',{method:'POST',body:JSON.stringify({ms:1500})}); });
     await p.goto(url); await p.waitForTimeout(250);
     var body=await text();
     assert.ok(/loading your data/.test(body),'no loading state was shown:\n'+body.slice(0,200));
-    var wasSet=calls.set;
-    if(await tap('[data-action="water"][data-d="1"]')) await p.waitForTimeout(300);
+    // The button has to be there, or nothing was tapped and nothing is proved.
+    assert.ok(await p.locator('[data-action="water"][data-d="1"]').count(),'no water button while loading');
+    var day=await today(), w0=(store['days/'+day]||{}).water||0, wasSet=calls.set, shown=await waterCount();
+    await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(300);
+    assert.strictEqual(await waterCount(),shown,'a tap during the load was taken: the count moved');
     assert.strictEqual(calls.set,wasSet,'a tap during the load reached the store anyway');
     await p.evaluate(function(){ return fetch('/db/slow',{method:'POST',body:JSON.stringify({ms:0})}); });
     await p.waitForTimeout(2400);
     var after=await text();
     assert.ok(!/loading your data/.test(after),'it never left the loading state');
+    // Once the store has answered, the count is the store's, and the tap is in neither.
+    assert.strictEqual((store['days/'+day]||{}).water||0,w0,'the store moved after the load');
+    assert.strictEqual(await waterCount(),stored,'the count is not the store\'s once it had answered');
   });
 
   var W='[data-action="water"][data-d="1"]';
@@ -668,11 +700,19 @@ srv.listen(0,async function(){
 
   await t('one render that throws during a save does not stop every later save', async function(){
     await go(); var day=await today(), w0=dayWater(day);
+    // A save draws the page only when it moved something or failed, so this
+    // one is refused: its failure is what renders while rendering throws.
+    failNext.push({match:'days/'+day,code:'resource_exhausted'});
+    await p.evaluate(function(){ var g=document.getElementById; window.__boom=false; window.__booms=0;
+      document.getElementById=function(id){ if(window.__boom && id==='app'){ window.__booms++; throw new Error('render broke'); }
+        return g.apply(document,arguments); }; });
+    // The tap is drawn first; its save goes a second later, into the throw.
     await p.click(W); await p.waitForTimeout(200);
-    await p.evaluate(function(){ var g=document.getElementById; window.__boom=true;
-      document.getElementById=function(id){ if(window.__boom && id==='app') throw new Error('render broke'); return g.apply(document,arguments); }; });
+    await p.evaluate(function(){ window.__boom=true; });
     await p.waitForTimeout(1500);
-    await p.evaluate(function(){ window.__boom=false; });
+    var booms=await p.evaluate(function(){ window.__boom=false; return window.__booms; });
+    assert.strictEqual(failNext.length,0,'the save was never refused, so no render threw during it');
+    assert.ok(booms>0,'no render threw during the save, so this proves nothing ('+booms+')');
     await p.click(W); await p.waitForTimeout(4500);
     // The throw was this check's own doing, not a page error.
     for(var i=errs.length-1;i>=0;i--) if(/render broke/.test(errs[i])) errs.splice(i,1);
@@ -823,7 +863,10 @@ srv.listen(0,async function(){
     // Drawn afresh from state: the boxes now start from the set just logged.
     assert.deepStrictEqual(cleared,['60','8'],'the boxes did not start from the set just logged: '+JSON.stringify(cleared));
     await p.fill('#log-w-'+ex,'62.5'); await p.fill('#log-v-'+ex,'6');
+    // Another view's change brought in by a save draws the page afresh.
+    await redraws(); await otherSip();
     await p.waitForTimeout(2500);
+    assert.ok(await drawn()>0,'the page was never drawn again, so this proves nothing');
     var st=await p.evaluate(function(ex){ var a=document.activeElement;
       return [document.getElementById('log-w-'+ex).value, document.getElementById('log-v-'+ex).value, a&&a.id]; },ex);
     assert.deepStrictEqual(st,['62.5','6','log-v-'+ex],'the save wiped the next set: '+JSON.stringify(st));
