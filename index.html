@@ -3067,17 +3067,16 @@ function parseIng(text){
   }
   inside=fr+inside.slice(from);
   var said=inside;
-  // "1,5 l" is a litre and a half. "1,000ml" is refused, as the number boxes
-  // refuse it: read as a decimal it would buy one millilitre, so it is kept
-  // as words rather than guessed at.
-  if(/^\D{0,20}[1-9]\d{0,2},\d{3}(?![\d,])/.test(inside)) return {n:name, q:null, u:'', d:inside, raw:raw};
-  inside=inside.replace(/(^|[^\d.,])(\d+),(\d+)(?![\d,])/g,function(m,p,a,b){ return p+a+'.'+b; });
   // "about 200g" is still 200g to shop for. The word stays on the card.
   var pre=(inside.match(/^(?:~|(?:about|approx(?:imately|\.)?|roughly)(?![a-z]))\s*/i)||[''])[0];
   inside=inside.slice(pre.length); pre=pre.trim();
-  var N='\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:\\.\\d+)?';
+  // "1,5 l" is a litre and a half, and "1,000ml" a litre: read as a decimal
+  // it would buy one millilitre. Only the amounts read are, so the words
+  // around them stay as typed.
+  var N='\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|[1-9]\\d{0,2}(?:,\\d{3})+(?![\\d,.])|\\d+(?:[.,]\\d+)?';
   var qm=inside.match(new RegExp('^('+N+')'));
-  function val(x){ var p=x.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/); return p ? (+(p[1]||0))+p[2]/p[3] : +x; }
+  function val(x){ var p=x.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/);
+    return p ? (+(p[1]||0))+p[2]/p[3] : /^[1-9]\d{0,2}(,\d{3})+$/.test(x) ? +x.replace(/,/g,'') : +x.replace(',','.'); }
   // "sticks" is a counting noun, not an instruction: dropping it turned
   // "Celery (2 sticks)" into "Celery (2)" on the shopping list, which is two
   // heads of celery rather than two sticks. Plurals of abbreviations ("kgs",
@@ -3116,7 +3115,7 @@ function parseIng(text){
   var gap=rest.match(/^\s*/)[0], size='';
   rest=rest.trim();
   // "2 x 400g tins" is two tins: the size is part of what to buy, not the unit.
-  var sz=rest.match(/^(?:[x×](?=[\s\d])\s*)?(?:(\d+(?:\.\d+)?)\s*(kg|g|ml|l)(?![a-z])\s*)?/i);
+  var sz=rest.match(/^(?:[x×](?=[\s\d])\s*)?(?:(\d+(?:[.,]\d+)*)\s*(kg|g|ml|l)(?![a-z])\s*)?/i);
   if(sz[0]){
     var at2=unitAt(rest.slice(sz[0].length));
     if(at2.u && !/^(kg|g|ml|l|tbsp|tsp)$/.test(at2.u)){ size=sz[1]?sz[1]+sz[2].toLowerCase():''; rest=rest.slice(sz[0].length); }
@@ -3372,8 +3371,11 @@ function shoppingList(dates){
       var slot=byName[fold];
       if(!slot){ slot=byName[fold]={key:'i|'+nameKey, n:ing.n, parts:{}, order:[], plain:null}; order.push(slot); }
       if(ing.q===null){ if(slot.plain===null) slot.plain=ing.raw; return; }
-      var u=canonUnit(ing.u), part=slot.parts[u];
-      if(!part){ part=slot.parts[u]={u:u,q:0}; slot.order.push(part); }
+      // "2 x 400g tins" and "2 x 200g tins" are different packs, and a tin of
+      // no stated size is not assumed to be either, so each size adds alone.
+      var u=canonUnit(ing.u), sm=String(ing.size||'').match(/^([\d.,]+)(\w+)$/);
+      var sv=sm?canonQty(+sm[1].replace(',','.'),sm[2]):0, k=u+'|'+(sm?sv+canonUnit(sm[2]):''), part=slot.parts[k];
+      if(!part){ part=slot.parts[k]={u:u,q:0,size:sm?ing.size:'',sv:sv}; slot.order.push(part); }
       part.q+=canonQty(ing.qMax||ing.q,ing.u)*f;
     });
   });
@@ -3381,8 +3383,9 @@ function shoppingList(dates){
     if(!o.order.length){ o.label=o.plain||o.n; return; }
     // A measured amount answers the unmeasured mention too, so it is absorbed
     // rather than left as a second row saying only "you also need this".
-    o.order.sort(function(a,b){ return unitRank(a.u)-unitRank(b.u) || (a.u<b.u?-1:a.u>b.u?1:0); });
-    o.label=o.n+' ('+o.order.map(function(p){ return qtyText(p.q,p.u,true); }).join(' + ')+')';
+    o.order.sort(function(a,b){ return unitRank(a.u)-unitRank(b.u) || (a.u<b.u?-1:a.u>b.u?1:0) || a.sv-b.sv; });
+    o.label=o.n+' ('+o.order.map(function(p){ var t=qtyText(p.q,p.u,true);
+      return p.size?t.replace(/^([\d.]+)\s*/,'$1 x '+p.size+' '):t; }).join(' + ')+')';
   });
   // Added by hand, so they carry no quantity to add up, but they belong in the
   // same list: shopping from two lists is how the second one gets forgotten.

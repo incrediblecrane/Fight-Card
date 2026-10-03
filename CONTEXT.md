@@ -200,11 +200,15 @@ typed as "Name (quantity unit)". Built-in recipes deleted are listed in
 
 **Ingredient**:
 One line of a recipe, read by `parseIng` into a name, a quantity and a unit.
-Fractions ("1 1/2", "½", "1-1/2"), comma decimals ("1,5 l"; "1,000" is
-refused as `parseNum` refuses it), ranges ("2-3", "2–3", "2 to 3", "500g-1kg",
+Fractions ("1 1/2", "½", "1-1/2"), comma decimals ("1,5 l"), thousands
+commas ("1,000ml" is a litre: unlike a logged weight, read as a decimal it
+would make the list short), ranges ("2-3", "2–3", "2 to 3", "500g-1kg",
 bought at the top end), plural abbreviations ("kgs", "tbsps"), "large
 handful", a pack size ("2 x 400g tins": unit `tins`, `size` "400g") and a
-leading "about" or "~" (kept as `pre`) are read. A scaled card line parses
+leading "about" or "~" (kept as `pre`) are read. Only the amounts read are
+rewritten; any later number stays as typed. On the shopping list packs of
+different sizes, and a pack of no stated size, add up apart on the one row
+("2 x 200g tins + 2 x 400g tins"). A scaled card line parses
 back to the amount it shows, and at the recipe's own size is the line as
 typed. A line with no number ("Honey (drizzle)") keeps its name and invents no
 quantity; any name is allowed, `constructor` included. The bracket is found

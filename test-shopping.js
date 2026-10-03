@@ -475,7 +475,8 @@ t('"1 large handful" is read back as the unit it is', function(){
 t('"2 x 400g tins" keeps its unit and its size', function(){
   var g=pi('Chopped tomatoes (2 x 400g tins)'); assert.deepStrictEqual([g.q,g.u,g.size],[2,'tins','400g'], JSON.stringify(g));
   g=pi('Chopped tomatoes (2×400g tins)'); assert.deepStrictEqual([g.q,g.u,g.size],[2,'tins','400g'], JSON.stringify(g));
-  assert.deepStrictEqual(listOf(['Chopped tomatoes (2 x 400g tins)','Chopped tomatoes (tin)']),['Chopped tomatoes (3 tins)']);
+  // A tin of no stated size is not assumed to be the 400g one.
+  assert.deepStrictEqual(listOf(['Chopped tomatoes (2 x 400g tins)','Chopped tomatoes (tin)']),['Chopped tomatoes (1 tin + 2 x 400g tins)']);
   assert.strictEqual(sc('Chopped tomatoes (2 x 400g tins)',2),'Chopped tomatoes (4 x 400g tins)');
   assert.strictEqual(sc('Chopped tomatoes (2 x 400g tins)',0.5),'Chopped tomatoes (1 x 400g tin)');
 });
@@ -483,9 +484,8 @@ t('"2 x 400g tins" keeps its unit and its size', function(){
 t('a comma decimal is a decimal, and a typed amount is not garbled on the card', function(){
   var g=pi('Milk (1,5 l)'); assert.deepStrictEqual([g.q,g.u],[1.5,'l'], JSON.stringify(g));
   g=pi('Flour (0,25 kg)'); assert.deepStrictEqual([g.q,g.u],[0.25,'kg'], JSON.stringify(g));
-  // A thousands separator is refused, as the number boxes refuse it.
+  // A thousands comma is not a decimal: one litre is not one millilitre.
   assert.notStrictEqual(pi('Water (1,000ml)').q,1, JSON.stringify(pi('Water (1,000ml)')));
-  assert.notStrictEqual(pi('Water (1,000ml)').q,1.0, JSON.stringify(pi('Water (1,000ml)')));
   assert.strictEqual(sc('Rice (1 1/2 mugs)',1),'Rice (1 1/2 mugs)');
   assert.strictEqual(sc('Rice (1 1/2 mugs)',2),'Rice (3 mugs)');
   assert.strictEqual(sc('Rice (1 1/2 mugs)',3),'Rice (4.5 mugs)');
@@ -499,16 +499,37 @@ t('a comma decimal is a decimal, and a typed amount is not garbled on the card',
   assert.strictEqual(sc('Milk (1.5l)',0.5),'Milk (750ml)');
 });
 
+t('a thousands comma is read as thousands, and never makes a list row short', function(){
+  var g=pi('Water (1,000ml)'); assert.deepStrictEqual([g.q,g.u],[1000,'ml'], JSON.stringify(g));
+  g=pi('Flour (about 1,250 g)'); assert.deepStrictEqual([g.q,g.u,g.pre],[1250,'g','about'], JSON.stringify(g));
+  g=pi('Water (1,000-1,500ml)'); assert.deepStrictEqual([g.q,g.qMax,g.u],[1000,1500,'ml'], JSON.stringify(g));
+  assert.deepStrictEqual(listOf(['Water (1,000ml)','Water (500ml)']),['Water (1.5l)']);
+  assert.strictEqual(sc('Water (1,000ml)',2),'Water (2l)');
+  // A comma decimal is still a decimal, and "0,250" has no thousands to read.
+  assert.strictEqual(pi('Flour (0,250 kg)').q,0.25);
+  // A later amount is the user's words: it is not rewritten on the card.
+  assert.strictEqual(sc('Tomatoes (2 x 1,000ml cartons)',2),'Tomatoes (4 x 1,000ml cartons)');
+  assert.strictEqual(sc('Tomatoes (1 tin, in 0,5 l water)',2),'Tomatoes (2 tins, in 0,5 l water)');
+});
+
+t('packs of different sizes stay apart on the list row', function(){
+  assert.deepStrictEqual(listOf(['Tomatoes (2 x 400g tins)','Tomatoes (2 x 200g tins)']),['Tomatoes (2 x 200g tins + 2 x 400g tins)']);
+  assert.deepStrictEqual(listOf(['Tomatoes (2 x 400g tins)','Tomatoes (1 x 0.4kg tin)']),['Tomatoes (3 x 400g tins)']);
+  assert.deepStrictEqual(listOf(['Tomatoes (2 x 400g tins)','Tomatoes (2 x 400g tins)'],2),['Tomatoes (8 x 400g tins)']);
+});
+
 // Every line the app ships, scaled, has to read back as the amount it shows,
 // or a card copied into a new recipe quietly changes the recipe.
 t('every seed ingredient, scaled, reads back as the same amount and unit', function(){
   var box=sandbox({recipes:[], plan:[], shopExtras:[]}), bad=[], n=0;
   var extra=['Sugar (1-1/2 tsp)','Eggs (2–3)','Chicken (500g-1kg)','Chicken (1.5 kgs)','Spinach (1 large handful)',
-    'Chopped tomatoes (2 x 400g tins)','Milk (1,5 l)','Rice (1 1/2 mugs)','Ginger (2cm piece)','Rice (about 200g)'];
+    'Chopped tomatoes (2 x 400g tins)','Milk (1,5 l)','Water (1,000ml)','Water (1,000-1,500ml)','Rice (1 1/2 mugs)','Ginger (2cm piece)','Rice (about 200g)'];
   var lines=[]; SEED.recipes.forEach(function(r){ lines=lines.concat(r.ingredients||[]); });
   lines.concat(extra).forEach(function(txt){
     var p=box.parseIng(txt); if(p.q===null) return;
-    [0.2,0.5,1,1.5,2,3,4.4,7].forEach(function(f){
+    // At factor 1 a card is the line as typed, checked on its own below.
+    assert.strictEqual(box.scaledIng(p,1),p.raw);
+    [0.2,0.5,0.9,1.25,1.5,2,3,4.4,7].forEach(function(f){
       n++;
       var out=box.scaledIng(p,f), b=box.parseIng(out), say=txt+' x'+f+' -> '+out+' -> ';
       if(b.n!==p.n || b.q===null || box.canonUnit(b.u)!==box.canonUnit(p.u)) return bad.push(say+JSON.stringify(b));
