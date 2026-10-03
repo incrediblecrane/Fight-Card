@@ -17,6 +17,10 @@ var inflight=0, peak=0, slowGetMs=0;
 // for `ms` and only lands in the store when it completes, which is what makes
 // an overlapping save observable.
 var failNext=[], setDelays=[];
+// Leases, as acquire grants them: one holder per document until it runs out,
+// ttlMs clamped to [1000, 600000], 30000 when absent. setMs: how long a set
+// takes to answer. A page with __NO_LEASE set has a db with no acquire at all.
+var leases={}, setMs=12, leaseCalls=0;
 // failAll: every store request of those ops (all of them when ops is unset) is
 // refused with that code until it is cleared, as a store that has gone away is.
 var failAll=null;
@@ -75,7 +79,9 @@ var SHIM=`<script>(function(){
                 metadata:{fromCache:false,hasPendingWrites:false}}; }); },
       set:function(data){ return post('set',{path:path,data:data}).then(function(){}); },
       update:function(data){ return post('update',{path:path,data:data}).then(function(){}); },
-      delete:function(){ return post('del',{path:path}).then(function(){}); }
+      delete:function(){ return post('del',{path:path}).then(function(){}); },
+      acquire:window.__NO_LEASE?undefined:function(o){ return post('acquire',{path:path,holder:o&&o.holder,ttlMs:o&&o.ttlMs}).then(function(r){
+        var out={acquired:r.acquired, expiresAt:r.expiresAt}; if(r.acquired){ out.holder=r.holder; out.version=r.version; } return out; }); }
     };
   }
   function collRef(path){
@@ -143,6 +149,11 @@ var srv=http.createServer(function(q,r){
         if(slowGetMs){ return setTimeout(send,slowGetMs); }
         return send(); }
       if(op==='slow'){ slowGetMs=body.ms||0; return srvJson(r,{ok:1}); }
+      if(op==='acquire'){ leaseCalls++;
+        var now=Date.now(), l=leases[body.path], ttl=Math.min(600000,Math.max(1000,+body.ttlMs||30000));
+        if(l && l.exp>now && l.holder!==body.holder) return srvJson(r,{acquired:false, expiresAt:new Date(l.exp).toISOString()});
+        leases[body.path]={holder:body.holder, exp:now+ttl, version:((l&&l.version)||0)+1};
+        return srvJson(r,{acquired:true, holder:body.holder, version:leases[body.path].version, expiresAt:new Date(now+ttl).toISOString()}); }
       if(op==='set'&&tooBig(body.data)){ calls.set++; limitRefused++; return srvJson(r,{err:'invalid_argument'}); }
       if(op==='update'&&Object.prototype.hasOwnProperty.call(store,body.path)&&tooBig(Object.assign({},store[body.path],body.data))){
         calls.set++; limitRefused++; return srvJson(r,{err:'invalid_argument'}); }
@@ -150,7 +161,7 @@ var srv=http.createServer(function(q,r){
         var held=take(setDelays,op,body.path);
         if(held){ return setTimeout(function(){ store[body.path]=body.data; inflight--; srvJson(r,{ok:1}); },held.ms); }
         store[body.path]=body.data;
-        setTimeout(function(){ inflight--; srvJson(r,{ok:1}); },12); return; }
+        setTimeout(function(){ inflight--; srvJson(r,{ok:1}); },setMs); return; }
       // As the real store does: update merges into a document that exists and
       // is refused for one that does not.
       if(op==='update'){ calls.set++;
@@ -373,7 +384,7 @@ srv.listen(0,async function(){
   await t('the migration save is batched the same way seeding is', async function(){
     // This is the real burst: a store still holding recipes in the old shape.
     // On load, migratePlan strips all forty-five at once and ONE save carries
-    // them. dbSeed batches at eight precisely to avoid that, and a save has no
+    // them. Seeding goes eight at a time precisely to avoid that, and a save has no
     // more right to forty-five parallel writes than seeding does.
     Object.keys(store).forEach(function(k){
       if(k.indexOf('recipes/')!==0) return;
@@ -558,6 +569,7 @@ srv.listen(0,async function(){
 
   var W='[data-action="water"][data-d="1"]';
   var dayWater=function(day){ return (store['days/'+day]||{}).water||0; };
+  var builtIn=function(k){ return /^recipes\/p\d+$/.test(k); };
 
   console.log('\nSAVES GO ONE AT A TIME');
   await t('a slow save cannot land after a newer one and undo it', async function(){
@@ -1766,7 +1778,9 @@ srv.listen(0,async function(){
     await importing(JSON.stringify({schema:1,days:{'2026-09-29':blank()}}));
     await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
     // Today is made again by the first tap after it, as on any day.
-    var left=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('state/')!==0 && k!=='days/2026-09-29' && k!=='days/'+day; }); };
+    // The built-in prep recipes are part of the app: a record that neither
+    // has nor deleted one is given it, on an import as on a load.
+    var left=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('state/')!==0 && k!=='days/2026-09-29' && k!=='days/'+day && !builtIn(k); }); };
     assert.deepStrictEqual(left(),[],'documents the import does not have are still stored');
     await go();
     assert.deepStrictEqual(left(),[],'they came back on a reload');
@@ -2171,7 +2185,7 @@ srv.listen(0,async function(){
   };
   var imported=function(o){ return Object.keys(o.days).map(function(k){ return 'days/'+k; })
     .concat(o.saunaSessions.map(function(x){ return 'sauna/'+x.id; })).sort(); };
-  var held=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('state/')!==0; }).sort(); };
+  var held=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('state/')!==0 && !builtIn(k); }).sort(); };
   var cutOff=async function(o){
     await importing(JSON.stringify(o));
     setDelays.push({op:'set',match:'days/',ms:2500});
@@ -2672,6 +2686,8 @@ srv.listen(0,async function(){
       await qToday(q); await q.click('[data-action="water"][data-d="1"]');
       for(var k=0;k<40 && !Object.keys(store).some(function(x){ return store[x]&&store[x].title==='BOOM marker'; });k++) await q.waitForTimeout(250);
       assert.ok(Object.keys(store).some(function(x){ return store[x]&&store[x].title==='BOOM marker'; }),'the next change did not save it');
+      // In the store is not yet answered: the notice goes once the write is.
+      for(k=0;k<20 && (await notSaved(q)).length;k++) await q.waitForTimeout(150);
       assert.ok(!(await notSaved(q)).length,'the notice stayed up after a save landed');
     } finally { errs.splice(e0); await q.context().close(); }
     await go();
@@ -2788,6 +2804,161 @@ srv.listen(0,async function(){
     await importing(JSON.stringify({schema:1, exportedAt:iso, days:{'2025-04-01':blank()}}));
     var body=await text();
     assert.ok(body.indexOf('Exported '+local+':')>-1,'the summary does not say Exported '+local+': '+(body.match(/Exported [^:]*/)||[''])[0]);
+  });
+
+  console.log('\nFIRST RUN ON AN EMPTY STORE');
+  // An empty store, with the document's seed as it is or as given, and
+  // everything put back after, whatever the check did.
+  var emptyStore=async function(fn,seed){
+    var was=JSON.parse(JSON.stringify(store)), docWas=doc;
+    Object.keys(store).forEach(function(k){ delete store[k]; }); leases={};
+    if(seed) doc=env.withSeed(doc,seed);
+    try{ await fn(); }
+    finally{ setMs=12; setDelays.length=0; doc=docWas; leases={};
+      Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); }
+  };
+  var until=async function(fn,ms,what){ var t0=Date.now();
+    while(!fn()){ if(Date.now()-t0>ms) throw new Error('timed out waiting for '+what); await new Promise(function(r){ setTimeout(r,25); }); } };
+  var seedDocs=function(){ return Object.keys(store).filter(function(k){ return k!=='state/meta'; }).length; };
+  var waterOn=async function(q,n){ for(var i=0;i<n;i++){ await q.click('[data-action="water"][data-d="1"]'); await q.waitForTimeout(120); } };
+  // In litres, a cup a quarter of one.
+  var shownWater=function(q){ return q.evaluate(function(){
+    var c=[].slice.call(document.querySelectorAll('.card')).filter(function(c){ return /Water/i.test((c.querySelector('h3')||{}).textContent||''); })[0];
+    return c?c.querySelector('.count').textContent.trim():null; }); };
+  var withToday=async function(water){
+    var st=env.seedOf(doc), day=await today();
+    st.days[day]={water:water,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true};
+    return {st:st, day:day};
+  };
+
+  // Both seeded: the later one's whole-document writes landed over what had
+  // been logged in the first, and the first then took them in as the store's.
+  await t('two views opened on a fresh store at once: one seeds, and what the other logs is kept', async function(){
+    var w=await withToday(1), day=w.day;
+    await emptyStore(async function(){
+      setMs=200;
+      var A=await fresh(), B=null;
+      try{
+        await until(function(){ return !!store['days/'+day]; },15000,'view A to write today');
+        // The next whole write of today is held for six seconds: a second
+        // seed's would land after what view A logs.
+        setDelays.push({op:'set',match:'days/'+day,ms:6000});
+        B=await fresh();
+        await A.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); });
+        await qToday(A); await waterOn(A,3);
+        await B.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); },null,{timeout:15000});
+        setMs=12;
+        await until(function(){ return store['state/meta'] && setDelays.length===0; },20000,'the seed and the held write');
+        await new Promise(function(r){ setTimeout(r,7000); });
+        assert.strictEqual(store['days/'+day].water,4,'the store lost what view A logged: water is '+store['days/'+day].water);
+        await B.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); }); await B.waitForTimeout(1500);
+        await qToday(B);
+        assert.strictEqual(await shownWater(B),'1L','view B does not show what view A logged');
+        assert.strictEqual(await shownWater(A),'1L','view A does not show its own water');
+      } finally { await A.context().close(); if(B) await B.context().close(); }
+    },w.st);
+  });
+
+  await t('a first run is not held on loading while the seed is written, and a tap made meanwhile is saved after', async function(){
+    var w=await withToday(2), day=w.day;
+    await emptyStore(async function(){
+      setMs=150;
+      var q=await fresh();
+      try{
+        await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); },null,{timeout:3000});
+        assert.ok(!store['state/meta'],'the seed had finished before the page was usable, so this proves nothing');
+        await qToday(q); await waterOn(q,1);
+        assert.ok(!store['state/meta'],'the seed finished before the tap, so this proves nothing');
+        assert.strictEqual(await shownWater(q),'0.75L','the tap during seeding did nothing');
+        await until(function(){ return !!store['state/meta']; },20000,'the seed');
+        await q.waitForTimeout(2500);
+        assert.strictEqual(store['days/'+day].water,3,'the tap made while seeding was not saved: water is '+store['days/'+day].water);
+        assert.ok(seedDocs()>40,'only '+seedDocs()+' documents were seeded');
+        var pk=await q.evaluate(function(){ return window.__db.peak; });
+        assert.ok(pk<=8,'up to '+pk+' writes were in flight at once');
+      } finally { await q.context().close(); }
+    },w.st);
+  });
+
+  await t('a view that finds another seeding waits, and takes over once its lease runs out', async function(){
+    await emptyStore(async function(){
+      leases['state/seeding']={holder:'a closed view',exp:Date.now()+4000,version:1};
+      var q=await fresh();
+      try{
+        await q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); },null,{timeout:3000});
+        await q.waitForTimeout(1500);
+        assert.strictEqual(Object.keys(store).length,0,'it seeded while another view held the lease');
+        await until(function(){ return !!store['state/meta']; },15000,'the seed after the lease ran out');
+        assert.ok(seedDocs()>40,'only '+seedDocs()+' documents were seeded');
+      } finally { await q.context().close(); }
+    });
+  });
+
+  await t('with no leases, a marker written by another view stops this one seeding over it', async function(){
+    await emptyStore(async function(){
+      setMs=150;
+      var q=await fresh('window.__NO_LEASE=true;');
+      try{
+        await until(function(){ return seedDocs()>=8; },15000,'the first batch');
+        store['state/meta']={seeded:true, by:'another view'};
+        var n=seedDocs();
+        await q.waitForTimeout(2500);
+        assert.strictEqual(store['state/meta'].by,'another view','this view wrote its marker over another\'s');
+        assert.ok(seedDocs()<=n+8,'it went on seeding past the marker: '+n+' then '+seedDocs());
+      } finally { await q.context().close(); }
+    });
+  });
+
+  await t('a seed cut off part way is finished without writing over what it had already put', async function(){
+    var w=await withToday(2), day=w.day;
+    await emptyStore(async function(){
+      store['days/'+day]={water:6,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true};
+      calls.set=0;
+      var q=await fresh();
+      try{
+        await until(function(){ return !!store['state/meta']; },15000,'the seed');
+        await q.waitForTimeout(1500);
+        assert.strictEqual(store['days/'+day].water,6,'the seed wrote over a document already there');
+        await qToday(q);
+        assert.strictEqual(await shownWater(q),'1.5L','the view does not show what the store holds');
+      } finally { await q.context().close(); }
+    },w.st);
+  });
+
+  console.log('\nWHAT A LOAD FROM THE STORE PUTS RIGHT');
+  await t('a built-in prep recipe the store lacks is added, and one deleted stays deleted', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      delete store['recipes/p8']; delete store['recipes/p7'];
+      store['state/profile']=Object.assign({},store['state/profile'],{deletedRecipes:['p7']});
+      // A built-in recipe as an older version stored it, with no portions or macros.
+      var r1=JSON.parse(JSON.stringify(env.seedOf(doc).recipes.filter(function(r){ return r.id==='r1'; })[0]));
+      delete r1.base; delete r1.macros; delete r1.portions; store['recipes/r1']=r1;
+      await go(); await p.waitForTimeout(1500);
+      assert.ok(store['recipes/p8'],'the missing prep recipe was not added');
+      assert.ok(!store['recipes/p7'],'a deleted built-in recipe came back');
+      assert.ok(store['recipes/r1'].base && store['recipes/r1'].macros,'the recipe\'s metadata was not attached');
+    } finally { Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); await go(); }
+  });
+
+  await t('recipes and notes keep their order across a reload, and a new one stays last', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    var titles=function(){ return p.$$eval('.libitem h4',function(xs){ return xs.map(function(x){ return x.textContent; }); }); };
+    try{
+      await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(300);
+      await p.fill('#rec-title','ZZ My new recipe'); await p.fill('#rec-ing','Beef (800g)'); await p.click('[data-action="addrecipe"]');
+      await p.waitForTimeout(1800);
+      var a=await titles();
+      await go(); await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(300);
+      var b=await titles();
+      assert.deepStrictEqual(b,a,'the recipes came back in another order');
+      assert.strictEqual(b.indexOf('ZZ My new recipe'),b.length-1,'the new recipe is not last');
+      await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(300);
+      await p.fill('#lib-title','My knee note'); await p.click('[data-action="addlib"]'); await p.waitForTimeout(1800);
+      var c=await titles();
+      await go(); await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(300);
+      assert.deepStrictEqual(await titles(),c,'the notes came back in another order');
+    } finally { Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); await go(); }
   });
 
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');

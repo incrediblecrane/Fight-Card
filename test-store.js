@@ -20,10 +20,10 @@ function grabVar(decl){
   return m[0];
 }
 // readImport knows the exercises, so a session can lose one this version does not have.
-var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('WORKOUT_TYPES'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
+var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_SEED_BATCH'), grabVar('DB_LISTS'), grabVar('SLOTS'), grabVar('WORKOUT_TYPES'), grabVar('DB_COLLECTIONS'), grabVar('DB_STATE_DOCS'),
   grabVar('DAY_MAX'), h.match(/var EX=\[[\s\S]*?\n\];/)[0], grab('isSuperset'), grab('exDef'), grab('blankDay'), grab('wholeDay'),
   grabVar('EXPORT_SCHEMA'), h.match(/var EXPORT_KEYS=\[[^\]]*\];/)[0], grabVar('EXPORT_LISTS'), grabVar('IMPORT_SET'), h.match(/var IMPORT_FIELDS=\{[\s\S]*?\}\};/)[0],
-  grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('isBlankDay'), grab('dbDocs'), grab('byDateId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
+  grab('slotRank'), grab('planOrder'), grab('dbClone'), grab('stripDerived'), grab('isBlankDay'), grab('dbDocs'), grab('byDateId'), grab('listKey'), grab('byListId'), grab('sessId'), grab('liveSession'), grab('dbApply'),
   grab('stableJson'), grab('mergeKeyed'), grab('setKey'), grab('mergeSetLogs'), grab('mergeSession'), grab('mergeActive'), grab('mergeSessionDoc'), grab('dbMerge'), grab('foldPend'),
   grabVar('DAY_COUNTS'), grab('mergeDay'), grab('profShape'), grab('dayPair'), grab('dayWx'), grab('dayXp'), grab('waterTgt'), 'var state=null, pendFix=0;',
   h.match(/var DUMP_COLL=[^\n]*\n/)[0], grab('readDump'),
@@ -464,6 +464,22 @@ t('a path the store throws on is one refused document, not a throw', async funct
   await Promise.all(jobs);
   assert.deepStrictEqual(landed,['library/a'],'the good document did not land');
   assert.deepStrictEqual(errs,['invalid_argument','invalid_argument','invalid_argument','invalid_argument','invalid_argument']);
+});
+
+// The store hands a collection back in id order (r1, r10, r11 ...), which
+// reshuffled the recipes and notes on every load and put a new recipe in the
+// middle. Read back, they are in the order they were made.
+t('recipes and notes come back from the store in the order they were made', function(){
+  var st=JSON.parse(JSON.stringify(seed));
+  st.recipes.push({id:'r1727900000000',title:'Mine',tag:'Recipe',ingredients:[],base:1,portions:1});
+  st.recipes.push({id:'r1727900500000',title:'Mine later',tag:'Recipe',ingredients:[],base:1,portions:1});
+  st.library.push({id:'l1727900000000',title:'Knee',tag:'Note',notes:''});
+  var docs=box.dbDocs(st), map={};
+  Object.keys(docs).sort().forEach(function(p){ map[p]=JSON.parse(JSON.stringify(docs[p])); });
+  var back=box.dbApply(map), ids=function(l){ return l.map(function(x){ return x.id; }); };
+  assert.deepStrictEqual(ids(back.recipes),ids(st.recipes),'the recipes were reordered');
+  assert.deepStrictEqual(ids(back.library),ids(st.library),'the notes were reordered');
+  assert.strictEqual(ids(back.recipes).slice(-1)[0],'r1727900500000','the newest recipe is not last');
 });
 
 (async function(){

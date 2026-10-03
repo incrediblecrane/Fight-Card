@@ -879,13 +879,19 @@ var PREP_RECIPES=[
 
 // Attach the metadata to whatever recipes are already saved, and add any prep
 // recipe that is not there yet. Doing it this way means your saved plan, days
-// and any recipe you added yourself all survive untouched.
-(function(){
+// and any recipe you added yourself all survive untouched. Run on the seed
+// here, and on what the store or an import hands over (dbBoot, applyImport),
+// which replace state wholesale: run only here, a store never got a new prep
+// recipe or the metadata. Answers whether it changed anything.
+function topUpRecipes(){
+  var changed=false;
+  if(!state.recipes) state.recipes=[];
+  if(!state.deletedRecipes) state.deletedRecipes=[];
   state.recipes.forEach(function(r){
     var m=RECIPE_META[r.id];
-    if(m && !r.base){ r.base=m[0]; r.macros=[m[1],m[2],m[3],m[4]]; }
-    if(!r.base) r.base=1;
-    if(!r.portions) r.portions=r.base;
+    if(m && !r.base){ r.base=m[0]; r.macros=[m[1],m[2],m[3],m[4]]; changed=true; }
+    if(!r.base){ r.base=1; changed=true; }
+    if(!r.portions){ r.portions=r.base; changed=true; }
   });
   // Missing is also what a deleted one looks like, so those are remembered and
   // not put back: without that a saved page reloaded with the recipe returned.
@@ -895,9 +901,11 @@ var PREP_RECIPES=[
     if(have[p.id]) return;
     var c=JSON.parse(JSON.stringify(p));
     c.portions=c.base;
-    state.recipes.push(c);
+    state.recipes.push(c); changed=true;
   });
-})();
+  return changed;
+}
+topUpRecipes();
 
 // Which tab, slide and chart range this view is on. It is this device's
 // position, not part of the record: kept in the profile, every tab change
@@ -1076,8 +1084,9 @@ function stripDerived(r){
 var SESS_ENDED_KEEP=20;
 var DB_LISTS={workoutLogs:'workoutLogs', sauna:'saunaSessions', library:'library', recipes:'recipes', plan:'plan'};
 /* Rebuild state from what the store returned. Order matters for the lists:
-   the app renders workout logs and sauna sessions newest-last, and document
-   ids sort lexically, so anything order-dependent is sorted explicitly. */
+   the app renders workout logs and sauna sessions newest-last, notes and
+   recipes in the order they were made, and document ids sort lexically, so
+   every list is sorted explicitly. */
 /* Documents come back FROZEN, and the app mutates state in place everywhere:
    a water tap does `today.water = n`. Against a frozen body that assignment is
    a silent no-op outside strict mode, so the tap does nothing and the document
@@ -1111,12 +1120,30 @@ function dbApply(map){
   Object.keys(buckets).forEach(function(key){ st[key]=buckets[key]; });
   // Logged work is read back in the order it happened.
   st.workoutLogs.sort(byDateId); st.saunaSessions.sort(byDateId);
+  // Notes and recipes in the order they were made, not the store's (r1, r10,
+  // r11 ...), so they do not reshuffle on every load.
+  st.library.sort(byListId); st.recipes.sort(byListId);
   // The calendar reads the plan in day then slot order, so sort it once here
   // rather than at every render.
   st.plan.sort(planOrder);
   return st;
 }
 function byDateId(a,b){ return (a.date<b.date?-1:a.date>b.date?1:0)||(a.id<b.id?-1:1); }
+/* The order notes and recipes were made in, read from their ids: the
+   built-in ones (r1..r37, then the prep recipes p1..p8, the note t1) by
+   number, then any other id, then those added here, named for the time they
+   were made ('r'+Date.now()), oldest first. */
+function listKey(id){
+  var m=/^([a-z]+)(\d+)$/.exec(String(id)), n=m?+m[2]:0;
+  if(m && n>=1e9) return [3,'',n,id];
+  if(m) return [m[1]==='r'?0:m[1]==='p'?1:2,m[1],n,id];
+  return [2,'~',0,String(id)];
+}
+function byListId(a,b){
+  var x=listKey(a&&a.id), y=listKey(b&&b.id);
+  for(var i=0;i<4;i++){ if(x[i]<y[i]) return -1; if(x[i]>y[i]) return 1; }
+  return 0;
+}
 /* Key order, canonicalised. The store hands documents back with their keys in
    alphabetical order rather than the order they were written in. That does not
    bite today, because state and lastSaved are both built from the very same
@@ -1612,7 +1639,9 @@ function scheduleSave(){ exportDirty=true; if(saveTimer) clearTimeout(saveTimer)
 // fields this view changed, and the next save, on being looked at again, merges.
 function flushSave(){ if(!saveTimer) return; clearTimeout(saveTimer); saveTimer=null;
   // An import still owed stays one: a flush sends fields, not the deletes it needs.
-  saveNow=dbState==='db'?(saveNow==='put'||saveNow==='replace'?saveNow:'flush'):false; persist(); }
+  // While the store is being seeded nothing can be sent; seedDone reads and saves.
+  var owed=saveNow==='put'||saveNow==='replace';
+  saveNow=dbState!=='db'?false:owed?saveNow:dbSeeding?false:'flush'; persist(); }
 
 var DB_COLLECTIONS=['days','workoutLogs','sauna','library','recipes','plan'];
 var DB_STATE_DOCS=['state/profile','state/shopping','state/session'];
@@ -1661,6 +1690,9 @@ function DbStore(db){
         return map;
       });
     }};
+  // A lease, where the db has them: one view at a time seeds (see dbSeedStart).
+  var lock=null; try{ lock=db.doc(DB_SEED_LOCK); }catch(e){}
+  if(lock&&typeof lock.acquire==='function') s.acquire=function(path,o){ return at(path,function(r){ return r.acquire(o); }); };
   if(typeof db.collection(DB_COLLECTIONS[0]).onSnapshot==='function') s.subscribe=function(fn){
     var offs=DB_COLLECTIONS.map(function(coll){
       return db.collection(coll).onSnapshot(function(snap){
@@ -1708,25 +1740,120 @@ function MemoryStore(init){
   };
 }
 
-/* Write every document the seed implies, then mark the store seeded. The
-   marker is written LAST and only after every write resolved, so a migration
-   that dies halfway is simply retried on the next load rather than leaving a
-   store that claims to be complete and is not. */
-var DB_SEED_BATCH=8;
-function dbSeed(st){
-  var docs=dbDocs(st), paths=Object.keys(docs);
-  // In batches, not seventy writes at once: a burst that size is the shape the
-  // store calls resource_exhausted, and a seed that always trips it would
-  // never get past its first attempt.
-  function batch(i){
-    if(i>=paths.length) return Promise.resolve();
-    var slice=paths.slice(i,i+DB_SEED_BATCH);
-    return Promise.all(slice.map(function(path){ return dbStore.put(path,docs[path]); }))
-      .then(function(){ return batch(i+DB_SEED_BATCH); });
-  }
-  return batch(0)
-    .then(function(){ return dbStore.put('state/meta',{seeded:true, seededAt:new Date().toISOString(), docs:paths.length}); })
-    .then(function(){ return docs; });
+/* First run on an empty store: write every document the seed implies, then
+   mark the store seeded. The marker is written LAST and only after every write
+   landed, so a seed that dies halfway is retried on the next load (skipping
+   what is already there) rather than leaving a store that claims to be
+   complete and is not.
+   It runs in the background. The app runs on the embedded seed meanwhile,
+   which is what is being written: a year of data took up to half a minute
+   behind 'loading your data'. Taps go into state as ever, and saves are held
+   until the marker lands; the whole store is then read and merged against
+   the seed, as when the page is looked at again, so they are saved after.
+   One view seeds. Two opened on a fresh store at once both seeded, and the
+   later one's whole-document writes put the seed back over what had been
+   logged in the first. The seeding view holds a lease (acquire) on
+   DB_SEED_LOCK, renewed while it works; any other waits for the marker,
+   trying for the lease as it goes, so one left by a view that closed is
+   taken over once it runs out. A store with no leases has the marker looked
+   for before each batch instead. */
+var DB_SEED_BATCH=8, DB_SEED_LOCK='state/seeding', DB_SEED_TTL=10000, DB_SEED_POLL=1000, dbSeeding=null;
+function dbSeedStart(){
+  var snap=dbSnapshot(dbDocs(state));
+  dbSeeding={snap:snap, holder:'seed-'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),
+    done:{}, refused:{}, attempt:0, renew:null, wait:null, lost:false, err:null, meta:null};
+  setSaving(true); seedStep(dbSeeding);
+}
+function seedLease(me,ttl){ return dbStore.acquire(DB_SEED_LOCK,{holder:me.holder, ttlMs:ttl||DB_SEED_TTL}); }
+function seedQuiet(me){
+  if(me.renew){ clearInterval(me.renew); me.renew=null; }
+  if(me.wait){ clearTimeout(me.wait); me.wait=null; }
+}
+function seedStep(me){
+  me.wait=null;
+  if(dbSeeding!==me||dbState!=='db') return;
+  dbStore.get('state/meta').then(function(meta){
+    if(dbSeeding!==me) return;
+    if(meta) return seedDone(me,meta);
+    if(!dbStore.acquire) return seedWrite(me,false);
+    return seedLease(me).then(function(r){
+      if(dbSeeding!==me) return;
+      if(r&&r.acquired) return seedWrite(me,true);
+      // Another view is seeding: its marker is looked for again shortly.
+      me.wait=setTimeout(function(){ seedStep(me); },DB_SEED_POLL);
+    },function(e){
+      // A lease refused is no reason never to seed: as with no leases.
+      if(e&&DB_LOST[e.code]) throw e;
+      if(dbSeeding===me) return seedWrite(me,false);
+    });
+  }).then(null,function(e){ seedFail(me,e); });
+}
+function seedFail(me,e){
+  if(dbSeeding!==me) return;
+  seedQuiet(me);
+  var code=(e&&e.code)||'unavailable';
+  if(DB_LOST[code]){ dbSeeding=null; dbErr=code; dbState='paused'; setSaving(false); render(); return; }
+  me.wait=setTimeout(function(){ seedStep(me); },Math.min(30000,2000*Math.pow(2,me.attempt++))+Math.random()*500);
+}
+function seedWrite(me,lease){
+  if(lease&&!me.renew) me.renew=setInterval(function(){
+    seedLease(me).then(function(r){ if(r&&!r.acquired) me.lost=true; },function(){}); },DB_SEED_TTL/3);
+  return dbStore.readAll().then(function(have){
+    if(dbSeeding!==me) return;
+    // What a seed cut off before put there is the seed already.
+    var todo=Object.keys(me.snap).filter(function(p){ return have[p]===undefined&&!me.done[p]&&!me.refused[p]; });
+    if(lease) return seedPool(me,todo);
+    function batch(i){
+      if(i>=todo.length||me.err) return;
+      return dbStore.get('state/meta').then(function(meta){
+        if(meta){ me.meta=meta; return; }
+        return seedPool(me,todo.slice(i,i+DB_SEED_BATCH)).then(function(){ return batch(i+DB_SEED_BATCH); });
+      });
+    }
+    return batch(0);
+  }).then(function(){
+    if(dbSeeding!==me) return;
+    if(me.meta) return seedDone(me,me.meta);
+    if(me.err){ var e=me.err; me.err=null; throw e; }
+    // Taken over by a view that found this one's lease run out: it seeds.
+    if(me.lost){ me.lost=false; seedQuiet(me); return seedStep(me); }
+    var meta={seeded:true, seededAt:new Date().toISOString(), docs:Object.keys(me.snap).length};
+    return dbStore.put('state/meta',meta).then(function(){
+      // Let go of the lease soon, as there is no verb to release it.
+      if(lease) seedLease(me,1000).then(null,function(){});
+      seedDone(me,meta);
+    });
+  });
+}
+/* DB_SEED_BATCH writes out at once, the next going as each lands, never a
+   burst of the lot: that is the shape the store calls resource_exhausted. A
+   refusal retrying cannot fix is left for the first save to name. */
+function seedPool(me,list){
+  var i=0, out=0;
+  return new Promise(function(resolve){
+    function next(){
+      if(dbSeeding!==me||me.lost||me.err||i>=list.length){ if(!out) resolve(); return; }
+      var path=list[i++]; out++;
+      dbStore.put(path,JSON.parse(me.snap[path])).then(function(){ me.done[path]=1; },function(e){
+        var code=(e&&e.code)||'unavailable';
+        if(DB_HARD[code]) me.refused[path]=code; else if(!me.err) me.err={code:code};
+      }).then(function(){ out--; next(); });
+    }
+    for(var k=0;k<DB_SEED_BATCH;k++) next();
+  });
+}
+/* The store holds the seed now, written by this view or another. That is
+   what this view last heard from it, and the whole store is read and merged
+   against it, so what was tapped here meanwhile is saved and what was logged
+   in another view comes in. */
+function seedDone(me,meta){
+  seedQuiet(me);
+  if(dbSeeding!==me) return;
+  dbSeeding=null; dbMeta=meta;
+  lastSaved={}; savedGen={};
+  Object.keys(me.snap).forEach(function(p){ if(!me.refused[p]) lastSaved[p]=me.snap[p]; });
+  if(saveNow==='flush') saveNow=false;
+  setSaving(false); saveSync=true; dbSave();
 }
 
 /* 'local' means there is no store to read: this page is open outside the
@@ -1771,7 +1898,7 @@ function dbBoot(){
       throw {code:'unavailable'};
     }
     dbStore=DbStore(db);
-    var resume=null;
+    var resume=null, fresh=false;
     return dbStore.get('state/meta').then(live(function(meta){
       dbMeta=meta||null;
       if(meta) return dbStore.readAll().then(live(function(map){
@@ -1784,6 +1911,7 @@ function dbBoot(){
         // Both write, so either one changing anything has to be saved.
         var moved=migratePlan(); if(prunePlan()) moved=true;
         if(migrateMinutes()) moved=true;
+        if(topUpRecipes()) moved=true;
         // A change a closed view sent beside a document is folded in above
         // and goes into the document itself now.
         if(Object.keys(pendSeen).length) moved=true;
@@ -1804,11 +1932,12 @@ function dbBoot(){
         if(moved) scheduleSave();
       }));
       // First run on this store: the document's own seed is the truth, and
-      // no import left on this device can be about it.
-      clearPending();
-      return dbSeed(state).then(live(function(docs){ lastSaved=dbSnapshot(docs); }));
+      // no import left on this device can be about it. It is written in the
+      // background, once this view is running on it (see dbSeedStart).
+      clearPending(); fresh=true;
     })).then(live(function(){
       dbState='db'; dbErr=null;
+      if(fresh) dbSeedStart();
       syncFromState();
       if(resume){ importBusy=true; importNote='The import that was cut off is finished.'; saveNow=resume; persist(); }
       render();
@@ -2045,6 +2174,7 @@ function dbPlace(path,body){
     if(at>-1){ list[at]=st[key][0]; return; }
     list.push(st[key][0]);
     if(key==='plan') list.sort(planOrder); else if(key==='workoutLogs'||key==='saunaSessions') list.sort(byDateId);
+    else list.sort(byListId);
     return;
   }
   DB_STATE_KEYS[path].forEach(function(k){ state[k]=st[k]; });
@@ -2315,7 +2445,8 @@ function dbSettle(list){
 function dbSave(){
   // Not while held: a save asked for before the store refused this view for
   // good would otherwise still go once the one in flight was refused.
-  if(!dbStore||dbState!=='db') return;
+  // Nor while the store is being seeded: seedDone saves what is held.
+  if(!dbStore||dbState!=='db'||dbSeeding) return;
   if(saveBusy){ saveAgain=true; return; }
   saveBusy=true;
   var retrying=false, mode=saveNow, all=!mode&&saveSync, gen=++saveGen; saveNow=false; if(all) saveSync=false;
@@ -2427,7 +2558,7 @@ function dbSave(){
     if(!jobs.length&&!imp){ if(moved) render(); return; }
     setSaving(true); if(moved) render();
     // Almost every save is one or two documents, but a migration dirties every
-    // recipe at once. Firing fifty writes in parallel is what dbSeed batches to
+    // recipe at once. Firing fifty writes in parallel is what seeding batches to
     // avoid, and a save has no more right to that burst than seeding does.
     function batch(list,i){
       if(i>=list.length) return Promise.resolve();
@@ -2503,9 +2634,9 @@ function pubSave(){
    The whole record as one versioned JSON file, in the same shape as the seed
    embedded in this document, so it is also what build-publish --state takes.
    It goes out through dbDocs/dbApply, which drops render caches and puts the
-   lists in their stored order, so exporting the same data twice gives the same
-   file but for exportedAt. Import only ever JSON.parses what it is given and
-   checks every shape before any of it becomes state. */
+   lists in the order a load gives them, so exporting the same data twice
+   gives the same file but for exportedAt. Import only ever JSON.parses what
+   it is given and checks every shape before any of it becomes state. */
 var EXPORT_SCHEMA=1;
 var EXPORT_KEYS=['waterTarget','weekTarget','totalXp','deletedRecipes','days','workoutLogs','saunaSessions',
   'library','recipes','plan','shoppingChecked','shopExtras','activeSession'];
@@ -2858,7 +2989,7 @@ function applyImport(st,mode){
   if(was && was!==now) ended=ended.concat([was]);
   state.endedSessions=ended.filter(function(x){ return x!==now; }).slice(-SESS_ENDED_KEEP);
   // A file in an older shape is converted now, as dbBoot does a store.
-  migratePlan(); prunePlan(); migrateMinutes();
+  migratePlan(); prunePlan(); migrateMinutes(); topUpRecipes();
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
   saveNow=dbState==='db'?(mode==='merge'?'put':'replace'):false;

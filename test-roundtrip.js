@@ -20,7 +20,7 @@ var DB_LISTS=h.match(/var SESS_ENDED_KEEP=\d+;/)[0]+'\n'+h.match(/var DB_LISTS=\
 var sandbox={};
 var SLOTS=h.match(/var SLOTS=\[[^\]]*\];/)[0];
 new Function(DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+
-  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('isBlankDay')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
+  grab('dbClone')+'\n'+grab('stripDerived')+'\n'+grab('isBlankDay')+'\n'+grab('dbDocs')+'\n'+grab('byDateId')+'\n'+grab('listKey')+'\n'+grab('byListId')+'\n'+grab('sessId')+'\n'+grab('liveSession')+'\n'+grab('dbApply')+
   '\nthis.dbDocs=dbDocs;this.dbApply=dbApply;').call(sandbox);
 
 var seedRaw=JSON.stringify(require('./test-env.js').seedOf(h));
@@ -301,7 +301,7 @@ function mergeSandbox(extra,out){
   var KEYS=h.match(/var DB_STATE_KEYS=\{[^}]*\};/)[0];
   var m={state:{waterTarget:8,totalXp:0,deletedRecipes:[]}};
   new Function('state',DB_LISTS+'\n'+SLOTS+'\n'+grab('slotRank')+'\n'+grab('planOrder')+'\n'+KEYS+'\nfunction ensurePrep(){}\n'+grab('dbClone')+'\n'+
-    grab('byDateId')+'\n'+grab('dbApply')+'\n'+grab('dbPlace')+'\ndbPlace("state/profile",{waterTarget:9,totalXp:5,deletedRecipes:["p3"]});')
+    grab('byDateId')+'\n'+grab('listKey')+'\n'+grab('byListId')+'\n'+grab('dbApply')+'\n'+grab('dbPlace')+'\ndbPlace("state/profile",{waterTarget:9,totalXp:5,deletedRecipes:["p3"]});')
     .call(m,m.state);
   if(JSON.stringify(m.state.deletedRecipes)==='["p3"]' && m.state.totalXp===5)
     console.log('  PASS  a merged profile brings another view\'s deleted recipes into state');

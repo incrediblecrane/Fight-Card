@@ -297,6 +297,7 @@ version is published.
 | `state/shopping` | `shoppingChecked` (ticked rows) and `shopExtras` |
 | `state/session` | `active`, the session in flight or null, and `ended`, the ids of the last twenty ended sessions |
 | `state/meta` | the seeded marker, and `importing` while an import is unfinished |
+| `state/seeding` | only the lease the view seeding a fresh store holds; never read as data |
 | `days/<YYYY-MM-DD>` | one day |
 | `workoutLogs/<id>` | one finished session and its sets |
 | `sauna/<id>` | one sauna visit and its stints |
@@ -326,6 +327,36 @@ app was open twice. A tap now writes about 150 bytes and nothing reloads.
 embedded in the document, so shipping code never touches logged data. Absent
 means seed the store from that embedded copy, the marker written last so a
 half migration is retried rather than believed.
+
+**Seeding** runs in the background (`dbSeedStart`): the view goes to `db` at
+once, running on the embedded seed, which is what is being written. Taps go
+into state as ever and saves are held until the marker lands; then
+`lastSaved` is the seed as written and the whole store is read and merged, as
+when the page is looked at again, so what was tapped meanwhile is saved and
+what another view logged comes in. A year of data had kept the page on
+"loading your data" for up to half a minute. One view seeds: it holds a lease
+(`acquire` on `state/seeding`, ten seconds, renewed every third of that) and
+lets it go once the marker is written. Any other view opened meanwhile waits
+for the marker, trying for the lease each second, so the lease of a view that
+closed part way is taken over when it runs out. Two seeding at once had the
+later one's whole documents land over what was logged in the first. A db
+with no `acquire` (and `MemoryStore`) has the marker looked for before each
+batch instead. A seed picks up where one cut off left it: documents already
+in the store are not written again. Writes go eight at a time, the next as
+each lands. A refusal retrying cannot fix leaves that document for the first
+save to name; a transient one is retried with the save backoff; one in
+`DB_LOST` pauses the view. A page closed before the marker lands loses what
+was tapped on it, since nothing can be written before.
+
+What a load from the store hands over goes through the same top-ups as the
+seed: `topUpRecipes` attaches `RECIPE_META` to a recipe without a base and
+adds any built-in prep recipe that is neither there nor in `deletedRecipes`,
+on the seed, on a load (beside `migratePlan`, `prunePlan` and
+`migrateMinutes`) and on an import. Notes and recipes are put in the order
+they were made (`byListId`): the built-in ids by number (r1..r37, then p1..p8,
+t1), then any other id, then those added here, whose ids carry the time they
+were made. The store hands a collection back in id order (r1, r10, r11 ...),
+which reshuffled them on every load and put a new recipe in the middle.
 
 The store takes at most 256 KiB of JSON in one document, nested at most 32
 levels (the body is the first), and no `.` or `..` path segment: a write past
@@ -727,7 +758,9 @@ the shipped `index.html`, so they test what ships.
   refusal retried and shown, a conflict, a publish that throws, a tap while one
   is out, and the session screen and drafts kept across the reload, with web
   storage and without.
-- `test-db.js`: seeding, small saves, reload survival, merge between views,
+- `test-db.js`: seeding (in the background, one view at a time, a lease run
+  out, a store with no leases, a seed cut off), small saves, reload survival,
+  merge between views,
   save serialization and retry, every store state and how a failed save shows,
   imports in the browser: the backup, Put back and an unfinished import; the
   store's per-document limits, which the stub keeps, and the forms and imports
