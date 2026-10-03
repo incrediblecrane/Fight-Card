@@ -586,6 +586,41 @@ t('Chilli and Chillies, Berry and Berries are one row each', function(){
   assert.deepStrictEqual(listOf(['Blueberry (50g)','Blueberries (100g)']),['Blueberry (150g)']);
 });
 
+t('Cookie and Cookies, Pie and Pies are one row each', function(){
+  assert.deepStrictEqual(listOf(['Cookie (1)','Cookies (2)']),['Cookie (3)']);
+  assert.deepStrictEqual(listOf(['Pie (1)','Pies (1)']),['Pie (2)']);
+  assert.deepStrictEqual(listOf(['Brownies (2)','Brownie (1)']),['Brownies (3)']);
+  assert.deepStrictEqual(listOf(['Smoothie (1)','Smoothies (1)']),['Smoothie (2)']);
+  // and the plurals that already folded still do.
+  assert.deepStrictEqual(listOf(['Berry (1)','Berries (2)']),['Berry (3)']);
+});
+
+t('"00 flour" is a flour, not none of one', function(){
+  var g=pi('00 flour'); assert.deepStrictEqual([g.n,g.q],['00 flour',null], JSON.stringify(g));
+  g=pi('0 onions'); assert.strictEqual(g.q,null, JSON.stringify(g));
+  assert.strictEqual(sc('00 flour',0.5),'00 flour');
+  assert.deepStrictEqual(listOf(['00 flour','Flour (100g)']),['00 flour','Flour (100g)']);
+  // A real amount still reads, with or without a decimal.
+  assert.strictEqual(pi('0.5 onion').q,0.5);
+});
+
+t('an amount-first count scaled down reads in the singular', function(){
+  assert.strictEqual(sc('2 onions (chopped)',0.5),'1 onion (chopped)');
+  assert.strictEqual(sc('2 large eggs',0.5),'1 large egg');
+  assert.strictEqual(sc('2 tomatoes',0.5),'1 tomato');
+  assert.strictEqual(sc('2 peaches',0.5),'1 peach');
+  assert.strictEqual(sc('2 onions',2),'4 onions');
+  // A unit carries the plural, not the name after it.
+  assert.strictEqual(sc('2 tins chopped tomatoes',0.5),'1 tin chopped tomatoes');
+});
+
+t('"approx." and "approximately" before an amount read like "about"', function(){
+  var g=pi('approx. 200g rice'); assert.deepStrictEqual([g.n,g.q,g.u],['rice',200,'g'], JSON.stringify(g));
+  g=pi('approximately 200g rice'); assert.deepStrictEqual([g.n,g.q,g.u],['rice',200,'g'], JSON.stringify(g));
+  assert.strictEqual(sc('approx. 200g rice',2),'approx. 400g rice');
+  assert.strictEqual(pi('approximate rice').q,null);
+});
+
 // Every line the app ships, scaled, has to read back as the amount it shows,
 // or a card copied into a new recipe quietly changes the recipe.
 t('every seed ingredient, scaled, reads back as the same amount and unit', function(){
@@ -601,7 +636,9 @@ t('every seed ingredient, scaled, reads back as the same amount and unit', funct
     [0.2,0.5,0.9,1.25,1.5,2,3,4.4,7].forEach(function(f){
       n++;
       var out=box.scaledIng(p,f), b=box.parseIng(out), say=txt+' x'+f+' -> '+out+' -> ';
-      if(b.n!==p.n || b.q===null || box.canonUnit(b.u)!==box.canonUnit(p.u)) return bad.push(say+JSON.stringify(b));
+      // An amount-first count halved names one of it: "1 onion" is still onions.
+      var fold=function(x){ return String(x).toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/(ie|y)$/,'i'); };
+      if((p.lead!=null?fold(b.n)!==fold(p.n):b.n!==p.n) || b.q===null || box.canonUnit(b.u)!==box.canonUnit(p.u)) return bad.push(say+JSON.stringify(b));
       [[b.qMax||b.q,(p.qMax||p.q)*f],[b.q,p.q*f]].forEach(function(x){
         var got=box.canonQty(x[0],b.u), exp=box.canonQty(x[1],p.u);
         // What the card can show: a tenth of a gram, a tenth of a kilo, an eighth to a quarter of a spoon below two, half a count.

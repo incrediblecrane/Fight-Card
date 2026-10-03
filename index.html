@@ -3056,10 +3056,11 @@ function parseIng(text){
   // "500g beef mince", "2 onions", "1 tin of chickpeas": the amount first, as
   // a recipe is usually typed. Read as a name, it bought none of them. Only
   // with a space or a unit after the number, so "7up" is still a name.
-  if(o.q!==null || !/^[\d\u00bc-\u00be\u2153\u2154\u215b~]|^(about|approx|roughly)\s/i.test(o.n)) return o;
+  if(o.q!==null || !/^[\d\u00bc-\u00be\u2153\u2154\u215b~]|^(about|approx(imately|\.)?|roughly)(?![a-z])/i.test(o.n)) return o;
   var l=read('',o.n), nm=String(l.d||'').replace(/^of\s+/i,'');
-  // The name is as typed, never one with its fractions rewritten.
-  if(l.q===null || !/[a-z]/i.test(nm) || (!l.u && l.j!==' ') || o.n.slice(-l.d.length)!==l.d) return o;
+  // The name is as typed, never one with its fractions rewritten. "00 flour"
+  // is a flour, not none of one.
+  if(!l.q || /^0\d/.test(o.n) || !/[a-z]/i.test(nm) || (!l.u && l.j!==' ') || o.n.slice(-l.d.length)!==l.d) return o;
   var lead={n:nm, q:l.q, u:l.u, raw:raw, lead:l.d+raw.slice(o.n.length)};
   if(o.d) lead.d=o.d;
   if(l.qMax) lead.qMax=l.qMax;
@@ -3339,8 +3340,12 @@ function scaledIng(ing,factor){
   // number comes back around the new one, so the card parses back the same.
   if(ing.size) txt=txt.replace(/^([\d.]+(?:-[\d.]+)?)\s*/,'$1 x '+ing.size+' ');
   if(ing.pre) txt=ing.pre+(ing.pre==='~'?'':' ')+txt;
-  // Typed amount first ("500g beef mince"), it stays amount first.
-  if(ing.lead!=null) return txt+' '+ing.lead;
+  // Typed amount first ("500g beef mince"), it stays amount first. A count
+  // with no unit is the name's to singularise, or halved it reads "1 onions".
+  if(ing.lead!=null) return txt+' '+(ing.u||ing.size||(ing.qMax||ing.q)<=1||(ing.qMax||ing.q)*factor>1?ing.lead
+    :ing.lead.replace(/^[^,(]*/,function(h){ var done=false; return h.replace(/[a-z]+/gi,function(w){
+      if(done||!/[^su]s$/i.test(w)||/ves$/i.test(w)) return w; done=true;
+      return w.replace(/llies$/i,'lli').replace(/ies$/i,'y').replace(/(ch|sh|x|o)es$/i,'$1').replace(/s$/i,''); }); }));
   return ing.n+' ('+txt+(ing.d?(ing.j==null?', ':ing.j)+ing.d:'')+')';
 }
 
@@ -3396,7 +3401,7 @@ function shoppingList(dates){
       // "Egg" and "Eggs", "Chilli" and "Chillies", "Berry" and "Berries" are
       // one thing to buy. Folded only for grouping: the row keeps the first
       // spelling, and its tick key, as it was.
-      var fold=bare.toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/y$/,'i');
+      var fold=bare.toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/(ie|y)$/,'i');
       var slot=byName[fold];
       if(!slot){ slot=byName[fold]={key:'i|'+nameKey, n:bare.charAt(0).toUpperCase()+bare.slice(1), parts:{}, order:[], plain:null}; order.push(slot); }
       if(ing.q===null){ if(slot.plain===null) slot.plain=ing.raw; return; }
