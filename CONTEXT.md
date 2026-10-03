@@ -236,17 +236,30 @@ the day after it was for, and `prunePlan()` deletes it.
 _Avoid_: this week, calendar week
 
 **Shopping row**:
-One line of the shopping list, keyed so a tick survives a portion change.
-`i|<name>` is derived: every mention of an ingredient across the planned meals
+One line of the shopping list, keyed on its folded name (`i|<fold>`, "Eggs"
+and "Egg" both `i|egg`) so a tick survives a portion change and whichever
+meal spells it first. The row is derived: every mention of an ingredient across the planned meals
 in view, at each meal's portions, added into one row. kg folds into g and l
 into ml; amounts that do not add (200g and a handful) share the row
 ("Spinach (200g + 1 handful)"). Names are grouped with a known instruction
 after a comma dropped ("Cheddar cheese, grated", "Potatoes, for mash"; not
 "Carrot, parsnip, potato") and plurals folded ("Eggs", "Chillies",
-"Berries"); the row shows the first name without its instruction, and the
-key stays the first name as typed. Countable amounts (tins, cloves, onions)
+"Berries"); the row shows the first name without its instruction. Countable amounts (tins, cloves, onions)
 always round UP, since 0.4 of a tin cannot be bought and being short costs a
 trip; weights, volumes and spoons stay fractional.
+
+**Tick**:
+A string in `state.shoppingChecked`: the row's key, a line break, and what it
+was bought for, each amount as bought (`i|onion` then `|=2`; `g|=200;handful|=1`).
+It ticks the row while no amount there has grown past it: two onions ticked
+for three days do not tick the week's five, and fewer portions keep it. A bare
+key is a tick from older code, under any spelling in the row's group, and
+ticks it whatever the amount. At load (and when the day turns) a tick for
+nothing planned goes and a bare one is stamped with the whole week's amounts,
+so nothing ticked before is unticked by it. Clear the ticks clears those of
+the list in view and leaves the meals; clearing three days keeps the ticks of
+what the rest of the week still needs, and of your own items. Each row is a
+`role="checkbox"` that Tab reaches and Space or Enter ticks.
 
 **Extra**:
 A shopping row typed by hand (`x|<id>`, in `state.shopExtras`). No quantity,
@@ -268,7 +281,7 @@ _Avoid_: history, trash
 **Undo kind**:
 What the slot holds: `sauna` (a visit), `log` (a finished session, with the XP
 it took), `recipe` (with its planned meals), `lib` (a note), `meal` (a planned
-meal), `extra` (with its tick), `week` (a cleared week with its ticks),
+meal), `extra` (with its tick), `week` (a cleared week with its ticks, or the ticks alone),
 `session` (a discarded or replaced session), `sessionEx` (one exercise taken
 out of a session, tied to that session's `t0`, not the next of the same
 workout; adding that exercise back from the picker is this Undo, sets and
@@ -819,6 +832,8 @@ the shipped `index.html`, so they test what ships.
   ingredient lines the store or the page could not take.
 - `test-plan.js`: the meal planner in the browser: the same meal twice, slots,
   partial-week shopping.
+- `test-ticks.js`: shopping ticks in the browser: what a tick is for, older
+  ticks, spellings, the clears, and ticking from the keyboard.
 - `test-design.js`: computed contrast, tap target sizes, what touch can reach,
   and layout at phone width.
 - `test-dates.js`: the log date picked by a real tap and typed, a backfill left

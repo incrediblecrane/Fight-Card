@@ -118,8 +118,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .addplan{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;}\
 .planned{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--text-faint);}\
 .shoprange{margin-bottom:10px;}\
-.shop{display:flex;align-items:center;gap:10px;padding:7px 0;min-height:44px;border-bottom:1px solid var(--line);cursor:pointer;font-size:0.9rem;}\
-.shop:last-child{border-bottom:none;}\
+.shoprow{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line);}\
+.shoprow:last-child{border-bottom:none;}\
+.shop{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:7px 0;min-height:44px;cursor:pointer;font-size:0.9rem;}\
 .shop .box{width:20px;height:20px;border-radius:5px;border:1.5px solid var(--field-border);flex-shrink:0;}\
 .shop.checked{color:var(--text-faint);text-decoration:line-through;}\
 .shop.checked .box{background:var(--good);border-color:var(--good);}\
@@ -133,7 +134,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .banner.local{background:none;color:var(--warn);padding:0;}\
 .statusbar{position:fixed;top:calc(8px + env(safe-area-inset-top));left:16px;right:16px;max-width:648px;margin:0 auto;z-index:21;}\
 .statusbar .banner{margin-bottom:6px;box-shadow:0 4px 18px rgba(0,0,0,.18);}\
-.held .grid button:not([data-action=tab]),.held .grid input,.held .grid select,.held .datepick,.held .nudge .btns,.held .weekgoal .tgt,.held .wcard .start,.held .resume-banner .btns,.held .libitem .x,.held .recipe-controls,.held .portions,.held .addform,.held .mealrow .mp,.held .mealrow .mx,.held .shop,.held .addshop,.held .clearbtn,.held .swipe-del,.held .logrow,.held .setchips button,.held .loground,.held .ssadd,.held .ssx,.held .storynav .finish,.held .addex-btn,.held .discard-btn,.held .datarow{opacity:0.45;}\
+.held .grid button:not([data-action=tab]),.held .grid input,.held .grid select,.held .datepick,.held .nudge .btns,.held .weekgoal .tgt,.held .wcard .start,.held .resume-banner .btns,.held .libitem .x,.held .recipe-controls,.held .portions,.held .addform,.held .mealrow .mp,.held .mealrow .mx,.held .shop,.held .shop-x,.held .addshop,.held .clearbtn,.held .swipe-del,.held .logrow,.held .setchips button,.held .loground,.held .ssadd,.held .ssx,.held .storynav .finish,.held .addex-btn,.held .discard-btn,.held .datarow{opacity:0.45;}\
 .savepill{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:20;pointer-events:none;font-family:'IBM Plex Mono',monospace;font-size:0.76rem;color:var(--text);background:var(--surface-raised);border:1px solid var(--line);border-radius:999px;padding:4px 12px;opacity:0;transition:opacity .2s;}\
 .savepill.on{opacity:1;}\
 .savepill.fail{background:var(--warn);border-color:var(--warn);color:var(--warn-ink);font-weight:600;}\
@@ -266,7 +267,7 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 @media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}\
 .chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.c-tip{min-height:3em;line-height:1.5;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);overflow-wrap:anywhere;}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--field-border);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.exrow .top .last time{font:inherit;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap:first-child>div{max-width:var(--fig-max,155px);}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;aspect-ratio:100/168;}.fig-pair .fig-wrap:first-child svg{aspect-ratio:var(--fig-ar,100/168);}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;opacity:0;transition:opacity .18s ease;}.swipe.open .swipe-del,.swipe-del:focus-visible{opacity:1;}.swipe-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:4px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe .recent-log{padding-right:36px;}.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-soft);border-color:var(--field-border);}.undo-bar .msg{flex:1 1 auto;min-width:0;}.undo-bar .btns{flex:0 0 auto;white-space:nowrap;}.undo-bar.mini{left:auto;right:max(16px,calc((100vw - 648px) / 2));padding:4px;border-radius:999px;}.undo-bar.mini .msg,.undo-bar.mini .ghost,.undo-bar:not(.mini) .what{display:none;}.undo-bar.mini button:first-child{margin-left:0;}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{font-size:0.66rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{position:sticky;top:var(--status-h,0px);z-index:15;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:6px 8px 6px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{min-height:44px;background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 14px;font-size:0.72rem;font-weight:600;text-transform:uppercase;cursor:pointer;font-family:'IBM Plex Mono',monospace;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.84rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;opacity:0.8;}\
 .plainlist{list-style:none;padding:0;margin:8px 0 0;font-size:0.86rem;color:var(--text-soft);}.plainlist li{margin:3px 0;}.libitem .plainlist+p{margin-top:12px;}\
-@media (min-width:1100px){.wrap{max-width:1000px;}.grid{grid-template-columns:repeat(3,minmax(0,1fr));}.shoplist{columns:2;column-gap:28px;}.shoplist .shop{break-inside:avoid;}.libgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}.libgrid .libitem{margin-bottom:0;}.undo-bar,.statusbar{max-width:968px;}.undo-bar.mini{right:max(16px,calc((100vw - 968px) / 2));}}\
+@media (min-width:1100px){.wrap{max-width:1000px;}.grid{grid-template-columns:repeat(3,minmax(0,1fr));}.shoplist{columns:2;column-gap:28px;}.shoplist .shoprow{break-inside:avoid;}.libgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}.libgrid .libitem{margin-bottom:0;}.undo-bar,.statusbar{max-width:968px;}.undo-bar.mini{right:max(16px,calc((100vw - 968px) / 2));}}\
 ";
 
 var WORKOUT_TYPES=["Boxing/MMA","Strength","Power/Speed","Flexibility","Conditioning","Custom"];
@@ -1953,6 +1954,7 @@ function dbBoot(){
         var moved=migratePlan(); if(prunePlan()) moved=true;
         if(migrateMinutes()) moved=true;
         if(topUpRecipes(true)) moved=true;
+        if(pruneTicks()) moved=true;
         // A change a closed view sent beside a document is folded in above
         // and goes into the document itself now.
         if(Object.keys(pendSeen).length) moved=true;
@@ -3031,7 +3033,7 @@ function applyImport(st,mode){
   if(was && was!==now) ended=ended.concat([was]);
   state.endedSessions=ended.filter(function(x){ return x!==now; }).slice(-SESS_ENDED_KEEP);
   // A file in an older shape is converted now, as dbBoot does a store.
-  migratePlan(); prunePlan(); migrateMinutes(); topUpRecipes(true);
+  migratePlan(); prunePlan(); migrateMinutes(); topUpRecipes(true); pruneTicks();
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
   saveNow=dbState==='db'?(mode==='merge'?'put':'replace'):false;
@@ -3399,22 +3401,27 @@ function shoppingList(dates){
       var bare=String(ing.n).trim(), dm;
       while((dm=bare.match(ING_TAIL)) && dm.index>0) bare=bare.slice(0,dm.index);
       // "Egg" and "Eggs", "Chilli" and "Chillies", "Berry" and "Berries" are
-      // one thing to buy. Folded only for grouping: the row keeps the first
-      // spelling, and its tick key, as it was.
+      // one thing to buy. The row keeps the first spelling; its tick is keyed
+      // on the folded name, so which meal says it first cannot untick it. A
+      // tick made by older code under any spelling in the group still counts.
       var fold=bare.toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/(ie|y)$/,'i');
       var slot=byName[fold];
-      if(!slot){ slot=byName[fold]={key:'i|'+nameKey, n:bare.charAt(0).toUpperCase()+bare.slice(1), parts:{}, order:[], plain:null}; order.push(slot); }
+      if(!slot){ slot=byName[fold]={key:'i|'+fold, raws:[], n:bare.charAt(0).toUpperCase()+bare.slice(1), parts:{}, order:[], plain:null}; order.push(slot); }
+      if(slot.raws.indexOf('i|'+nameKey)<0) slot.raws.push('i|'+nameKey);
       if(ing.q===null){ if(slot.plain===null) slot.plain=ing.raw; return; }
       // "2 x 400g tins" and "2 x 200g tins" are different packs, and a tin of
       // no stated size is not assumed to be either, so each size adds alone.
       var u=canonUnit(ing.u), sm=String(ing.size||'').match(/^([\d.,]+)(\w+)$/);
       var sn=sm?(/^[1-9]\d{0,2}(,\d{3})+$/.test(sm[1])?sm[1].replace(/,/g,''):sm[1].replace(',','.')):0;
       var sv=sm?canonQty(+sn,sm[2]):0, k=u+'|'+(sm?sv+canonUnit(sm[2]):''), part=slot.parts[k];
-      if(!part){ part=slot.parts[k]={u:u,q:0,size:sm?ing.size:'',sv:sv}; slot.order.push(part); }
+      if(!part){ part=slot.parts[k]={k:k,u:u,q:0,size:sm?ing.size:'',sv:sv}; slot.order.push(part); }
       part.q+=canonQty(ing.qMax||ing.q,ing.u)*f;
     });
   });
   order.forEach(function(o){
+    // What a tick on this row was made for: each amount as it is bought. A
+    // tick covers the row only while no amount has grown past it (tickCovers).
+    o.stamp=o.order.map(function(p){ return p.k+'='+buyQty(p.q,p.u); }).join(';');
     if(!o.order.length){ o.label=o.plain||o.n; return; }
     // A measured amount answers the unmeasured mention too, so it is absorbed
     // rather than left as a second row saying only "you also need this".
@@ -3429,6 +3436,42 @@ function shoppingList(dates){
   });
   order.sort(function(a,b){return a.label.toLowerCase().localeCompare(b.label.toLowerCase());});
   return order;
+}
+/* A tick is stored with what it was bought for: "i|onion" and the amounts,
+   after a line break. Ticked at 2 onions, the row asking for 5 once another
+   meal goes in is not ticked; asking for fewer, it still is. A bare key is a
+   tick from older code, under any spelling in the group, and counts whatever
+   the amount. Your own items have no amount: their tick is their key. */
+var TICK_SEP='\n';
+function tickOf(t,it){ return t===it.key || (!it.extra && (t.indexOf(it.key+TICK_SEP)===0 || it.raws.indexOf(t)>-1)); }
+function tickCovers(t,it){
+  if(!tickOf(t,it)) return false;
+  if(it.extra || t.indexOf(it.key+TICK_SEP)!==0) return true;
+  var had=Object.create(null);
+  t.slice(it.key.length+1).split(';').forEach(function(x){ var e=x.lastIndexOf('='); if(e>0) had[x.slice(0,e)]=+x.slice(e+1); });
+  return (it.stamp?it.stamp.split(';'):[]).every(function(x){ var e=x.lastIndexOf('='), k=x.slice(0,e);
+    return k in had && had[k]>=+x.slice(e+1)-1e-9; });
+}
+function shopTicked(it){ return (state.shoppingChecked||[]).some(function(t){ return tickCovers(t,it); }); }
+function tickFor(it){ return it.extra?it.key:it.key+TICK_SEP+it.stamp; }
+/* A tick for something no planned meal needs any more goes, so it is not
+   waiting, ticked, for the next time that thing is planned. One from older
+   code is stamped with the whole week's amounts, so nothing ticked before is
+   unticked by this, in either range. Only at load and when the day turns:
+   pruned as a meal goes, a tick would not come back with its Undo. */
+function pruneTicks(){
+  var list=shoppingList(planWindow(7)), before=state.shoppingChecked||[], out=[];
+  before.forEach(function(t){
+    var row=null;
+    if(String(t).indexOf('i|')===0) list.forEach(function(it){ if(!row && !it.extra && tickOf(t,it)) row=it; });
+    else row={};
+    if(!row) return;
+    var nt=row.key===undefined || t.indexOf(row.key+TICK_SEP)===0?t:tickFor(row);
+    if(out.indexOf(nt)<0) out.push(nt);
+  });
+  var changed=out.length!==before.length || out.some(function(t,i){ return t!==before[i]; });
+  state.shoppingChecked=out;
+  return changed;
 }
 function macroLine(r){
   var m=r.macros; if(!Array.isArray(m) || m.length!==4) return '';
@@ -4378,12 +4421,14 @@ function bodyContent(){
       rows+'</div>';
   }).join('');
   var listSL=shoppingList(shopDates);
-  // Ticked off by a key that does not move when the portions change, so
-  // changing a recipe's portions no longer silently unticks its ingredients.
+  // Ticked off by a key that does not move when the portions change; a tick
+  // made for less than the row now asks for does not count (tickCovers). Each row is a checkbox to the keyboard and a screen reader; the x on your
+  // own items sits beside it, not inside it.
+  var anyTicked=false;
   var shopRows=listSL.map(function(it){
-    var checked=state.shoppingChecked.indexOf(it.key)>-1;
-    return '<div class="shop'+(checked?' checked':'')+'" data-action="shopcheck" data-item="'+esc(it.key)+'">'+
-      '<span class="box"></span><span class="shop-t">'+esc(it.label)+'</span>'+
+    var checked=shopTicked(it); if(checked) anyTicked=true;
+    return '<div class="shoprow"><div class="shop'+(checked?' checked':'')+'" role="checkbox" tabindex="0" aria-checked="'+checked+'" data-action="shopcheck" data-item="'+esc(it.key)+'">'+
+      '<span class="box"></span><span class="shop-t">'+esc(it.label)+'</span></div>'+
       (it.extra?'<button class="shop-x" data-action="delextra" data-id="'+esc(it.extraId)+'" title="Remove" aria-label="Remove '+esc(it.label)+'">&times;</button>':'')+'</div>';
   }).join('');
   function recipeCard(r){
@@ -4438,8 +4483,9 @@ function bodyContent(){
       '<div class="addshop"><input id="shop-add" autocomplete="off" maxlength="120" '+
           'placeholder="Milk, bin bags, coffee&hellip;" value="'+esc(shopDraft)+'">'+
         '<button data-action="addextra">Add</button></div>'+
+      (anyTicked?'<button class="clearbtn" data-action="clearticks">Clear the ticks</button> ':'')+
       (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear '+
-        (shopRange===7?'the week':'these '+shopRange+' days')+' &amp; the ticks</button>':'')+'</div>'+
+        (shopRange===7?'the week &amp; the ticks':'these '+shopRange+' days &amp; their ticks')+'</button>':'')+'</div>'+
     '<div class="sectiontitle">Meal prep</div>'+
     '<p class="note" style="margin-top:0;">Batch-cook meals that hold up after a few days and a reheat. The portions here scale the ingredients so you can see the batch; what the shopping list buys is set on each meal in the week above. Cool them within about an hour, keep for two days, reheat once until steaming. Rice is the strict one: fridge it fast and eat it the next day. <a href="https://www.nhs.uk/live-well/eat-well/how-to-prepare-and-cook-food-safely/" target="_blank" rel="noopener">NHS food safety guidance</a>.</p>'+
     prepItems+
@@ -5086,11 +5132,14 @@ function drawPage(){
   // Replacing innerHTML throws away whatever field was being typed into. Note
   // what had focus and where the caret was, and put it back afterwards, so a
   // save landing mid-keystroke cannot interrupt typing.
-  var act=document.activeElement, keep=null;
+  var act=document.activeElement, keep=null, keepTick=null;
   if(act && act.id && app.contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)){
     keep={id:act.id, start:null, end:null};
     try{ keep.start=act.selectionStart; keep.end=act.selectionEnd; }catch(err){}
   }
+  // A shopping row ticked from the keyboard keeps the focus, so the next one
+  // is a Tab away rather than the whole page.
+  if(act && app.contains(act) && act.getAttribute('data-action')==='shopcheck') keepTick=act.getAttribute('data-item');
   // Nor must it throw away what was typed but not yet read: a field whose value
   // is not the one it was drawn with is put back, unless a tap just used it.
   var typed={};
@@ -5138,6 +5187,8 @@ function drawPage(){
       }catch(err){}
     }
   }
+  if(keepTick!==null) [].forEach.call(app.querySelectorAll('[data-action="shopcheck"]'),function(el){
+    if(el.getAttribute('data-item')===keepTick){ try{ el.focus({preventScroll:true}); }catch(err){} } });
   undoFit();
   if(restTimer){ clearInterval(restTimer); restTimer=null; }
   if(document.getElementById('restline')) restTimer=setInterval(restTick,1000);
@@ -5438,7 +5489,16 @@ function onClick(e){
     if(PREP_RECIPES.some(function(x){ return x.id===rid; }) && state.deletedRecipes.indexOf(rid)<0) state.deletedRecipes.push(rid);
     parkUndo({kind:'recipe',item:recGone,pos:ri2,plan:planGone,label:recGone.title});
   }
-  else if(action==='shopcheck'){ var item=t.getAttribute('data-item'); var sidx=state.shoppingChecked.indexOf(item); if(sidx>-1) state.shoppingChecked.splice(sidx,1); else state.shoppingChecked.push(item); }
+  else if(action==='shopcheck'){
+    var item=t.getAttribute('data-item'), row=null;
+    shoppingList(planWindow(shopRange)).forEach(function(it){ if(it.key===item) row=it; });
+    if(!row) return;
+    // Unticked, every tick for the row goes; ticked, it is for what the row
+    // asks for now, in place of any made for less.
+    var was=shopTicked(row);
+    state.shoppingChecked=state.shoppingChecked.filter(function(k){ return !tickOf(k,row); });
+    if(!was) state.shoppingChecked.push(tickFor(row));
+  }
   else if(action==='addextra'){
     var box=document.getElementById('shop-add');
     var txt=((box?box.value:shopDraft)||'').trim();
@@ -5591,8 +5651,20 @@ function onClick(e){
       label:weekGone.length+' planned meal'+(weekGone.length===1?'':'s')+' and the ticks'});
     state.plan=state.plan.filter(function(e){ return !inWindow[e.date]; });
     // Your own items are not part of "the week", so they stay; only their ticks
-    // are cleared, along with everything the recipes contributed.
-    state.shoppingChecked=[];
+    // are cleared, along with everything the recipes contributed. Clearing
+    // three days keeps the ticks of what the rest of the week still needs, and
+    // of your own items.
+    if(shopRange>=7) state.shoppingChecked=[];
+    else { var restSL=shoppingList(planWindow(7));
+      state.shoppingChecked=state.shoppingChecked.filter(function(k){
+        return k.indexOf('x|')===0 || restSL.some(function(it){ return !it.extra && tickOf(k,it); }); }); }
+  }
+  else if(action==='clearticks'){
+    // The ticks on the list in view, and nothing else: the meals stay.
+    var viewSL=shoppingList(planWindow(shopRange)), was2=state.shoppingChecked.slice();
+    state.shoppingChecked=state.shoppingChecked.filter(function(k){ return !viewSL.some(function(it){ return tickOf(k,it); }); });
+    if(state.shoppingChecked.length===was2.length) return;
+    parkUndo({kind:'week',plan:[],checked:was2,label:'the ticks',text:'Cleared the ticks'});
   }
 
   // The change is in state already: a render that throws must not take its
@@ -5675,7 +5747,7 @@ function onKeydown(e){
     return;
   }
   // A div that stands in for a button answers the keys a button would.
-  var rb=e.target && e.target.getAttribute && e.target.getAttribute('role')==='button' && e.target.hasAttribute('data-action');
+  var rb=e.target && e.target.getAttribute && /^(button|checkbox)$/.test(e.target.getAttribute('role')||'') && e.target.hasAttribute('data-action');
   if(rb && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); e.target.click(); return; }
   if(e.key!=='Enter' || !e.target || e.target.id!=='shop-add') return;
   e.preventDefault();
@@ -5698,7 +5770,7 @@ function onPointerUp(){ pointerDown=false; if(renderOnUp) setTimeout(function(){
    page has to catch up. Meals for the day just gone are spent then, too. */
 function watchDay(){
   if(realToday()===drawnDay) return;
-  if(!dbHeld() && prunePlan()) scheduleSave();
+  if(!dbHeld()){ var gone=prunePlan(); if(pruneTicks()||gone) scheduleSave(); }
   render();
 }
 

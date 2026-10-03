@@ -30,7 +30,8 @@ var src=[grabVar('IMPLIED_ONE'), grabVar('UNIT_SCALE'), grabVar('ING_TAIL'), gra
   grab('recipeIngs'), grab('recipeBase'), grab('recipePortions'),
   grab('slotRank'), grab('planOrder'), grab('pad'), grab('dateKey'), grab('planDates'),
   grab('planEntries'), grab('planRecipe'), grab('planPortions'),
-  grab('shoppingList')].join('\n');
+  grab('shoppingList'), grabVar('TICK_SEP'), grab('planWindow'), grab('tickOf'), grab('tickCovers'),
+  grab('shopTicked'), grab('tickFor'), grab('pruneTicks')].join('\n');
 
 var fails=0;
 function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
@@ -39,6 +40,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 function sandbox(st){
   var box={};
   new Function('state', src+'\nthis.shoppingList=shoppingList;this.planDates=planDates;'+
+    'this.shopTicked=shopTicked;this.tickFor=tickFor;this.pruneTicks=pruneTicks;'+
     'this.parseIng=parseIng;this.qtyText=qtyText;this.scaledIng=scaledIng;this.canonUnit=canonUnit;this.canonQty=canonQty;').call(box, st);
   return box;
 }
@@ -565,10 +567,11 @@ t('"Cheddar cheese, grated" is cheddar on the list, and "Carrot, parsnip, potato
   assert.deepStrictEqual(listOf(['Cheddar cheese, grated (40g)','Cheddar cheese (80g)']),['Cheddar cheese (120g)']);
   assert.deepStrictEqual(listOf(['Potatoes, for mash','Potatoes (2, diced)']),['Potatoes (2)']);
   assert.deepStrictEqual(listOf(['Carrot, parsnip, potato','Carrot (2)']),['Carrot (2)','Carrot, parsnip, potato']);
-  // The tick key is the first spelling's, as it always was.
+  // The tick key is the folded name the row is grouped on, so it does not
+  // move with whichever spelling comes first.
   var st={recipes:[{id:'a',title:'A',base:1,ingredients:['Cheddar cheese, grated (40g)','Cheddar cheese (80g)']}], plan:[], shopExtras:[]};
   var box=sandbox(st); st.plan.push({id:'x', recipeId:'a', date:box.planDates()[0], slot:'dinner', portions:1});
-  assert.deepStrictEqual(box.shoppingList().map(function(o){ return o.key; }),['i|cheddar cheese, grated']);
+  assert.deepStrictEqual(box.shoppingList().map(function(o){ return o.key; }),['i|cheddar cheese']);
   // Every seed recipe planned at once: each of these is one row.
   st={recipes:ALL, plan:[], shopExtras:[]}; box=sandbox(st);
   ALL.forEach(function(r,i){ st.plan.push({id:'p'+i, recipeId:r.id, date:box.planDates()[0], slot:'dinner', portions:r.base||1}); });
@@ -654,5 +657,43 @@ t('every seed ingredient, scaled, reads back as the same amount and unit', funct
   assert.deepStrictEqual(bad.slice(0,8),[], bad.length+' lines do not read back, first few:\n        '+bad.slice(0,8).join('\n        '));
 });
 
+console.log('\nTICKS');
+
+// A plan of [recipe ingredients, day] pairs, one recipe each, and the list.
+function tickBox(meals,checked){
+  var st={recipes:[], plan:[], shopExtras:[{id:'x1',text:'Bin bags'}], shoppingChecked:checked||[]}, box=sandbox(st);
+  meals.forEach(function(m,i){ st.recipes.push({id:'t'+i,title:'T'+i,base:1,ingredients:m[0]});
+    st.plan.push({id:'pl'+i,recipeId:'t'+i,date:box.planDates()[m[1]],slot:'dinner',portions:1}); });
+  box.st=st; box.row=function(n,days){ return box.shoppingList(box.planDates().slice(0,days||7)).filter(function(o){ return o.label.indexOf(n)===0; })[0]; };
+  return box;
+}
+t('a tick is for the amount it was made at, and counts while the row asks no more', function(){
+  var box=tickBox([[['Onion (2)'],0],[['Onion (3)'],4]]);
+  var three=box.row('Onion',3), week=box.row('Onion');
+  assert.strictEqual(three.label,'Onion (2)'); assert.strictEqual(week.label,'Onion (5)');
+  box.st.shoppingChecked=[box.tickFor(three)];
+  assert.ok(box.shopTicked(three),'the row it was made on is not ticked');
+  assert.ok(!box.shopTicked(week),'2 onions bought ticks the week\'s 5');
+  box.st.shoppingChecked=[box.tickFor(week)];
+  assert.ok(box.shopTicked(week) && box.shopTicked(three),'5 onions bought does not cover the 2 for three days');
+  // A pack of another size is another thing to buy.
+  box=tickBox([[['Chopped tomatoes (1 x 400g tin)'],0],[['Chopped tomatoes (1 x 200g tin)'],4]]);
+  box.st.shoppingChecked=[box.tickFor(box.row('Chopped',3))];
+  assert.ok(!box.shopTicked(box.row('Chopped')),'a 400g tin covers a 200g one too');
+});
+t('Egg and Eggs share one tick, and an older tick under either spelling counts', function(){
+  var box=tickBox([[['Egg (1)'],0],[['Eggs (2)'],3]]);
+  assert.strictEqual(box.row('Egg').key,'i|egg');
+  ['i|egg','i|eggs'].forEach(function(k){ box.st.shoppingChecked=[k];
+    assert.ok(box.shopTicked(box.row('Egg')),k+' does not tick the row'); });
+});
+t('at load, ticks for nothing planned go and older ticks take the week\'s amounts', function(){
+  var box=tickBox([[['Eggs (2)'],1],[['Eggs (2)'],5],[['Flour (100g)'],2]],
+    ['i|eggs','i|butter','x|x1','beef mince|g','i|flour'+'\n'+'g|=100']);
+  assert.ok(box.pruneTicks(),'nothing changed');
+  assert.deepStrictEqual(box.st.shoppingChecked,['i|egg\n|=4','x|x1','beef mince|g','i|flour\ng|=100']);
+  assert.ok(box.shopTicked(box.row('Egg')) && box.shopTicked(box.row('Egg',3)),'the migrated tick does not cover the rows it ticked before');
+  assert.ok(!box.pruneTicks(),'a second pass changed something');
+});
 console.log(fails?('\n'+fails+' FAILING\n'):'\nAll shopping checks pass.\n');
 process.exit(fails?1:0);

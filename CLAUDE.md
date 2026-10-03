@@ -48,7 +48,7 @@ Follow this on every change:
    analyse, adversarial, continuous, views, render) and `test:app` builds the
    document and runs every suite over it: build, tooling, shopping, planmodel,
    catalog, volume, coaching, roundtrip, app, removal, undo, session, meals,
-   publish, db, store, plan, design, dates, touch (`test-<name>.js`). A new suite goes
+   publish, db, store, plan, ticks, design, dates, touch (`test-<name>.js`). A new suite goes
    into `test:app` in `package.json` and into CONTEXT.md's list. Use
    `npm run test:pose` alone only for the fast loop while authoring a rig, never
    as the gate before publishing: `npm test` used to be the rig suites only, so
