@@ -158,7 +158,16 @@ Several exercises done back to back as one round. A slide in a session, not a
 movement: `ss1`, `ss2` are instances, and `supersets[ssId]` holds the exercise
 ids. A round calls the normal logger for each member, so history, PBs and
 volume need know nothing of it. `roundLog` records which members each round
-actually logged, so Undo round takes back exactly that round.
+actually logged, and each set a round logs carries the superset's id (`ss`):
+an exercise's sets of one superset line up with the rounds that hold it,
+newest with newest. So Undo round, the Undo on a member's row and the Undo on
+the exercise's own slide all take back exactly that round's set and keep the
+count right, never a set logged on the exercise's own slide. A round from
+before sets were tagged takes the newest untagged set. A typo in any box
+stops the whole round. Removing a superset takes with it the sets of members
+shown nowhere else (Undo puts them back); taking one member out moves its
+sets out of the rounds and, if it is shown nowhere else, onto a slide of its
+own. Superset ids are never reused while a removal can be undone.
 
 **Prep step**:
 The warm-up and cool-down put into every session that does not already have

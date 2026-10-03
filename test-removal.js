@@ -378,6 +378,123 @@ srv.listen(0,async function(){
     await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300);
   });
 
+  console.log('\nA SUPERSET TAKES BACK ONLY WHAT ITS ROUNDS LOGGED');
+  var T0=Date.now()-600000;
+  var ssSeed=function(exIds,box,logs,targets){ setSeed(function(st){
+    var tg={warmup:{sets:1,reps:'5-10 min'},cooldown:{sets:1,reps:'5-10 min'},ss1:{sets:3,reps:'rounds'}};
+    Object.keys(targets||{}).forEach(function(k){ tg[k]=targets[k]; });
+    st.activeSession={workoutId:'w_custom',startedAt:todayK,t0:T0,prep:1,exIds:exIds,
+      supersets:box?{ss1:box}:{},targets:tg,logs:logs||{}};
+  }); };
+  var toSlideN=async function(n){ await toFirst(); for(var k=0;k<n;k++){ await tap('[data-action="nextslide"]'); await p.waitForTimeout(150); } };
+  var resume=async function(n){ await go(); await tabTo('training');
+    await tap('[data-action="resumesession"]'); await p.waitForTimeout(400); await toSlideN(n); };
+  var endIt=async function(){ await tap('[data-action="cancelsession"]'); await p.waitForTimeout(300);
+    await tabTo('training'); await tap('[data-action="discardsession"]'); await settle();
+    await tap('[data-action="dismissundo"]'); await p.waitForTimeout(300); };
+  var sets=function(m){ return ((seedOf().activeSession.logs||{})[m]||[]).map(function(x){ return x.w+'x'+x.v; }); };
+  var box1=function(){ return seedOf().activeSession.supersets.ss1; };
+  var SQ={sq_back:{sets:3,reps:'5'}};
+  var roundThenOwn=async function(){
+    ssSeed(['warmup','ss1','sq_back','cooldown'],{ex:['sq_back'],rounds:0},{},SQ);
+    await resume(1);
+    await p.fill('#log-w-sq_back','100'); await p.fill('#log-v-sq_back','5');
+    await tap('[data-action="loground"]'); await settle();
+    await toSlideN(2);
+    await p.fill('#log-w-sq_back','120'); await p.fill('#log-v-sq_back','3');
+    await tap('[data-action="logset"]'); await settle();
+    assert.deepStrictEqual(sets('sq_back'),['100x5','120x3'],'the two sets did not log');
+    await toSlideN(1);
+  };
+  await t('a superset row Undo takes back the round set, not one logged on the exercise own slide', async function(){
+    await roundThenOwn();
+    assert.ok(await tap('[data-action="undoset"][data-ss="ss1"][data-ex="sq_back"]'),'no Undo on the superset row'); await settle();
+    assert.deepStrictEqual(sets('sq_back'),['120x3'],'the own-slide set was taken');
+    assert.strictEqual(box1().rounds,0,'the round still counts');
+    assert.deepStrictEqual(box1().roundLog,[],'the round is still logged');
+    await endIt();
+  });
+  await t('Undo round takes back that round set, not one logged on the exercise own slide', async function(){
+    await roundThenOwn();
+    assert.ok(await tap('[data-action="undoround"]'),'no Undo round'); await settle();
+    assert.deepStrictEqual(sets('sq_back'),['120x3'],'the own-slide set was taken');
+    assert.strictEqual(box1().rounds,0,'the round still counts');
+    await endIt();
+  });
+  await t('Log round with a typo in one box logs nothing and points at the typo', async function(){
+    ssSeed(['warmup','ss1','cooldown'],{ex:['sq_back','dl_rdl'],rounds:0},{},{sq_back:{sets:3,reps:'5'},dl_rdl:{sets:3,reps:'8'}});
+    await resume(1);
+    await p.fill('#log-w-sq_back','100'); await p.fill('#log-v-sq_back','5');
+    await p.fill('#log-w-dl_rdl','60'); await p.fill('#log-v-dl_rdl','8o');
+    await tap('[data-action="loground"]'); await p.waitForTimeout(150);
+    var f=await p.evaluate(function(){ var a=document.activeElement; return a?a.id+'|'+a.getAttribute('aria-invalid'):''; });
+    await settle();
+    assert.strictEqual(f,'log-v-dl_rdl|true','focus is on '+f);
+    var s=seedOf().activeSession;
+    assert.deepStrictEqual(s.logs,{},'sets were logged: '+JSON.stringify(s.logs));
+    assert.strictEqual(s.supersets.ss1.rounds||0,0,'the round counted');
+    await endIt();
+  });
+  await t('removing a superset takes its sets with it, and Undo puts them back', async function(){
+    var lg={press_bench:[{v:8,w:60,t:T0+1000,ss:'ss1'}],row_bent:[{v:10,w:50,t:T0+1001,ss:'ss1'}]};
+    ssSeed(['warmup','ss1','cooldown'],{ex:['press_bench','row_bent'],rounds:1,roundLog:[['press_bench','row_bent']]},lg);
+    var s0=seedOf().activeSession;
+    await resume(1);
+    await tap('[data-action="removeex"][data-id="ss1"]'); await settle();
+    var s=seedOf().activeSession;
+    assert.deepStrictEqual(s.logs,{},'hidden sets would be saved on Finish: '+JSON.stringify(s.logs));
+    await undoBack();
+    assert.deepStrictEqual(seedOf().activeSession,s0,'the session came back different');
+    await endIt();
+  });
+  await t('taking an exercise out of a superset gives its round sets a slide of their own', async function(){
+    var lg={press_bench:[{v:8,w:60,t:T0+1000,ss:'ss1'}],row_bent:[{v:10,w:50,t:T0+1001,ss:'ss1'}]};
+    ssSeed(['warmup','ss1','cooldown'],{ex:['press_bench','row_bent'],rounds:1,roundLog:[['press_bench','row_bent']]},lg);
+    await resume(1);
+    await tap('[data-action="ssdel"][data-ex="row_bent"]'); await settle();
+    var s=seedOf().activeSession;
+    assert.ok(s.exIds.indexOf('row_bent')>-1,'its sets are out of sight: '+s.exIds.join(','));
+    assert.deepStrictEqual(sets('row_bent'),['50x10'],'its set was lost');
+    assert.deepStrictEqual(s.supersets.ss1.roundLog,[['press_bench']],'it is still in the round');
+    assert.strictEqual(await p.evaluate(function(){ var h=document.querySelector('.slide h4'); return h&&h.textContent.trim(); }),'Superset','it left the superset slide');
+    await endIt();
+  });
+  await t('Undo on an exercise own slide takes it out of the round that logged the set', async function(){
+    var lg={press_bench:[{v:8,w:60,t:T0+1000,ss:'ss1'},{v:8,w:60,t:T0+3000,ss:'ss1'}],dip:[{v:10,w:null,t:T0+1001,ss:'ss1'}]};
+    ssSeed(['warmup','press_bench','ss1','cooldown'],{ex:['press_bench','dip'],rounds:2,roundLog:[['press_bench','dip'],['press_bench']]},lg,
+      {press_bench:{sets:3,reps:'8'}});
+    await resume(1);
+    for(var k=0;k<2;k++){ assert.ok(await tap('[data-action="undoset"][data-ex="press_bench"]'),'no Undo on the bench slide'); await settle(); }
+    assert.deepStrictEqual(sets('press_bench'),[],'bench sets are left');
+    assert.deepStrictEqual(box1().roundLog,[['dip']],'the rounds still hold bench');
+    assert.strictEqual(box1().rounds,1,'the round of bench alone still counts');
+    await toSlideN(2);
+    assert.ok(/1 done/.test(await p.evaluate(function(){ return document.querySelector('.slide .target').textContent; })),'the superset count is wrong');
+    await endIt();
+  });
+  await t('a round logged before round sets were tagged still undoes the way it did', async function(){
+    ssSeed(['warmup','ss1','cooldown'],{ex:['press_bench'],rounds:1,roundLog:[['press_bench']]},{press_bench:[{v:8,w:60,t:T0+1000}]});
+    await resume(1);
+    assert.ok(await tap('[data-action="undoround"]'),'no Undo round'); await settle();
+    assert.deepStrictEqual(sets('press_bench'),[],'the old round left its set');
+    assert.strictEqual(box1().rounds,0,'the round still counts');
+    await endIt();
+  });
+  await t('a superset added after one was removed gets a new id, and the removal can still be undone', async function(){
+    ssSeed(['warmup','ss1','cooldown'],{ex:['press_bench'],rounds:0});
+    await resume(1);
+    await tap('[data-action="removeex"][data-id="ss1"]'); await settle();
+    await tap('[data-action="openpicker"]'); await p.waitForTimeout(300);
+    await p.fill('#ex-search','superset'); await p.waitForTimeout(400);
+    assert.ok(await tap('[data-action="addex"][data-id="superset"]'),'no Superset in the picker'); await settle();
+    var s=seedOf().activeSession;
+    assert.ok(s.exIds.indexOf('ss2')>-1 && s.exIds.indexOf('ss1')<0,'the new superset is '+s.exIds.join(','));
+    await undoBack();
+    s=seedOf().activeSession;
+    assert.ok(s.exIds.indexOf('ss1')>-1 && s.supersets.ss1 && s.supersets.ss1.ex[0]==='press_bench','the removed superset did not come back');
+    await endIt();
+  });
+
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');
   await b.close(); srv.close();
   console.log(fails||errs.length?'\nFAILING\n':'\nAll removal checks pass.\n');

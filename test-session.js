@@ -852,10 +852,9 @@ srv.listen(0,async function(){
     await p.click('[data-action="ssdel"]'); await settle();
     assert.strictEqual(await p.evaluate(function(){ return document.querySelectorAll('.ssrow').length; }),0,
       'it was not taken out of the round');
-    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
-    await p.click('#ex-search');
-    await p.type('#ex-search','bicep curl',{delay:25}); await p.waitForTimeout(450);
-    await p.click('[data-action="addex"][data-id="curl_bicep"]'); await settle();
+    // Shown nowhere else, it gets a slide of its own, so its sets are not
+    // saved out of sight.
+    assert.ok(await toSlide('Bicep curl'),'the exercise got no slide of its own');
     var chips=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.setchip')).map(function(e){return e.textContent.trim();});
     });

@@ -1616,6 +1616,7 @@ function undoOne(u){
     if(u.target) s.targets[u.exId]=u.target;
     if(u.logs && !(s.logs[u.exId]||[]).length) s.logs[u.exId]=u.logs;
     if(u.box){ if(!s.supersets) s.supersets={}; s.supersets[u.exId]=u.box; }
+    Object.keys(u.memberLogs||{}).forEach(function(m){ if(!(s.logs[m]||[]).length) s.logs[m]=u.memberLogs[m]; });
     slide=at;
   }
   else if(u.kind==='extra'){ putBack(state.shopExtras,u.item,u.pos);
@@ -2681,7 +2682,7 @@ var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
 // checked on their own. Every field of a set is drawn, so every one logSet
 // writes is here. A count is drawn once per unit and a round count rebuilds
 // one entry per round, so those have a top.
-var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',machine:'s',work:'s',rest:'s',wu:'b'}]};
+var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',machine:'s',work:'s',rest:'s',wu:'b',ss:'i'}]};
 var IMPORT_FIELDS={
   days:{water:{'#':[0,DAY_MAX.water]},wx:{'#':[0,DAY_MAX.water]},alcohol:{'#':[0,DAY_MAX.alcohol]},smoking:{'#':[0,DAY_MAX.smoking]},
     weed:{'#':[0,DAY_MAX.weed]},rest:'b',touched:'b',workout:{done:'b',type:{'|':WORKOUT_TYPES}}},
@@ -3490,6 +3491,53 @@ function roundLogOf(b){
   if(!b.roundLog){ b.roundLog=[]; for(var r=0;r<(b.rounds||0);r++) b.roundLog.push([]); }
   return b.roundLog;
 }
+/* A set a round logs carries its superset's id (ss), and an exercise's sets of
+   one superset line up with the rounds that hold it, newest with newest. So a
+   round, or one member of it, is taken back by that very set, never just the
+   newest one, which may have been logged on the exercise's own slide. A round
+   from before sets were tagged has none, and takes the newest untagged set,
+   the way it always took the newest. */
+function roundSetFor(ssId,b,r,m){
+  var rl=roundLogOf(b), k=0, a=(state.activeSession.logs[m]||[]), mine, i;
+  for(var j=r+1;j<rl.length;j++) if(rl[j].indexOf(m)>-1) k++;
+  mine=a.filter(function(x){ return x.ss===ssId; });
+  if(k<mine.length) return mine[mine.length-1-k];
+  for(i=a.length-1;i>=0;i--) if(!a[i].ss) return a[i];
+  return null;
+}
+function dropSet(m,x){
+  var logs=state.activeSession.logs, a=logs[m]||[], i=a.indexOf(x);
+  if(i>-1) a.splice(i,1);
+  if(!a.length) delete logs[m];
+}
+function lastRoundWith(b,m){ var rl=roundLogOf(b); for(var r=rl.length-1;r>=0;r--) if(rl[r].indexOf(m)>-1) return r; return -1; }
+// A round left with nobody in it is no round.
+function outOfRound(b,r,m){
+  var rl=roundLogOf(b), at=r>-1?rl[r].indexOf(m):-1; if(at<0) return;
+  rl[r].splice(at,1); if(!rl[r].length){ rl.splice(r,1); b.rounds=Math.max(0,(b.rounds||0)-1); }
+}
+// Takes back the newest set of an exercise, and its place in a round if a round logged it.
+function undoOwnSet(m){
+  var a=(state.activeSession&&state.activeSession.logs[m])||[], x=a[a.length-1], b=x&&x.ss&&supersetBox(x.ss);
+  undoSet(m);
+  if(b) outOfRound(b,lastRoundWith(b,m),m);
+}
+// The Undo on a superset's row: its newest set if a round of this superset
+// logged it, or else this member's set in the latest round that has one.
+function undoMemberSet(ssId,m){
+  var b=supersetBox(ssId), a=(state.activeSession.logs[m]||[]), x=a[a.length-1];
+  if(!b || !x) return undoSet(m);
+  var r=lastRoundWith(b,m);
+  if(x.ss===ssId || r<0) return undoOwnSet(m);
+  var y=roundSetFor(ssId,b,r,m); if(y) dropSet(m,y);
+  outOfRound(b,r,m);
+}
+function undoLastRound(ssId){
+  var b=supersetBox(ssId); if(!b || !(b.rounds>0)) return;
+  var rl=roundLogOf(b), r=rl.length-1;
+  if(r>-1) rl[r].slice().forEach(function(m){ var y=roundSetFor(ssId,b,r,m); if(y) dropSet(m,y); });
+  rl.pop(); b.rounds--;
+}
 /* What was supersetted, kept for the finished log. The sets themselves already
    land on the individual exercises, which is what makes history and PBs work
    without knowing about rounds, but it also meant the log had no record that
@@ -3566,9 +3614,11 @@ function addExToSession(exId){
   if(!state.activeSession) return null;
   if(exId==='superset'){
     // Every superset is its own instance, so this is the one thing you can add
-    // twice. Numbered past whatever is already there so ids never collide.
-    var next=1;
-    state.activeSession.exIds.forEach(function(x){
+    // twice. Numbered past whatever is already there so ids never collide,
+    // and past one parked for Undo, which reusing would quietly cancel.
+    var next=1, u=readUndo(), seen=state.activeSession.exIds.concat(Object.keys(state.activeSession.supersets||{}));
+    if(u) (u.kind==='many'?u.parts:[u]).forEach(function(x){ if(x.kind==='sessionEx') seen.push(x.exId); });
+    seen.forEach(function(x){
       if(isSuperset(x)) next=Math.max(next, parseInt(x.slice(2),10)+1);
     });
     exId='ss'+next;
@@ -3598,8 +3648,14 @@ function removeExFromSession(exId){
   if(isSuperset(exId) && s.supersets){ u.box=s.supersets[exId]; delete s.supersets[exId]; }
   // Sets a round logged live on the exercise too, so they stay while any
   // superset still holds it.
-  var inRound=Object.keys(s.supersets||{}).some(function(k){ return supersetMembers(k).indexOf(exId)>-1; });
-  if(!inRound && s.logs[exId]){ u.logs=s.logs[exId]; delete s.logs[exId]; }
+  var inRound=function(m){ return s.exIds.indexOf(m)>-1 || Object.keys(s.supersets||{}).some(function(k){ return supersetMembers(k).indexOf(m)>-1; }); };
+  if(!inRound(exId) && s.logs[exId]){ u.logs=s.logs[exId]; delete s.logs[exId]; }
+  // A member shown nowhere else goes with its superset: kept, its sets would
+  // be out of sight and still saved on Finish.
+  ((u.box&&(Array.isArray(u.box)?u.box:u.box.ex))||[]).forEach(function(m){
+    if(inRound(m) || !s.logs[m]) return;
+    (u.memberLogs=u.memberLogs||{})[m]=s.logs[m]; delete s.logs[m];
+  });
   parkUndo(u);
   if(slide>=state.activeSession.exIds.length) slide=Math.max(0,state.activeSession.exIds.length-1);
 }
@@ -5091,18 +5147,8 @@ function onClick(e){
     }
   }
   else if(action==='undoset'){
-    var exU=t.getAttribute('data-ex'), bU=supersetBox(t.getAttribute('data-ss')||'');
-    undoSet(exU);
-    // On a superset slide the set came from a round: take the member out of
-    // the latest round that has it, and a round left with nobody is no round.
-    if(bU && bU.rounds>0){
-      var rl=roundLogOf(bU);
-      for(var r=rl.length-1;r>=0;r--){
-        var at=rl[r].indexOf(exU); if(at<0) continue;
-        rl[r].splice(at,1); if(!rl[r].length){ rl.splice(r,1); bU.rounds--; }
-        break;
-      }
-    }
+    var exU=t.getAttribute('data-ex'), ssU=t.getAttribute('data-ss');
+    if(ssU) undoMemberSet(ssU,exU); else undoOwnSet(exU);
   }
   else if(action==='togglewu'){
     var wl=state.activeSession && state.activeSession.logs[t.getAttribute('data-ex')];
@@ -5111,8 +5157,7 @@ function onClick(e){
     if(ws.wu) delete ws.wu; else ws.wu=true;
   }
   else if(action==='undoround'){
-    var bR=supersetBox(t.getAttribute('data-ss'));
-    if(bR && bR.rounds>0){ (roundLogOf(bR).pop()||[]).forEach(undoSet); bR.rounds--; }
+    undoLastRound(t.getAttribute('data-ss'));
   }
   else if(action==='ssadd'){
     var ssA=t.getAttribute('data-ss'), pick=document.getElementById('ss-pick-'+ssA);
@@ -5129,20 +5174,33 @@ function onClick(e){
   }
   else if(action==='ssdel'){
     var ssD=t.getAttribute('data-ss'), gone=t.getAttribute('data-ex');
-    var b2=supersetBox(ssD);
-    // Sets already logged stay where they are: they belong to the exercise,
-    // not to the round it happened to be done in.
-    if(b2) b2.ex=b2.ex.filter(function(x){ return x!==gone; });
+    var b2=supersetBox(ssD), sD=state.activeSession;
+    // Sets already logged stay: they belong to the exercise, not to the round
+    // it happened to be done in. They leave the rounds, and an exercise shown
+    // nowhere else gets its own slide, so they are never saved out of sight.
+    if(b2){
+      b2.ex=b2.ex.filter(function(x){ return x!==gone; });
+      for(var rD=lastRoundWith(b2,gone);rD>-1;rD=lastRoundWith(b2,gone)) outOfRound(b2,rD,gone);
+      (sD.logs[gone]||[]).forEach(function(x){ if(x.ss===ssD) delete x.ss; });
+      var elsewhere=sD.exIds.indexOf(gone)>-1 || Object.keys(sD.supersets||{}).some(function(k){ return supersetMembers(k).indexOf(gone)>-1; });
+      if(!elsewhere && (sD.logs[gone]||[]).length){ addExToSession(gone); slide=Math.max(0,sD.exIds.indexOf(ssD)); }
+    }
   }
   else if(action==='loground'){
     // One round is one set of each member. A row left empty is skipped rather
     // than refused: half a round logged beats nothing logged.
-    var ssL=t.getAttribute('data-ss'), b3=supersetBox(ssL), got=[];
+    // A box holding something that is not a number stops the whole round
+    // before any of it is logged: skipped quietly, it would count the round
+    // with that member missing, as if it had been left empty.
+    var ssL=t.getAttribute('data-ss'), b3=supersetBox(ssL), got=[], typo=[];
+    supersetMembers(ssL).forEach(function(m){
+      ['log-v-','log-w-','log-lvl-'].forEach(function(k){ var el=document.getElementById(k+m);
+        if(el && el.tagName==='INPUT' && isNaN(readNum(el))) typo.push(k+m); });
+    });
+    if(typo.length){ focusBad(typo); return; }
     supersetMembers(ssL).forEach(function(m){
       var d=exDef(m); if(!d) return;
-      var before=(state.activeSession.logs[m]||[]).length;
-      logSet(m,d.type,true);
-      if((state.activeSession.logs[m]||[]).length>before) got.push(m);
+      if(logSet(m,d.type,true)){ var a=state.activeSession.logs[m]; a[a.length-1].ss=ssL; got.push(m); }
     });
     // A round nobody filled in is not a round, and the empty boxes say so the
     // way a single Log set does, so the tap never just looks dead.
