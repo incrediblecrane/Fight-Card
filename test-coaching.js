@@ -99,6 +99,15 @@ if(loaded===true){
     assert.strictEqual(box.computeStreaks().cleanStreak,2);
   });
 
+  t('a streak longer than 400 days is counted in full, and stops at the oldest day held', function(){
+    var days={}; for(var i=0;i<450;i++) days[keyAgo(i)]=day(true);
+    box.state({days:days,workoutLogs:[]});
+    var s=box.computeStreaks();
+    assert.strictEqual(s.dayStreak,450); assert.strictEqual(s.cleanStreak,450);
+    box.state({days:{},workoutLogs:[]});
+    assert.deepStrictEqual(box.computeStreaks(),{dayStreak:0,cleanStreak:0});
+  });
+
   console.log('\nLAST TIME, PREFILL AND DOUBLE PROGRESSION');
 
   var logs=[

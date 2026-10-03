@@ -90,6 +90,21 @@ WORLDS.mixed1=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
   [[{v:15,w:null}],[{v:12,w:5}],[{v:20,w:null}]].forEach(function(s,i){
     st.workoutLogs.push({id:'wl-m'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(6-i*2), logs:{press_bench:s}}); }); });
 UI.mixed1='{"tab":"progress","open":["press_bench"]}';
+// Five hundred clean days in a row, up to today.
+function cleanDay(w){ return {water:w||0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true}; }
+WORLDS.long=withSeed(function(st){ st.activeSession=null; st.days={}; for(var i=0;i<500;i++) st.days[key(i)]=cleanDay(); });
+UI.long='{"tab":"today"}';
+// A year of 2L days, and one day logged in 2015.
+WORLDS.old=withSeed(function(st){ st.activeSession=null; st.days={'2015-06-01':cleanDay(8)}; for(var i=1;i<=365;i++) st.days[key(i)]=cleanDay(8); });
+UI.old='{"tab":"progress"}';
+// Two days before yesterday a rest day, three days before nothing logged,
+// and today's water at the target and higher than any other day.
+WORLDS.rest=withSeed(function(st){ recent(st);
+  st.workoutLogs=st.workoutLogs.filter(function(l){ return l.date!==key(2) && l.date!==key(3); });
+  delete st.days[key(3)]; st.days[key(2)]=cleanDay(); st.days[key(2)].rest=true;
+  st.waterTarget=10; Object.keys(st.days).forEach(function(k){ st.days[k].water=Math.min(st.days[k].water||0,9); });
+  st.days[key(0)]=cleanDay(10); });
+UI.rest='{"tab":"progress"}';
 // A runtime whose store answers null: the page cannot load and says so.
 var NO_STORE='<script>window.claude={use:function(n){ return Promise.resolve(null); }};<\/script>';
 
@@ -799,6 +814,63 @@ srv.listen(0,async function(){
     await close(p);
     assert.ok(r.li>=7,'the template has '+r.li+' list lines');
     assert.ok(!/overview/i.test(r.tag),'the card repeats the Overview heading');
+  });
+
+  console.log('\nSTREAKS, AVERAGES AND CHART DETAILS');
+  await t('streaks: 500 clean days in a row read 500 on Today and on Progress', async function(){
+    var p=await open('long');
+    var today=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.streaks .streak .n'),function(e){ return e.textContent; }).slice(0,2); });
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(150);
+    var prog=await p.evaluate(function(){ return document.querySelector('.daystrip').parentNode.querySelector('.pbrow').textContent; });
+    await close(p);
+    assert.deepStrictEqual(today,['500','500'],'Today reads '+today.join(', '));
+    assert.ok(/Current streak 500 days/.test(prog) && /Day streak 500/.test(prog),'Progress reads '+prog);
+  });
+  await t('all-time water: one day in 2015 averages over every day since, recent days included', async function(){
+    var p=await open('old');
+    var all=await p.evaluate(function(){ var t=[].slice.call(document.querySelectorAll('.stat-tile')).filter(function(x){ return /all time/.test(x.textContent); })[0];
+      return {n:t.querySelector('.n').textContent, sub:t.querySelector('.sub-l').textContent}; });
+    await close(p);
+    var span=Math.round((new Date(key(0)+'T12:00:00')-new Date('2015-06-01T12:00:00'))/864e5)+1;
+    assert.strictEqual(all.sub,'over '+span+' days','the tile says '+all.sub);
+    var want=Math.round(366*8/span*100)/100*0.25;
+    assert.ok(Math.abs(parseFloat(all.n)-want)<0.011 && parseFloat(all.n)>0,'the all-time average reads '+all.n+', not about '+want.toFixed(2)+'L');
+  });
+  await t('Sets per day: a rest day is drawn apart from a day with nothing logged', async function(){
+    var p=await open('rest');
+    var r=await p.evaluate(function(ks){ var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Sets per day/.test(x.textContent); })[0];
+      var g=c.querySelectorAll('.mark'), n=g.length;
+      var mk=function(i){ var e=g[n-1-i].querySelectorAll('rect')[1]; var cs=getComputedStyle(e);
+        return {h:e.getAttribute('height'), fill:cs.fill, tip:g[n-1-i].getAttribute('data-tip')}; };
+      return {rest:mk(2), none:mk(3), legend:!!c.querySelector('.legend i.rest')}; });
+    await close(p);
+    assert.ok(/rest day/.test(r.rest.tip) && /nothing logged/.test(r.none.tip),'the days are '+r.rest.tip+' / '+r.none.tip);
+    assert.ok(r.rest.h!==r.none.h || r.rest.fill!==r.none.fill,'a rest day and an empty day draw the same mark: '+JSON.stringify(r));
+    assert.ok(r.legend,'nothing says what the rest-day mark means');
+  });
+  for(var nd of [14,30,90]) await (function(nd){ return t('Water per day over '+nd+' days: a peak at the target is not labelled twice, and no label overlaps the target\'s', async function(){
+    var p=await open('rest',{viewport:{width:360,height:740}});
+    await p.click('[data-action="prange"][data-n="'+nd+'"]'); await p.waitForTimeout(150);
+    var r=await p.evaluate(function(){ var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Water per day/.test(x.textContent); })[0];
+      var bb=function(e){ var b=e.getBoundingClientRect(); return {l:b.left,t:b.top,r:b.right,b:b.bottom,s:e.textContent}; };
+      var lbls=[].map.call(c.querySelectorAll('.c-lbl'),bb);
+      return {vals:[].map.call(c.querySelectorAll('.c-val'),bb), tgt:lbls.filter(function(l){ return l.s==='2.5L'; })[0]}; });
+    await close(p);
+    assert.ok(r.tgt,'no target label');
+    r.vals.forEach(function(v){ assert.ok(v.r<=r.tgt.l || v.l>=r.tgt.r || v.b<=r.tgt.t || v.t>=r.tgt.b,'"'+v.s+'" overlaps the target label'); });
+    assert.ok(!r.vals.some(function(v){ return v.s==='2.5L'; }),'2.5L is labelled twice');
+  }); })(nd);
+  await t('a screen reader reads each day of the charts, the clean-day squares and the week dots', async function(){
+    var p=await open('rest');
+    var sets=await p.locator('.chart',{hasText:'Sets per day'}).ariaSnapshot();
+    var strip=await p.locator('.daystrip').ariaSnapshot();
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(150);
+    var week=await p.locator('.week').ariaSnapshot();
+    await close(p);
+    assert.ok(/listitem: .*\d+ sets? over \d+ session/.test(sets) && /listitem: .*rest day/.test(sets) && /listitem: .*nothing logged/.test(sets),'Sets per day reads:\n'+sets);
+    assert.strictEqual((sets.match(/listitem/g)||[]).length,14,'Sets per day reads:\n'+sets);
+    assert.ok(/^- list "Clean days/.test(strip) && (strip.match(/listitem/g)||[]).length===14 && /listitem ".*: clean"/.test(strip) && /listitem ".*: not logged"/.test(strip),'the clean days read:\n'+strip);
+    assert.ok(/, clean"/.test(week) && /, not logged"/.test(week),'the week reads:\n'+week);
   });
 
   // Not assertions: pictures for a person to look at.
