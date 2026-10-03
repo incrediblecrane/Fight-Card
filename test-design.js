@@ -105,6 +105,14 @@ WORLDS.rest=withSeed(function(st){ recent(st);
   st.waterTarget=10; Object.keys(st.days).forEach(function(k){ st.days[k].water=Math.min(st.days[k].water||0,9); });
   st.days[key(0)]=cleanDay(10); });
 UI.rest='{"tab":"progress"}';
+// A note titled with a bare 77-character link, a recipe with a 66-letter
+// name, both planned today, so no break opportunity anywhere in either title.
+WORLDS.longword=withSeed(function(st){ st.activeSession=null;
+  var url='https://example.com/'+new Array(58).join('a');
+  st.library.push({id:'lib-long', tag:'Note', title:url, notes:url+' '+url});
+  st.recipes[0].title='Supercalifragilisticexpialidociouschickenandricebowlwithextrasauce';
+  st.plan=[{id:'pl-d1', recipeId:st.recipes[0].id, date:key(0), slot:'dinner', portions:2},
+           {id:'pl-b1', recipeId:st.recipes[1].id, date:key(0), slot:'breakfast', portions:1}]; });
 // A runtime whose store answers null: the page cannot load and says so.
 var NO_STORE='<script>window.claude={use:function(n){ return Promise.resolve(null); }};<\/script>';
 
@@ -219,6 +227,62 @@ srv.listen(0,async function(){
       return row.querySelector('.mx').getBoundingClientRect().left-row.querySelector('.mp').getBoundingClientRect().right; });
     await close(p);
     assert.ok(gap>=8,'gap is '+gap+'px');
+  });
+  for(var lw of [['training','a note'],['meals','a recipe and a planned meal']]) await (function(lw){ return t('a long unbroken word in '+lw[1]+' title wraps inside its card on a 360px phone', async function(){
+    var p=await open('longword',{viewport:{width:360,height:740},touch:true,ui:'{"tab":"'+lw[0]+'"}'});
+    var r=await p.evaluate(function(){ var W=document.documentElement.clientWidth;
+      return {sw:document.documentElement.scrollWidth, W:W, off:[].map.call(document.querySelectorAll('.libitem .x,.mealrow .mx'),function(e){ return Math.round(e.getBoundingClientRect().right); }).filter(function(x){ return x>W; })}; });
+    await close(p);
+    assert.ok(r.sw<=r.W,'the page is '+r.sw+'px wide at '+r.W);
+    assert.deepStrictEqual(r.off,[],'a delete sits off the right edge');
+  }); })(lw);
+  await t('planned meal titles keep their own line clear of the portion buttons on a 320px phone', async function(){
+    var p=await open('longword',{viewport:{width:320,height:700},touch:true,ui:'{"tab":"meals"}'});
+    var r=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.mealrow'),function(row){
+      var mt=row.querySelector('.mt'), m=mt.getBoundingClientRect(), b=row.querySelector('.mp button').getBoundingClientRect();
+      return {sw:mt.scrollWidth, cw:mt.clientWidth, w:Math.round(m.width), clear:m.right<=b.left+0.5||m.bottom<=b.top+0.5}; }); });
+    await close(p);
+    assert.ok(r.length>=2,'only '+r.length+' planned meals drawn');
+    r.forEach(function(x,i){ assert.ok(x.sw<=x.cw,'meal '+i+' title needs '+x.sw+'px of '+x.cw);
+      assert.ok(x.w>=100,'meal '+i+' title is squeezed to '+x.w+'px');
+      assert.ok(x.clear,'meal '+i+' title runs under the - button'); });
+  });
+  await t('each sauna stint\'s remove is a 44px target that never reaches into the next chip', async function(){
+    var p=await open('plain',{viewport:{width:360,height:740},touch:true,ui:'{"tab":"today"}'});
+    for(var i=0;i<5;i++){ await p.fill('#sauna-mins',String(10+i)); await p.click('[data-action="addstint"]'); await p.waitForTimeout(60); }
+    var r=await p.evaluate(function(){ var chips=[].slice.call(document.querySelectorAll('.setchip')), xs=[].slice.call(document.querySelectorAll('.chipx')), bad=[], small=[];
+      // Every point of each chip lands on that chip or its own x, never on another chip's x.
+      chips.forEach(function(c,i){ var r=c.getBoundingClientRect();
+        for(var x=r.left+1;x<r.right-1;x+=2) for(var y=r.top+1;y<r.bottom-1;y+=2){ var e=document.elementFromPoint(x,y);
+          var j=xs.indexOf(e&&e.closest?e.closest('.chipx'):null); if(j>-1&&j!==i) bad.push(i+'>'+j); } });
+      xs.forEach(function(x,i){ var hr=x.getBoundingClientRect(), a=getComputedStyle(x,'::after'), h=hr.height;
+        if(a.content!=='none'&&a.position==='absolute') h=Math.max(h,hr.height-parseFloat(a.top)-parseFloat(a.bottom));
+        if(h<44) small.push(i+': '+Math.round(h)); });
+      return {n:chips.length, bad:bad.filter(function(v,i,a){ return a.indexOf(v)===i; }), small:small}; });
+    await close(p);
+    assert.strictEqual(r.n,5,'stints drawn: '+r.n);
+    assert.deepStrictEqual(r.bad,[],'a tap on one chip lands on another chip\'s x');
+    assert.deepStrictEqual(r.small,[],'stint x hit heights');
+  });
+  await t('Start, the Workout link, Log sauna, the plan boxes and the day dots are 44px to a thumb at 390px', async function(){
+    var all=[];
+    var hit=async function(p,sel){ (await p.evaluate(function(s){ return [].map.call(document.querySelectorAll(s),function(e){
+      var r=e.getBoundingClientRect(), w=r.width, h=r.height;
+      ['::before','::after'].forEach(function(ps){ var a=getComputedStyle(e,ps); if(a.content!=='none'&&a.position==='absolute'){
+        w=Math.max(w,r.width-parseFloat(a.left)-parseFloat(a.right)); h=Math.max(h,r.height-parseFloat(a.top)-parseFloat(a.bottom)); } });
+      return {s:s,w:Math.round(w),h:Math.round(h)}; }); },sel)).forEach(function(x){ all.push(x); }); };
+    var p=await open('plain',{viewport:{width:390,height:844},touch:true,ui:'{"tab":"today"}'});
+    await hit(p,'.linklike'); await hit(p,'.logbtn'); await hit(p,'.datepick input'); await hit(p,'.dot.pickable');
+    await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(150);
+    await hit(p,'.wcard .start');
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(150);
+    await hit(p,'.exrow .top');
+    await close(p);
+    p=await open('meal',{viewport:{width:390,height:844},touch:true}); await hit(p,'.recipe-controls select'); await close(p);
+    ['.linklike','.logbtn','.datepick input','.dot.pickable','.wcard .start','.exrow .top','.recipe-controls select'].forEach(function(s){
+      assert.ok(all.some(function(x){ return x.s===s; }),'nothing matched '+s); });
+    var small=all.filter(function(x){ return x.h<44 || (x.s==='.dot.pickable'&&x.w<44); });
+    assert.deepStrictEqual(small.map(function(x){ return x.s+' '+x.w+'x'+x.h; }).slice(0,8),[]);
   });
   await t('Log set is the biggest button on the slide and Next drops back', async function(){
     var p=await open('press');

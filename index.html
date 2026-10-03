@@ -80,7 +80,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .sectiontitle:first-child{margin-top:0;}\
 .libitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}\
 .libitem .row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}\
+.libitem .row>div{flex:1 1 auto;min-width:0;}\
 .libitem h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.98rem;margin:0 0 4px;}\
+.libitem h4,.libitem p,.libitem li,.mealrow .mt{overflow-wrap:anywhere;}\
 .libitem .tag{font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);}\
 .libitem p{font-size:0.86rem;color:var(--text-soft);margin:6px 0 0;white-space:pre-wrap;}\
 .libitem ul{margin:8px 0 0;padding-left:1.1em;font-size:0.86rem;color:var(--text-soft);}\
@@ -149,7 +151,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .wcard .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}\
 .wcard h4{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
 .wcard .meta{font-size:0.78rem;color:var(--text-faint);}\
-.wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;}\
+.wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;min-height:44px;cursor:pointer;white-space:nowrap;}\
 .wcard .start:disabled{background:var(--surface-raised);color:var(--text-faint);border:1px solid var(--line);cursor:default;}\
 .story{max-width:420px;margin:0 auto;}\
 @media (min-width:760px){.story{max-width:none;}}\
@@ -190,8 +192,8 @@ button.setchip{color:var(--text);min-height:44px;cursor:pointer;}\
 .nudge .btns{display:flex;gap:8px;}\
 .nudge button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;border-radius:8px;padding:8px 12px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--text);}\
 .nudge button.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}\
-.chipx{border:none;background:none;color:var(--text-faint);font-size:0.9rem;line-height:1;padding:0 0 0 3px;cursor:pointer;position:relative;}\
-.chipx::after{content:'';position:absolute;inset:-14px -12px;}\
+.setchip.stint{display:inline-flex;align-items:center;min-height:44px;padding:0 0 0 12px;box-sizing:border-box;}\
+.chipx{border:none;background:none;color:var(--text-faint);font-size:0.9rem;line-height:1;align-self:stretch;min-width:36px;margin:-1px -1px -1px 0;padding:0 12px 0 6px;border-radius:0 20px 20px 0;cursor:pointer;}\
 .logrow{display:flex;gap:8px;align-items:flex-end;justify-content:center;flex-wrap:wrap;}\
 .logrow input::placeholder{font-size:0.8rem;}.fld{display:flex;flex-direction:column;align-items:center;gap:3px;}\
 .fld span{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-soft);}\
@@ -4528,8 +4530,8 @@ function bodyContent(){
         '<div class="stepper"><button data-action="weed" data-d="-1" aria-label="One less session">-</button><span class="count">'+t.weed+'</span><button data-action="weed" data-d="1" aria-label="One more session">+</button></div></div>'+
       '<div class="card"><h3>Sauna</h3><div class="sub">'+(todaySaunaCount?(todaySaunaCount+' session'+(todaySaunaCount===1?'':'s')+' '+dayWord()):'Mins, temp &amp; bench position'+(backfilling()?' '+esc(dayWord()):''))+'</div>'+
         (saunaDraft.length?('<div class="setchips" style="justify-content:flex-start;">'+
-          saunaDraft.map(function(st,i){ return '<span class="setchip">'+st.mins+' min &middot; '+esc(st.position)+
-            ' <button class="chipx" data-action="delstint" data-i="'+i+'" aria-label="Remove this stint">&times;</button></span>'; }).join('')+'</div>'):'')+
+          saunaDraft.map(function(st,i){ return '<span class="setchip stint">'+st.mins+' min &middot; '+esc(st.position)+
+            '<button class="chipx" data-action="delstint" data-i="'+i+'" aria-label="Remove this stint">&times;</button></span>'; }).join('')+'</div>'):'')+
         '<div class="sauna-row"><input id="sauna-mins" type="text" inputmode="decimal" placeholder="mins">'+
           '<input id="sauna-temp" type="text" inputmode="decimal" placeholder="&deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
           '<select id="sauna-pos"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
