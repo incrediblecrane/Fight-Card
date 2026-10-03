@@ -788,6 +788,14 @@ Eleven exercises have no rig deliberately: warm-up, cool-down, technique and
 rounds blocks and the three gym-machine slots are containers rather than
 movements, and the four swim entries have no ground to stand on.
 
+**Live figure**:
+The slide's figure plays the rep on a loop at about 20 frames a second. Each
+frame moves the shapes already drawn (`drawInPlace`) rather than drawing the
+figure again, and a rep's frames are solved once and kept for the next rep.
+While the rest clock runs it moves at a third of that rate. Under
+`prefers-reduced-motion: reduce` it is a still at the end of the first
+movement, and a tap on it plays one rep.
+
 `RIGFRAMES` in the app is generated from `pose/exercises.js` by
 `pose/emit-rig.js`, never edited by hand: change `pose/` and regenerate.
 `emit-rig.js --check` (part of `npm test`) fails when the app is behind.
@@ -870,3 +878,7 @@ the shipped `index.html`, so they test what ships.
 - `test-touch.js`: real touch input on a phone context: the slide swipe,
   swipe-to-remove, and what a scroll, pinch, caret drag or cancelled touch must
   not do.
+- `test-slideview.js`: the session slide view: a new slide (Next, Prev, Skip,
+  a swipe, Resume) opens at its top while a tap within it leaves the page
+  where it is, the live figure's main-thread cost, its slower rate while
+  resting, and the still under reduced motion.

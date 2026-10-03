@@ -4,7 +4,7 @@
   "scripts": {
     "build": "node pose/build.js",
     "test:pose": "node pose/build.js && node pose/emit-rig.js --check && node pose/checks/analyse.js && node pose/checks/adversarial.js && node pose/checks/continuous.js && node pose/checks/views.js && node pose/checks/render.js",
-    "test:app": "node build-publish.js && node test-build.js && node test-tooling.js && node test-shopping.js && node test-planmodel.js && node test-catalog.js && node test-volume.js && node test-coaching.js && node test-roundtrip.js && node test-app.js && node test-removal.js && node test-undo.js && node test-session.js && node test-meals.js && node test-publish.js && node test-db.js && node test-store.js && node test-plan.js && node test-addplan.js && node test-ticks.js && node test-design.js && node test-dates.js && node test-touch.js",
+    "test:app": "node build-publish.js && node test-build.js && node test-tooling.js && node test-shopping.js && node test-planmodel.js && node test-catalog.js && node test-volume.js && node test-coaching.js && node test-roundtrip.js && node test-app.js && node test-removal.js && node test-undo.js && node test-session.js && node test-meals.js && node test-publish.js && node test-db.js && node test-store.js && node test-plan.js && node test-addplan.js && node test-ticks.js && node test-design.js && node test-dates.js && node test-touch.js && node test-slideview.js",
     "test": "npm run test:pose && npm run test:app"
   },
   "devDependencies": {

@@ -852,7 +852,7 @@ srv.listen(0,async function(){
     await p.click('[data-action="water"][data-d="-1"]'); await settle();
   });
 
-  await t('the rig keeps its place in the rep across a render, at about 30fps', async function(){
+  await t('the rig keeps its place in the rep across a render, at about 20fps', async function(){
     await go(); var ex=await toLift();
     assert.ok(ex,'no rigged lift slide');
     await p.waitForTimeout(1300);
@@ -861,14 +861,15 @@ srv.listen(0,async function(){
       document.querySelector('[data-action="logset"][data-ex="'+ex+'"]').click();   // empty: renders, logs nothing
       return new Promise(function(res){ setTimeout(function(){
         var u1=parseFloat(document.getElementById('fig-live').getAttribute('data-u'));
+        // A frame moves the drawing in place and marks its phase.
         var n=0, ob=new MutationObserver(function(){ n++; });
-        ob.observe(document.getElementById('fig-live'),{childList:true});
+        ob.observe(document.getElementById('fig-live'),{attributes:true,attributeFilter:['data-u']});
         setTimeout(function(){ ob.disconnect(); res({u0:u0,u1:u1,paints:n}); },1000);
       },80); });
     },ex);
     assert.ok(r.u0>0.3,'the phase never advanced: '+r.u0);
     assert.ok(r.u1>=r.u0 && r.u1-r.u0<0.15,'a render moved the rep from '+r.u0+' to '+r.u1);
-    assert.ok(r.paints>=15 && r.paints<=36,r.paints+' redraws in a second');
+    assert.ok(r.paints>=12 && r.paints<=26,r.paints+' redraws in a second');
     await leave();
   });
 

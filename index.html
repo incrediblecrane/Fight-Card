@@ -166,8 +166,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 #fig-live svg,#fig-live-front svg{pointer-events:none;}\
 .fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;}\
 .fig-wrap svg{width:155px;height:172px;}\
-.fig-wrap svg line,.fig-wrap svg circle{transition:all .7s cubic-bezier(.4,0,.2,1);}\
-@media (prefers-reduced-motion:reduce){.fig-wrap svg line,.fig-wrap svg circle{transition:none;}}\
+@media (prefers-reduced-motion:reduce){#fig-live,#fig-live-front{cursor:pointer;}}\
 .slide h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1.15rem;margin:0 0 2px;text-align:center;}\
 .slide .cat{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;text-align:center;display:block;margin-bottom:8px;}\
 .slide .target{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--text-faint);text-align:center;}\
@@ -4391,37 +4390,82 @@ function figureSVG(poseKey,phase,equip){
 // drawing it, so a render (a save, a tap) carries on mid-rep instead of
 // snapping back to the start. Only moving to another rig starts it over.
 var rigRaf=null, rigT0=0, rigLastId=null;
-function startPoseLoop(){
+function stillMotion(){ try{ return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(err){ return false; } }
+// The still is where the first movement ends, the bottom of a squat or the top
+// of a press: the start of most reps is just standing.
+function rigStillU(rigId){
+  var ex=rigFor(rigId), t=ex.tempo||ex.frames.map(function(){ return 1; });
+  return t.length>1?t[0]/t.reduce(function(a,b){ return a+b; },0):0;
+}
+/* A frame moves the figure already drawn: the same shapes in the same order,
+   each given the new frame's attributes. Rebuilding both drawings with
+   innerHTML thirty times a second kept a phone's main thread a quarter busy
+   for the whole session. Anything that does not line up shape for shape is
+   drawn whole. */
+function svgShapes(html){
+  return {h:html, s:(html.match(/<[a-z][^>]*>/g)||[]).map(function(tag){
+    var a=[]; tag.replace(/([\w:-]+)="([^"]*)"/g,function(m,k,v){ a.push(k,v); return m; });
+    return {n:tag.match(/^<([\w:-]+)/)[1], a:a};
+  })};
+}
+function drawInPlace(el,d){
+  var svg=el.firstElementChild, s=d.s, kids=svg?svg.children:[];
+  if(!svg || svg.tagName!=='svg' || s.length!==kids.length+1){ el.innerHTML=d.h; return; }
+  for(var i=0;i<s.length;i++){
+    var node=i?kids[i-1]:svg, a=s[i].a;
+    if(node.tagName!==s[i].n || node.attributes.length*2!==a.length){ el.innerHTML=d.h; return; }
+    for(var j=0;j<a.length;j+=2) if(node.getAttribute(a[j])!==a[j+1]) node.setAttribute(a[j],a[j+1]);
+  }
+}
+// A rep is RIG_STEPS frames, each drawn once and kept for the next rep, so
+// solving the figure is the first rep's work only. One rig is kept at a time.
+var RIG_STEPS=48, rigDrawn={id:null, at:{}};
+function drawRig(rigId,u){
+  if(rigDrawn.id!==rigId) rigDrawn={id:rigId, at:{}};
+  var k=u.toFixed(3), d=rigDrawn.at[k]||(rigDrawn.at[k]=[svgShapes(rigSVG(rigId,u)),svgShapes(rigFrontSVG(rigId,u))]);
+  var el=document.getElementById('fig-live');
+  if(el){ drawInPlace(el,d[0]); el.setAttribute('data-u',k); }
+  var fr=document.getElementById('fig-live-front');
+  if(fr) drawInPlace(fr,d[1]);
+}
+// While the rest clock runs the figure moves at a third of the rate: nobody is
+// copying it then, and the phone is spared two thirds of the work.
+function resting(){ var r=document.getElementById('restline'); return !!r && !/\bover\b/.test(r.className); }
+// Under reduced motion the figure is a still, and a tap on it plays one rep.
+function startPoseLoop(play){
   stopPoseLoop();
   var w=document.getElementById('fig-live');
-  var rigId=w?w.getAttribute('data-rig'):null;
+  var rigId=w?w.getAttribute('data-rig'):null, still=!play && stillMotion();
   if(rigId && rigFor(rigId)){
+    if(still){ drawRig(rigId,rigStillU(rigId)); return; }
     // A rigged exercise animates continuously through the whole rep rather than
     // flipping between two stills, because the path between the positions is
     // most of what a form reminder is for.
-    if(rigId!==rigLastId){ rigT0=performance.now(); rigLastId=rigId; }
-    // About 30fps: the motion reads the same and it is half the work on a phone.
-    var last=-1e9;
+    if(play || rigId!==rigLastId){ rigT0=performance.now(); rigLastId=rigId; }
+    // About 20fps: the motion reads the same and it is a third of the work on a phone.
+    var last=-1;
     var step=function(now){
       var el=document.getElementById('fig-live');
       if(!el || el.getAttribute('data-rig')!==rigId){ rigRaf=null; return; }
-      if(now-last>=30){
-        last=now;
-        var u=(Math.max(0,now-rigT0)/2400)%1;
-        el.innerHTML=rigSVG(rigId,u); el.setAttribute('data-u',u.toFixed(3));
-        var fr=document.getElementById('fig-live-front');
-        if(fr) fr.innerHTML=rigFrontSVG(rigId,u);
-      }
+      if(play && now-rigT0>=2400){ rigRaf=null; drawRig(rigId,rigStillU(rigId)); return; }
+      var i=Math.floor(Math.max(0,now-rigT0)/2400*RIG_STEPS)%RIG_STEPS;
+      if(i!==last && (last<0 || i%3===0 || !resting())){ last=i; drawRig(rigId,i/RIG_STEPS); }
       rigRaf=requestAnimationFrame(step);
     };
     // Straight away, at the phase it was at, not a frame later from u=0.
     step(performance.now());
     return;
   }
-  poseTimer=setInterval(function(){
-    poseFlip=!poseFlip;
+  var flips=0;
+  var flip=function(on){
+    poseFlip=on;
     var w2=document.getElementById('fig-live');
     if(w2){ var key=w2.getAttribute('data-pose'); var eq=w2.getAttribute('data-equip'); w2.innerHTML=figureSVG(key,poseFlip,eq); }
+  };
+  if(still){ if(w && poseFlip!==true) flip(true); return; }
+  poseTimer=setInterval(function(){
+    flip(!poseFlip);
+    if(play && ++flips>=2){ clearInterval(poseTimer); poseTimer=null; flip(true); }
   },900);
 }
 function stopPoseLoop(){
@@ -5384,6 +5428,7 @@ function drawPage(){
   if(keepTick!==null) [].forEach.call(app.querySelectorAll('[data-action="shopcheck"]'),function(el){
     if(el.getAttribute('data-item')===keepTick){ try{ el.focus({preventScroll:true}); }catch(err){} } });
   undoFit();
+  if(slideTop){ slideTop=false; storyTop(app); }
   if(restTimer){ clearInterval(restTimer); restTimer=null; }
   if(document.getElementById('restline')) restTimer=setInterval(restTick,1000);
   stopPoseLoop();
@@ -5392,6 +5437,20 @@ function drawPage(){
   if(fitCharts() && chartPass<2){ chartPass++; renderAgain=true; } else chartPass=0;
 }
 var chartPass=0;
+/* Another slide, or going into or out of the session, opens at the top of the
+   story: Next tapped at the foot of a long slide used to open the next one
+   scrolled past its figure, name and target. A tap within a slide leaves the
+   page where it is. The top is only brought down to, never pushed up past
+   the bar fixed above the page. */
+var slideTop=false;
+function storyTop(app){
+  var st=app.querySelector('.story');
+  try{
+    if(!st){ window.scrollTo(0,0); return; }
+    var by=st.getBoundingClientRect().top-(parseFloat(app.style.getPropertyValue('--status-h'))||0);
+    if(by<0) window.scrollBy(0,by);
+  }catch(err){}
+}
 /* #app takes no part in the browser's scroll anchoring, so a redraw keeps the
    page's offset, and a control below something that grew moves down under the
    finger. holdInView notes a control and where it is on screen; the next
@@ -5448,11 +5507,11 @@ function drawKeeping(app,html){
 var lastCut=null;
 function onClick(e){
   var t=e.target.closest('[data-action]');
-  if(!t) return;
+  if(!t){ if(stillMotion() && e.target.closest('#fig-live,#fig-live-front')) startPoseLoop(true); return; }
   var action=t.getAttribute('data-action');
   // Only a tap that logs something on the day makes a record of it.
   var today={water:1,logsauna:1,workout:1,rest:1,alcohol:1,smoking:1,weed:1}[action]?ensureDay(activeDate()):null;
-  var uiOnly=false;
+  var uiOnly=false, wasView=viewingSession, wasSlide=slide;
 
   // Controls whose value onChange reads must not be re-rendered on click: the
   // click handler runs first, and replacing the DOM detaches the element before
@@ -5906,6 +5965,7 @@ function onClick(e){
   // The change is in state already: a render that throws must not take its
   // save with it, or the reload that could draw it never sees it.
   if(!uiOnly) exportDirty=true;
+  if(viewingSession!==wasView || viewingSession && slide!==wasSlide) slideTop=true;
   try{ if(!drawn) render(); } finally { if(!uiOnly) scheduleSave(); }
   if(pickerTop){ pickerTop=false; try{ window.scrollTo(0,0); }catch(err){} }
 }
@@ -6049,8 +6109,8 @@ function onTouchEnd(e){
   if(Math.abs(dx)<50 || !sideways(dx,dy)) return;
   if(!state.activeSession) return;
   var n=state.activeSession.exIds.length;
-  if(dx<0 && slide<n-1){ slide++; render(); }
-  else if(dx>0 && slide>0){ slide--; render(); }
+  if(dx<0 && slide<n-1){ slide++; slideTop=true; render(); }
+  else if(dx>0 && slide>0){ slide--; slideTop=true; render(); }
 }
 
 // Inline script text ends at the first closing script tag, and an HTML comment
