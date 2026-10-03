@@ -125,7 +125,7 @@ server.listen(0, async function(){
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(700);
     var before=errs.length;
     var opened=await p.evaluate(function(){
-      var rows=[].slice.call(document.querySelectorAll('.exrow .top h4'));
+      var rows=[].slice.call(document.querySelectorAll('.exrow .top h3'));
       for(var i=0;i<rows.length;i++){
         if(rows[i].textContent.trim()==='Warm-up'){ rows[i].closest('.top').click(); return true; }
       }
@@ -137,7 +137,7 @@ server.listen(0, async function(){
     var detail=await p.evaluate(function(){
       var rows=[].slice.call(document.querySelectorAll('.exrow'));
       for(var i=0;i<rows.length;i++){
-        var h=rows[i].querySelector('.top h4');
+        var h=rows[i].querySelector('.top h3');
         if(h && h.textContent.trim()==='Warm-up') return rows[i].innerText;
       }
       return '';
@@ -150,7 +150,7 @@ server.listen(0, async function(){
   try{
     var before2=errs.length;
     var opened2=await p.evaluate(function(){
-      var rows=[].slice.call(document.querySelectorAll('.exrow .top h4'));
+      var rows=[].slice.call(document.querySelectorAll('.exrow .top h3'));
       for(var i=0;i<rows.length;i++){
         if(rows[i].textContent.trim()==='Overhead press'){ rows[i].closest('.top').click(); return true; }
       }
@@ -162,7 +162,7 @@ server.listen(0, async function(){
     var detail2=await p.evaluate(function(){
       var rows=[].slice.call(document.querySelectorAll('.exrow'));
       for(var i=0;i<rows.length;i++){
-        var h=rows[i].querySelector('.top h4');
+        var h=rows[i].querySelector('.top h3');
         if(h && h.textContent.trim()==='Overhead press') return rows[i].innerText;
       }
       return '';
@@ -179,12 +179,12 @@ server.listen(0, async function(){
   pctx.setDefaultTimeout(8000); pp.on('pageerror',function(e){errs.push(e.message);});
   var exRow=function(name){ return pp.evaluate(function(n){
     var rows=[].slice.call(document.querySelectorAll('.exrow'));
-    for(var i=0;i<rows.length;i++){ var h=rows[i].querySelector('.top h4');
+    for(var i=0;i<rows.length;i++){ var h=rows[i].querySelector('.top h3');
       if(h && h.textContent.trim()===n) return {last:rows[i].querySelector('.last').textContent, text:rows[i].innerText}; }
     return null; },name); };
   var openEx=async function(name){ await pp.evaluate(function(n){
     [].slice.call(document.querySelectorAll('.exrow .top')).forEach(function(t){
-      if(t.querySelector('h4').textContent.trim()===n) t.click(); }); },name); await pp.waitForTimeout(300); };
+      if(t.querySelector('h3').textContent.trim()===n) t.click(); }); },name); await pp.waitForTimeout(300); };
   try{
     await pp.goto(URL+'prog'); await pp.waitForSelector('#app *');
     await pp.click('[data-action="tab"][data-tab="progress"]'); await pp.waitForTimeout(400);
@@ -204,7 +204,7 @@ server.listen(0, async function(){
   }catch(e){ bad('best set with no weight',e); }
   try{
     var order=await pp.evaluate(function(){
-      return [].slice.call(document.querySelectorAll('.exrow .top h4')).map(function(h){ return h.textContent.trim(); }); });
+      return [].slice.call(document.querySelectorAll('.exrow .top h3')).map(function(h){ return h.textContent.trim(); }); });
     assert.ok(order.indexOf('Plank')>-1 && order.indexOf('Pull-up')>-1,'order: '+order.join(', '));
     assert.ok(order.indexOf('Plank')<order.indexOf('Pull-up'),
       'a log saved out of date order sank the plank below an older pull-up: '+order.join(', '));

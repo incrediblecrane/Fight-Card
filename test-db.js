@@ -3057,7 +3057,7 @@ srv.listen(0,async function(){
 
   await t('recipes and notes keep their order across a reload, and a new one stays last', async function(){
     await go(); var was=JSON.parse(JSON.stringify(store));
-    var titles=function(){ return p.$$eval('.libitem h4',function(xs){ return xs.map(function(x){ return x.textContent; }); }); };
+    var titles=function(){ return p.$$eval('.libitem h3',function(xs){ return xs.map(function(x){ return x.textContent; }); }); };
     try{
       await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(300);
       await p.fill('#rec-title','ZZ My new recipe'); await p.fill('#rec-ing','Beef (800g)'); await p.click('[data-action="addrecipe"]');

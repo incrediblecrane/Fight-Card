@@ -118,7 +118,7 @@ srv.listen(0,async function(){
   var finishOne=async function(title){
     await tabTo('training');
     if(title) assert.ok(await p.evaluate(function(want){
-      var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h4').textContent.trim()===want; })[0];
+      var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h3').textContent.trim()===want; })[0];
       var b=c&&c.querySelector('[data-action="startworkout"]'); if(b) b.click(); return !!b; },title),'no card for '+title);
     else await p.locator('[data-action="startworkout"]').first().click();
     await p.waitForTimeout(500);

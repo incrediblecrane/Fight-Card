@@ -784,7 +784,7 @@ srv.listen(0,async function(){
   await t('charts: a load chart leaves out the sessions with no weight, rather than drawing them at 0kg', async function(){
     var p=await open('mixed',{viewport:{width:360,height:740}});
     var r=await p.evaluate(function(){
-      var ex=[].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return /Bench/.test(x.querySelector('h4').textContent); })[0].querySelector('.exdetail');
+      var ex=[].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return /Bench/.test(x.querySelector('h3').textContent); })[0].querySelector('.exdetail');
       var hit=ex.querySelector('[data-xs]');
       return {tips:hit?JSON.parse(hit.getAttribute('data-tips')):[], vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; }),
         pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }), sub:ex.querySelector('.chart-head .sub').textContent}; });
@@ -805,7 +805,7 @@ srv.listen(0,async function(){
   await t('charts: reps and minutes read with a space ("14 reps"), and so does the change', async function(){
     var p=await open('mixed',{viewport:{width:360,height:740}});
     var r=await p.evaluate(function(){
-      var ex=[].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return /Air squat/.test(x.querySelector('h4').textContent); })[0].querySelector('.exdetail');
+      var ex=[].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return /Air squat/.test(x.querySelector('h3').textContent); })[0].querySelector('.exdetail');
       return {pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }), vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; })}; });
     await close(p);
     assert.ok(r.pb.indexOf('Personal best 14 reps')>-1,'the PB row says '+r.pb.join(' / '));
@@ -847,14 +847,14 @@ srv.listen(0,async function(){
       var tiles=[].slice.call(document.querySelectorAll('.stat-row')).filter(function(x){ return /all time/i.test(x.textContent); })[0];
       var tt=[].map.call(tiles.querySelectorAll('.stat-tile'),function(e){ return Math.round(e.getBoundingClientRect().top); });
       var sauna=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Minutes per session/.test(x.textContent); })[0];
-      return {tt:tt, sauna:sauna?sauna.querySelectorAll('.mark').length:0, title:(document.querySelector('.chart-head h4')||{}).textContent}; });
+      return {tt:tt, sauna:sauna?sauna.querySelectorAll('.mark').length:0, title:(document.querySelector('.chart-head h3')||{}).textContent}; });
     await p.click('[data-action="prange"][data-n="90"]'); await p.waitForTimeout(150);
     var sauna90=await p.evaluate(function(){ var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Minutes per session/.test(x.textContent); })[0];
       return c?c.querySelectorAll('.mark').length:0; });
     var top=await p.$('.exrow .top'); await top.click(); await p.waitForTimeout(150);
     var h=await p.evaluate(function(){ var tb=document.querySelector('.exdetail table'), dates=[].map.call(tb.querySelectorAll('td.dt'),function(e){ return e.textContent; }).filter(function(x){ return x; });
       return {dates:dates, uniq:dates.filter(function(v,i,a){ return a.indexOf(v)===i; }).length, iso:/\d{4}-\d{2}-\d{2}/.test(tb.textContent),
-        title:document.querySelector('.exdetail .chart-head h4')?document.querySelector('.exdetail .chart-head h4').textContent:'Heaviest'}; });
+        title:document.querySelector('.exdetail .chart-head h3')?document.querySelector('.exdetail .chart-head h3').textContent:'Heaviest'}; });
     await close(p);
     assert.ok(r.tt.length===3 && r.tt.every(function(x){ return x===r.tt[0]; }),'water tiles at '+r.tt.join(', '));
     assert.ok(r.sauna>0 && sauna90>=r.sauna,'sauna marks: 14 days '+r.sauna+', 90 days '+sauna90);

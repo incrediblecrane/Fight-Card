@@ -882,3 +882,8 @@ the shipped `index.html`, so they test what ships.
   a swipe, Resume) opens at its top while a tap within it leaves the page
   where it is, the live figure's main-thread cost, its slower rate while
   resting, and the still under reduced motion.
+- `test-a11y.js`: what a screen reader and a keyboard meet, read from the
+  accessibility tree at phone width: an idle saving pill that says nothing,
+  every control named for what it acts on (sauna boxes, history-row removes,
+  superset boxes, picker rows and Adds, plan selects), one Remove per history
+  row in the tab order, and headings that go h1, h2, h3 without a skip.

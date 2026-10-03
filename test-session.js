@@ -49,7 +49,7 @@ srv.listen(0,async function(){
     var started=await p.evaluate(function(want){
       var cards=[].slice.call(document.querySelectorAll('.wcard'));
       for(var i=0;i<cards.length;i++){
-        var h=cards[i].querySelector('h4');
+        var h=cards[i].querySelector('h3');
         if(h && h.textContent.trim()===want){ cards[i].querySelector('[data-action="startworkout"]').click(); return true; }
       }
       return false;
@@ -581,7 +581,7 @@ srv.listen(0,async function(){
     var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
     if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(700); }
     var opened=await p.evaluate(function(){
-      var rows=[].slice.call(document.querySelectorAll('.exrow .top h4'));
+      var rows=[].slice.call(document.querySelectorAll('.exrow .top h3'));
       for(var i=0;i<rows.length;i++){
         if(rows[i].textContent.trim()==='Warm-up'){ rows[i].closest('.top').click(); return true; }
       }
@@ -596,7 +596,7 @@ srv.listen(0,async function(){
     var detail=await p.evaluate(function(){
       var rows=[].slice.call(document.querySelectorAll('.exrow'));
       for(var i=0;i<rows.length;i++){
-        var h=rows[i].querySelector('.top h4');
+        var h=rows[i].querySelector('.top h3');
         if(h && h.textContent.trim()==='Warm-up') return rows[i].innerText;
       }
       return '';
@@ -1224,7 +1224,7 @@ srv.listen(0,async function(){
     await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
     var push=function(){ return p.evaluateHandle(function(){
       var cards=[].slice.call(document.querySelectorAll('.wcard'));
-      for(var i=0;i<cards.length;i++){ var h=cards[i].querySelector('h4');
+      for(var i=0;i<cards.length;i++){ var h=cards[i].querySelector('h3');
         if(h && h.textContent.trim()==='Push') return cards[i].querySelector('button'); }
     }); };
     assert.ok(await p.evaluate(function(b){ return b.disabled; },await push()),
@@ -1473,7 +1473,7 @@ srv.listen(0,async function(){
   await t('the workout card says when it was last done, and the week counts it', async function(){
     await p.click('[data-action="tab"][data-tab="training"]'); await p.waitForTimeout(350);
     var meta=await p.evaluate(function(){
-      var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h4').textContent.trim()==='Push'; })[0];
+      var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h3').textContent.trim()==='Push'; })[0];
       return c?c.querySelector('.meta').textContent:''; });
     assert.ok(/last done today/.test(meta),'card meta: '+meta);
     var wk=await p.evaluate(function(){ var e=document.querySelector('.weekgoal'); return e?e.textContent:''; });
@@ -1529,7 +1529,7 @@ srv.listen(0,async function(){
   var storyTitle=function(){ return p.evaluate(function(){ var h=document.querySelector('.story-title'); return h?h.textContent:''; }); };
   var banner=function(){ return p.evaluate(function(){ var b=document.querySelector('.resume-banner'); return b?b.textContent:''; }); };
   var cardButton=function(title){ return p.evaluate(function(want){
-    var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h4').textContent.trim()===want; })[0];
+    var c=[].slice.call(document.querySelectorAll('.wcard')).filter(function(x){ return x.querySelector('h3').textContent.trim()===want; })[0];
     var b=c&&c.querySelector('[data-action="startworkout"]'); return b?b.textContent.trim():''; },title); };
   var logBench=async function(n){
     assert.ok(await toSlide('Bench press'),'never reached the bench press');

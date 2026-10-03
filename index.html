@@ -81,8 +81,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .libitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}\
 .libitem .row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}\
 .libitem .row>div{flex:1 1 auto;min-width:0;}\
-.libitem h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.98rem;margin:0 0 4px;}\
-.libitem h4,.libitem p,.libitem li,.mealrow .mt{overflow-wrap:anywhere;}\
+.libitem h3{font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.98rem;margin:0 0 4px;}\
+.libitem h3,.libitem p,.libitem li,.mealrow .mt{overflow-wrap:anywhere;}\
 .libitem .tag{font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);}\
 .libitem p{font-size:0.86rem;color:var(--text-soft);margin:6px 0 0;white-space:pre-wrap;}\
 .libitem ul{margin:8px 0 0;padding-left:1.1em;font-size:0.86rem;color:var(--text-soft);}\
@@ -149,7 +149,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .resume-banner button.x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1.1rem;padding:0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
 .wcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}\
 .wcard .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}\
-.wcard h4{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
+.wcard h3{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
 .wcard .meta{font-size:0.78rem;color:var(--text-faint);}\
 .wcard .start{font-family:'IBM Plex Mono',monospace;font-size:0.76rem;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 14px;min-height:44px;cursor:pointer;white-space:nowrap;}\
 .wcard .start:disabled{background:var(--surface-raised);color:var(--text-faint);border:1px solid var(--line);cursor:default;}\
@@ -251,7 +251,7 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 .stat-tile .l{font-size:0.7rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.stat-tile .sub-l{font-size:0.66rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;}\
 .exrow{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0;margin-bottom:8px;}\
 .exrow .top{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:10px;padding:12px 14px;min-height:44px;}\
-.exrow .top h4{font-size:0.94rem;margin:0;font-family:'Work Sans',sans-serif;font-weight:700;}\
+.exrow .top h3{font-size:0.94rem;margin:0;font-family:'Work Sans',sans-serif;font-weight:700;}\
 .exrow .top .last{font-size:0.74rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;white-space:nowrap;}\
 .exdetail{margin:0 14px 12px;border-top:1px solid var(--line);padding-top:10px;overflow-x:auto;}\
 .exdetail table{width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:fixed;}\
@@ -268,7 +268,7 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 .recent-log>span:first-child{min-width:0;}\
 .ssnote{display:block;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--accent);margin-top:2px;}\
 @media (prefers-reduced-motion:no-preference){.xp-fill,.dots .cup,.bar{transition:all .25s ease;}}\
-.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;touch-action:pan-y;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.c-tip{min-height:3em;line-height:1.5;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);overflow-wrap:anywhere;}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h4{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--field-border);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend i.rest{background:var(--rest);border-color:var(--rest);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.exrow .top .last time{font:inherit;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap:first-child>div{max-width:var(--fig-max,155px);}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;aspect-ratio:100/168;}.fig-pair .fig-wrap:first-child svg{aspect-ratio:var(--fig-ar,100/168);}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;opacity:0;transition:opacity .18s ease;}.swipe.open .swipe-del,.swipe-del:focus-visible{opacity:1;}.swipe-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:4px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe .recent-log{padding-right:36px;}.swipe:hover .swipe-x{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-soft);border-color:var(--field-border);}.undo-bar .msg{flex:1 1 auto;min-width:0;}.undo-bar .btns{flex:0 0 auto;white-space:nowrap;}.undo-bar.mini{left:auto;right:max(16px,calc((100vw - 648px) / 2));padding:4px;border-radius:999px;}.undo-bar.mini .msg,.undo-bar.mini .ghost,.undo-bar:not(.mini) .what{display:none;}.undo-bar.mini button:first-child{margin-left:0;}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{font-size:0.66rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{position:sticky;top:var(--status-h,0px);z-index:15;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:6px 8px 6px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{min-height:44px;background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 14px;font-size:0.72rem;font-weight:600;text-transform:uppercase;cursor:pointer;font-family:'IBM Plex Mono',monospace;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}\
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}.chart svg{width:100%;height:auto;display:block;overflow:visible;touch-action:pan-y;}.c-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;fill:var(--text-faint);}.c-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;fill:var(--text-soft);}.c-tip{min-height:3em;line-height:1.5;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-soft);overflow-wrap:anywhere;}.empty-chart{color:var(--text-faint);font-size:0.82rem;padding:18px 12px;text-align:center;}.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;}.chart-head h3{margin:0;font-size:0.9rem;font-family:'Work Sans',sans-serif;font-weight:700;}.chart-head .sub{font-size:0.72rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;text-align:right;}.rangebar{display:flex;gap:6px;margin:0 0 12px;}.rangebar button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text-soft);cursor:pointer;}.rangebar button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}.daystrip{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}.daystrip i,.legend i{width:14px;height:14px;border-radius:4px;background:var(--surface-raised);border:1px solid var(--field-border);display:block;}.legend i{width:10px;height:10px;border-radius:3px;}.daystrip i.clean,.legend i.clean{background:var(--good);border-color:var(--good);}.daystrip i.used,.legend i.used{background:var(--text-faint);border-color:var(--text-faint);}.legend i.rest{background:var(--rest);border-color:var(--rest);}.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.7rem;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;align-items:center;}.legend span{display:flex;align-items:center;gap:5px;}.pbrow{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-faint);}.pbrow b{color:var(--text);font-weight:600;font-size:0.86rem;}.exrow .top .last .chev{color:var(--accent);margin-left:6px;}.exrow .top .last time{font:inherit;}.chart .mark{cursor:pointer;}.fig-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}.fig-pair .fig-wrap>div{width:100%;max-width:155px;}.fig-pair .fig-wrap:first-child>div{max-width:var(--fig-max,155px);}.fig-pair .fig-wrap svg{display:block;width:100%;height:auto;aspect-ratio:100/168;}.fig-pair .fig-wrap:first-child svg{aspect-ratio:var(--fig-ar,100/168);}.fig-pair .fig-wrap{position:relative;}.fig-wrap .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);z-index:1;}.swipe{position:relative;margin-bottom:8px;border-radius:12px;overflow:hidden;}.swipe .swipe-inner{margin-bottom:0;transition:transform .18s ease;position:relative;z-index:1;align-items:center;}.swipe.open .swipe-inner{transform:translateX(-94px);}.swipe-del{position:absolute;top:0;right:0;height:100%;width:94px;border:none;background:var(--warn);color:var(--warn-ink);font-family:'Work Sans',sans-serif;font-weight:700;font-size:0.8rem;cursor:pointer;z-index:0;opacity:0;transition:opacity .18s ease;}.swipe.open .swipe-del,.swipe-del:focus-visible{opacity:1;}.swipe-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--text-faint);font-size:1.1rem;line-height:1;padding:4px;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease;}@media (hover:hover){.swipe .recent-log{padding-right:36px;}.swipe-x{visibility:visible;}.swipe:hover .swipe-x,.swipe-x:focus-visible{opacity:1;visibility:visible;pointer-events:auto;}}.swipe.open .swipe-x{opacity:0;visibility:hidden;pointer-events:none;}.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;z-index:19;box-shadow:0 4px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:0.82rem;}.undo-bar button{min-height:40px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:5px 13px;font-size:0.74rem;font-weight:700;cursor:pointer;margin-left:6px;}.undo-bar button.ghost{background:none;color:var(--text-soft);border-color:var(--field-border);}.undo-bar .msg{flex:1 1 auto;min-width:0;}.undo-bar .btns{flex:0 0 auto;white-space:nowrap;}.undo-bar.mini{left:auto;right:max(16px,calc((100vw - 648px) / 2));padding:4px;border-radius:999px;}.undo-bar.mini .msg,.undo-bar.mini .ghost,.undo-bar:not(.mini) .what{display:none;}.undo-bar.mini button:first-child{margin-left:0;}.macros{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:8px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--text-faint);}.macros b{color:var(--text);font-weight:600;font-size:0.84rem;}.macros .per{font-size:0.66rem;}.portions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}.portions .l{font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.portions button{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);font-size:1rem;line-height:1;cursor:pointer;}.portions .n{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;font-weight:600;min-width:20px;text-align:center;}.portions button.reset{width:auto;padding:0 12px;height:44px;font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text-faint);}.addform input[type=number]{width:100%;}.backfill-bar{position:sticky;top:var(--status-h,0px);z-index:15;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:6px 8px 6px 14px;margin-bottom:14px;font-size:0.86rem;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,0.12);}.backfill-bar strong{font-family:'IBM Plex Mono',monospace;}.backfill-bar button{min-height:44px;background:var(--warn-ink);color:var(--warn);border:none;border-radius:999px;padding:6px 14px;font-size:0.72rem;font-weight:600;text-transform:uppercase;cursor:pointer;font-family:'IBM Plex Mono',monospace;}.backfilling .card{border-color:var(--warn);background:var(--surface-raised);}.backfilling .hud{border-color:var(--warn);}.datepick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-top:12px;}.datepick label{font-size:0.72rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;}.datepick input{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:6px 9px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}.datepick .hint{flex:1 1 100%;font-size:0.72rem;color:var(--text-faint);}.dot.pickable{cursor:pointer;}.dot.active{outline:2px solid var(--accent);outline-offset:2px;}\
 .plainlist{list-style:none;padding:0;margin:8px 0 0;font-size:0.86rem;color:var(--text-soft);}.plainlist li{margin:3px 0;}.libitem .plainlist+p{margin-top:12px;}\
 @media (min-width:1100px){.wrap{max-width:1000px;}.grid{grid-template-columns:repeat(3,minmax(0,1fr));}.shoplist{columns:2;column-gap:28px;}.shoplist .shoprow{break-inside:avoid;}.libgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}.libgrid .libitem{margin-bottom:0;}.undo-bar,.statusbar{max-width:968px;}.undo-bar.mini{right:max(16px,calc((100vw - 968px) / 2));}}\
 ";
@@ -1280,7 +1280,7 @@ function shortDay(k,yr){ return k.slice(8,10)+'/'+k.slice(5,7)+((yr||k.slice(0,4
    rides on <title>; touch never shows that, so each mark also carries its
    text in data-tip and a tap writes it into the chart's head line. */
 function chartEmpty(msg){ return '<div class="chart empty-chart">'+esc(msg)+'</div>'; }
-function chartHead(title,sub){ return '<div class="chart-head"><h4>'+esc(title)+'</h4><span class="sub">'+esc(sub||'')+'</span></div>'; }
+function chartHead(title,sub){ return '<div class="chart-head"><h3>'+esc(title)+'</h3><span class="sub">'+esc(sub||'')+'</span></div>'; }
 /* Drawn at the width the chart is shown at, so one unit is one CSS pixel and
    an 11px label reads as 11px. A viewBox fixed at 680 was halved on a phone
    and every label shrank to 6px. The width is read back after each draw
@@ -1512,8 +1512,8 @@ function restLineFor(sess,goal){
   return (goal&&lastT&&sessionLive(sess)&&Date.now()-lastT<REST_SHOW)?('<div class="restline'+((Date.now()-lastT)/1000>=goal?' over':'')+'" id="restline" data-t="'+lastT+'" data-goal="'+goal+'">'+restText(lastT,goal)+'</div>'):'';
 }
 // A cardio picker, drawn with the choice it should start on.
-function cardioSelect(id,hint,list,on){
-  return '<select id="'+id+'" class="cardio-select"><option value="">'+hint+'&hellip;</option>'+
+function cardioSelect(id,hint,list,on,name){
+  return '<select id="'+id+'" class="cardio-select" aria-label="'+esc(name||hint)+'"><option value="">'+hint+'&hellip;</option>'+
     list.map(function(x){ return '<option value="'+esc(x)+'"'+(x===on?' selected':'')+'>'+esc(x)+'</option>'; }).join('')+'</select>';
 }
 // A box with its unit under it, which stays when the box holds a number.
@@ -4532,9 +4532,9 @@ function bodyContent(){
         (saunaDraft.length?('<div class="setchips" style="justify-content:flex-start;">'+
           saunaDraft.map(function(st,i){ return '<span class="setchip stint">'+st.mins+' min &middot; '+esc(st.position)+
             '<button class="chipx" data-action="delstint" data-i="'+i+'" aria-label="Remove this stint">&times;</button></span>'; }).join('')+'</div>'):'')+
-        '<div class="sauna-row"><input id="sauna-mins" type="text" inputmode="decimal" placeholder="mins">'+
-          '<input id="sauna-temp" type="text" inputmode="decimal" placeholder="&deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
-          '<select id="sauna-pos"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
+        '<div class="sauna-row"><input id="sauna-mins" type="text" inputmode="decimal" placeholder="mins" aria-label="Minutes">'+
+          '<input id="sauna-temp" type="text" inputmode="decimal" placeholder="&deg;C" aria-label="Temperature &deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
+          '<select id="sauna-pos" aria-label="Bench position"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
         '<button class="linklike" data-action="addstint">+ Another stint at a different height</button>'+
         '<button class="logbtn" data-action="logsauna">'+(saunaDraft.length?'Log session':'Log sauna')+'</button></div>'+
     '</div>'+
@@ -4559,7 +4559,7 @@ function bodyContent(){
   var trainingItems=state.library.map(function(item){
     // Under the Overview heading an "Overview" tag only says it twice.
     var tagShown=String(item.tag||'').toLowerCase()!=='overview';
-    return '<div class="libitem"><div class="row"><div>'+(tagShown?'<span class="tag">'+esc(item.tag)+'</span>':'')+'<h4>'+esc(item.title)+'</h4></div>'+
+    return '<div class="libitem"><div class="row"><div>'+(tagShown?'<span class="tag">'+esc(item.tag)+'</span>':'')+'<h3>'+esc(item.title)+'</h3></div>'+
       '<button class="x" data-action="dellib" data-id="'+item.id+'" aria-label="Remove '+esc(item.title)+'">&times;</button></div>'+(item.notes?notesHtml(item.notes):'')+'</div>';
   }).join('');
 
@@ -4580,18 +4580,18 @@ function bodyContent(){
     var busy=sessionBusy(w.id);
     var start='<button class="start" data-action="startworkout" data-id="'+w.id+'"'+
       (busy?' disabled title="Finish or discard the session in progress first">Start':resumesOnStart(w.id)?'>Resume':'>Start')+'</button>';
-    return '<div class="wcard"><div class="row"><div><h4>'+esc(w.title)+'</h4><div class="meta">'+meta+' &middot; '+esc(w.tag)+'</div></div>'+
+    return '<div class="wcard"><div class="row"><div><h3>'+esc(w.title)+'</h3><div class="meta">'+meta+' &middot; '+esc(w.tag)+'</div></div>'+
       start+'</div></div>';
   }).join('');
-  return '<div class="sectiontitle">Overview</div>'+trainingItems+
-    '<div class="sectiontitle">Workouts</div>'+
+  return '<h2 class="sectiontitle">Overview</h2>'+trainingItems+
+    '<h2 class="sectiontitle">Workouts</h2>'+
     '<div class="weekgoal"><span>Last 7 days: '+(weekN>=state.weekTarget?('<b>'+weekN+' session'+(weekN===1?'':'s')+'</b>, target '+state.weekTarget+' hit'):('<b>'+weekN+' of '+state.weekTarget+'</b> sessions'))+'</span><span class="tgt">'+
       '<button data-action="weektarget" data-d="-1" aria-label="Fewer sessions a week">-</button>'+
       '<button data-action="weektarget" data-d="1" aria-label="More sessions a week">+</button></span></div>'+
     resumeBanner+workoutCards+
     '<div class="addform"><strong class="formhead">Add a note or adjustment</strong>'+
       '<input id="lib-title" placeholder="Title" maxlength="80">'+
-      '<select id="lib-tag"><option>Note</option><option>Adjustment</option><option>Other</option></select>'+
+      '<select id="lib-tag" aria-label="Kind"><option>Note</option><option>Adjustment</option><option>Other</option></select>'+
       '<textarea id="lib-notes" placeholder="Notes"></textarea>'+formNoteHtml('lib')+
       '<button data-action="addlib">Add to training plan</button></div>';
   }
@@ -4649,7 +4649,7 @@ function bodyContent(){
     // Closed by default: what you scan the list for is the name, the macros
     // and the add button. The batch and the method open on a tap.
     return '<div class="libitem"><div class="row"><div class="rtoggle" data-action="toggleex" data-id="'+esc(rk)+'" role="button" tabindex="0" aria-expanded="'+open+'">'+
-        '<span class="tag">'+esc(r.tag||'Recipe')+'</span><span class="chev">'+(open?'&#9650; hide':'&#9660; ingredients')+'</span><h4>'+esc(r.title)+'</h4></div>'+
+        '<span class="tag">'+esc(r.tag||'Recipe')+'</span><span class="chev">'+(open?'&#9650; hide':'&#9660; ingredients')+'</span><h3>'+esc(r.title)+'</h3></div>'+
       '<button class="x" data-action="delrecipe" data-id="'+r.id+'" aria-label="Delete '+esc(r.title)+'">&times;</button></div>'+
       (m?macroLine(r):'')+
       (open?('<div class="portions"><span class="l">Portions</span>'+
@@ -4664,8 +4664,8 @@ function bodyContent(){
         // whole point is being able to add the same recipe more than once.
         // Each box is drawn holding only its choice, and gets the rest of the
         // week as it is reached (planOptsFill).
-        '<select data-action="planday" data-id="'+esc(r.id)+'" data-lazy="1">'+planOpts('planday',r,false)+'</select>'+
-        '<select data-action="planslot" data-id="'+esc(r.id)+'" data-lazy="1">'+planOpts('planslot',r,false)+'</select>'+
+        '<select data-action="planday" data-id="'+esc(r.id)+'" data-lazy="1" aria-label="Day for '+esc(r.title)+'">'+planOpts('planday',r,false)+'</select>'+
+        '<select data-action="planslot" data-id="'+esc(r.id)+'" data-lazy="1" aria-label="Meal slot for '+esc(r.title)+'">'+planOpts('planslot',r,false)+'</select>'+
         '<button class="addplan" data-action="addmeal" data-id="'+r.id+'">'+(addN===recipeBase(r)?'Add to plan':'Add '+addN+' portion'+(addN===1?'':'s'))+'</button>'+
         (added||planned?'<span class="planned" role="status">'+esc(added)+(added&&planned?' &middot; ':'')+(planned?planned+' in the week':'')+'</span>':'')+
       '</div></div>';
@@ -4676,8 +4676,8 @@ function bodyContent(){
   if(recipeItems) recipeItems='<div class="libgrid">'+recipeItems+'</div>';
 
   return '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
-    '<div class="sectiontitle">The week</div><div class="weekbox cal">'+calRows+'</div>'+
-    '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+
+    '<h2 class="sectiontitle">The week</h2><div class="weekbox cal">'+calRows+'</div>'+
+    '<h2 class="sectiontitle">Shopping list</h2><div class="weekbox">'+
       '<div class="rangebar shoprange">'+
         [[3,'Next 3 days'],[7,'Whole week']].map(function(o){
           return '<button data-action="shoprange" data-n="'+o[0]+'"'+(shopRange===o[0]?' class="on"':'')+' aria-pressed="'+(shopRange===o[0])+'">'+o[1]+'</button>';
@@ -4689,10 +4689,10 @@ function bodyContent(){
       (anyTicked?CLEAR_TICKS:'')+
       (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear '+
         (shopRange===7?'the week &amp; the ticks':'these '+shopRange+' days &amp; their ticks')+'</button>':'')+'</div>'+
-    '<div class="sectiontitle">Meal prep</div>'+
+    '<h2 class="sectiontitle">Meal prep</h2>'+
     '<p class="note" style="margin-top:0;">Batch-cook meals that hold up after a few days and a reheat. The portions here scale the ingredients so you can see the batch; what the shopping list buys is set on each meal in the week above. Cool them within about an hour, keep for two days, reheat once until steaming. Rice is the strict one: fridge it fast and eat it the next day. <a href="https://www.nhs.uk/live-well/eat-well/how-to-prepare-and-cook-food-safely/" target="_blank" rel="noopener">NHS food safety guidance</a>.</p>'+
     prepItems+
-    '<div class="sectiontitle">Recipes</div>'+(recipeItems||'<p class="note" style="margin-top:0;">No recipes yet.</p>')+
+    '<h2 class="sectiontitle">Recipes</h2>'+(recipeItems||'<p class="note" style="margin-top:0;">No recipes yet.</p>')+
     '<div class="addform"><strong class="formhead">Add a recipe</strong>'+
       '<input id="rec-title" placeholder="Title" maxlength="80">'+
       '<label class="fieldlbl" for="rec-portions">Portions this makes</label>'+
@@ -4846,7 +4846,8 @@ function bodyContent(){
     var ss=supersetSummary(l);
     return swipeRow(l.id,'dellog',
       '<span>'+esc(l.title)+(ss?('<span class="ssnote">'+ss+'</span>'):'')+'</span>'+
-      '<span class="d">'+timeTag(l.date)+' &middot; '+setCount+' set'+(setCount===1?'':'s')+(l.durationMin?' &middot; '+l.durationMin+' min':'')+'</span>');
+      '<span class="d">'+timeTag(l.date)+' &middot; '+setCount+' set'+(setCount===1?'':'s')+(l.durationMin?' &middot; '+l.durationMin+' min':'')+'</span>',
+      l.title+', '+rowDate(l.date));
   }).join('') || '<p class="note" style="margin-top:0;">No sessions logged yet. Start one from the Training tab.</p>';
 
   var exList=exIds.map(function(exId){
@@ -4918,7 +4919,7 @@ function bodyContent(){
           '<span>Sets <b>'+hist.filter(function(x){ return !x.wu; }).length+'</b></span></div>'+
         '<table><tr><th>Date</th><th>Set</th></tr>'+rows+'</table>'+more+'</div>';
     }
-    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+esc(exId)+'" role="button" tabindex="0" aria-expanded="'+isOpen+'"><h4>'+esc(def.name)+'</h4>'+
+    return '<div class="exrow"><div class="top" data-action="toggleex" data-id="'+esc(exId)+'" role="button" tabindex="0" aria-expanded="'+isOpen+'"><h3>'+esc(def.name)+'</h3>'+
       '<span class="last">'+esc(setLabel(def,last))+' &middot; '+timeTag(last.date)+'<span class="chev">'+(isOpen?'&#9650;':'&#9660;')+'</span></span></div>'+
       detail+'</div>';
   }).join('') || '<p class="note" style="margin-top:0;">Log a workout to start building exercise history.</p>';
@@ -4926,21 +4927,27 @@ function bodyContent(){
   var saunaHtml=saunaAll.slice(0,6).map(function(x){
     return swipeRow(x.id,'delsauna',
       '<span>'+saunaTotal(x)+' min'+((x.stints&&x.stints.length>1)?(' &middot; '+esc(saunaStintText(x))):(' &middot; '+esc(x.position||'')))+
-      (x.temp?' &middot; '+x.temp+'&deg;C':'')+'</span><span class="d">'+timeTag(x.date)+'</span>');
+      (x.temp?' &middot; '+x.temp+'&deg;C':'')+'</span><span class="d">'+timeTag(x.date)+'</span>',
+      'sauna, '+saunaTotal(x)+' min, '+rowDate(x.date));
   }).join('') || '<p class="note" style="margin-top:0;">No sauna sessions logged yet.</p>';
 
   // Swipe left to reveal Remove. Two deliberate actions, so a stray swipe while
   // scrolling never deletes anything on its own.
-  function swipeRow(id,action,inner){
-    var open=swipeOpen===id;
+  // Both buttons are named for their row: a list of "Remove" says nothing out
+  // of context. Where there is a pointer the × is the way in from the keyboard
+  // and a screen reader too, so the Remove behind a closed row is left out of
+  // both; on touch the × is never drawn and that Remove is the one they reach.
+  function swipeRow(id,action,inner,what){
+    var hoverable=!!(window.matchMedia && matchMedia('(hover:hover)').matches);
+    var open=swipeOpen===id, said=' aria-label="Remove '+esc(what)+'"';
     return '<div class="swipe'+(open?' open':'')+'" data-swipe="'+esc(id)+'">'+
-      '<button class="swipe-del" data-action="'+action+'" data-id="'+esc(id)+'">Remove</button>'+
+      '<button class="swipe-del" data-action="'+action+'" data-id="'+esc(id)+'"'+said+(open||!hoverable?'':' tabindex="-1" aria-hidden="true"')+'>Remove</button>'+
       '<div class="recent-log swipe-inner">'+inner+
-        '<button class="swipe-x" data-action="'+action+'" data-id="'+esc(id)+'" aria-label="Remove">&times;</button>'+
+        '<button class="swipe-x" data-action="'+action+'" data-id="'+esc(id)+'"'+said+'>&times;</button>'+
       '</div></div>';
   }
   return statRow + rangeBar +
-    '<div class="sectiontitle">Training</div>'+
+    '<h2 class="sectiontitle">Training</h2>'+
     barChart(trainRows,{title:'Sets per day',sub:trainedDays+' of '+progRange+' days trained',
       empty:'No sets logged in the last '+progRange+' days. Finish a session to see this.',
       aria:'Sets logged per day over the last '+progRange+' days',
@@ -4948,26 +4955,26 @@ function bodyContent(){
     barChart(volRows,{title:'Weight moved per day',sub:Math.round(rangeVolume).toLocaleString()+'kg in '+progRange+' days',
       empty:'No sets with a weight in the last '+progRange+' days.',
       aria:'Kilograms lifted per day over the last '+progRange+' days'})+
-    '<div class="sectiontitle">Water</div>'+
+    '<h2 class="sectiontitle">Water</h2>'+
     waterAvgRow+
     barChart(waterRows,{title:'Water per day',sub:'Avg '+litres(Math.round(waterAvg*10)/10)+' \u00b7 target hit '+waterHits+'/'+progRange,
       target:state.waterTarget,targetLabel:litres(state.waterTarget),
       empty:'No water logged in the last '+progRange+' days. Tap + on the Water card to start.',
       aria:'Water drunk per day over the last '+progRange+' days'})+
-    '<div class="sectiontitle">Clean days</div>'+
+    '<h2 class="sectiontitle">Clean days</h2>'+
     '<div class="chart">'+chartHead('Day by day',cleanCount+' clean of '+loggedCount+' logged')+
       '<div class="daystrip" role="list" aria-label="Clean days over the last '+progRange+' days">'+cleanStrip+'</div>'+
       '<div class="legend"><span><i class="clean"></i>clean</span><span><i class="used"></i>used</span><span><i></i>not logged</span></div>'+
       '<div class="pbrow"><span>Current streak <b>'+pStreaks.cleanStreak+' day'+(pStreaks.cleanStreak===1?'':'s')+'</b></span>'+
         '<span>Day streak <b>'+pStreaks.dayStreak+'</b></span></div></div>'+
-    '<div class="sectiontitle">Sauna</div>'+
+    '<h2 class="sectiontitle">Sauna</h2>'+
     (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaRows.length+' in '+progRange+' days · '+saunaRows.reduce(function(a,r){ return a+r.v; },0)+' min',
       empty:'No sauna visits in the last '+progRange+' days.',hint:'Tap a bar, or slide along them, for that visit',
       aria:'Sauna minutes per session over the last '+progRange+' days'}):'')+saunaHtml+
-    '<div class="sectiontitle">Exercise progression</div>'+
+    '<h2 class="sectiontitle">Exercise progression</h2>'+
     (exIds.length?'<p class="note" style="margin-top:0;">Tap any exercise to chart it.</p>':'')+exList+
-    '<div class="sectiontitle">Recent sessions</div>'+recentHtml+
-    '<div class="sectiontitle">Your data</div>'+dataCard();
+    '<h2 class="sectiontitle">Recent sessions</h2>'+recentHtml+
+    '<h2 class="sectiontitle">Your data</h2>'+dataCard();
   }
 
   var sessionHtml='';
@@ -5018,18 +5025,21 @@ function bodyContent(){
         // of minutes with the machine and effort silently dropped.
         var mCardio='';
         if(d.type==='cardio'){
-          mCardio='<div class="cardio-row">'+cardioSelect('log-machine-'+m,'Machine',MACHINES,mPre&&mPre.machine)+
-            (d.interval?(cardioSelect('log-work-'+m,'Work effort',EFFORT_LEVELS,mPre&&mPre.work)+
-              cardioSelect('log-rest-'+m,'Rest effort',EFFORT_LEVELS,mPre&&mPre.rest)):'')+
+          mCardio='<div class="cardio-row">'+cardioSelect('log-machine-'+m,'Machine',MACHINES,mPre&&mPre.machine,d.name+' machine')+
+            (d.interval?(cardioSelect('log-work-'+m,'Work effort',EFFORT_LEVELS,mPre&&mPre.work,d.name+' work effort')+
+              cardioSelect('log-rest-'+m,'Rest effort',EFFORT_LEVELS,mPre&&mPre.rest,d.name+' rest effort')):'')+
             '</div>';
         }
+        // Every member has the same boxes, so each is named for its exercise:
+        // read out of context, "kg" or "Undo" says nothing about which.
+        var mName=esc(d.name);
         return '<div class="ssrow">'+
           '<div class="ssrow-head"><span class="ssn">'+esc(d.name)+'</span>'+
             '<button class="ssx" data-action="ssdel" data-ss="'+ssId+'" data-ex="'+m+'" title="Take out of the superset" aria-label="Take '+esc(d.name)+' out of the superset">&times;</button></div>'+
-          (mChips?'<div class="setchips">'+mChips+'<button class="chipundo" data-action="undoset" data-ex="'+m+'" data-ss="'+ssId+'">Undo</button></div>':'')+mCardio+
+          (mChips?'<div class="setchips">'+mChips+'<button class="chipundo" data-action="undoset" data-ex="'+m+'" data-ss="'+ssId+'" aria-label="Undo last '+mName+' set">Undo</button></div>':'')+mCardio+
           '<div class="logrow">'+
-            (d.type==='load'?fieldBox('<input id="log-w-'+m+'" type="text" inputmode="decimal" placeholder="'+(mPer?'kg each':'kg')+'"'+(mPre&&mPre.w?' value="'+mPre.w+'"':'')+'>',mPer?'kg each':'kg'):'')+
-            fieldBox('<input id="log-v-'+m+'" type="text" inputmode="decimal" placeholder="'+mVal+'"'+(mPre&&mPre.v?' value="'+mPre.v+'"':'')+'>',mVal)+
+            (d.type==='load'?fieldBox('<input id="log-w-'+m+'" type="text" inputmode="decimal" placeholder="'+(mPer?'kg each':'kg')+'" aria-label="'+mName+' weight, '+(mPer?'kg each':'kg')+'"'+(mPre&&mPre.w?' value="'+mPre.w+'"':'')+'>',mPer?'kg each':'kg'):'')+
+            fieldBox('<input id="log-v-'+m+'" type="text" inputmode="decimal" placeholder="'+mVal+'" aria-label="'+mName+' '+mVal+'"'+(mPre&&mPre.v?' value="'+mPre.v+'"':'')+'>',mVal)+
           '</div>'+
         '</div>';
       }).join('');
@@ -5059,8 +5069,8 @@ function bodyContent(){
           '<div class="cue">'+esc(exDef('superset').cue)+'</div>'+
           (roundsDone?restLineFor(sess,ssGoal):'')+
           (memberRows||'<p class="note" style="text-align:center;">Nothing paired up yet. Pick the exercises you are doing back to back.</p>')+
-          '<div class="ssadd"><select id="ss-pick-'+ssId+'"><option value="">Add an exercise&hellip;</option>'+ssOptions+'</select>'+
-            '<button data-action="ssadd" data-ss="'+ssId+'">Add</button></div>'+
+          '<div class="ssadd"><select id="ss-pick-'+ssId+'" aria-label="Add an exercise to this superset"><option value="">Add an exercise&hellip;</option>'+ssOptions+'</select>'+
+            '<button data-action="ssadd" data-ss="'+ssId+'" aria-label="Add to this superset">Add</button></div>'+
           (members.length?'<button class="loground" data-action="loground" data-ss="'+ssId+'">Log round '+(roundsDone+1)+'</button>':'')+
           (roundsDone?'<button class="chipundo roundundo" data-action="undoround" data-ss="'+ssId+'">Undo round '+roundsDone+'</button>':'')+
           storyNav(ssId)+
@@ -5115,7 +5125,7 @@ function bodyContent(){
             ? fieldBox('<input id="log-w-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="kg">','kg')
           : kind==='speed'
             ? fieldBox('<input id="log-lvl-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="'+lvlHint+'">','km/h')
-            : ('<select id="log-lvl-'+exId+'" class="cardio-select"><option value="">'+lvlHint+'</option>'+
+            : ('<select id="log-lvl-'+exId+'" class="cardio-select" aria-label="'+(kind==='resistance'?'Resistance':'How hard')+'"><option value="">'+lvlHint+'</option>'+
                lvlList.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>');
         // Which lift, by name: the first thing in the session that is not a
         // prep step. Saves guessing what "the first lift" meant afterwards.
@@ -5165,7 +5175,7 @@ function bodyContent(){
           (lastLine?'<div class="lasttime">'+esc(lastLine).replace(/(\d+(?:\.\d+)?kg(?: ea)? × \d+|\d+ reps)/g,'<span class="nw">$1</span>')+'</div>':'')+
           '<div class="cue">'+esc((def2.type==='prep'&&w2&&w2[exId])?w2[exId]:def2.cue)+'</div>'+
           restLine+
-          (chips?'<div class="setchips">'+chips+'<button class="chipundo" data-action="undoset" data-ex="'+exId+'">Undo</button></div>':'')+
+          (chips?'<div class="setchips">'+chips+'<button class="chipundo" data-action="undoset" data-ex="'+exId+'" aria-label="Undo last '+esc(def2.name)+' set">Undo</button></div>':'')+
           (chips&&canWu?'<div class="perimp">Tap a set to mark it as a warm-up.</div>':'')+
           perImpNote+
           prepHint+
@@ -5339,8 +5349,8 @@ function pickerResults(){
       var isOpen=!!expanded['pick:'+e.id];
       return '<div class="pickrow">'+
         '<div class="pickrow-head">'+
-          '<div class="pickrow-main" data-action="toggleex" data-id="pick:'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
-          '<button data-action="addex" data-id="'+e.id+'">Add</button>'+
+          '<div class="pickrow-main" data-action="toggleex" data-id="pick:'+e.id+'" role="button" tabindex="0" aria-expanded="'+isOpen+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
+          '<button data-action="addex" data-id="'+e.id+'" aria-label="Add '+esc(e.name)+'">Add</button>'+
         '</div>'+
         (isOpen&&!e.pose?('<div class="pickpreview"><p class="cue">'+esc(e.cue)+'</p></div>'):
          isOpen?('<div class="pickpreview"><div class="preview-figs"><div class="pf">'+
@@ -5379,6 +5389,8 @@ function drawPage(){
   // A shopping row ticked from the keyboard keeps the focus, so the next one
   // is a Tab away rather than the whole page.
   if(act && app.contains(act) && act.getAttribute('data-action')==='shopcheck') keepTick=act.getAttribute('data-item');
+  // So does a heading or picker row opened or closed from the keyboard.
+  var keepToggle=act && app.contains(act) && act.getAttribute('data-action')==='toggleex' ? act.getAttribute('data-id') : null;
   // Nor must it throw away what was typed but not yet read: a field whose value
   // is not the one it was drawn with is put back, unless a tap just used it.
   var typed={};
@@ -5430,6 +5442,8 @@ function drawPage(){
   }
   if(keepTick!==null) [].forEach.call(app.querySelectorAll('[data-action="shopcheck"]'),function(el){
     if(el.getAttribute('data-item')===keepTick){ try{ el.focus({preventScroll:true}); }catch(err){} } });
+  if(keepToggle!==null) [].forEach.call(app.querySelectorAll('[data-action="toggleex"]'),function(el){
+    if(el.getAttribute('data-id')===keepToggle){ try{ el.focus({preventScroll:true}); }catch(err){} } });
   undoFit();
   if(slideTop){ slideTop=false; storyTop(app); }
   if(restTimer){ clearInterval(restTimer); restTimer=null; }

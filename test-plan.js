@@ -81,7 +81,7 @@ srv.listen(0,async function(){
   };
   var titleOf=async function(id){ return p.evaluate(function(i){
     var b=document.querySelector('[data-action="addmeal"][data-id="'+i+'"]');
-    return b.closest('.libitem').querySelector('h4').textContent; }, id); };
+    return b.closest('.libitem').querySelector('h3').textContent; }, id); };
 
   console.log('\nA WEEK IS SEVEN REAL DAYS');
 
