@@ -125,6 +125,11 @@ var HELPERS=function(){
     return rgb(getComputedStyle(document.body).backgroundColor); }
   function ratio(a,b){ var x=lum(a), y=lum(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05); }
   window.__contrast=function(el){ return ratio(rgb(getComputedStyle(el).color), bgOf(el)); };
+  // The same, with the text's colour faded by every opacity on the way up, as
+  // the eye sees it.
+  window.__contrastSeen=function(el){ var a=1; for(var e=el;e;e=e.parentElement) a*=+getComputedStyle(e).opacity;
+    var f=rgb(getComputedStyle(el).color), g=bgOf(el); a*=f.a;
+    return ratio({r:f.r*a+g.r*(1-a),g:f.g*a+g.g*(1-a),b:f.b*a+g.b*(1-a)},g); };
   window.__borderContrast=function(el){ return ratio(rgb(getComputedStyle(el).borderTopColor), bgOf(el.parentElement)); };
 };
 
@@ -402,6 +407,63 @@ srv.listen(0,async function(){
     p=await open('press',{scheme:sch}); r.cat=await c('.slide .cat'); await close(p);
     Object.keys(r).forEach(function(k){ assert.ok(r[k]>=4.5, k+' is '+r[k].toFixed(2)+':1 in '+sch); });
   }); })(sch3);
+  for(var sch5 of ['light','dark']) await (function(sch){ return t('every accent word and accent button on every tab reads at 4.5:1 in '+sch+', and so does the over N days line', async function(){
+    var bad=[], subs=[];
+    var scan=function(p,where){ return p.evaluate(function(w){
+      var probe=document.createElement('i'); probe.style.color='var(--accent)'; document.body.appendChild(probe);
+      var acc=getComputedStyle(probe).color; probe.remove(); var out=[];
+      [].forEach.call(document.querySelectorAll('body *'),function(e){
+        var cs=getComputedStyle(e), r=e.getBoundingClientRect();
+        if(!r.width||!r.height||cs.visibility==='hidden'||+cs.opacity===0) return;
+        if(cs.color!==acc && cs.backgroundColor!==acc) return;
+        if(![].some.call(e.childNodes,function(n){ return n.nodeType===3 && n.textContent.trim(); })) return;
+        out.n=(out.n||0)+1; var c=__contrastSeen(e); if(c<4.5) out.push(w+' '+e.tagName.toLowerCase()+'.'+String(e.className).replace(/ /g,'.')+' "'+e.textContent.trim().slice(0,24)+'" '+c.toFixed(2));
+      });
+      return {list:out, n:out.n||0}; },where).then(function(o){ seen+=o.n; return o.list; }); };
+    var seen=0;
+    var p=await open('meal',{scheme:sch,ui:'{"tab":"today"}'});
+    for(var tb of ['today','training','meals','progress']){
+      await p.click('[data-action="tab"][data-tab="'+tb+'"]'); await p.waitForTimeout(120);
+      bad=bad.concat(await scan(p,tb));
+      if(tb==='progress') subs=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.stat-tile .sub-l'),function(e){ return __contrastSeen(e); }); });
+    }
+    await close(p);
+    p=await open('press',{scheme:sch}); bad=bad.concat(await scan(p,'session')); await close(p);
+    assert.ok(seen>=10,'only '+seen+' accent words and buttons found');
+    assert.deepStrictEqual(bad,[],'below 4.5:1 in '+sch);
+    assert.ok(subs.length>0,'no over N days line');
+    subs.forEach(function(c){ assert.ok(c>=4.5,'the over N days line is '+c.toFixed(2)+':1 in '+sch); });
+  }); })(sch5);
+  for(var vw5 of [360,390]) await (function(vw){ return t('every text box and dropdown is at least 16px at '+vw+'px, so iOS does not zoom in on a tap, and the rows still fit', async function(){
+    var small=[], over=[];
+    var scan=function(p,where){ return p.evaluate(function(w){
+      var out={small:[],over:[]}, W=document.documentElement.clientWidth;
+      [].forEach.call(document.querySelectorAll('input,select,textarea'),function(e){
+        if(/^(checkbox|radio|range|hidden|button|submit)$/.test(e.type)) return;
+        var f=parseFloat(getComputedStyle(e).fontSize); if(f<16) out.small.push(w+' #'+(e.id||e.className||e.tagName)+' '+f+'px');
+        var r=e.getBoundingClientRect(); if(r.width && (r.right>W+0.5 || r.left<-0.5)) out.over.push(w+' #'+(e.id||e.className||e.tagName));
+      });
+      if(document.documentElement.scrollWidth>W) out.over.push(w+' page scrolls sideways');
+      return out; },where); };
+    var add=function(r){ small=small.concat(r.small); over=over.concat(r.over); };
+    var p=await open('meal',{viewport:{width:vw,height:844},ui:'{"tab":"today"}'});
+    await p.evaluate(function(){ var d=document.createElement('div'); d.id='probe-cardio';
+      d.innerHTML='<select class="cardio-select"><option>Treadmill</option></select><input class="cardio-select" type="text">';
+      document.body.appendChild(d); });
+    add(await scan(p,'cardio'));
+    await p.evaluate(function(){ document.getElementById('probe-cardio').remove(); });
+    for(var tb of ['today','training','meals','progress']){
+      await p.click('[data-action="tab"][data-tab="'+tb+'"]'); await p.waitForTimeout(120);
+      await p.evaluate(function(){ [].forEach.call(document.querySelectorAll('details'),function(d){ d.open=true; }); });
+      add(await scan(p,tb));
+    }
+    await close(p);
+    p=await open('ss',{viewport:{width:vw,height:844}}); add(await scan(p,'superset'));
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(150); add(await scan(p,'picker')); await close(p);
+    p=await open('press',{viewport:{width:vw,height:844}}); add(await scan(p,'session')); await close(p);
+    assert.deepStrictEqual(small,[],'fields under 16px at '+vw+'px');
+    assert.deepStrictEqual(over,[],'fields past the edge at '+vw+'px');
+  }); })(vw5);
   await t('history rows put their date on the right, and the Remove behind them does not show at the corners', async function(){
     var p=await open('recent',{viewport:{width:390,height:844},touch:true});
     var r=await p.evaluate(function(){
