@@ -342,6 +342,21 @@ are unfolded, and the yesterday nudge waved off. Kept in `localStorage` under
 `fc.ui` and never in the store, because writing it to the profile made every
 tab change carry this view's stale XP over another view's.
 
+**Typed drafts** (`drafts`):
+What was typed into a box and not yet logged or added (the recipe and note
+forms, the sauna row, a set's kg and reps), by the box's id, so leaving the
+view (another tab, Prev or Next, Back) does not throw it away. Drawn back over
+whatever the box is drawn with, a set's prefill included, until a tap uses it
+(`consumed`). A set's boxes belong to the session they were typed in and are
+never drawn into another. Kept for the page only, not across a reload.
+
+**Focus across a render**:
+Every render replaces the page. A text box that had the focus gets it back
+with its caret; a button or button-like control gets it back by its action
+and the data that picks its target, or, when the tap took it off the page,
+the new Undo or the nearest control still there. The page is not scrolled for
+it unless the control moved out of sight.
+
 ## Where data lives
 
 Two stores, and the split is the point.
@@ -886,4 +901,7 @@ the shipped `index.html`, so they test what ships.
   accessibility tree at phone width: an idle saving pill that says nothing,
   every control named for what it acts on (sauna boxes, history-row removes,
   superset boxes, picker rows and Adds, plan selects), one Remove per history
-  row in the tab order, and headings that go h1, h2, h3 without a skip.
+  row in the tab order, headings that go h1, h2, h3 without a skip, the focus
+  kept on a button pressed from the keyboard (or moved to Undo when its row
+  went), the shopping box kept in sight as items are added, and typed drafts
+  kept across tabs, Back and Resume, Prev and Next, but not into a new session.

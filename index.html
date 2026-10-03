@@ -953,8 +953,21 @@ var prepPick={}, prepMins={};
 function clearPrep(){
   var ids=[]; Object.keys(prepPick).concat(Object.keys(prepMins)).forEach(function(x){
     ids.push('log-v-'+x,'log-opt-'+x,'log-w-'+x,'log-lvl-'+x); });
-  consumed(ids); prepPick={}; prepMins={};
+  consumed(ids.concat(Object.keys(drafts).filter(function(id){ return /^log-/.test(id); }))); prepPick={}; prepMins={};
 }
+/* What was typed into a box and not yet logged or added, by the box's id:
+   the recipe and note forms, the sauna row, a set's kg and reps. A render
+   only puts back what a box on the page still holds, so leaving the view
+   (another tab, Prev or Next, Back) used to throw it away. Drawn back over
+   whatever the box was drawn with, prefill included, until a tap uses it
+   (consumed). A set's boxes belong to the session they were typed in, and are
+   never drawn into another one. Kept for this page only. */
+var drafts={};
+function draftable(el){
+  return !!(el && el.id && (el.tagName==='TEXTAREA' || el.tagName==='INPUT' && !/^(checkbox|radio|date|file|button|submit|hidden)$/.test(el.type)) &&
+    !/^(ex-search|shop-add|logdate)$/.test(el.id) && BIG_BOXES.indexOf(el.id)<0);
+}
+function draftSess(id){ return /^log-/.test(id)?sessId(state.activeSession):null; }
 // Stints already added to the sauna session being logged, plus the temperature
 // so it does not have to be retyped for each one. UI-only: nothing is written
 // to state until the session is logged.
@@ -1043,7 +1056,7 @@ function paintSaving(){
 // Ids of fields a tap has just read and acted on, which the next render draws
 // afresh instead of putting back what was typed in them.
 var clearOnRender={};
-function consumed(ids){ ids.forEach(function(id){ clearOnRender[id]=1; }); }
+function consumed(ids){ ids.forEach(function(id){ clearOnRender[id]=1; delete drafts[id]; }); }
 var touchX=null;
 
 /* ---------- storage ------------------------------------------------------
@@ -5381,16 +5394,14 @@ function drawPage(){
   // Replacing innerHTML throws away whatever field was being typed into. Note
   // what had focus and where the caret was, and put it back afterwards, so a
   // save landing mid-keystroke cannot interrupt typing.
-  var act=document.activeElement, keep=null, keepTick=null;
+  var act=document.activeElement, keep=null, keepCtl=null;
   if(act && act.id && app.contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)){
-    keep={id:act.id, start:null, end:null};
+    keep={id:act.id, start:null, end:null, top:topOf(act)};
     try{ keep.start=act.selectionStart; keep.end=act.selectionEnd; }catch(err){}
   }
-  // A shopping row ticked from the keyboard keeps the focus, so the next one
-  // is a Tab away rather than the whole page.
-  if(act && app.contains(act) && act.getAttribute('data-action')==='shopcheck') keepTick=act.getAttribute('data-item');
-  // So does a heading or picker row opened or closed from the keyboard.
-  var keepToggle=act && app.contains(act) && act.getAttribute('data-action')==='toggleex' ? act.getAttribute('data-id') : null;
+  // A button worked from the keyboard, or by a screen reader, gets it back
+  // too: it used to drop to the top of the page after every press.
+  else if(act && app.contains(act) && isCtl(act)) keepCtl=ctlNear(app,act);
   // Nor must it throw away what was typed but not yet read: a field whose value
   // is not the one it was drawn with is put back, unless a tap just used it.
   var typed={};
@@ -5407,6 +5418,13 @@ function drawPage(){
   clearOnRender={};
   var hold=inView; inView=null;
   drawKeeping(app,bodyContent());
+  // What was typed and left: drawn back over whatever the box was drawn with.
+  Object.keys(drafts).forEach(function(id){
+    var el=document.getElementById(id), d=drafts[id];
+    if(!el || !app.contains(el) || !draftable(el)) return;
+    if(d.s!==draftSess(id)){ delete drafts[id]; return; }
+    if(el.value!==d.v) el.value=d.v;
+  });
   if(hold) keepInView(app,hold);
   BIG_BOXES.forEach(function(id){
     var el=document.getElementById(id), was=bigBox[id];
@@ -5427,24 +5445,19 @@ function drawPage(){
   // A box marked as not a number stays marked until it is typed into again.
   var bad={};
   Object.keys(badFields).forEach(function(id){
-    var el=document.getElementById(id); if(!el) return;
+    var el=document.getElementById(id); if(!el){ if(drafts[id]) bad[id]=1; return; }
     el.setAttribute('aria-invalid','true'); bad[id]=1;
   });
   badFields=bad;
   if(keep){
     var back=document.getElementById(keep.id);
-    if(back){
-      try{
-        back.focus({preventScroll:true});
-        if(keep.start!==null && keep.start!==undefined) back.setSelectionRange(keep.start,keep.end);
-      }catch(err){}
+    if(back && focusAt(back,keep.top)){
+      try{ if(keep.start!==null && keep.start!==undefined) back.setSelectionRange(keep.start,keep.end); }catch(err){}
     }
   }
-  if(keepTick!==null) [].forEach.call(app.querySelectorAll('[data-action="shopcheck"]'),function(el){
-    if(el.getAttribute('data-item')===keepTick){ try{ el.focus({preventScroll:true}); }catch(err){} } });
-  if(keepToggle!==null) [].forEach.call(app.querySelectorAll('[data-action="toggleex"]'),function(el){
-    if(el.getAttribute('data-id')===keepToggle){ try{ el.focus({preventScroll:true}); }catch(err){} } });
+  if(keepCtl) ctlFocus(app,keepCtl);
   undoFit();
+  var uD=readUndo(); undoDrawn=uD?uD.at:null;
   if(slideTop){ slideTop=false; storyTop(app); }
   if(restTimer){ clearInterval(restTimer); restTimer=null; }
   if(document.getElementById('restline')) restTimer=setInterval(restTick,1000);
@@ -5454,6 +5467,47 @@ function drawPage(){
   if(fitCharts() && chartPass<2){ chartPass++; renderAgain=true; } else chartPass=0;
 }
 var chartPass=0;
+/* Putting the focus back. The control is found again by what it does and
+   what to (its action and the data that picks its target); one a tap took
+   off the page hands the focus to the Undo it offered, else to the nearest
+   control either side that is still there. The page is not scrolled for it,
+   unless what had the focus is still there and has moved out of sight, such
+   as the shopping box pushed down a row by each item added above it. */
+var CTL_KEYS=['data-action','data-d','data-id','data-type','data-k','data-tab','data-ss','data-i','data-item','data-ex','data-n','data-mode','data-p'];
+function isCtl(el){ return el.hasAttribute('data-action') && (el.tagName==='BUTTON' || /^(button|checkbox)$/.test(el.getAttribute('role')||'')); }
+function ctlKey(el){ return CTL_KEYS.map(function(n){ var v=el.getAttribute(n); return v===null?'\u0000':v; }).join('\u0001'); }
+function ctlList(app){ return [].filter.call(app.querySelectorAll('[data-action]'),isCtl); }
+function topOf(el){ try{ return el.getBoundingClientRect().top; }catch(err){ return null; } }
+// The control and up to three either side, nearest first, each as its key and
+// which of the controls with that key it is.
+function ctlNear(app,act){
+  var all=ctlList(app), at=all.indexOf(act), keys=all.map(ctlKey), out=[];
+  function at2(i){ if(i<0||i>=all.length) return; var n=0; for(var j=0;j<i;j++) if(keys[j]===keys[i]) n++; out.push({k:keys[i], n:n}); }
+  at2(at); for(var d=1;d<=3;d++){ at2(at+d); at2(at-d); }
+  return {near:out, top:topOf(act), undo:undoDrawn};
+}
+// The undo offer the page on screen was drawn with, so a new one can be told from it.
+var undoDrawn=null;
+function ctlFocus(app,keep){
+  var all=ctlList(app), keys=all.map(ctlKey);
+  function find(c){ var hit=[]; keys.forEach(function(k,i){ if(k===c.k) hit.push(all[i]); }); return hit.length?hit[Math.min(c.n,hit.length-1)]:null; }
+  var el=find(keep.near[0]);
+  if(el){ focusAt(el,keep.top); return; }
+  // Somewhere else on the page now: the focus goes there, the page stays put.
+  var u=readUndo(); if(u && u.at!==keep.undo) el=app.querySelector('.undo-bar [data-action="undo"]');
+  for(var i=1;!el && i<keep.near.length;i++) el=find(keep.near[i]);
+  if(el) focusAt(el,null);
+}
+function focusAt(el,top){
+  try{ el.focus({preventScroll:true}); }catch(err){ return false; }
+  if(top===null || slideTop) return true;
+  try{
+    var r=el.getBoundingClientRect(); if(Math.abs(r.top-top)<1) return true;
+    var vv=window.visualViewport, y0=vv?vv.offsetTop:0, y1=y0+(vv?vv.height:window.innerHeight);
+    if(r.top<y0 || r.bottom>y1) el.scrollIntoView({block:'nearest'});
+  }catch(err){}
+  return true;
+}
 /* Another slide, or going into or out of the session, opens at the top of the
    story: Next tapped at the foot of a long slide used to open the next one
    scrolled past its figure, name and target. A tap within a slide leaves the
@@ -6031,6 +6085,7 @@ function onChange(e){
 
 function onInput(e){
   if(e.target && badFields[e.target.id]){ delete badFields[e.target.id]; e.target.removeAttribute('aria-invalid'); }
+  if(draftable(e.target)) drafts[e.target.id]={v:e.target.value, s:draftSess(e.target.id)};
   if(e.target && e.target.id==='ex-search'){
     exSearch=e.target.value;
     // Swap the results only. A full render would replace the box being typed

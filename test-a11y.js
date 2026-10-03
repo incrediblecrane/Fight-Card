@@ -24,7 +24,9 @@ var WORLDS={
     st.activeSession={workoutId:'w6', startedAt:key(0), t0:NOW-600000, exIds:['warmup','ss1','cooldown'],
       targets:{warmup:{sets:1,reps:'5-10 min'},ss1:{sets:3,reps:'rounds'},cooldown:{sets:1,reps:'5-10 min'}},
       supersets:{ss1:{ex:['press_bench','row_bent'],rounds:1,roundLog:[['press_bench','row_bent']]}},
-      logs:{press_bench:[{v:8,w:60,t:NOW-30000}],row_bent:[{v:10,w:50,t:NOW-20000}]}}; })
+      logs:{press_bench:[{v:8,w:60,t:NOW-30000}],row_bent:[{v:10,w:50,t:NOW-20000}]}}; }),
+  // Nothing logged today, so the water count starts at nothing.
+  dry: withSeed(function(st){ st.activeSession=null; delete st.days[key(0)]; })
 };
 var UI={plain:'{"tab":"today"}', meal:'{"tab":"meals"}', ss:'{"tab":"today","viewingSession":true,"slide":1}'};
 
@@ -159,6 +161,83 @@ srv.listen(0,async function(){
     assert.ok(lv.indexOf(2)>-1 && lv.indexOf(3)>-1,'levels '+lv.join(','));
     assert.deepStrictEqual(unnamed(snap),[],'unnamed controls on '+tb);
   }); })(tb);
+
+  console.log('\nFOCUS AND TYPING ACROSS REDRAWS');
+  await t('a button pressed from the keyboard keeps the focus, so Enter again presses it again', async function(){
+    var p=await open('dry');
+    await p.focus('[aria-label="More water"]');
+    await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    var got=await p.evaluate(function(){ var b=document.querySelector('[aria-label="More water"]');
+      return {count:b.parentNode.querySelector('.count').textContent, focused:document.activeElement===b}; });
+    await close(p);
+    assert.deepStrictEqual(got,{count:'0.5L',focused:true});
+  });
+  await t('a row removed from the keyboard hands the focus to its Undo', async function(){
+    var p=await open('meal');
+    await p.focus('[data-action="delmeal"]');
+    await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    var got=await p.evaluate(function(){ var a=document.activeElement; return a.getAttribute('data-action')+' '+!!a.closest('.undo-bar'); });
+    await close(p);
+    assert.strictEqual(got,'undo true');
+  });
+  await t('items added with Enter leave the shopping box in sight', async function(){
+    var p=await open('meal');
+    await p.evaluate(function(){ var e=document.getElementById('shop-add'); window.scrollBy(0,e.getBoundingClientRect().bottom-window.innerHeight+20); });
+    await p.focus('#shop-add');
+    for(var i=0;i<2;i++){ await p.keyboard.type('Milk '+i); await p.keyboard.press('Enter'); await p.waitForTimeout(150); }
+    var got=await p.evaluate(function(){ var e=document.getElementById('shop-add'), r=e.getBoundingClientRect();
+      return {focused:document.activeElement===e, inView:r.top>=0 && r.bottom<=window.innerHeight+1, items:document.querySelectorAll('[data-action="delextra"]').length}; });
+    await close(p);
+    assert.deepStrictEqual(got,{focused:true,inView:true,items:2});
+  });
+  await t('a recipe half typed is still there after another tab', async function(){
+    var p=await open('meal');
+    await p.fill('#rec-title','My curry'); await p.fill('#rec-ing','Onion (1)');
+    await p.click('[data-tab="today"]'); await p.waitForTimeout(150);
+    await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','85');
+    await p.click('[data-tab="meals"]'); await p.waitForTimeout(150);
+    var rec=await p.evaluate(function(){ return [document.getElementById('rec-title').value,document.getElementById('rec-ing').value]; });
+    await p.click('[data-tab="today"]'); await p.waitForTimeout(150);
+    var sa=await p.evaluate(function(){ return [document.getElementById('sauna-mins').value,document.getElementById('sauna-temp').value]; });
+    await close(p);
+    assert.deepStrictEqual(rec,['My curry','Onion (1)'],'recipe form');
+    assert.deepStrictEqual(sa,['15','85'],'sauna row');
+  });
+  await t('reps typed and not logged survive Back and Resume, and Prev and Next, over the prefill', async function(){
+    var p=await open('ss');
+    var vals=function(){ return p.evaluate(function(){ return ['log-v-press_bench','log-w-press_bench','log-v-row_bent'].map(function(id){ var e=document.getElementById(id); return e?e.value:null; }); }); };
+    var first=await vals();
+    await p.fill('#log-v-press_bench','9');
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(150);
+    await p.click('[data-tab="training"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="resumesession"]'); await p.waitForTimeout(150);
+    var resumed=await vals();
+    await p.click('[data-action="nextslide"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="prevslide"]'); await p.waitForTimeout(150);
+    var moved=await vals();
+    await close(p);
+    assert.deepStrictEqual(first,['8','60','10'],'prefill');
+    assert.deepStrictEqual(resumed,['9','60','10'],'after Back and Resume');
+    assert.deepStrictEqual(moved,['9','60','10'],'after Next and Prev');
+  });
+  await t('reps typed in one session are not drawn into the next one', async function(){
+    var p=await open('plain',{ui:'{"tab":"training"}'});
+    var wid=await p.getAttribute('[data-action="startworkout"]','data-id');
+    await p.click('[data-action="startworkout"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="nextslide"]'); await p.waitForTimeout(150);
+    var id=await p.getAttribute('[id^="log-v-"]','id'), fresh=await p.inputValue('#'+id);
+    await p.fill('#'+id,'77');
+    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="discardsession"]'); await p.waitForTimeout(150);
+    await p.click('[data-tab="training"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="startworkout"][data-id="'+wid+'"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="nextslide"]'); await p.waitForTimeout(150);
+    var again=await p.inputValue('#'+id);
+    await close(p);
+    assert.notStrictEqual(fresh,'77');
+    assert.strictEqual(again,fresh);
+  });
 
   await b.close(); srv.close();
   console.log('\n'+(n-fails)+'/'+n+' passed');
