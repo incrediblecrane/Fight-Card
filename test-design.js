@@ -77,6 +77,19 @@ WORLDS.years=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
   for(var i=0;i<300;i++) st.workoutLogs.push({id:'wl-y'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(1+Math.floor(i*3.6)),
     logs:{press_bench:[{v:8,w:40+(i%50),t:1000+i},{v:6,w:30+(i%50),t:2000+i}]}}); });
 UI.years='{"tab":"progress","open":["press_bench"]}';
+// A bench press done with no weight on some days and with one on others, and
+// air squats going 12, 14, 13: what the exercise charts say about each.
+WORLDS.mixed=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
+  [[{v:15,w:null}],[{v:12,w:5}],[{v:20,w:null}],[{v:10,w:7.5}]].forEach(function(s,i){
+    st.workoutLogs.push({id:'wl-m'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(8-i*2), logs:{press_bench:s}}); });
+  [[12],[14],[13]].forEach(function(v,i){
+    st.workoutLogs.push({id:'wl-q'+i, workoutId:'w6', title:'Legs', tag:'Strength', date:key(7-i*2), logs:{sq_air:[{v:v[0],w:null}]}}); }); });
+UI.mixed='{"tab":"progress","open":["press_bench","sq_air"]}';
+// The same bench press with just one weighted session among the bodyweight ones.
+WORLDS.mixed1=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
+  [[{v:15,w:null}],[{v:12,w:5}],[{v:20,w:null}]].forEach(function(s,i){
+    st.workoutLogs.push({id:'wl-m'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(6-i*2), logs:{press_bench:s}}); }); });
+UI.mixed1='{"tab":"progress","open":["press_bench"]}';
 // A runtime whose store answers null: the page cannot load and says so.
 var NO_STORE='<script>window.claude={use:function(n){ return Promise.resolve(null); }};<\/script>';
 
@@ -104,7 +117,7 @@ srv.listen(0,async function(){
   var base='http://127.0.0.1:'+srv.address().port+'/';
   var b=await env.launch();
   var fails=0, n=0;
-  var t=async function(name,fn){ n++; try{ await fn(); console.log('  PASS  '+name); }
+  var t=async function(name,fn){ if(process.env.FC_ONLY && name.indexOf(process.env.FC_ONLY)<0) return; n++; try{ await fn(); console.log('  PASS  '+name); }
     catch(e){ fails++; console.log('  FAIL  '+name+'\n        '+e.message); } };
   var open=async function(world,o){
     o=o||{};
@@ -626,6 +639,66 @@ srv.listen(0,async function(){
       assert.strictEqual(got.ring,'visible','the point tapped is not marked');
     }
     await close(p);
+  });
+  await t('charts: a load chart leaves out the sessions with no weight, rather than drawing them at 0kg', async function(){
+    var p=await open('mixed',{viewport:{width:360,height:740}});
+    var r=await p.evaluate(function(){
+      var ex=[].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return /Bench/.test(x.querySelector('h4').textContent); })[0].querySelector('.exdetail');
+      var hit=ex.querySelector('[data-xs]');
+      return {tips:hit?JSON.parse(hit.getAttribute('data-tips')):[], vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; }),
+        pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }), sub:ex.querySelector('.chart-head .sub').textContent}; });
+    await close(p);
+    assert.strictEqual(r.tips.length,2,'the chart has '+r.tips.length+' points: '+r.tips.join(' | '));
+    assert.ok(r.vals.every(function(v){ return !/^0kg/.test(v); }),'a point reads '+r.vals.join(', '));
+    assert.ok(r.pb.indexOf('Personal best 7.5kg')>-1,'the PB row says '+r.pb.join(' / '));
+    assert.ok(r.pb.some(function(x){ return /^Change \+2\.5kg since /.test(x); }),'the change says '+r.pb.join(' / '));
+    assert.ok(/2 without a weight/.test(r.sub),'the head says '+r.sub);
+    p=await open('mixed1',{viewport:{width:360,height:740}});
+    r=await p.evaluate(function(){ var ex=document.querySelector('.exdetail');
+      return {pts:ex.querySelectorAll('[data-xs]').length, empty:(ex.querySelector('.empty-chart')||{}).textContent, pb:ex.querySelector('.pbrow').textContent}; });
+    await close(p);
+    assert.strictEqual(r.pts,0,'one weighted session drew a line');
+    assert.ok(/one session with a weight/i.test(r.empty||''),'the chart says '+r.empty);
+    assert.ok(/Personal best 5kg/.test(r.pb) && !/0kg/.test(r.pb.replace('Personal best 5kg','')),'the PB row says '+r.pb);
+  });
+  await t('charts: reps and minutes read with a space ("14 reps"), and so does the change', async function(){
+    var p=await open('mixed',{viewport:{width:360,height:740}});
+    var r=await p.evaluate(function(){
+      var ex=[].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return /Air squat/.test(x.querySelector('h4').textContent); })[0].querySelector('.exdetail');
+      return {pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }), vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; })}; });
+    await close(p);
+    assert.ok(r.pb.indexOf('Personal best 14 reps')>-1,'the PB row says '+r.pb.join(' / '));
+    assert.ok(r.pb.some(function(x){ return /^Change \+1 reps since /.test(x); }),'the change says '+r.pb.join(' / '));
+    assert.deepStrictEqual(r.vals,['12 reps','13 reps']);
+  });
+  await t('charts: a trend over more than a year gives its dates with the year', async function(){
+    var p=await open('years',{viewport:{width:390,height:844}});
+    var r=await p.evaluate(function(){ var ex=document.querySelector('.exdetail');
+      return {lbl:[].map.call(ex.querySelectorAll('.c-lbl'),function(e){ return e.textContent; }),
+        change:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }).filter(function(x){ return /^Change/.test(x); })[0]}; });
+    await close(p);
+    assert.ok(r.lbl.length===2 && r.lbl.every(function(x){ return /^\d\d\/\d\d\/\d\d$/.test(x); }),'the axis reads '+r.lbl.join(', '));
+    assert.ok(/since \d\d\/\d\d\/\d\d$/.test(r.change),'the change says '+r.change);
+  });
+  await t('charts: a finger sliding along 90 days of bars reads each day it passes', async function(){
+    var p=await open('recent',{viewport:{width:360,height:740},touch:true});
+    await p.click('[data-action="prange"][data-n="90"]'); await p.waitForTimeout(200);
+    var box=await p.evaluate(function(){ var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Sets per day/.test(x.textContent); })[0];
+      var s=c.querySelector('svg'); s.scrollIntoView({block:'center'}); var b=s.getBoundingClientRect(); return {l:b.left,r:b.right,y:b.top+b.height/2}; });
+    var cdp=await p.context().newCDPSession(p), seen=[];
+    var at=function(x){ return [{x:x,y:box.y,id:1}]; };
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:at(box.l+4)});
+    for(var i=1;i<=10;i++){
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:at(box.l+4+(box.r-box.l-8)*i/10)});
+      await p.waitForTimeout(30);
+      seen.push(await p.evaluate(function(){ var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ return /Sets per day/.test(x.textContent); })[0];
+        return c.querySelector('.c-tip').textContent; }));
+    }
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await close(p);
+    var uniq=seen.filter(function(v,i,a){ return a.indexOf(v)===i; });
+    assert.ok(uniq.length>=8,'the head line read '+uniq.length+' days: '+uniq.join(' | '));
+    assert.ok(/:/.test(seen[seen.length-1]),'the last read is '+seen[seen.length-1]);
   });
   await t('Progress: water tiles share a row, history is grouped by session, sauna follows the range', async function(){
     var p=await open('recent',{viewport:{width:390,height:844}});
