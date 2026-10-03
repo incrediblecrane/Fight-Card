@@ -57,7 +57,7 @@ srv.listen(0,async function(){
     seed([[['Onion (2)'],0],[['Onion (3)'],4]].slice(0,1)); await go();
     await range(3); await tick('Onion');
     await range(3); assert.ok((await row('Onion (2)')).ticked,'the tick did not stick');
-    await p.selectOption('[data-action="planday"][data-id="tk0"]',day(4));
+    await p.focus('[data-action="planday"][data-id="tk0"]'); await p.selectOption('[data-action="planday"][data-id="tk0"]',day(4));
     await saving(()=>p.click('[data-action="addmeal"][data-id="tk0"]'));
     await range(7); var w=await row('Onion');
     assert.strictEqual(w.label,'Onion (4)','the week reads '+w.label);
@@ -153,6 +153,37 @@ srv.listen(0,async function(){
     var inside=await p.evaluate(function(){ return document.querySelectorAll('.shop .shop-x, [role="checkbox"] button').length; });
     assert.strictEqual(inside,0,'a button sits inside a checkbox');
     assert.ok(await p.$('.shoprow > .shop-x[data-action="delextra"]'),'your own item has no x beside it');
+  });
+
+  console.log('\nA TICK DRAWS ITS ROW');
+  // The whole tab, seventy recipe cards and all, was drawn again on every
+  // tick. Only the row changes, with the Clear the ticks button.
+  await t('a tick changes its row and the Clear button where they are, and is saved', async function(){
+    seed([[['Onion (2)','Garlic (1 clove)','Rice (200g)'],0]]); await go();
+    var r=await row('Garlic'); assert.ok(r && !r.ticked,'no Garlic row to tick');
+    var mark=()=>p.evaluate(function(){ [].forEach.call(document.querySelectorAll('.shop, .weekbox, .libitem'),function(e){ e.__kept=1; }); });
+    var look=k=>p.evaluate(function(k){ var all=[].slice.call(document.querySelectorAll('.shop, .weekbox, .libitem'));
+      var e=document.querySelector('.shop[data-item="'+k+'"]');
+      return {kept:all.length>0 && all.every(function(x){ return x.__kept===1; }), aria:e.getAttribute('aria-checked'), cls:/\bchecked\b/.test(e.className),
+        clear:document.querySelectorAll('[data-action="clearticks"]').length, focus:document.activeElement===e}; },k);
+    await mark(); var n0=loads;
+    await p.focus('.shop[data-item="'+r.key+'"]'); await p.keyboard.press('Space');
+    var now=await look(r.key);
+    assert.strictEqual(loads,n0,'the page reloaded before it could be looked at');
+    assert.ok(now.kept,'the list and the cards were drawn again');
+    assert.ok(now.aria==='true' && now.cls,'the row did not tick: '+JSON.stringify(now));
+    assert.strictEqual(now.clear,1,'no Clear the ticks after the first tick');
+    assert.ok(now.focus,'the focus left the row');
+    await settle(n0);
+    var back=await row('Garlic'); assert.ok(back.ticked,'the tick was not saved');
+    await mark(); n0=loads;
+    await p.click('.shop[data-item="'+r.key+'"]');
+    now=await look(r.key);
+    assert.strictEqual(loads,n0,'the page reloaded before it could be looked at');
+    assert.ok(now.kept && now.aria==='false' && !now.cls,'unticking drew the page or missed the row: '+JSON.stringify(now));
+    assert.strictEqual(now.clear,0,'Clear the ticks stayed with nothing ticked');
+    await settle(n0);
+    back=await row('Garlic'); assert.ok(!back.ticked,'the untick was not saved');
   });
 
   await t('nothing threw', async function(){ assert.deepStrictEqual(errs,[]); });

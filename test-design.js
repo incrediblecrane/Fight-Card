@@ -72,6 +72,11 @@ WORLDS.sauna=withSeed(function(st){ st.activeSession=null; st.saunaSessions=[];
 var UI={benchtop:'{"tab":"today","viewingSession":true,"slide":1}', sauna:'{"tab":"progress"}', plain:'{"tab":"today"}', meal:'{"tab":"meals"}', recent:'{"tab":"progress"}', empty:'{"tab":"progress"}',
   press:'{"tab":"today","viewingSession":true,"slide":1}', bench:'{"tab":"today","viewingSession":true,"slide":1}',
   bench0:'{"tab":"today","viewingSession":true,"slide":1}', ss:'{"tab":"today","viewingSession":true,"slide":1}'};
+// Three hundred bench sessions over three years, the history open.
+WORLDS.years=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
+  for(var i=0;i<300;i++) st.workoutLogs.push({id:'wl-y'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(1+Math.floor(i*3.6)),
+    logs:{press_bench:[{v:8,w:40+(i%50),t:1000+i},{v:6,w:30+(i%50),t:2000+i}]}}); });
+UI.years='{"tab":"progress","open":["press_bench"]}';
 // A runtime whose store answers null: the page cannot load and says so.
 var NO_STORE='<script>window.claude={use:function(n){ return Promise.resolve(null); }};<\/script>';
 
@@ -590,6 +595,37 @@ srv.listen(0,async function(){
     await close(p);
     assert.ok(r.bad.indexOf('log-v-press_bench')>-1 && r.bad.indexOf('log-v-row_bent')>-1,'marked: '+r.bad.join(', '));
     assert.ok(/^log-[vw]-/.test(r.focus||''),'focus is on '+r.focus);
+  });
+  await t('years of one lift chart at most 60 points, with one place to tap that finds the nearest', async function(){
+    var p=await open('years',{viewport:{width:390,height:844}});
+    var r=await p.evaluate(function(){
+      var ex=document.querySelector('.exdetail'); if(!ex) return null;
+      var svg=ex.querySelector('svg'), hit=svg.querySelector('[data-xs]');
+      return {nodes:svg.getElementsByTagName('*').length, titles:svg.querySelectorAll('title').length,
+        pts:hit?hit.getAttribute('data-xs').split(' ').length:svg.querySelectorAll('.mark').length,
+        sub:ex.querySelector('.chart-head .sub').textContent, pb:ex.querySelector('.pbrow b').textContent, hint:ex.querySelector('.c-tip').textContent}; });
+    assert.ok(r,'the bench press history is not open');
+    assert.ok(r.pts<=60 && r.pts>=50,'it draws '+r.pts+' points for 300 sessions');
+    assert.ok(r.nodes<20 && r.titles===0,'the chart is '+r.nodes+' nodes with '+r.titles+' titles');
+    assert.ok(/^300 sessions/.test(r.sub),'the head says '+r.sub);
+    assert.strictEqual(r.pb,'89kg','the best of every session is not the PB');
+    assert.ok(/best of about 5 sessions/.test(r.hint),'the hint says '+r.hint);
+    var at=await p.evaluate(function(){ var svg=document.querySelector('.exdetail svg'), hit=svg.querySelector('[data-xs]');
+      svg.scrollIntoView({block:'center'});
+      var xs=hit.getAttribute('data-xs').split(' ').map(Number), ys=hit.getAttribute('data-ys').split(' ').map(Number), tips=JSON.parse(hit.getAttribute('data-tips'));
+      var b=svg.getBoundingClientRect(), k=b.width/svg.viewBox.baseVal.width;
+      return [20,21].map(function(i){ return {x:b.left+xs[i]*k, y:b.top+ys[i]*k, tip:tips[i]}; }); });
+    // Two points side by side, each tapped below itself, where the tap area
+    // of the other used to lie over it.
+    for(var i=0;i<2;i++){
+      var q=at[i];
+      await p.mouse.click(q.x,q.y+14);
+      var got=await p.evaluate(function(){ var c=document.querySelector('.exdetail .c-sel');
+        return {tip:document.querySelector('.exdetail .c-tip').textContent, ring:c&&c.getAttribute('visibility')}; });
+      assert.strictEqual(got.tip,q.tip,'a tap by point '+(20+i)+' read another');
+      assert.strictEqual(got.ring,'visible','the point tapped is not marked');
+    }
+    await close(p);
   });
   await t('Progress: water tiles share a row, history is grouped by session, sauna follows the range', async function(){
     var p=await open('recent',{viewport:{width:390,height:844}});

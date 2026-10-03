@@ -44,6 +44,8 @@ srv.listen(0,async function(){
   if(mealsTab){ await mealsTab.click(); await p.waitForTimeout(500); }
 
   // The seven option values are the seven real dates the calendar shows.
+  // A box gets the rest of the week as it is reached, as by a finger or Tab.
+  if(await p.$('[data-action="planday"]')) await p.focus('[data-action="planday"]');
   var dates=await p.evaluate(function(){
     var sel=document.querySelector('[data-action="planday"]');
     return sel?[].slice.call(sel.options).map(function(o){return o.value;}):[];
@@ -64,8 +66,10 @@ srv.listen(0,async function(){
     return [].slice.call(document.querySelectorAll('.shop .shop-t')).map(function(e){return e.textContent;});
   });
   var plan=async function(id,dayIndex,slot){
+    await p.focus('[data-action="planday"][data-id="'+id+'"]');
     await p.selectOption('[data-action="planday"][data-id="'+id+'"]', dates[dayIndex]);
-    if(slot) await p.selectOption('[data-action="planslot"][data-id="'+id+'"]', slot);
+    if(slot){ await p.focus('[data-action="planslot"][data-id="'+id+'"]');
+      await p.selectOption('[data-action="planslot"][data-id="'+id+'"]', slot); }
     await p.click('[data-action="addmeal"][data-id="'+id+'"]');
     await p.waitForTimeout(1700);
   };

@@ -482,6 +482,41 @@ t('recipes and notes come back from the store in the order they were made', func
   assert.strictEqual(ids(back.recipes).slice(-1)[0],'r1727900500000','the newest recipe is not last');
 });
 
+// Every save made the JSON of every document again, which grew with years of
+// logs. A document is made again only when its body has changed, wherever in
+// it the change was made, so what is saved is still exactly what is there.
+t('a save makes the JSON of only the documents that changed, wherever they changed', function(){
+  var m=h.match(/\nvar jsonMemo=[^\n]*\n/), k={n:0,d:0};
+  var made=new Function('k',(m?m[0]:'')+['stableJson','dbSnapshot'].concat(m?['docRec','docSame']:[]).map(grab).join('\n')+
+    '\nvar sj0=stableJson; stableJson=function(v){ if(!k.d) k.n++; k.d++; try{ return sj0(v); } finally{ k.d--; } };'+
+    '\nreturn {snap:dbSnapshot, sj:sj0};')(k);
+  var st=JSON.parse(JSON.stringify(seed));
+  for(var i=0;i<200;i++) st.workoutLogs.push({id:'wl-m'+i,workoutId:'w6',title:'Push',tag:'Strength',date:'2025-01-01',
+    logs:{press_bench:[{v:8,w:60,t:i},{v:6,w:70,t:i+1}]}});
+  var docs=box.dbDocs(st), paths=Object.keys(docs);
+  var snap=function(){ k.n=0; return made.snap(docs); };
+  var exact=function(s){ Object.keys(docs).forEach(function(p){ assert.strictEqual(s[p],made.sj(docs[p]),p+' is not what it holds'); });
+    assert.deepStrictEqual(Object.keys(s).sort(),Object.keys(docs).sort()); };
+  // Counted before exact(), which makes each document again to compare.
+  var s1=snap(); assert.strictEqual(k.n,paths.length); exact(s1);
+  var s2=snap(); assert.strictEqual(k.n,0,'nothing changed and '+k.n+' of '+paths.length+' documents were made again'); exact(s2);
+  // Changed in place, deep and shallow, without a new object anywhere.
+  var L=function(i){ return docs['workoutLogs/wl-m'+i]; };
+  L(5).logs.press_bench[1].w=72.5;
+  L(6).logs.press_bench.push({v:5,w:75,t:99});
+  delete L(7).title;
+  L(8).logs.press_bench={0:L(8).logs.press_bench[0],1:L(8).logs.press_bench[1]};
+  L(9).logs.press_bench[0].wu=undefined;
+  L(10).logs.press_bench.length=3;
+  docs['state/profile'].totalXp+=10;
+  var dk=Object.keys(docs).filter(function(p){ return p.indexOf('days/')===0; })[0];
+  docs[dk].workout.done=!docs[dk].workout.done;
+  delete docs['workoutLogs/wl-m11']; docs['library/new1']={id:'new1',title:'New',tag:'Note',notes:''};
+  var s3=snap(); assert.strictEqual(k.n,9,k.n+' documents made again for 9 changes'); exact(s3);
+  assert.ok(s3['workoutLogs/wl-m10']!==s2['workoutLogs/wl-m10'],'a hole at the end of a list was missed');
+  assert.ok(s3['workoutLogs/wl-m8']!==s2['workoutLogs/wl-m8'],'a list turned into an object was missed');
+});
+
 (async function(){
   for(var i=0;i<pending.length;i++){
     try{ await pending[i][1](); console.log('  PASS  '+pending[i][0]); }

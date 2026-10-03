@@ -530,6 +530,15 @@ Writes go in batches, as seeding does. When a save clears `state/session` and
 writes workout logs, the session is written only after those logs landed, so a
 finished session is never cleared before its log is stored.
 
+**What changed.** A save finds the documents that changed by comparing each
+one's JSON with `lastSaved`. That JSON is kept per path (`jsonMemo`) with a
+flat record of the body it was made from, every key and plain value in order,
+and made again only when the body no longer matches the record. The check
+walks the whole body without building strings, so a change made in place
+anywhere in it is caught and no mutation site has to say what it changed.
+Making all of it again on every save had grown with the logs, to most of a
+save's work after a few years.
+
 **Retry.** A transient refusal leaves what did not land different from
 `lastSaved`, so the next save carries it; that save is scheduled on its own,
 backing off 2s, 4s, 8s up to 30s with a little jitter. A refusal in `DB_HARD`
@@ -847,9 +856,12 @@ the shipped `index.html`, so they test what ships.
   partial-week shopping.
 - `test-addplan.js`: Add to plan on a phone against the db stub: the
   portions a new meal starts at, its slot, big batches on the steppers, the
-  week's count on a card, and the button held under the finger.
+  week's count on a card, and the button held under the finger. What a tap
+  draws: a closed card has no ingredient list and its day and slot boxes only
+  their choice until reached, and a tap on Today builds only Today.
 - `test-ticks.js`: shopping ticks in the browser: what a tick is for, older
-  ticks, spellings, the clears, and ticking from the keyboard.
+  ticks, spellings, the clears, and ticking from the keyboard. A tick
+  changes its row and the Clear button in place, without drawing the tab.
 - `test-design.js`: computed contrast, tap target sizes, what touch can reach,
   and layout at phone width.
 - `test-dates.js`: the log date picked by a real tap and typed, a backfill left

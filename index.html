@@ -89,6 +89,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .rtoggle .chev{font-family:'IBM Plex Mono',monospace;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-soft);margin-left:8px;}\
 .recipe-controls{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}\
 .recipe-controls select{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;padding:6px 8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
+.recipe-controls select[data-action=planday]{min-width:calc(8ch + 40px);}.recipe-controls select[data-action=planslot]{min-width:calc(9ch + 40px);}\
 .inplan{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;color:var(--text-soft);cursor:pointer;}\
 .addform{background:var(--surface-raised);border:1px dashed var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;}\
 .addform input,.addform select,.addform textarea{width:100%;font-family:'Work Sans',sans-serif;font-size:0.9rem;padding:8px 10px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface);color:var(--text);margin-top:8px;}\
@@ -1200,8 +1201,41 @@ function savedBody(path){
   if(lastSaved[path]===undefined) return undefined;
   try{ return JSON.parse(lastSaved[path]); }catch(e){ return null; }
 }
+/* The JSON of every document, made again on every save, was most of a
+   save's work once there were years of logs, and grew with them. Each is
+   kept by its path with a flat record of the body it was made from (every
+   key and plain value, in order), and made again only when the body no
+   longer matches the record. Checking builds no strings, and it compares the
+   whole body, so a change made in place anywhere in it is caught: no
+   mutation site has to say what it changed. */
+var jsonMemo=Object.create(null);
+function docRec(v,out){
+  if(v===null||typeof v!=='object'){ out.push(v); return out; }
+  var ks=Object.keys(v);
+  out.push(Array.isArray(v)?-1-v.length:ks.length,ks.length);
+  for(var i=0;i<ks.length;i++){ out.push(ks[i]); docRec(v[ks[i]],out); }
+  return out;
+}
+// The index past the record of v, or -1 where v differs from it.
+function docSame(v,rec,at){
+  if(v===null||typeof v!=='object') return rec[at]===v?at+1:-1;
+  var ks=Object.keys(v);
+  if(rec[at]!==(Array.isArray(v)?-1-v.length:ks.length) || rec[at+1]!==ks.length) return -1;
+  at+=2;
+  for(var i=0;i<ks.length;i++){
+    if(rec[at]!==ks[i]) return -1;
+    at=docSame(v[ks[i]],rec,at+1); if(at<0) return -1;
+  }
+  return at;
+}
 function dbSnapshot(map){
-  var snap={}; Object.keys(map).forEach(function(k){ snap[k]=stableJson(map[k]); });
+  var snap={}, memo=Object.create(null);
+  Object.keys(map).forEach(function(k){
+    var m=jsonMemo[k], v=map[k];
+    if(!m || docSame(v,m.rec,0)!==m.rec.length) m={json:stableJson(v), rec:docRec(v,[])};
+    memo[k]=m; snap[k]=m.json;
+  });
+  jsonMemo=memo;
   return snap;
 }
 
@@ -1318,10 +1352,17 @@ function lineChart(pts,opts){
   function X(i){ return padX+i/(pts.length-1)*plotW; }
   function Y(v){ return base-(v-min)/(max-min)*plotH; }
   var d=pts.map(function(p,i){ return (i?'L':'M')+X(i).toFixed(1)+' '+Y(p.v).toFixed(1); }).join(' ');
-  var dots=pts.map(function(p,i){
-    return '<g class="mark" data-action="charttip" data-tip="'+esc(p.tip||'')+'"><circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="16" fill="transparent"/>'+
-      '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"><title>'+esc(p.tip||'')+'</title></circle></g>';
-  }).join('');
+  // The dots are one path, and one transparent rect over the plot takes the
+  // taps and finds the point nearest across (chartPick). A group, two
+  // circles and a title for every point made years of sessions thousands of
+  // nodes, and the tap areas of close points lay over each other.
+  var xs=[], ys=[], dots='';
+  pts.forEach(function(p,i){ var x=X(i).toFixed(1), y=Y(p.v).toFixed(1); xs.push(x); ys.push(y);
+    dots+='M'+(x-4).toFixed(1)+' '+y+'a4 4 0 1 0 8 0a4 4 0 1 0 -8 0'; });
+  dots='<path d="'+dots+'" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>'+
+    '<circle class="c-sel" r="7" fill="none" stroke="var(--accent)" stroke-width="2" visibility="hidden"/>'+
+    '<rect class="mark" data-action="charttip" x="0" y="0" width="'+W+'" height="'+H+'" fill="transparent" data-xs="'+xs.join(' ')+'" data-ys="'+ys.join(' ')+'"'+
+      ' data-tips="'+esc(JSON.stringify(pts.map(function(p){ return p.tip||''; })))+'"/>';
   var first=pts[0], last=pts[pts.length-1];
   var lbls='<text x="0" y="'+(H-4)+'" class="c-lbl">'+esc(first.k)+'</text>'+
     '<text x="'+W+'" y="'+(H-4)+'" text-anchor="end" class="c-lbl">'+esc(last.k)+'</text>'+
@@ -1331,7 +1372,35 @@ function lineChart(pts,opts){
     '<svg viewBox="0 0 '+W+' '+H+'" data-kind="'+kind+'" role="img" aria-label="'+esc(opts.aria||opts.title||'line chart')+'">'+
     '<line x1="0" y1="'+base+'" x2="'+W+'" y2="'+base+'" stroke="var(--line)" stroke-width="1"/>'+
     '<path d="'+d+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
-    dots+lbls+'</svg>'+chartTip(opts.hint||'Tap a point for that session')+'</div>';
+    lbls+dots+'</svg>'+chartTip(opts.hint||'Tap a point for that session')+'</div>';
+}
+/* At most `max` points, for a chart a few hundred pixels wide: the newest
+   as it is, and the rest in runs of about equal length, each drawn as its
+   best. Years of sessions drew one point each, every one kept on the page. */
+var LINE_MAX=60;
+function thinPoints(pts,max){
+  if(pts.length<=max) return pts;
+  var out=[], n=pts.length-1, runs=max-1;
+  for(var i=0;i<runs;i++){
+    var a=Math.floor(i*n/runs), b=Math.floor((i+1)*n/runs), best=pts[a];
+    for(var j=a+1;j<b;j++) if(pts[j].v>=best.v) best=pts[j];
+    out.push(best);
+  }
+  out.push(pts[n]);
+  return out;
+}
+// The point of a line chart nearest across to where it was tapped, ringed,
+// its words in the chart's head line.
+function chartPick(t,e,tipEl){
+  var svg=t.ownerSVGElement, xs=(t.getAttribute('data-xs')||'').split(' '), ys=(t.getAttribute('data-ys')||'').split(' '), tips;
+  try{ tips=JSON.parse(t.getAttribute('data-tips')||'[]'); }catch(err){ tips=[]; }
+  var at=0;
+  try{ var b=svg.getBoundingClientRect(), vb=svg.viewBox.baseVal;
+    if(b.width && e.clientX) at=(e.clientX-b.left)*vb.width/b.width; }catch(err){}
+  var best=0; xs.forEach(function(x,i){ if(Math.abs(x-at)<Math.abs(xs[best]-at)) best=i; });
+  var ring=svg.querySelector('.c-sel');
+  if(ring){ ring.setAttribute('cx',xs[best]); ring.setAttribute('cy',ys[best]); ring.setAttribute('visibility','visible'); }
+  tipEl.textContent=tips[best]||'';
 }
 // The number that actually shows progress for one session of one exercise:
 // heaviest set for a loaded lift, best single set for everything else.
@@ -3283,6 +3352,29 @@ function recipeBase(r){ return r.base||1; }
 // else the recipe's own size. A scale left on a closed card is out of sight,
 // and buying for it is how one breakfast became six.
 function planAddPortions(r){ return expanded['rec:'+r.id]?recipePortions(r):recipeBase(r); }
+/* The day and slot boxes on a recipe card, picked from or drawn as the one
+   choice they show (all false). Seventy cards drawing every option made the
+   Meals tab a quarter of a second a tap, most of it laying out the options.
+   The day is the one picked while it is in the week, else today, which is
+   what Add to plan uses; the slot the one picked, else the tag's. */
+function planOpts(act,r,all){
+  var pick=planPick[r.id]||{};
+  if(act==='planday'){
+    var days=planDates(), on=days.indexOf(pick.date)>-1?pick.date:days[0];
+    return days.map(function(k,i){ return all||k===on?'<option value="'+esc(k)+'"'+(k===on?' selected':'')+'>'+esc(dayLabel(k,i))+'</option>':''; }).join('');
+  }
+  var sl0=pick.slot||slotFor(r);
+  return SLOTS.map(function(sl){ return all||sl===sl0?'<option value="'+sl+'"'+(sl===sl0?' selected':'')+'>'+SLOT_LABEL[sl]+'</option>':''; }).join('');
+}
+// Before a box can open or take a key, it gets every option, its choice still
+// the one marked: a pointer, a touch or the focus reaching it all come first.
+function planOptsFill(e){
+  var el=e.target;
+  if(!el || el.tagName!=='SELECT' || !el.hasAttribute('data-lazy')) return;
+  var id=el.getAttribute('data-id'), r=state.recipes.filter(function(x){ return x.id===id; })[0];
+  el.removeAttribute('data-lazy');
+  if(r) el.innerHTML=planOpts(el.getAttribute('data-action'),r,true);
+}
 function recipePortions(r){ return r.portions||recipeBase(r); }
 /* One step of a portion stepper. Twenty is the ceiling a tap reaches, but a
    recipe that makes more (from an import, or an older form) is not cut down
@@ -3478,6 +3570,7 @@ function tickCovers(t,it){
   return (it.stamp?it.stamp.split(';'):[]).every(function(x){ var e=x.lastIndexOf('='), k=x.slice(0,e);
     return k in had && had[k]>=+x.slice(e+1)-1e-9; });
 }
+var CLEAR_TICKS='<button class="clearbtn" data-action="clearticks">Clear the ticks</button> ';
 function shopTicked(it){ return (state.shoppingChecked||[]).some(function(t){ return tickCovers(t,it); }); }
 function tickFor(it){ return it.extra?it.key:it.key+TICK_SEP+(it.stamp?it.stamp+';':'')+'@='+it.ents.join(','); }
 /* A tick for something no planned meal needs any more goes, and so does one
@@ -4325,6 +4418,9 @@ function bodyContent(){
     return '<div class="'+cls+(pickable?' pickable':'')+'"'+(pickable?' data-action="pickday" data-k="'+k+'" role="button" tabindex="0" aria-label="Log for '+esc(prettyKey(k))+'"':'')+
       (k===activeDate()?' aria-current="date"':'')+' title="'+esc(rowDate(k))+(pickable?': tap to log for this day':'')+'">'+dd+'</div>';
   }).join('');
+  // Each view is built only when it is the one shown: building all four on
+  // every tap was most of the work of a tap on Today.
+  function todayView(){
   // A cup a tap, past the target too, but no more than a row holds: the count
   // above says how much.
   var cupsRow='', cupsN=Math.min(Math.max(state.waterTarget,t.water),40);
@@ -4342,7 +4438,7 @@ function bodyContent(){
        '<span class="btns"><button class="go" data-action="pickday" data-k="'+yk+'">Log yesterday</button>'+
        '<button data-action="nudgeoff" data-k="'+yk+'">Nothing to log</button></span></div>')
     : '';
-  var todayView = nudge+
+  return nudge+
     '<div class="grid">'+
       '<div class="card"><h3>Water</h3><div class="sub tgt"><span>Target <b>'+litres(state.waterTarget)+'</b> a day</span>'+
           '<button data-action="watertarget" data-d="-1" aria-label="Lower the water target">&minus;</button>'+
@@ -4373,7 +4469,9 @@ function bodyContent(){
       '<input type="date" id="logdate" data-action="logdate" value="'+activeDate()+'" min="'+minLogDate()+'" max="'+realToday()+'">'+
       '<span class="hint">Forgot to log something? Pick that day and use the cards above. Goes back '+BACKFILL_DAYS+' days.</span></div>'+
     '<p class="note">Logging a number never costs you points. The clean streak counts logged days with nothing used; a day you did not log is skipped, not counted against you. The day streak lets one missed day go.</p>';
+  }
 
+  function trainingView(){
   // Lines that start with a day ("Mon: ...") read as a list; the rest is advice
   // and gets its own paragraph, so a template is not one dense block.
   function notesHtml(txt){
@@ -4412,8 +4510,7 @@ function bodyContent(){
     return '<div class="wcard"><div class="row"><div><h4>'+esc(w.title)+'</h4><div class="meta">'+meta+' &middot; '+esc(w.tag)+'</div></div>'+
       start+'</div></div>';
   }).join('');
-  var trainingView =
-    '<div class="sectiontitle">Overview</div>'+trainingItems+
+  return '<div class="sectiontitle">Overview</div>'+trainingItems+
     '<div class="sectiontitle">Workouts</div>'+
     '<div class="weekgoal"><span>Last 7 days: '+(weekN>=state.weekTarget?('<b>'+weekN+' session'+(weekN===1?'':'s')+'</b>, target '+state.weekTarget+' hit'):('<b>'+weekN+' of '+state.weekTarget+'</b> sessions'))+'</span><span class="tgt">'+
       '<button data-action="weektarget" data-d="-1" aria-label="Fewer sessions a week">-</button>'+
@@ -4424,7 +4521,9 @@ function bodyContent(){
       '<select id="lib-tag"><option>Note</option><option>Adjustment</option><option>Other</option></select>'+
       '<textarea id="lib-notes" placeholder="Notes"></textarea>'+formNoteHtml('lib')+
       '<button data-action="addlib">Add to training plan</button></div>';
+  }
 
+  function mealsView(){
   // The calendar: seven rolling days, each showing the meals planned on it.
   // Empty days are drawn too, because a gap in the week is the thing you want
   // to notice.
@@ -4461,27 +4560,21 @@ function bodyContent(){
       '<span class="box"></span><span class="shop-t">'+esc(it.label)+'</span></div>'+
       (it.extra?'<button class="shop-x" data-action="delextra" data-id="'+esc(it.extraId)+'" title="Remove" aria-label="Remove '+esc(it.label)+'">&times;</button>':'')+'</div>';
   }).join('');
+  // Only the meals the week shows: one whose day has gone is not in it.
+  var plannedN=Object.create(null);
+  planEntries(planDays).forEach(function(e){ plannedN[e.recipeId]=(plannedN[e.recipeId]||0)+1; });
   function recipeCard(r){
-    var f=recipePortions(r)/recipeBase(r);
-    var ingList=recipeIngs(r).map(function(i){return '<li>'+esc(scaledIng(i,f))+'</li>';}).join('');
-    // Adding is a day, a slot and a button rather than a tick, because the
-    // whole point is being able to add the same recipe more than once.
-    var dayOptions=planDays.map(function(k,i){
-      return '<option value="'+esc(k)+'"'+(planPick[r.id]&&planPick[r.id].date===k?' selected':'')+'>'+esc(dayLabel(k,i))+'</option>';
-    }).join('');
-    var slotOptions=SLOTS.map(function(sl){
-      var chosen=(planPick[r.id]&&planPick[r.id].slot)||slotFor(r);
-      return '<option value="'+sl+'"'+(chosen===sl?' selected':'')+'>'+SLOT_LABEL[sl]+'</option>';
-    }).join('');
-    // Only the meals the week shows: one whose day has gone is not in it.
-    var planned=planEntries(planDays).filter(function(e){return e.recipeId===r.id;}).length;
+    // The ingredients are worked out only for a card that shows them.
+    var rk='rec:'+r.id, open=!!expanded[rk];
+    var f=open?recipePortions(r)/recipeBase(r):1;
+    var ingList=open?recipeIngs(r).map(function(i){return '<li>'+esc(scaledIng(i,f))+'</li>';}).join(''):'';
+    var planned=plannedN[r.id]||0;
     // What a tap adds: the batch on show when the card is open, and the
     // recipe's own size when it is closed and the scale cannot be seen.
     var addN=planAddPortions(r), added=planAdded&&planAdded.id===r.id?planAdded.text:'';
     var m=r.macros;
     // Closed by default: what you scan the list for is the name, the macros
     // and the add button. The batch and the method open on a tap.
-    var rk='rec:'+r.id, open=!!expanded[rk];
     return '<div class="libitem"><div class="row"><div class="rtoggle" data-action="toggleex" data-id="'+esc(rk)+'" role="button" tabindex="0" aria-expanded="'+open+'">'+
         '<span class="tag">'+esc(r.tag||'Recipe')+'</span><span class="chev">'+(open?'&#9650; hide':'&#9660; ingredients')+'</span><h4>'+esc(r.title)+'</h4></div>'+
       '<button class="x" data-action="delrecipe" data-id="'+r.id+'" aria-label="Delete '+esc(r.title)+'">&times;</button></div>'+
@@ -4494,8 +4587,12 @@ function bodyContent(){
       '</div>'+
       (ingList?'<ul>'+ingList+'</ul>':'')+(r.instructions?'<p>'+esc(r.instructions)+'</p>':'')):'')+
       '<div class="recipe-controls">'+
-        '<select data-action="planday" data-id="'+r.id+'">'+dayOptions+'</select>'+
-        '<select data-action="planslot" data-id="'+r.id+'">'+slotOptions+'</select>'+
+        // Adding is a day, a slot and a button rather than a tick, because the
+        // whole point is being able to add the same recipe more than once.
+        // Each box is drawn holding only its choice, and gets the rest of the
+        // week as it is reached (planOptsFill).
+        '<select data-action="planday" data-id="'+esc(r.id)+'" data-lazy="1">'+planOpts('planday',r,false)+'</select>'+
+        '<select data-action="planslot" data-id="'+esc(r.id)+'" data-lazy="1">'+planOpts('planslot',r,false)+'</select>'+
         '<button class="addplan" data-action="addmeal" data-id="'+r.id+'">'+(addN===recipeBase(r)?'Add to plan':'Add '+addN+' portion'+(addN===1?'':'s'))+'</button>'+
         (added||planned?'<span class="planned" role="status">'+esc(added)+(added&&planned?' &middot; ':'')+(planned?planned+' in the week':'')+'</span>':'')+
       '</div></div>';
@@ -4505,8 +4602,7 @@ function bodyContent(){
   if(prepItems) prepItems='<div class="libgrid">'+prepItems+'</div>';
   if(recipeItems) recipeItems='<div class="libgrid">'+recipeItems+'</div>';
 
-  var mealsView =
-    '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
+  return '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
     '<div class="sectiontitle">The week</div><div class="weekbox cal">'+calRows+'</div>'+
     '<div class="sectiontitle">Shopping list</div><div class="weekbox">'+
       '<div class="rangebar shoprange">'+
@@ -4517,7 +4613,7 @@ function bodyContent(){
       '<div class="addshop"><input id="shop-add" autocomplete="off" maxlength="120" '+
           'placeholder="Milk, bin bags, coffee&hellip;" value="'+esc(shopDraft)+'">'+
         '<button data-action="addextra">Add</button></div>'+
-      (anyTicked?'<button class="clearbtn" data-action="clearticks">Clear the ticks</button> ':'')+
+      (anyTicked?CLEAR_TICKS:'')+
       (listSL.length?'<button class="clearbtn" data-action="clearweek">Clear '+
         (shopRange===7?'the week &amp; the ticks':'these '+shopRange+' days &amp; their ticks')+'</button>':'')+'</div>'+
     '<div class="sectiontitle">Meal prep</div>'+
@@ -4531,10 +4627,11 @@ function bodyContent(){
       '<textarea id="rec-ing" placeholder="Ingredients, one per line, such as&#10;Beef mince (500g)&#10;2 onions&#10;1 tin chopped tomatoes"></textarea>'+
       '<textarea id="rec-inst" placeholder="Method / notes"></textarea>'+formNoteHtml('rec')+
       '<button data-action="addrecipe">Add recipe</button></div>';
+  }
 
+  // Built only when Progress is the tab shown: a render draws one view.
+  function progressView(){
   var logs=state.workoutLogs;
-  var wk=last7Keys();
-  var thisWeekCount=logs.filter(function(l){return wk.indexOf(l.date)>-1;}).length;
 
   // ---- progress: charts first, raw rows underneath -----------------------
   var rangeKeys=lastNKeys(progRange);
@@ -4558,11 +4655,13 @@ function bodyContent(){
   }); });
   // Newest date, not the date of whichever log was saved last: a backfilled
   // log lands on the end of the list with an older date.
-  var newest=function(id){ return histo[id].reduce(function(a,h){ return h.date>a?h.date:a; },''); };
+  // Worked out once an exercise, not once a comparison of the sort.
+  var newestOf=Object.create(null);
+  Object.keys(histo).forEach(function(id){ newestOf[id]=histo[id].reduce(function(a,h){ return h.date>a?h.date:a; },''); });
   // A log saved before empty lists were dropped can hold an exercise with no
   // sets, which has no history to show.
   var exIds=Object.keys(histo).filter(function(id){ return histo[id].length; })
-    .sort(function(a,b){ var da=newest(a), db=newest(b); return da<db?1:(da>db?-1:0); });
+    .sort(function(a,b){ var da=newestOf[a], db=newestOf[b]; return da<db?1:(da>db?-1:0); });
 
   var isSet=countsAsSet;
   var totalSets=0, totalVolume=0;
@@ -4720,8 +4819,10 @@ function bodyContent(){
       }).join('');
       var more=byDay.length>4?'<button class="showall" data-action="toggleex" data-id="'+esc(allK)+'" aria-expanded="'+showAll+'">'+
         (showAll?'Show the latest 4 sessions':'Show all '+byDay.length+' sessions')+'</button>':'';
+      var plot=thinPoints(pts,LINE_MAX);
       detail='<div class="exdetail">'+
-        lineChart(pts,{kind:'ex',title:pbLabel+' by session',sub:dates.length+' session'+(dates.length===1?'':'s'),
+        lineChart(plot,{kind:'ex',title:pbLabel+' by session',sub:dates.length+' session'+(dates.length===1?'':'s'),
+                       hint:plot.length<pts.length?'Each point is the best of about '+Math.round((pts.length-1)/(LINE_MAX-1))+' sessions. Tap one to see it.':'',
                        empty:(!pts.length&&hist.length)
                          ? (hist.every(function(h){ return h.wu; })
                             ? 'Every set so far was a warm-up, with no working set to chart. They are listed below.'
@@ -4754,8 +4855,7 @@ function bodyContent(){
         '<button class="swipe-x" data-action="'+action+'" data-id="'+esc(id)+'" aria-label="Remove">&times;</button>'+
       '</div></div>';
   }
-  var progressView =
-    statRow + rangeBar +
+  return statRow + rangeBar +
     '<div class="sectiontitle">Training</div>'+
     barChart(trainRows,{title:'Sets per day',sub:trainedDays+' of '+progRange+' days trained',
       empty:'No sets logged in the last '+progRange+' days. Finish a session to see this.',
@@ -4783,6 +4883,7 @@ function bodyContent(){
     (exIds.length?'<p class="note" style="margin-top:0;">Tap any exercise to chart it.</p>':'')+exList+
     '<div class="sectiontitle">Recent sessions</div>'+recentHtml+
     '<div class="sectiontitle">Your data</div>'+dataCard();
+  }
 
   var sessionHtml='';
   if(viewingSession && state.activeSession){
@@ -5000,10 +5101,10 @@ function bodyContent(){
 
   var current;
   if(viewingSession && state.activeSession){ current=sessionHtml; }
-  else if(tab==='training'){ current=trainingView; }
-  else if(tab==='meals'){ current=mealsView; }
-  else if(tab==='progress'){ current=progressView; }
-  else { current=todayView; }
+  else if(tab==='training'){ current=trainingView(); }
+  else if(tab==='meals'){ current=mealsView(); }
+  else if(tab==='progress'){ current=progressView(); }
+  else { current=todayView(); }
 
   var inSession=!!(viewingSession && state.activeSession);
   var tabsBar=inSession?'':
@@ -5301,6 +5402,7 @@ function onClick(e){
   // its change event can reach the document, so the change was silently lost.
   // The log date box is one of them: a tap opens the native picker on it.
   if(action==='planday'||action==='planslot'||action==='prepopt'||action==='logdate') return;
+  var addedShown=planAdded, drawn=false;
   if(action!=='addmeal') planAdded=null;
   // Until we know where data lives, a tap would be applied to state that is
   // about to be replaced by the store. Reading and moving around is fine.
@@ -5315,7 +5417,7 @@ function onClick(e){
   // height of its own, so the head never reflows under the finger. Rendering
   // would put the line straight back, so this writes it and stops.
   if(action==='charttip'){ var ch=t.closest('.chart'), tipEl=ch&&ch.querySelector('.c-tip');
-    if(tipEl){ tipEl.textContent=t.getAttribute('data-tip')||''; } return; }
+    if(tipEl){ if(t.hasAttribute('data-xs')) chartPick(t,e,tipEl); else tipEl.textContent=t.getAttribute('data-tip')||''; } return; }
   // The desktop × on a history row only shows on hover. On touch it is never
   // seen, so a tap that reaches it anyway must not delete the row.
   if(t.classList.contains('swipe-x') && window.matchMedia && !matchMedia('(hover:hover)').matches) return;
@@ -5544,14 +5646,26 @@ function onClick(e){
     parkUndo({kind:'recipe',item:recGone,pos:ri2,plan:planGone,label:recGone.title});
   }
   else if(action==='shopcheck'){
-    var item=t.getAttribute('data-item'), row=null;
-    shoppingList(planWindow(shopRange)).forEach(function(it){ if(it.key===item) row=it; });
+    var item=t.getAttribute('data-item'), row=null, sl=shoppingList(planWindow(shopRange));
+    sl.forEach(function(it){ if(it.key===item) row=it; });
     if(!row) return;
     // Unticked, every tick for the row goes; ticked, it is for what the row
     // asks for now, in place of any made for less.
     var was=shopTicked(row);
     state.shoppingChecked=state.shoppingChecked.filter(function(k){ return !tickOf(k,row); });
     if(!was) state.shoppingChecked.push(tickFor(row));
+    // Only the row changes, so only the row is drawn, with the Clear the
+    // ticks button that follows the first tick and the last, and the focus
+    // stays on it: the whole tab drawn again was most of half a second a
+    // tick. A note of where a meal went, which a tap clears, needs the render.
+    var on=shopTicked(row), any=sl.some(shopTicked), app0=document.getElementById('app');
+    var clr=app0.querySelector('[data-action="clearticks"]'), cw=app0.querySelector('[data-action="clearweek"]');
+    if(!addedShown && app0.contains(t) && (!!clr===any || (any?cw:clr))){
+      t.classList.toggle('checked',on); t.setAttribute('aria-checked',String(on));
+      if(any && !clr) cw.insertAdjacentHTML('beforebegin',CLEAR_TICKS);
+      if(!any && clr){ if(clr.nextSibling && clr.nextSibling.nodeType===3) clr.parentNode.removeChild(clr.nextSibling); clr.parentNode.removeChild(clr); }
+      drawn=true;
+    }
   }
   else if(action==='addextra'){
     var box=document.getElementById('shop-add');
@@ -5735,7 +5849,7 @@ function onClick(e){
   // The change is in state already: a render that throws must not take its
   // save with it, or the reload that could draw it never sees it.
   if(!uiOnly) exportDirty=true;
-  try{ render(); } finally { if(!uiOnly) scheduleSave(); }
+  try{ if(!drawn) render(); } finally { if(!uiOnly) scheduleSave(); }
   if(pickerTop){ pickerTop=false; try{ window.scrollTo(0,0); }catch(err){} }
 }
 var pickerTop=false;
@@ -5921,6 +6035,8 @@ function boot(){
   document.addEventListener('focusout',onFocusOut);
   // A tap on the date box opens the picker, whose change is drawn at once.
   document.addEventListener('pointerdown',function(e){ pointerDown=true; if(e.target && e.target.id==='logdate') logDateKeyed=false; },true);
+  ['pointerdown','mousedown','touchstart','focusin','keydown'].forEach(function(ev){
+    document.addEventListener(ev,planOptsFill,ev==='touchstart'?{capture:true,passive:true}:true); });
   document.addEventListener('pointerup',onPointerUp,true);
   document.addEventListener('pointercancel',onPointerUp,true);
   setInterval(watchDay,30000);

@@ -148,6 +148,65 @@ function bad(m,e){ fails++; console.log('  FAIL  '+m+'\n        '+e.message); }
     await D.ctx.close();
   }catch(e){ bad('the button stays under the finger',e); }
 
+  console.log('\nA TAP DRAWS ONLY WHAT IS SHOWN');
+  // Every tap drew all four tabs, and every closed recipe card its ingredient
+  // list and the whole week in its day box: on a phone a Meals tap was most
+  // of half a second.
+  try{
+    var E=await open('2026-10-02T12:00:00Z',docWith());
+    var closed=await E.p.evaluate(function(){
+      var c=document.querySelector('[data-action="addmeal"][data-id="r20"]').closest('.libitem');
+      return {li:c.querySelectorAll('li').length, day:c.querySelector('[data-action="planday"]').options.length,
+        slot:c.querySelector('[data-action="planslot"]').options.length, dayV:c.querySelector('[data-action="planday"]').value,
+        slotV:c.querySelector('[data-action="planslot"]').value, all:document.querySelectorAll('.recipe-controls option').length,
+        cards:document.querySelectorAll('.recipe-controls').length}; });
+    assert.strictEqual(closed.li,0,'a closed card drew its ingredients');
+    assert.ok(closed.day===1 && closed.slot===1,'a closed card drew '+closed.day+' days and '+closed.slot+' slots');
+    assert.strictEqual(closed.all,closed.cards*2,'the plan boxes drew '+closed.all+' options for '+closed.cards+' cards');
+    assert.strictEqual(closed.dayV,'2026-10-02','the day box starts on '+closed.dayV);
+    assert.strictEqual(closed.slotV,'lunch','the slot box starts on '+closed.slotV);
+    ok('a closed card draws no ingredients, and each plan box only its choice');
+    // Reached by Tab or a finger, a box has the whole week, its choice kept.
+    await E.p.focus('[data-action="planday"][data-id="r20"]');
+    var days=await E.p.evaluate(function(){ var s=document.querySelector('[data-action="planday"][data-id="r20"]');
+      return {n:s.options.length, v:s.value, first:s.options[0].textContent, second:s.options[1].textContent}; });
+    assert.ok(days.n===7 && days.v==='2026-10-02' && days.first==='Today' && days.second==='Tomorrow','reached, the day box holds '+JSON.stringify(days));
+    await E.p.selectOption('[data-action="planday"][data-id="r20"]','2026-10-05');
+    var slots=await E.p.evaluate(function(){ var s=document.querySelector('[data-action="planslot"][data-id="r20"]');
+      s.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})); return [].map.call(s.options,function(o){ return o.value; }).join(',')+'='+s.value; });
+    assert.strictEqual(slots,'breakfast,lunch,dinner=lunch','a pointer on the slot box finds '+slots);
+    await E.p.selectOption('[data-action="planslot"][data-id="r20"]','dinner');
+    await tap(E.p,'[data-action="addmeal"][data-id="r20"]');
+    var got=await meals(E.p,'r20');
+    assert.ok(got.length===1 && got[0].date==='2026-10-05' && got[0].slot==='dinner','planned '+JSON.stringify(got));
+    var after=await E.p.evaluate(function(){ var c=document.querySelector('[data-action="addmeal"][data-id="r20"]').closest('.recipe-controls');
+      return c.querySelector('[data-action="planday"]').options.length+' '+c.querySelector('[data-action="planday"]').value+' '+c.querySelector('[data-action="planslot"]').value; });
+    assert.strictEqual(after,'1 2026-10-05 dinner','drawn again, the boxes show '+after);
+    ok('reached, a box offers the whole week with its choice kept, and the meal lands on the day and slot picked');
+    await E.p.click('[data-action="toggleex"][data-id="rec:r20"]'); await E.p.waitForTimeout(100);
+    var lis=await E.p.evaluate(function(){ return document.querySelector('[data-action="addmeal"][data-id="r20"]').closest('.libitem').querySelectorAll('li').length; });
+    assert.ok(lis>0,'an open card has no ingredients');
+    ok('an opened card shows its ingredients');
+    await settle(E.p);
+    assert.deepStrictEqual(E.errs,[]);
+    await E.ctx.close();
+  }catch(e){ bad('a tap draws only what is shown',e); }
+  try{
+    var E=await open('2026-10-02T12:00:00Z',docWith());
+    // Today draws Today: not the Progress tab's data card behind it.
+    var reads=await E.p.evaluate(function(){ var n=0, g=Storage.prototype.getItem;
+      Storage.prototype.getItem=function(k){ if(k==='fc.backup') n++; return g.apply(this,arguments); };
+      try{ document.querySelector('[data-action="tab"][data-tab="today"]').click();
+        document.querySelector('[data-action="water"][data-d="1"]').click(); }
+      finally{ Storage.prototype.getItem=g; }
+      return {n:n}; });
+    assert.strictEqual(reads.n,0,'a tap on Today built the Progress tab ('+reads.n+' reads of the backup)');
+    ok('a tap on Today builds only Today');
+    await settle(E.p);
+    assert.deepStrictEqual(E.errs,[]);
+    await E.ctx.close();
+  }catch(e){ bad('a tap on Today builds only Today',e); }
+
   clearTimeout(watchdog);
   await b.close();
   console.log(fails?'\nFAILING\n':'\nAll add-to-plan checks pass.\n');

@@ -362,10 +362,13 @@ srv.listen(0,async function(){
     assert.ok(id,'no recipe offers an Add to plan button');
     // Plan it on the third day, so the chosen day has to survive too rather
     // than being right by accident.
+    // A box gets the rest of the week as it is reached, as by a finger or Tab.
+    await p.focus('[data-action="planday"][data-id="'+id+'"]');
     var wanted=await p.evaluate(function(i){
       var sel=document.querySelector('[data-action="planday"][data-id="'+i+'"]');
       return sel.options[2].value; }, id);
     await p.selectOption('[data-action="planday"][data-id="'+id+'"]', wanted);
+    await p.focus('[data-action="planslot"][data-id="'+id+'"]');
     await p.selectOption('[data-action="planslot"][data-id="'+id+'"]', 'lunch');
     await p.click('[data-action="addmeal"][data-id="'+id+'"]');
     await p.waitForTimeout(1800);
