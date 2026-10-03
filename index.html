@@ -883,7 +883,12 @@ var PREP_RECIPES=[
 // here, and on what the store or an import hands over (dbBoot, applyImport),
 // which replace state wholesale: run only here, a store never got a new prep
 // recipe or the metadata. Answers whether it changed anything.
-function topUpRecipes(){
+// stored: what is topped up came from a store or an export, not the seed.
+// Every store was seeded holding PREP_FIRST, and deletedRecipes is younger
+// than the store, so one of those missing there was deleted: only a prep
+// recipe added since is put in.
+var PREP_FIRST=['p1','p2','p3','p4','p5','p6','p7','p8'];
+function topUpRecipes(stored){
   var changed=false;
   if(!state.recipes) state.recipes=[];
   if(!state.deletedRecipes) state.deletedRecipes=[];
@@ -897,6 +902,7 @@ function topUpRecipes(){
   // not put back: without that a saved page reloaded with the recipe returned.
   var have={}; state.recipes.forEach(function(r){ have[r.id]=true; });
   state.deletedRecipes.forEach(function(id){ have[id]=true; });
+  if(stored) PREP_FIRST.forEach(function(id){ have[id]=true; });
   PREP_RECIPES.forEach(function(p){
     if(have[p.id]) return;
     var c=JSON.parse(JSON.stringify(p));
@@ -1755,8 +1761,9 @@ function MemoryStore(init){
    logged in the first. The seeding view holds a lease (acquire) on
    DB_SEED_LOCK, renewed while it works; any other waits for the marker,
    trying for the lease as it goes, so one left by a view that closed is
-   taken over once it runs out. A store with no leases has the marker looked
-   for before each batch instead. */
+   taken over once it runs out. The marker is looked for before each batch
+   too, and a store with no leases has each document read just before it is
+   written, so one another view has put there is left as it is. */
 var DB_SEED_BATCH=8, DB_SEED_LOCK='state/seeding', DB_SEED_TTL=10000, DB_SEED_POLL=1000, dbSeeding=null;
 function dbSeedStart(){
   var snap=dbSnapshot(dbDocs(state));
@@ -1770,15 +1777,16 @@ function seedQuiet(me){
   if(me.wait){ clearTimeout(me.wait); me.wait=null; }
 }
 function seedStep(me){
-  me.wait=null;
+  me.wait=null; me.until=0; me.ver=null;
   if(dbSeeding!==me||dbState!=='db') return;
   dbStore.get('state/meta').then(function(meta){
     if(dbSeeding!==me) return;
     if(meta) return seedDone(me,meta);
     if(!dbStore.acquire) return seedWrite(me,false);
+    var sent=Date.now();
     return seedLease(me).then(function(r){
       if(dbSeeding!==me) return;
-      if(r&&r.acquired) return seedWrite(me,true);
+      if(r&&r.acquired){ me.lost=false; me.ver=r.version; me.sent=sent; me.until=sent+DB_SEED_TTL; return seedWrite(me,true); }
       // Another view is seeding: its marker is looked for again shortly.
       me.wait=setTimeout(function(){ seedStep(me); },DB_SEED_POLL);
     },function(e){
@@ -1796,18 +1804,19 @@ function seedFail(me,e){
   me.wait=setTimeout(function(){ seedStep(me); },Math.min(30000,2000*Math.pow(2,me.attempt++))+Math.random()*500);
 }
 function seedWrite(me,lease){
-  if(lease&&!me.renew) me.renew=setInterval(function(){
-    seedLease(me).then(function(r){ if(r&&!r.acquired) me.lost=true; },function(){}); },DB_SEED_TTL/3);
+  if(lease&&!me.renew) me.renew=setInterval(function(){ var sent=Date.now();
+    seedLease(me).then(function(r){ seedHeld(me,r,sent); },function(){}); },DB_SEED_TTL/3);
   return dbStore.readAll().then(function(have){
     if(dbSeeding!==me) return;
     // What a seed cut off before put there is the seed already.
     var todo=Object.keys(me.snap).filter(function(p){ return have[p]===undefined&&!me.done[p]&&!me.refused[p]; });
-    if(lease) return seedPool(me,todo);
+    // The marker is looked for before each batch, lease or not: a view whose
+    // lease ran out while it was hidden may find another has seeded since.
     function batch(i){
-      if(i>=todo.length||me.err) return;
+      if(i>=todo.length||me.err||seedGone(me)||dbSeeding!==me) return;
       return dbStore.get('state/meta').then(function(meta){
         if(meta){ me.meta=meta; return; }
-        return seedPool(me,todo.slice(i,i+DB_SEED_BATCH)).then(function(){ return batch(i+DB_SEED_BATCH); });
+        return seedPool(me,todo.slice(i,i+DB_SEED_BATCH),!lease).then(function(){ return batch(i+DB_SEED_BATCH); });
       });
     }
     return batch(0);
@@ -1816,8 +1825,11 @@ function seedWrite(me,lease){
     if(me.meta) return seedDone(me,me.meta);
     if(me.err){ var e=me.err; me.err=null; throw e; }
     // Taken over by a view that found this one's lease run out: it seeds.
-    if(me.lost){ me.lost=false; seedQuiet(me); return seedStep(me); }
-    var meta={seeded:true, seededAt:new Date().toISOString(), docs:Object.keys(me.snap).length};
+    if(seedGone(me)){ me.lost=false; seedQuiet(me); return seedStep(me); }
+    // Which documents this seed is, so a view on another build that waited
+    // for it does not take one of its own the store lacks as deleted.
+    var meta={seeded:true, seededAt:new Date().toISOString(), docs:Object.keys(me.snap).length,
+      paths:Object.keys(me.snap).filter(function(p){ return !me.refused[p]; })};
     return dbStore.put('state/meta',meta).then(function(){
       // Let go of the lease soon, as there is no verb to release it.
       if(lease) seedLease(me,1000).then(null,function(){});
@@ -1825,16 +1837,32 @@ function seedWrite(me,lease){
     });
   });
 }
+/* The lease is this view's only while each renewal follows on from the last:
+   answered before the one held ran out, with no grant to another view in
+   between (each grant moves the version on). Timers stop while a page is
+   hidden or suspended, so the lease can run out, another view seed and log
+   in the gap, and the next renewal still be granted. Lost, the store is
+   looked at again before anything more is written. */
+function seedHeld(me,r,sent){
+  if(dbSeeding!==me||me.lost||sent<me.sent) return;
+  if(!r||!r.acquired||seedGone(me)||(me.ver!=null&&r.version!=null&&r.version>me.ver+1)){ me.lost=true; return; }
+  me.ver=r.version; me.sent=sent; me.until=sent+DB_SEED_TTL;
+}
+function seedGone(me){ if(me.until&&Date.now()>me.until) me.lost=true; return me.lost; }
 /* DB_SEED_BATCH writes out at once, the next going as each lands, never a
    burst of the lot: that is the shape the store calls resource_exhausted. A
    refusal retrying cannot fix is left for the first save to name. */
-function seedPool(me,list){
+function seedPool(me,list,look){
   var i=0, out=0;
   return new Promise(function(resolve){
     function next(){
-      if(dbSeeding!==me||me.lost||me.err||i>=list.length){ if(!out) resolve(); return; }
+      if(dbSeeding!==me||seedGone(me)||me.err||i>=list.length){ if(!out) resolve(); return; }
       var path=list[i++]; out++;
-      dbStore.put(path,JSON.parse(me.snap[path])).then(function(){ me.done[path]=1; },function(e){
+      // With no lease, another view may be seeding or logging as this one
+      // writes: a document that is there now is left as it is.
+      (look?dbStore.get(path):Promise.resolve()).then(function(v){
+        if(v===undefined) return dbStore.put(path,JSON.parse(me.snap[path]));
+      }).then(function(){ me.done[path]=1; },function(e){
         var code=(e&&e.code)||'unavailable';
         if(DB_HARD[code]) me.refused[path]=code; else if(!me.err) me.err={code:code};
       }).then(function(){ out--; next(); });
@@ -1845,13 +1873,17 @@ function seedPool(me,list){
 /* The store holds the seed now, written by this view or another. That is
    what this view last heard from it, and the whole store is read and merged
    against it, so what was tapped here meanwhile is saved and what was logged
-   in another view comes in. */
+   in another view comes in. A document of this view's seed that the other
+   view's seed did not have (another build, say, with a prep recipe this one
+   lacks) was never in the store, so it is saved, not read as deleted there.
+   A marker from before the list was kept is taken to have had them all. */
 function seedDone(me,meta){
   seedQuiet(me);
   if(dbSeeding!==me) return;
   dbSeeding=null; dbMeta=meta;
   lastSaved={}; savedGen={};
-  Object.keys(me.snap).forEach(function(p){ if(!me.refused[p]) lastSaved[p]=me.snap[p]; });
+  var had=null; if(meta&&Array.isArray(meta.paths)){ had={}; meta.paths.forEach(function(p){ had[p]=1; }); }
+  Object.keys(me.snap).forEach(function(p){ if(!me.refused[p]&&(!had||had[p]||me.done[p])) lastSaved[p]=me.snap[p]; });
   if(saveNow==='flush') saveNow=false;
   setSaving(false); saveSync=true; dbSave();
 }
@@ -1911,7 +1943,7 @@ function dbBoot(){
         // Both write, so either one changing anything has to be saved.
         var moved=migratePlan(); if(prunePlan()) moved=true;
         if(migrateMinutes()) moved=true;
-        if(topUpRecipes()) moved=true;
+        if(topUpRecipes(true)) moved=true;
         // A change a closed view sent beside a document is folded in above
         // and goes into the document itself now.
         if(Object.keys(pendSeen).length) moved=true;
@@ -2914,7 +2946,8 @@ function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} 
 function hasPending(){ try{ return localStorage.getItem(PENDING_KEY)!==null; }catch(e){ return false; } }
 function importUnfinished(){ return importBusy||importStuck||hasPending(); }
 function metaPut(importing){
-  var m={}; Object.keys(dbMeta||{seeded:true}).forEach(function(k){ if(k!=='importing') m[k]=(dbMeta||{seeded:true})[k]; });
+  // The seed's list of documents is only for views waiting on it (seedDone).
+  var m={}; Object.keys(dbMeta||{seeded:true}).forEach(function(k){ if(k!=='importing'&&k!=='paths') m[k]=(dbMeta||{seeded:true})[k]; });
   if(importing) m.importing=pendAt||true;
   return dbStore.put('state/meta',m).then(function(){ dbMeta=m; });
 }
@@ -2989,7 +3022,7 @@ function applyImport(st,mode){
   if(was && was!==now) ended=ended.concat([was]);
   state.endedSessions=ended.filter(function(x){ return x!==now; }).slice(-SESS_ENDED_KEEP);
   // A file in an older shape is converted now, as dbBoot does a store.
-  migratePlan(); prunePlan(); migrateMinutes(); topUpRecipes();
+  migratePlan(); prunePlan(); migrateMinutes(); topUpRecipes(true);
   ensurePrep(state.activeSession); viewingSession=false; addingExercise=false;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
   saveNow=dbState==='db'?(mode==='merge'?'put':'replace'):false;

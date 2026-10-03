@@ -21,6 +21,9 @@ var failNext=[], setDelays=[];
 // ttlMs clamped to [1000, 600000], 30000 when absent. setMs: how long a set
 // takes to answer. A page with __NO_LEASE set has a db with no acquire at all.
 var leases={}, setMs=12, leaseCalls=0;
+// onReq(op, path): told of every store request once it has been answered, so
+// a check can write as another view would, just after this one has looked.
+var onReq=null;
 // failAll: every store request of those ops (all of them when ops is unset) is
 // refused with that code until it is cleared, as a store that has gone away is.
 var failAll=null;
@@ -124,6 +127,7 @@ var srv=http.createServer(function(q,r){
       var raw=Buffer.concat(c).toString();
       if(q.url==='/publish'){ calls.publish++; doc=raw; return r.end('ok'); }
       var body=JSON.parse(raw||'{}'), op=q.url.slice(4);
+      if(onReq) r.on('finish',function(){ if(onReq) onReq(op,body.path); });
       if(failAll && op!=='slow' && (!failAll.ops||failAll.ops.indexOf(op)>-1)){
         if(op==='set'||op==='update') calls.set++; return srvJson(r,{err:failAll.code}); }
       var f=take(failNext,op,body.path);
@@ -2814,7 +2818,7 @@ srv.listen(0,async function(){
     Object.keys(store).forEach(function(k){ delete store[k]; }); leases={};
     if(seed) doc=env.withSeed(doc,seed);
     try{ await fn(); }
-    finally{ setMs=12; setDelays.length=0; doc=docWas; leases={};
+    finally{ setMs=12; setDelays.length=0; doc=docWas; leases={}; onReq=null;
       Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); }
   };
   var until=async function(fn,ms,what){ var t0=Date.now();
@@ -2925,19 +2929,125 @@ srv.listen(0,async function(){
     },w.st);
   });
 
+  // Every document a first run on this document writes, as one view seeds them.
+  var seededOnce=null;
+  var fullSeed=async function(){
+    if(!seededOnce) await emptyStore(async function(){
+      var q=await fresh();
+      try{ await until(function(){ return !!store['state/meta']; },20000,'a seed'); await q.waitForTimeout(1000);
+        seededOnce=JSON.parse(JSON.stringify(store)); delete seededOnce['state/meta']; }
+      finally { await q.context().close(); }
+    });
+    return JSON.parse(JSON.stringify(seededOnce));
+  };
+  // What another view writes over the rest of the seed: each document marked,
+  // so one this view then writes over shows.
+  var othersWrite=function(all){ var mine=[];
+    Object.keys(all).forEach(function(k){ if(!store[k]){ store[k]=Object.assign({},all[k],{other:true}); mine.push(k); } });
+    return mine; };
+  var overwritten=function(mine){ return mine.filter(function(k){ return !store[k]||!store[k].other; }); };
+
+  // A phone's timers stop while it is suspended, so its lease runs out; the
+  // tablet seeds the rest and logs on it, and lets its own lease go. The
+  // phone's next renewal is then granted, and it went on through the list it
+  // had read before, writing the seed over what the tablet had done.
+  await t('a view suspended while seeding does not write the seed over what another view did meanwhile', async function(){
+    var all=await fullSeed();
+    await emptyStore(async function(){
+      setMs=2500;
+      var q=await fresh(), cdp=await q.context().newCDPSession(q);
+      try{
+        await until(function(){ return seedDocs()>=8; },20000,'the first writes');
+        await cdp.send('Page.setWebLifecycleState',{state:'frozen'});
+        await new Promise(function(r){ setTimeout(r,12000); });
+        var l=leases['state/seeding'];
+        assert.ok(l&&l.holder!=='tablet','this view never held the lease');
+        leases['state/seeding']={holder:'tablet', exp:Date.now()-1, version:l.version+3};
+        var mine=othersWrite(all); store['state/meta']={seeded:true, by:'tablet'};
+        assert.ok(mine.length>8,'the seed was all but done before the view was suspended, so this proves nothing');
+        setMs=12;
+        await cdp.send('Page.setWebLifecycleState',{state:'active'});
+        await q.waitForTimeout(5000);
+        assert.strictEqual(store['state/meta'].by,'tablet','the view wrote its marker over the one that seeded');
+        var lost=overwritten(mine);
+        assert.deepStrictEqual(lost,[],lost.length+' documents the other view wrote were written over, '+lost.slice(0,3).join(', '));
+      } finally { await q.context().close(); }
+    });
+  });
+
+  await t('with no leases, a document another view writes just after the marker is looked for is not written over', async function(){
+    var all=await fullSeed();
+    await emptyStore(async function(){
+      var read=false, mine=null;
+      // Just after this view's first look for the marker since reading the store.
+      onReq=function(op,path){
+        if(op==='coll') read=true;
+        if(read&&!mine&&op==='get'&&path==='state/meta'){ mine=othersWrite(all); store['state/meta']={seeded:true, by:'another view'}; }
+      };
+      var q=await fresh('window.__NO_LEASE=true;');
+      try{
+        await until(function(){ return !!mine; },15000,'the look for the marker');
+        await q.waitForTimeout(3000);
+        assert.ok(mine.length>8,'only '+mine.length+' documents were left to write');
+        assert.strictEqual(store['state/meta'].by,'another view','this view wrote its marker over another\'s');
+        var lost=overwritten(mine);
+        assert.deepStrictEqual(lost,[],lost.length+' documents the other view wrote were written over, '+lost.slice(0,3).join(', '));
+      } finally { await q.context().close(); }
+    });
+  });
+
+  // The other view's build lacks p8: its seed has none, and this view, on a
+  // build that has it, took that as p8 deleted and dropped it.
+  await t('a view that waited on a seed from a build without one of its recipes saves that recipe', async function(){
+    var all=await fullSeed();
+    assert.ok(all['recipes/p8'],'the seed has no p8 to leave out');
+    await emptyStore(async function(){
+      leases['state/seeding']={holder:'another view', exp:Date.now()+60000, version:1};
+      var q=await fresh();
+      try{
+        await q.waitForTimeout(1500);
+        assert.ok(!store['state/meta'],'the view did not wait');
+        delete all['recipes/p8']; Object.assign(store,all);
+        store['state/meta']={seeded:true, docs:Object.keys(all).length, paths:Object.keys(all)};
+        await until(function(){ return !!store['recipes/p8']; },8000,'the recipe this build has to be saved');
+        await q.click('[data-action="tab"][data-tab="meals"]'); await q.waitForTimeout(300);
+        assert.ok(/Egg & veg muffin cups/.test(await q.evaluate(function(){ return document.body.innerText; })),'the view no longer shows the recipe');
+      } finally { await q.context().close(); }
+    });
+  });
+
   console.log('\nWHAT A LOAD FROM THE STORE PUTS RIGHT');
-  await t('a built-in prep recipe the store lacks is added, and one deleted stays deleted', async function(){
-    await go(); var was=JSON.parse(JSON.stringify(store));
+  // Every store was seeded holding p1..p8, and deletedRecipes came later,
+  // so one of those missing from a store was deleted there, even with no
+  // deletedRecipes to say so. Only a prep recipe added since (p9 here) is put in.
+  await t('a built-in prep recipe the store lacks stays deleted, a newer one is added, and old metadata is attached', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store)), docWas=doc;
     try{
+      doc=doc.replace("{id:'p8',title:","{id:'p9',title:'Test pot',tag:'Meal prep',prep:true,base:2,macros:[1,1,1,1],ingredients:['Rice (100g)'],instructions:'Boil it.'},\n {id:'p8',title:");
+      assert.notStrictEqual(doc,docWas,'no p8 in the document to put p9 beside');
       delete store['recipes/p8']; delete store['recipes/p7'];
       store['state/profile']=Object.assign({},store['state/profile'],{deletedRecipes:['p7']});
       // A built-in recipe as an older version stored it, with no portions or macros.
       var r1=JSON.parse(JSON.stringify(env.seedOf(doc).recipes.filter(function(r){ return r.id==='r1'; })[0]));
       delete r1.base; delete r1.macros; delete r1.portions; store['recipes/r1']=r1;
       await go(); await p.waitForTimeout(1500);
-      assert.ok(store['recipes/p8'],'the missing prep recipe was not added');
+      assert.ok(!store['recipes/p8'],'a prep recipe deleted before deletedRecipes was kept came back');
       assert.ok(!store['recipes/p7'],'a deleted built-in recipe came back');
+      assert.ok(store['recipes/p9'],'a prep recipe newer than the store was not added');
       assert.ok(store['recipes/r1'].base && store['recipes/r1'].macros,'the recipe\'s metadata was not attached');
+    } finally { doc=docWas; Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); await go(); }
+  });
+
+  await t('replacing everything with an older export that lacks a prep recipe does not bring it back', async function(){
+    await go(); var was=JSON.parse(JSON.stringify(store));
+    try{
+      await pane('export'); var a=JSON.parse(await p.inputValue('#export-json'));
+      a.recipes=a.recipes.filter(function(r){ return r.id!=='p3'; }); delete a.deletedRecipes;
+      await importing(JSON.stringify(a));
+      await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
+      assert.ok(!store['recipes/p3'],'the import brought back a prep recipe the export did not have');
+      await go(); await p.waitForTimeout(800);
+      assert.ok(!store['recipes/p3'],'the next load brought it back');
     } finally { Object.keys(store).forEach(function(k){ delete store[k]; }); Object.assign(store,was); await go(); }
   });
 

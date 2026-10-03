@@ -296,7 +296,7 @@ version is published.
 | `state/profile` | XP, `waterTarget`, `weekTarget`, `deletedRecipes` |
 | `state/shopping` | `shoppingChecked` (ticked rows) and `shopExtras` |
 | `state/session` | `active`, the session in flight or null, and `ended`, the ids of the last twenty ended sessions |
-| `state/meta` | the seeded marker, and `importing` while an import is unfinished |
+| `state/meta` | the seeded marker (with `paths`, the documents its seed had), and `importing` while an import is unfinished |
 | `state/seeding` | only the lease the view seeding a fresh store holds; never read as data |
 | `days/<YYYY-MM-DD>` | one day |
 | `workoutLogs/<id>` | one finished session and its sets |
@@ -339,11 +339,22 @@ what another view logged comes in. A year of data had kept the page on
 lets it go once the marker is written. Any other view opened meanwhile waits
 for the marker, trying for the lease each second, so the lease of a view that
 closed part way is taken over when it runs out. Two seeding at once had the
-later one's whole documents land over what was logged in the first. A db
-with no `acquire` (and `MemoryStore`) has the marker looked for before each
-batch instead. A seed picks up where one cut off left it: documents already
-in the store are not written again. Writes go eight at a time, the next as
-each lands. A refusal retrying cannot fix leaves that document for the first
+later one's whole documents land over what was logged in the first. The
+lease counts as held only while each renewal answers before the last one ran
+out and the version moves on by one (no grant to another view between): a
+phone suspended mid-seed has its timers stopped, and its lease can lapse,
+another view seed and log, and its next renewal still be granted. Lost, it
+writes nothing more and looks at the store again. The marker is looked for
+before each batch of eight as well, lease or not. A db with no `acquire`
+(and `MemoryStore`), or one that refuses it, also reads each document just
+before writing it and leaves one that is there: without a create-if-absent
+write that narrows, and cannot close, the gap in which another view's tap is
+written over. A seed picks up where one cut off left it: documents already
+in the store are not written again. The marker lists the documents its seed
+had (`paths`), and a view that waited on it takes as written only those and
+its own: one its build has and the other's did not (a newer prep recipe) is
+then saved, not read as deleted. A marker without the list is taken to have
+had them all. A refusal retrying cannot fix leaves that document for the first
 save to name; a transient one is retried with the save backoff; one in
 `DB_LOST` pauses the view. A page closed before the marker lands loses what
 was tapped on it, since nothing can be written before.
@@ -352,7 +363,9 @@ What a load from the store hands over goes through the same top-ups as the
 seed: `topUpRecipes` attaches `RECIPE_META` to a recipe without a base and
 adds any built-in prep recipe that is neither there nor in `deletedRecipes`,
 on the seed, on a load (beside `migratePlan`, `prunePlan` and
-`migrateMinutes`) and on an import. Notes and recipes are put in the order
+`migrateMinutes`) and on an import. On a load or an import the first eight
+(`PREP_FIRST`, p1..p8) are never added: every store was seeded with them and
+`deletedRecipes` is younger than the store, so one missing there was deleted. Notes and recipes are put in the order
 they were made (`byListId`): the built-in ids by number (r1..r37, then p1..p8,
 t1), then any other id, then those added here, whose ids carry the time they
 were made. The store hands a collection back in id order (r1, r10, r11 ...),
