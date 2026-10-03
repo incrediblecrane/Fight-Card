@@ -24,7 +24,7 @@ function grabVar(decl){
   return m[0];
 }
 
-var src=[grabVar('IMPLIED_ONE'), grabVar('UNIT_SCALE'), grabVar('COUNT_UNIT'), grabVar('SLOTS'),
+var src=[grabVar('IMPLIED_ONE'), grabVar('UNIT_SCALE'), grabVar('ING_TAIL'), grabVar('COUNT_UNIT'), grabVar('SLOTS'),
   grab('parseIng'), grab('canonUnit'), grab('canonQty'), grab('unitRank'),
   grab('roundQty'), grab('buyQty'), grab('fmtQty'), grab('qtyText'), grab('scaledIng'),
   grab('recipeIngs'), grab('recipeBase'), grab('recipePortions'),
@@ -301,10 +301,10 @@ t('a counting noun stays on the row, so celery is sticks and not heads', functio
 
 console.log('\nREADING WHAT PEOPLE TYPE');
 
-// The add-recipe box says "Name (quantity unit)", so anything a person might
+// The add-recipe box suggests "Name (quantity unit)" or "2 onions", so anything a person might
 // type there has to come back out meaning the same thing.
 function pi(txt){ var g=sandbox({recipes:[], plan:[], shopExtras:[]}).parseIng(txt);
-  return {q:g.q, qMax:g.qMax, u:g.u, d:g.d, size:g.size, pre:g.pre}; }
+  return {n:g.n, q:g.q, qMax:g.qMax, u:g.u, d:g.d, size:g.size, pre:g.pre}; }
 function sc(txt,f){ var b=sandbox({recipes:[], plan:[], shopExtras:[]}); return b.scaledIng(b.parseIng(txt),f); }
 
 t('a unit is a whole word, so "large" is not litres and "grams" is grams', function(){
@@ -323,7 +323,7 @@ t('a range keeps both ends on the card and buys the top end', function(){
   assert.strictEqual(sc('Sausages (4-6)',1),'Sausages (4-6)');
   assert.strictEqual(sc('Sausages (4-6)',2),'Sausages (8-12)');
   assert.strictEqual(sc('Bread (2-3 slices)',1),'Bread (2-3 slices)');
-  assert.strictEqual(sc('Bread (2-3 slices)',0.5),'Bread (1-2 slices)');
+  assert.strictEqual(sc('Bread (2-3 slices)',0.5),'Bread (1-1.5 slices)');
   assert.strictEqual(sc('Parsley (1-2 bunches)',0.5),'Parsley (0.5-1 bunch)');
   assert.strictEqual(sc('Chicken breast (2-3, sliced)',1),'Chicken breast (2-3, sliced)');
   var st={recipes:[{id:'a',title:'A',base:2,ingredients:['Sausages (4-6)']}], plan:[], shopExtras:[]};
@@ -357,8 +357,9 @@ t('a bunch is a unit, and more than one is bunches', function(){
 
 t('a small amount never rounds to nothing', function(){
   var box=sandbox({recipes:[], plan:[], shopExtras:[]});
-  assert.strictEqual(box.qtyText(0.125,'tsp'),'0.5 tsp');
-  assert.strictEqual(box.qtyText(0.2,'tbsp',true),'0.5 tbsp');
+  assert.strictEqual(box.qtyText(0.125,'tsp'),'0.125 tsp');
+  assert.strictEqual(box.qtyText(0.01,'tsp'),'0.125 tsp');
+  assert.strictEqual(box.qtyText(0.2,'tbsp',true),'0.25 tbsp');
   assert.strictEqual(box.qtyText(0.04,'g',true),'0.1g');
   assert.strictEqual(box.qtyText(0.04,'ml'),'0.1ml');
 });
@@ -404,6 +405,8 @@ t('the bracket and fractions are read as the old patterns read them', function()
   for(var k=0;k<20000;k++){
     var txt='', n=rnd(14); for(var q=0;q<n;q++) txt+=A.charAt(rnd(A.length));
     var g=box.parseIng(txt), want=old(txt);
+    // An amount typed first ("1 a") is read as one, and checked below.
+    if(g.lead!==undefined){ assert.strictEqual(g.lead.replace(/^of\s+/i,'').indexOf(g.n),0,'name of '+JSON.stringify(txt)); continue; }
     assert.strictEqual(g.n,want[0],'name of '+JSON.stringify(txt));
     if(want[1]===null) assert.strictEqual(g.q,null,'quantity of '+JSON.stringify(txt));
     // What is left of the bracket once the amount is read, or all of it.
@@ -518,12 +521,78 @@ t('packs of different sizes stay apart on the list row', function(){
   assert.deepStrictEqual(listOf(['Tomatoes (2 x 400g tins)','Tomatoes (2 x 400g tins)'],2),['Tomatoes (8 x 400g tins)']);
 });
 
+t('an amount typed first is read, and pints, cups and packs keep their unit', function(){
+  // Typed the natural way, these were names with no amount: the list bought
+  // none of them, and "2 pints" lost its unit.
+  var st={recipes:[{id:'a',title:'A',base:2,ingredients:['500g beef mince','2 onions','Milk (1 pint)','Flour (1 1/2 cups)','1 bag of spinach','7up','2cm ginger']}], plan:[], shopExtras:[]};
+  var box=sandbox(st), d=box.planDates();
+  st.plan.push({id:'x', recipeId:'a', date:d[0], slot:'dinner', portions:4});
+  st.plan.push({id:'y', recipeId:'a', date:d[1], slot:'dinner', portions:4});
+  assert.deepStrictEqual(box.shoppingList().map(function(o){ return o.label; }),
+    ['2cm ginger','7up','Beef mince (2kg)','Flour (6 cups)','Milk (4 pints)','Onions (8)','Spinach (4 bags)']);
+  var g=pi('1 tin of chickpeas'); assert.deepStrictEqual([g.n,g.q,g.u],['chickpeas',1,'tin'], JSON.stringify(g));
+  g=pi('2 x 400g tins chopped tomatoes'); assert.deepStrictEqual([g.n,g.q,g.u,g.size],['chopped tomatoes',2,'tins','400g'], JSON.stringify(g));
+  // A carton is a pack like a tin, and "1,000ml" is the same size as "1l".
+  assert.deepStrictEqual(listOf(['Juice (2 x 1,000ml cartons)','Juice (1 x 1l carton)']),['Juice (3 x 1,000ml cartons)']);
+  g=pi('Rice (2 packs, cooked)'); assert.deepStrictEqual([g.q,g.u,g.d],[2,'packs','cooked'], JSON.stringify(g));
+  // The card keeps the amount first, as typed.
+  assert.strictEqual(sc('500g beef mince',2),'1kg beef mince');
+  assert.strictEqual(sc('2 x 400g tins chopped tomatoes',2),'4 x 400g tins chopped tomatoes');
+  assert.strictEqual(sc('about 200g rice',2),'about 400g rice');
+  assert.strictEqual(sc('1 tin of chickpeas',3),'3 tins of chickpeas');
+  // "Name (amount)" still wins, and a name that only starts with a digit stays whole.
+  assert.strictEqual(pi('00 flour (500g)').n,'00 flour');
+  assert.strictEqual(pi('7up').q,null);
+});
+
+t('a card in kg or l agrees with the list once its portions change', function(){
+  assert.strictEqual(sc('Sweet potato (1.2kg)',0.2),'Sweet potato (240g)');
+  assert.deepStrictEqual(listOf(['Sweet potato (1.2kg)'],1,5),['Sweet potato (240g)']);
+});
+
+t('spoons scale in quarters and eighths, and counts in halves on the card', function(){
+  assert.strictEqual(sc('Salt (1/4 tsp)',2),'Salt (0.5 tsp)');
+  assert.strictEqual(sc('Salt (1/8 tsp)',2),'Salt (0.25 tsp)');
+  assert.strictEqual(sc('Salt (1/4 tsp)',0.5),'Salt (0.125 tsp)');
+  assert.strictEqual(sc('Cumin (3/4 tsp)',1),'Cumin (3/4 tsp)');
+  assert.strictEqual(sc('Cumin (3/4 tsp)',1.5),'Cumin (1.25 tsp)');
+  assert.strictEqual(sc('Chopped tomatoes (3 tins)',0.5),'Chopped tomatoes (1.5 tins)');
+  // The list still buys whole tins.
+  assert.deepStrictEqual(listOf(['Chopped tomatoes (3 tins)'],1,2),['Chopped tomatoes (2 tins)']);
+});
+
+t('"Cheddar cheese, grated" is cheddar on the list, and "Carrot, parsnip, potato" is not carrot', function(){
+  assert.deepStrictEqual(listOf(['Cheddar cheese, grated (40g)','Cheddar cheese (80g)']),['Cheddar cheese (120g)']);
+  assert.deepStrictEqual(listOf(['Potatoes, for mash','Potatoes (2, diced)']),['Potatoes (2)']);
+  assert.deepStrictEqual(listOf(['Carrot, parsnip, potato','Carrot (2)']),['Carrot (2)','Carrot, parsnip, potato']);
+  // The tick key is the first spelling's, as it always was.
+  var st={recipes:[{id:'a',title:'A',base:1,ingredients:['Cheddar cheese, grated (40g)','Cheddar cheese (80g)']}], plan:[], shopExtras:[]};
+  var box=sandbox(st); st.plan.push({id:'x', recipeId:'a', date:box.planDates()[0], slot:'dinner', portions:1});
+  assert.deepStrictEqual(box.shoppingList().map(function(o){ return o.key; }),['i|cheddar cheese, grated']);
+  // Every seed recipe planned at once: each of these is one row.
+  st={recipes:ALL, plan:[], shopExtras:[]}; box=sandbox(st);
+  ALL.forEach(function(r,i){ st.plan.push({id:'p'+i, recipeId:r.id, date:box.planDates()[0], slot:'dinner', portions:r.base||1}); });
+  var labels=box.shoppingList().map(function(o){ return o.label; });
+  ['Carrot','Potatoes','Spring onion','Honey','Protein powder'].forEach(function(n){
+    var rows=labels.filter(function(l){ return l===n || l.indexOf(n+' (')===0 || l.indexOf(n+',')===0; })
+      .filter(function(l){ return l!=='Carrot, parsnip, potato'; });
+    assert.strictEqual(rows.length,1,n+' is on '+rows.length+' rows: '+rows.join(' | '));
+  });
+  assert.ok(labels.indexOf('Carrot, parsnip, potato')>-1, labels.join(' | '));
+});
+
+t('Chilli and Chillies, Berry and Berries are one row each', function(){
+  assert.deepStrictEqual(listOf(['Red chillies (2)','Red chilli (1)']),['Red chillies (3)']);
+  assert.deepStrictEqual(listOf(['Blueberry (50g)','Blueberries (100g)']),['Blueberry (150g)']);
+});
+
 // Every line the app ships, scaled, has to read back as the amount it shows,
 // or a card copied into a new recipe quietly changes the recipe.
 t('every seed ingredient, scaled, reads back as the same amount and unit', function(){
   var box=sandbox({recipes:[], plan:[], shopExtras:[]}), bad=[], n=0;
   var extra=['Sugar (1-1/2 tsp)','Eggs (2–3)','Chicken (500g-1kg)','Chicken (1.5 kgs)','Spinach (1 large handful)',
-    'Chopped tomatoes (2 x 400g tins)','Milk (1,5 l)','Water (1,000ml)','Water (1,000-1,500ml)','Rice (1 1/2 mugs)','Ginger (2cm piece)','Rice (about 200g)'];
+    'Chopped tomatoes (2 x 400g tins)','Milk (1,5 l)','Water (1,000ml)','Water (1,000-1,500ml)','Rice (1 1/2 mugs)','Ginger (2cm piece)','Rice (about 200g)',
+    '500g beef mince','2 onions','1 tin of chickpeas','2 x 400g tins chopped tomatoes','Milk (1 pint)','1 1/2 cups flour','Salt (1/8 tsp)','Cumin (3/4 tsp)'];
   var lines=[]; SEED.recipes.forEach(function(r){ lines=lines.concat(r.ingredients||[]); });
   lines.concat(extra).forEach(function(txt){
     var p=box.parseIng(txt); if(p.q===null) return;
@@ -535,10 +604,10 @@ t('every seed ingredient, scaled, reads back as the same amount and unit', funct
       if(b.n!==p.n || b.q===null || box.canonUnit(b.u)!==box.canonUnit(p.u)) return bad.push(say+JSON.stringify(b));
       [[b.qMax||b.q,(p.qMax||p.q)*f],[b.q,p.q*f]].forEach(function(x){
         var got=box.canonQty(x[0],b.u), exp=box.canonQty(x[1],p.u);
-        // What the card can show: a tenth of a gram, a tenth of a kilo, half a spoon or count.
-        var tol=/^(g|ml)$/.test(box.canonUnit(p.u))?(exp>=950?50:0.051):/^(tbsp|tsp)$/.test(p.u)?0.25:0.5;
+        // What the card can show: a tenth of a gram, a tenth of a kilo, an eighth to a quarter of a spoon below two, half a count.
+        var tol=/^(g|ml)$/.test(box.canonUnit(p.u))?(exp>=950?50:0.051):/^(tbsp|tsp)$/.test(p.u)?(exp<2?0.125:0.25):0.25;
         // and never less than the smallest amount it shows, so a pinch is not "0 tsp".
-        var least=/^(g|ml)$/.test(box.canonUnit(p.u))?0.1:0.5;
+        var least=/^(g|ml)$/.test(box.canonUnit(p.u))?0.1:/^(tbsp|tsp)$/.test(p.u)?0.125:0.5;
         if(Math.abs(got-Math.max(exp,least))>tol+1e-9) bad.push(say+'reads '+got+', wants '+exp);
       });
       if((b.size||'')!==(p.size||'') || (b.d||'')!==(p.d||'') || (b.pre||'')!==(p.pre||'')) bad.push(say+JSON.stringify(b));

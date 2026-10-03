@@ -195,7 +195,8 @@ many; its `mins` is their total.
 
 **Recipe**:
 A meal-prep card (`recipes/<id>`) with a base portion count and ingredients
-typed as "Name (quantity unit)". Built-in recipes deleted are listed in
+typed as "Name (quantity unit)" or amount first ("500g beef mince", "2
+onions"). Built-in recipes deleted are listed in
 `deletedRecipes` so they are not topped up again.
 
 **Ingredient**:
@@ -205,7 +206,13 @@ commas ("1,000ml" is a litre: unlike a logged weight, read as a decimal it
 would make the list short), ranges ("2-3", "2–3", "2 to 3", "500g-1kg",
 bought at the top end), plural abbreviations ("kgs", "tbsps"), "large
 handful", a pack size ("2 x 400g tins": unit `tins`, `size` "400g") and a
-leading "about" or "~" (kept as `pre`) are read. Only the amounts read are
+leading "about" or "~" (kept as `pre`) are read. Counting units include
+pint, cup, mug, bag, pack, packet, jar, bottle, carton, punnet and pot. A
+line with no bracket amount that starts with one ("500g beef mince", "1 tin
+of chickpeas") is read amount first, its name the words after the unit, and
+its card keeps the amount first (`lead`); "7up" and "2cm ginger" stay names.
+A scaled card shows spoons in eighths below a quarter and quarters below two
+("0.25 tsp"), and counts in halves; only the list rounds counts up. Only the amounts read are
 rewritten; any later number stays as typed. On the shopping list packs of
 different sizes, and a pack of no stated size, add up apart on the one row
 ("2 x 200g tins + 2 x 400g tins"). A scaled card line parses
@@ -233,7 +240,11 @@ One line of the shopping list, keyed so a tick survives a portion change.
 `i|<name>` is derived: every mention of an ingredient across the planned meals
 in view, at each meal's portions, added into one row. kg folds into g and l
 into ml; amounts that do not add (200g and a handful) share the row
-("Spinach (200g + 1 handful)"). Countable amounts (tins, cloves, onions)
+("Spinach (200g + 1 handful)"). Names are grouped with a known instruction
+after a comma dropped ("Cheddar cheese, grated", "Potatoes, for mash"; not
+"Carrot, parsnip, potato") and plurals folded ("Eggs", "Chillies",
+"Berries"); the row shows the first name without its instruction, and the
+key stays the first name as typed. Countable amounts (tins, cloves, onions)
 always round UP, since 0.4 of a tin cannot be bought and being short costs a
 trip; weights, volumes and spoons stay fractional.
 
