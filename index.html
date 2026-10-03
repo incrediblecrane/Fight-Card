@@ -5243,26 +5243,45 @@ function syncUi(){ writeUi(JSON.stringify(uiNow())); }
    in one place. "reverse fly" used to find nothing at all while "Reverse cable
    fly" was sitting in the list, because the two words are not next to each
    other in the name. Something you cannot find may as well not be there. */
+/* Hyphens, spaces and apostrophes are dropped on both sides, so "pushups",
+   "push ups" and "push-up" all find Push-up and "farmers" finds Farmer's carry.
+   A word has to start where the term starts (or hold it whole, from four
+   letters), so "rows" no longer lands on the throws and "abs" no longer finds
+   a cable fly or the jab drill. The id and a few everyday names count too:
+   rdl, ohp, swim, jump rope, the machines a gym actually has. */
+var PICK_ALIAS={dl_rdl:'rdl',press_ohp:'ohp military shoulder press',kb_tgu:'tgu',pushup:'press up',
+  swim_warmup:'swim pool',swim_drill:'swim pool',swim_main:'swim pool',swim_cooldown:'swim pool',
+  skipping:'jump rope',rowerg:'rower erg',briskwalkjog:'run walking',sprint:'run',
+  cardio_gym_warmup:'bike cycle treadmill rower run cardio',cardio_gym_intervals:'bike cycle treadmill rower run cardio',
+  cardio_gym_steady:'bike cycle treadmill rower run cardio',shadowbox:'boxing'};
+var PICK_SYN={ab:['core'],abs:['core'],crunch:['core'],situp:['core'],running:['run'],jogging:['run'],
+  jog:['run'],cycling:['cycle'],rowing:['rower'],yoga:['flexibility','mobility','stretch'],stretching:['stretch']};
+function pickWords(s){
+  var out=[];
+  String(s||'').toLowerCase().replace(/['’]/g,'').split(/[^a-z0-9-]+/).forEach(function(w){
+    if(!w) return; var whole=w.replace(/-/g,''); if(whole) out.push(whole);
+    if(w.indexOf('-')>-1) w.split('-').forEach(function(p){ if(p) out.push(p); });
+  });
+  return out;
+}
 function pickerMatches(q){
   var already=(state.activeSession&&state.activeSession.exIds)||[];
-  function has(e,term){
-    return e.name.toLowerCase().indexOf(term)>-1 ||
-           e.cat.toLowerCase().indexOf(term)>-1 ||
-           e.area.toLowerCase().indexOf(term)>-1;
+  function forms(t){
+    var f=[t]; if(t.length>2 && t.charAt(t.length-1)==='s') f.push(t.slice(0,-1));
+    f.slice().forEach(function(x){ (PICK_SYN[x]||[]).forEach(function(y){ if(f.indexOf(y)<0) f.push(y); }); });
+    return f;
   }
-  function hits(terms){
-    return EX.filter(function(e){
-      if(already.indexOf(e.id)>-1) return false;
-      return terms.every(function(t){ return has(e,t); });
-    });
+  function has(words,fs){
+    return fs.some(function(t){ return words.some(function(w){
+      return w.indexOf(t)===0 || (t.length>3 && w.indexOf(t)>-1); }); });
   }
-  var terms=q.split(/\s+/).filter(function(x){ return x; });
-  var found=hits(terms);
-  // A trailing plural on any word: "shrugs", "reverse flys".
-  if(!found.length) found=hits(terms.map(function(t){
-    return (t.length>2 && t.charAt(t.length-1)==='s') ? t.slice(0,-1) : t;
-  }));
-  return found;
+  // "push-up" as typed is one word; "push up" is two, each landing on a part.
+  var terms=pickWords(q.replace(/-/g,'')).map(forms);
+  return EX.filter(function(e){
+    if(already.indexOf(e.id)>-1) return false;
+    var words=pickWords([e.name,e.cat,e.area,e.id.replace(/_/g,' '),e.id,PICK_ALIAS[e.id]||''].join(' '));
+    return terms.every(function(fs){ return has(words,fs); });
+  });
 }
 function pickerResults(){
   var results=pickerMatches(exSearch.toLowerCase().trim());
@@ -5270,10 +5289,10 @@ function pickerResults(){
     var inArea=results.filter(function(e){return e.area===area;});
     if(!inArea.length) return '';
     var rowsHtml=inArea.map(function(e){
-      var isOpen=!!expanded[e.id];
+      var isOpen=!!expanded['pick:'+e.id];
       return '<div class="pickrow">'+
         '<div class="pickrow-head">'+
-          '<div class="pickrow-main" data-action="toggleex" data-id="'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
+          '<div class="pickrow-main" data-action="toggleex" data-id="pick:'+e.id+'"><div class="n">'+esc(e.name)+'</div><div class="c">'+esc(e.cat)+' &middot; '+(isOpen?'&#9650; hide preview':'&#9660; preview')+'</div></div>'+
           '<button data-action="addex" data-id="'+e.id+'">Add</button>'+
         '</div>'+
         (isOpen&&!e.pose?('<div class="pickpreview"><p class="cue">'+esc(e.cue)+'</p></div>'):

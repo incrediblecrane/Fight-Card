@@ -136,5 +136,67 @@ t('old technique logs typed as seconds are converted once, minutes left alone', 
   assert.deepStrictEqual(l.technique.map(function(x){return x.v;}),[25,30],'a second run changed it');
 });
 
+console.log('\nEXERCISE SEARCH');
+
+// The picker's own matcher, run against the real library. Names are
+// hyphenated, so "pushups" found nothing, and the plural fallback let "ab"
+// land inside "cable" and "jab".
+var pick=(function(){
+  var a=h.indexOf('\nvar PICK_ALIAS'); if(a<0) a=h.indexOf('\nfunction pickerMatches(');
+  var b=h.indexOf('\nfunction pickerResults(');
+  var state={activeSession:null};
+  return eval('(function(){'+h.slice(a,b)+'\nreturn pickerMatches;})()');
+})();
+function ids(q){ return pick(q).map(function(e){ return e.id; }); }
+var CORE=EX.filter(function(e){ return e.area==='Core & rotation'; }).map(function(e){ return e.id; });
+
+t('plural and hyphen-free names find the hyphenated exercise', function(){
+  [['pushups','pushup'],['pushup','pushup'],['push ups','pushup'],['push-ups','pushup'],['pullups','pullup'],
+   ['chinups','chinup'],['situps','situpwallthrow'],['farmers carry','farmerscarry'],['shrugs','shrug']]
+    .forEach(function(c){ assert.ok(ids(c[0]).indexOf(c[1])>-1,'"'+c[0]+'" found: '+(ids(c[0]).join(',')||'nothing')); });
+});
+
+t('swim finds all four swim exercises', function(){
+  var r=ids('swim');
+  ['swim_warmup','swim_drill','swim_main','swim_cooldown'].forEach(function(id){
+    assert.ok(r.indexOf(id)>-1,'"swim" missed '+id+': '+r.join(','));
+  });
+});
+
+t('short names and ids find the lift: rdl, ohp, tgu, jump rope', function(){
+  assert.ok(ids('rdl').indexOf('dl_rdl')>-1,'rdl: '+ids('rdl'));
+  assert.ok(ids('ohp').indexOf('press_ohp')>-1,'ohp: '+ids('ohp'));
+  assert.ok(ids('tgu').indexOf('kb_tgu')>-1,'tgu: '+ids('tgu'));
+  assert.ok(ids('jump rope').indexOf('skipping')>-1,'jump rope: '+ids('jump rope'));
+});
+
+t('rows finds the rows and not the throws', function(){
+  var r=ids('rows');
+  ['row_bent','row_single','invertedrow'].forEach(function(id){ assert.ok(r.indexOf(id)>-1,'rows missed '+id+': '+r); });
+  ['medballthrow','situpwallthrow'].forEach(function(id){ assert.ok(r.indexOf(id)<0,'rows hit '+id); });
+});
+
+t('abs finds the core work and no cable fly or jab drill', function(){
+  var r=ids('abs');
+  ['plank','deadbug','hollowhold','sideplank'].forEach(function(id){ assert.ok(r.indexOf(id)>-1,'abs missed '+id+': '+r); });
+  r.forEach(function(id){ assert.ok(CORE.indexOf(id)>-1,'abs found '+id+', which is not core work'); });
+});
+
+t('bike, treadmill, rower and run find their machines', function(){
+  ['bike','treadmill','run'].forEach(function(q){
+    assert.ok(ids(q).indexOf('cardio_gym_intervals')>-1,q+' found: '+(ids(q).join(',')||'nothing'));
+  });
+  assert.ok(ids('rower').indexOf('rowerg')>-1,'rower found: '+ids('rower'));
+  assert.ok(ids('run').indexOf('briskwalkjog')>-1,'run missed the walk or jog');
+  assert.ok(ids('running').indexOf('sprint')>-1,'running missed the sprint');
+});
+
+t('words still land anywhere and a part word still narrows', function(){
+  assert.ok(ids('fly reverse').indexOf('fly_cable_rev')>-1);
+  assert.deepStrictEqual(ids('shrug'),['shrug']);
+  assert.ok(ids('lift').indexOf('dl_conv')>-1,'lift no longer finds the deadlift');
+  assert.strictEqual(ids('').length,EX.length,'an empty search should list everything');
+});
+
 console.log(fails?('\n'+fails+' FAILING\n'):'\nCatalogue is consistent.\n');
 process.exit(fails?1:0);

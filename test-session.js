@@ -239,7 +239,7 @@ srv.listen(0,async function(){
       return n;
     });
     assert.ok(found.indexOf('Dumbbell shrug')>-1,'search found: '+found.join(','));
-    await p.click('[data-action="toggleex"][data-id="shrug"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="toggleex"][data-id="pick:shrug"]'); await p.waitForTimeout(400);
     var views=await p.evaluate(function(){ return document.querySelectorAll('.pickpreview svg').length; });
     assert.strictEqual(views,2,'expected a side and a front view, got '+views);
   });
@@ -470,14 +470,14 @@ srv.listen(0,async function(){
     assert.ok(names.indexOf('Cable fly')>-1 && names.indexOf('High cable fly')>-1,'search found: '+names.join(','));
     for(var k=0;k<2;k++){
       var id=['fly_cable','fly_cable_high'][k];
-      await p.click('[data-action="toggleex"][data-id="'+id+'"]'); await p.waitForTimeout(400);
+      await p.click('[data-action="toggleex"][data-id="pick:'+id+'"]'); await p.waitForTimeout(400);
       var views=await p.evaluate(function(i){
-        var row=document.querySelector('[data-action="toggleex"][data-id="'+i+'"]');
+        var row=document.querySelector('[data-action="toggleex"][data-id="pick:'+i+'"]');
         var pv=row.closest('.pickrow').querySelector('.pickpreview');
         return pv?pv.querySelectorAll('svg').length:0;
       }, id);
       assert.strictEqual(views,2,id+' drew '+views+' views');
-      await p.click('[data-action="toggleex"][data-id="'+id+'"]'); await p.waitForTimeout(200);
+      await p.click('[data-action="toggleex"][data-id="pick:'+id+'"]'); await p.waitForTimeout(200);
     }
   });
 
@@ -618,6 +618,52 @@ srv.listen(0,async function(){
     assert.ok(/"w":42.5/.test(savedJson()),'the weight did not survive the reload');
   });
 
+  console.log('\nPICKER SEARCH AND PREVIEWS');
+
+  await t('the picker finds pushups and the swim sets by the words people type', async function(){
+    await go(); await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    var look=async function(q){
+      await p.fill('#ex-search',q); await p.waitForTimeout(350);
+      return p.evaluate(function(){
+        return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
+      });
+    };
+    var n=await look('pushups');
+    assert.ok(n.indexOf('Push-up')>-1,'"pushups" found: '+(n.join(',')||'nothing'));
+    n=await look('swim');
+    ['Warm-up swim','Technique drill','Main set intervals','Cool-down swim'].forEach(function(x){
+      assert.ok(n.indexOf(x)>-1,'"swim" missed '+x+': '+n.join(','));
+    });
+    n=await look('abs');
+    assert.ok(n.indexOf('Plank')>-1 && n.indexOf('Cable fly')<0 && n.indexOf('Jab-cross combo drill')<0,'"abs" found: '+n.join(','));
+  });
+
+  await t('opening Dip on Progress leaves its picker preview closed', async function(){
+    await p.fill('#ex-search','dip'); await p.waitForTimeout(350);
+    await p.click('[data-action="addex"][data-id="dip"]'); await settle();
+    assert.ok(await toSlide('Dip'),'the dip did not join the session');
+    await p.fill('#log-v-dip','8');
+    await p.click('[data-action="logset"]'); await settle();
+    await toSlide('Cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
+    await p.click('.exrow [data-action="toggleex"][data-id="dip"]'); await p.waitForTimeout(300);
+    assert.strictEqual(await p.getAttribute('.exrow [data-action="toggleex"][data-id="dip"]','aria-expanded'),'true','the Dip history did not open');
+    await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','dip'); await p.waitForTimeout(350);
+    // Found by its name, not its key, so this reads what is on screen.
+    var st=await p.evaluate(function(){
+      var r=[].filter.call(document.querySelectorAll('.pickrow'),function(x){ return x.querySelector('.n').textContent.trim()==='Dip'; })[0];
+      return {row:!!r, open:r?!!r.querySelector('.pickpreview'):null};
+    });
+    assert.ok(st.row,'Dip is not in the picker');
+    assert.strictEqual(st.open,false,'the picker preview opened because Progress did');
+    await p.click('[data-action="toggleex"][data-id="pick:dip"]'); await p.waitForTimeout(300);
+    assert.ok(await p.$('.pickpreview'),'the picker preview does not open');
+  });
+
   console.log('\nREVERSE CABLE FLY');
 
   await t('two words that are not next to each other still find it', async function(){
@@ -654,9 +700,9 @@ srv.listen(0,async function(){
       var t=row.querySelector('.pickgroup-title'); return t?t.textContent.trim():'';
     });
     assert.strictEqual(area,'Pull','it is grouped under "'+area+'": rear delts are a pull');
-    await p.click('[data-action="toggleex"][data-id="fly_cable_rev"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="toggleex"][data-id="pick:fly_cable_rev"]'); await p.waitForTimeout(400);
     var got=await p.evaluate(function(){
-      var row=document.querySelector('[data-action="toggleex"][data-id="fly_cable_rev"]').closest('.pickrow');
+      var row=document.querySelector('[data-action="toggleex"][data-id="pick:fly_cable_rev"]').closest('.pickrow');
       return {views: row.querySelectorAll('.pickpreview svg').length,
               shapes: row.querySelectorAll('.pickpreview svg polygon').length,
               cords: row.querySelectorAll('.pickpreview svg line').length};
@@ -706,9 +752,9 @@ srv.listen(0,async function(){
       return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){return e.textContent.trim();});
     });
     assert.ok(names.indexOf('Ski erg')>-1,'search found: '+names.join(','));
-    await p.click('[data-action="toggleex"][data-id="skierg"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="toggleex"][data-id="pick:skierg"]'); await p.waitForTimeout(400);
     var got=await p.evaluate(function(){
-      var row=document.querySelector('[data-action="toggleex"][data-id="skierg"]').closest('.pickrow');
+      var row=document.querySelector('[data-action="toggleex"][data-id="pick:skierg"]').closest('.pickrow');
       return {views: row.querySelectorAll('.pickpreview svg').length,
               props: row.querySelectorAll('.pickpreview svg rect').length,
               shapes: row.querySelectorAll('.pickpreview svg polygon').length};
@@ -748,9 +794,9 @@ srv.listen(0,async function(){
     // Counting svgs is not enough: the fallback also draws two figures, which
     // is how this shipped green while the app drew a squat. The rig has to be
     // reachable, and its own wall has to be in the drawing.
-    await p.click('[data-action="toggleex"][data-id="situpwallthrow"]'); await p.waitForTimeout(400);
+    await p.click('[data-action="toggleex"][data-id="pick:situpwallthrow"]'); await p.waitForTimeout(400);
     var got=await p.evaluate(function(){
-      var row=document.querySelector('[data-action="toggleex"][data-id="situpwallthrow"]').closest('.pickrow');
+      var row=document.querySelector('[data-action="toggleex"][data-id="pick:situpwallthrow"]').closest('.pickrow');
       return {views: row.querySelectorAll('.pickpreview svg').length,
               props: row.querySelectorAll('.pickpreview svg rect').length,
               shapes: row.querySelectorAll('.pickpreview svg polygon').length};
@@ -1072,9 +1118,9 @@ srv.listen(0,async function(){
         return [].slice.call(document.querySelectorAll('.pickrow-main .n')).map(function(e){ return e.textContent.trim(); });
       });
       assert.ok(names.indexOf(E.name)>-1,'searching "'+E.find+'" found: '+names.join(','));
-      await p.click('[data-action="toggleex"][data-id="'+E.id+'"]'); await p.waitForTimeout(400);
+      await p.click('[data-action="toggleex"][data-id="pick:'+E.id+'"]'); await p.waitForTimeout(400);
       var got=await p.evaluate(function(i){
-        var row=document.querySelector('[data-action="toggleex"][data-id="'+i+'"]').closest('.pickrow');
+        var row=document.querySelector('[data-action="toggleex"][data-id="pick:'+i+'"]').closest('.pickrow');
         var svgs=[].slice.call(row.querySelectorAll('.pickpreview svg'));
         return {views:svgs.length,
                 boxes:svgs.map(function(s){ return s.getAttribute('viewBox'); }),
