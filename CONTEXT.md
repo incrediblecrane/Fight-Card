@@ -250,15 +250,20 @@ trip; weights, volumes and spoons stay fractional.
 
 **Tick**:
 A string in `state.shoppingChecked`: the row's key, a line break, and what it
-was bought for, each amount as bought (`i|onion` then `|=2`; `g|=200;handful|=1`).
-It ticks the row while no amount there has grown past it: two onions ticked
-for three days do not tick the week's five, and fewer portions keep it. A bare
-key is a tick from older code, under any spelling in the row's group, and
-ticks it whatever the amount. At load (and when the day turns) a tick for
-nothing planned goes and a bare one is stamped with the whole week's amounts,
-so nothing ticked before is unticked by it. Clear the ticks clears those of
-the list in view and leaves the meals; clearing three days keeps the ticks of
-what the rest of the week still needs, and of your own items. Each row is a
+was bought for, each amount as bought and the ids of the planned meals it was
+for (`i|onion` then `|=2;@=pl1,pl2`; `g|=200;handful|=1;@=pl3`).
+It ticks the row while no amount there has grown past it and every meal on
+the row is one of its own: two onions ticked for three days do not tick the
+week's five, fewer portions keep it, and next week's onions are another shop
+however few. A bare key is a tick from older code, under any spelling in the
+row's group, and ticks it whatever the amount. At load (and when the day
+turns) a tick for nothing planned, or whose meals have all passed or gone,
+goes, and one without meals (bare, or stamped with amounts only) is stamped
+with the whole week's amounts and meals, so nothing ticked before is unticked
+by it. Older code reads `@` as an amount no row asks for and ignores it.
+Clear the ticks clears those of the list in view and leaves the meals;
+clearing three days keeps the ticks of your own items and of what the rest of
+the week still needs where they were also bought for a meal there. Each row is a
 `role="checkbox"` that Tab reaches and Space or Enter ticks.
 
 **Extra**:

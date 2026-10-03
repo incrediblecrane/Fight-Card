@@ -111,6 +111,18 @@ srv.listen(0,async function(){
     assert.ok(!(await rows()).some(function(x){ return x.ticked; }),'clearing the week left ticks');
   });
 
+  await t('clearing three days takes the ticks made for those days, even where the rest of the week has the same thing', async function(){
+    seed([[['Eggs (2)'],1],[['Eggs (2)'],5]]); await go();
+    await range(3); await tick('Eggs (2)'); await range(3);
+    await saving(()=>p.click('[data-action="clearweek"]'));
+    var msg=await p.textContent('.undo-bar .msg');
+    assert.ok(/1 planned meal and their ticks/.test(msg),'the Undo reads: '+msg);
+    await range(7); var r=await row('Eggs'); assert.ok(r,'the day-five eggs were cleared too');
+    assert.ok(!r.ticked,'eggs bought for the cleared days tick day five\'s');
+    await saving(()=>p.click('.undo-bar [data-action="undo"]'));
+    await range(3); assert.ok((await row('Eggs (2)')).ticked,'Undo did not bring the tick back');
+  });
+
   await t('Clear the ticks unticks the list and keeps the meals, and Undo brings them back', async function(){
     seed([[['Onion (2)'],0],[['Rice (200g)'],2]]); await go();
     assert.ok(!await p.$('[data-action="clearticks"]'),'offered with nothing ticked');

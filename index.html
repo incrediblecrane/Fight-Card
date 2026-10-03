@@ -3406,8 +3406,9 @@ function shoppingList(dates){
       // tick made by older code under any spelling in the group still counts.
       var fold=bare.toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/(ie|y)$/,'i');
       var slot=byName[fold];
-      if(!slot){ slot=byName[fold]={key:'i|'+fold, raws:[], n:bare.charAt(0).toUpperCase()+bare.slice(1), parts:{}, order:[], plain:null}; order.push(slot); }
+      if(!slot){ slot=byName[fold]={key:'i|'+fold, raws:[], n:bare.charAt(0).toUpperCase()+bare.slice(1), parts:{}, order:[], plain:null, ents:[]}; order.push(slot); }
       if(slot.raws.indexOf('i|'+nameKey)<0) slot.raws.push('i|'+nameKey);
+      if(slot.ents.indexOf(String(e.id))<0) slot.ents.push(String(e.id));
       if(ing.q===null){ if(slot.plain===null) slot.plain=ing.raw; return; }
       // "2 x 400g tins" and "2 x 200g tins" are different packs, and a tin of
       // no stated size is not assumed to be either, so each size adds alone.
@@ -3437,28 +3438,39 @@ function shoppingList(dates){
   order.sort(function(a,b){return a.label.toLowerCase().localeCompare(b.label.toLowerCase());});
   return order;
 }
-/* A tick is stored with what it was bought for: "i|onion" and the amounts,
-   after a line break. Ticked at 2 onions, the row asking for 5 once another
-   meal goes in is not ticked; asking for fewer, it still is. A bare key is a
-   tick from older code, under any spelling in the group, and counts whatever
-   the amount. Your own items have no amount: their tick is their key. */
+/* A tick is stored with what it was bought for: "i|onion", a line break, the
+   amounts and the planned meals they were for ("|=2;@=pl1,pl2"). Ticked at 2
+   onions, the row asking for 5 once another meal goes in is not ticked;
+   asking for fewer, it still is, but only while every meal on the row is one
+   it was bought for: next week's onions are another shop, however few. A
+   tick without meals is from older code and is given them at load
+   (pruneTicks); a bare key, under any spelling in the group, counts whatever
+   the amount. Your own items have no amount: their tick is their key. Older
+   code reads "@" as an amount no row asks for, and passes over it. */
 var TICK_SEP='\n';
 function tickOf(t,it){ return t===it.key || (!it.extra && (t.indexOf(it.key+TICK_SEP)===0 || it.raws.indexOf(t)>-1)); }
+function tickParts(t,key){
+  var had=Object.create(null), meals=null;
+  t.slice(key.length+1).split(';').forEach(function(x){ var e=x.lastIndexOf('='); if(e<1) return;
+    if(x.slice(0,e)==='@') meals=x.slice(e+1).split(','); else had[x.slice(0,e)]=+x.slice(e+1); });
+  return {had:had, meals:meals};
+}
 function tickCovers(t,it){
   if(!tickOf(t,it)) return false;
   if(it.extra || t.indexOf(it.key+TICK_SEP)!==0) return true;
-  var had=Object.create(null);
-  t.slice(it.key.length+1).split(';').forEach(function(x){ var e=x.lastIndexOf('='); if(e>0) had[x.slice(0,e)]=+x.slice(e+1); });
+  var tp=tickParts(t,it.key), had=tp.had;
+  if(tp.meals && !it.ents.every(function(id){ return tp.meals.indexOf(id)>-1; })) return false;
   return (it.stamp?it.stamp.split(';'):[]).every(function(x){ var e=x.lastIndexOf('='), k=x.slice(0,e);
     return k in had && had[k]>=+x.slice(e+1)-1e-9; });
 }
 function shopTicked(it){ return (state.shoppingChecked||[]).some(function(t){ return tickCovers(t,it); }); }
-function tickFor(it){ return it.extra?it.key:it.key+TICK_SEP+it.stamp; }
-/* A tick for something no planned meal needs any more goes, so it is not
-   waiting, ticked, for the next time that thing is planned. One from older
-   code is stamped with the whole week's amounts, so nothing ticked before is
-   unticked by this, in either range. Only at load and when the day turns:
-   pruned as a meal goes, a tick would not come back with its Undo. */
+function tickFor(it){ return it.extra?it.key:it.key+TICK_SEP+(it.stamp?it.stamp+';':'')+'@='+it.ents.join(','); }
+/* A tick for something no planned meal needs any more goes, and so does one
+   whose meals have all passed or gone, so it is not waiting, ticked, for the
+   next time that thing is planned. One from older code is stamped with the
+   whole week's amounts and meals, so nothing ticked before is unticked by
+   this, in either range. Only at load and when the day turns: pruned as a
+   meal goes, a tick would not come back with its Undo. */
 function pruneTicks(){
   var list=shoppingList(planWindow(7)), before=state.shoppingChecked||[], out=[];
   before.forEach(function(t){
@@ -3466,7 +3478,10 @@ function pruneTicks(){
     if(String(t).indexOf('i|')===0) list.forEach(function(it){ if(!row && !it.extra && tickOf(t,it)) row=it; });
     else row={};
     if(!row) return;
-    var nt=row.key===undefined || t.indexOf(row.key+TICK_SEP)===0?t:tickFor(row);
+    var nt=t, m;
+    if(row.key!==undefined && t.indexOf(row.key+TICK_SEP)!==0) nt=tickFor(row);
+    else if(row.key!==undefined && !(m=tickParts(t,row.key).meals)) nt=t+(t.length>row.key.length+1?';':'')+'@='+row.ents.join(',');
+    else if(m && !row.ents.some(function(id){ return m.indexOf(id)>-1; })) return;
     if(out.indexOf(nt)<0) out.push(nt);
   });
   var changed=out.length!==before.length || out.some(function(t,i){ return t!==before[i]; });
@@ -5648,16 +5663,21 @@ function onClick(e){
     var inWindow={}; planWindow(shopRange).forEach(function(k){ inWindow[k]=1; });
     var weekGone=state.plan.filter(function(e){ return inWindow[e.date]; });
     parkUndo({kind:'week',plan:weekGone,checked:state.shoppingChecked.slice(),
-      label:weekGone.length+' planned meal'+(weekGone.length===1?'':'s')+' and the ticks'});
+      label:weekGone.length+' planned meal'+(weekGone.length===1?'':'s')+(shopRange>=7?' and the ticks':' and their ticks')});
     state.plan=state.plan.filter(function(e){ return !inWindow[e.date]; });
     // Your own items are not part of "the week", so they stay; only their ticks
     // are cleared, along with everything the recipes contributed. Clearing
-    // three days keeps the ticks of what the rest of the week still needs, and
-    // of your own items.
+    // three days keeps your own items' ticks, and those of what the rest of
+    // the week still needs, but only where they were bought for a meal there
+    // too: eggs bought for the cleared days are not day five's.
     if(shopRange>=7) state.shoppingChecked=[];
-    else { var restSL=shoppingList(planWindow(7));
+    else { var restSL=shoppingList(planWindow(7)), goneId={};
+      weekGone.forEach(function(e){ goneId[String(e.id)]=1; });
       state.shoppingChecked=state.shoppingChecked.filter(function(k){
-        return k.indexOf('x|')===0 || restSL.some(function(it){ return !it.extra && tickOf(k,it); }); }); }
+        if(k.indexOf('x|')===0) return true;
+        var row=null; restSL.forEach(function(it){ if(!row && !it.extra && tickOf(k,it)) row=it; });
+        var m=row && k.indexOf(row.key+TICK_SEP)===0?tickParts(k,row.key).meals:null;
+        return !!row && (!m || m.some(function(id){ return !goneId[id]; })); }); }
   }
   else if(action==='clearticks'){
     // The ticks on the list in view, and nothing else: the meals stay.

@@ -30,7 +30,7 @@ var src=[grabVar('IMPLIED_ONE'), grabVar('UNIT_SCALE'), grabVar('ING_TAIL'), gra
   grab('recipeIngs'), grab('recipeBase'), grab('recipePortions'),
   grab('slotRank'), grab('planOrder'), grab('pad'), grab('dateKey'), grab('planDates'),
   grab('planEntries'), grab('planRecipe'), grab('planPortions'),
-  grab('shoppingList'), grabVar('TICK_SEP'), grab('planWindow'), grab('tickOf'), grab('tickCovers'),
+  grab('shoppingList'), grabVar('TICK_SEP'), grab('planWindow'), grab('tickOf'), grab('tickParts'), grab('tickCovers'),
   grab('shopTicked'), grab('tickFor'), grab('pruneTicks')].join('\n');
 
 var fails=0;
@@ -691,9 +691,36 @@ t('at load, ticks for nothing planned go and older ticks take the week\'s amount
   var box=tickBox([[['Eggs (2)'],1],[['Eggs (2)'],5],[['Flour (100g)'],2]],
     ['i|eggs','i|butter','x|x1','beef mince|g','i|flour'+'\n'+'g|=100']);
   assert.ok(box.pruneTicks(),'nothing changed');
-  assert.deepStrictEqual(box.st.shoppingChecked,['i|egg\n|=4','x|x1','beef mince|g','i|flour\ng|=100']);
+  assert.deepStrictEqual(box.st.shoppingChecked,['i|egg\n|=4;@=pl0,pl1','x|x1','beef mince|g','i|flour\ng|=100;@=pl2']);
   assert.ok(box.shopTicked(box.row('Egg')) && box.shopTicked(box.row('Egg',3)),'the migrated tick does not cover the rows it ticked before');
   assert.ok(!box.pruneTicks(),'a second pass changed something');
+});
+// A tick is for the meals it was bought for. The next lot of the same
+// ingredient, however small, is another shop.
+t('a tick does not cover a later meal, even one asking for less', function(){
+  // Ticked on Sunday for the week's five onions; by Thursday those meals have
+  // passed and Saturday's new meal wants two.
+  var box=tickBox([[['Onion (3)'],1],[['Onion (2)'],2]]);
+  box.st.shoppingChecked=[box.tickFor(box.row('Onion'))];
+  box.st.plan=[{id:'pl9',recipeId:'t1',date:box.planDates()[5],slot:'dinner',portions:1}];
+  assert.strictEqual(box.row('Onion').label,'Onion (2)');
+  assert.ok(!box.shopTicked(box.row('Onion')),'onions bought for meals already eaten tick a later meal');
+  // A weekly recipe: Monday's two onions ticked do not tick next Monday's.
+  box=tickBox([[['Onion (2)'],0]]);
+  box.st.shoppingChecked=[box.tickFor(box.row('Onion'))];
+  box.st.plan=[{id:'pl8',recipeId:'t0',date:box.planDates()[6],slot:'dinner',portions:1}];
+  assert.ok(!box.shopTicked(box.row('Onion')),'last week\'s onions tick this week\'s');
+  // And when the day turns, the spent tick goes rather than waiting.
+  assert.ok(box.pruneTicks(),'the spent tick was kept');
+  assert.deepStrictEqual(box.st.shoppingChecked,[]);
+});
+t('a tick still covers its own meals as they pass or move', function(){
+  var box=tickBox([[['Onion (3)'],1],[['Onion (2)'],2]]);
+  box.st.shoppingChecked=[box.tickFor(box.row('Onion'))];
+  box.st.plan=box.st.plan.slice(1); box.st.plan[0].date=box.planDates()[4];
+  assert.ok(box.shopTicked(box.row('Onion')),'a meal moving to another day lost its tick');
+  assert.ok(!box.pruneTicks(),'a live tick was rewritten');
+  assert.ok(box.shopTicked(box.row('Onion')));
 });
 console.log(fails?('\n'+fails+' FAILING\n'):'\nAll shopping checks pass.\n');
 process.exit(fails?1:0);
