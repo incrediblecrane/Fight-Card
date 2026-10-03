@@ -4,8 +4,12 @@ var doc=env.localOnly(env.readDoc());
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'
  +'.then(function(){setTimeout(function(){location.reload();},0);});}};'
  +'window.claude={use:function(n){return Promise.resolve(n==="artifact"?ns:null);}};})();<\/script>';
+// Each load of the page is counted, so a check waits for the publish and the
+// reload a save brings, not for a guess at how long they take.
+var loads=0;
 var srv=http.createServer(function(q,r){
   if(q.url==='/publish'){var c=[];q.on('data',x=>c.push(x));q.on('end',function(){doc=Buffer.concat(c).toString();r.end('ok');});return;}
+  loads++;
   var out=doc.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis[^>]*>/,'').replace('<body>','<body>'+SHIM);
   r.setHeader('content-type','text/html; charset=utf-8');r.setHeader('content-length',Buffer.byteLength(out));r.end(out);
 });
@@ -13,17 +17,26 @@ srv.listen(0,async function(){
   var b=await env.launch();
   var p=await b.newPage({viewport:{width:420,height:900}});
   p.setDefaultTimeout(9000);
+  // FC_THROTTLE=4 runs the page on a quarter of the CPU, where fixed sleeps
+  // between a tap and the reload it brings ran out.
+  if(process.env.FC_THROTTLE){ var cdp=await p.context().newCDPSession(p);
+    await cdp.send('Emulation.setCPUThrottlingRate',{rate:+process.env.FC_THROTTLE}); }
   var errs=[]; p.on('pageerror',e=>errs.push(e.message));
   var published=()=>doc;   // whatever the app last saved
+  // Until the page has reloaded onto the publish a tap made, and is ready for
+  // the next one: a tap while a publish is out is refused.
+  var settle=async n0=>{ for(var i=0;loads<=n0;i++){ if(i>600) throw new Error('no publish and reload came');
+    await new Promise(r=>setTimeout(r,50)); } await p.waitForSelector('#app .wrap:not(.held)'); };
+  var saving=async fn=>{ var n0=loads; await fn(); await settle(n0); };
   var fails=0, ok=m=>console.log('  PASS  '+m), bad=(m,e)=>{fails++;console.log('  FAIL  '+m+'\n        '+e.message);};
-  await p.goto('http://127.0.0.1:'+srv.address().port+'/'); await p.waitForTimeout(500);
-  var back=await p.$('[data-action="cancelsession"]'); if(back){await back.click(); await p.waitForTimeout(400);}
-  await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForTimeout(500);
+  await p.goto('http://127.0.0.1:'+srv.address().port+'/'); await p.waitForSelector('#app .wrap:not(.held)');
+  var back=await p.$('[data-action="cancelsession"]'); if(back) await back.click();
+  await p.click('[data-action="tab"][data-tab="meals"]');
 
   // Recipe cards start closed; portions and ingredients show once opened, and
   // stay open across the save-and-reload because the view remembers it.
   var openCard=async id=>{ var tg=await p.$('[data-action="toggleex"][data-id="rec:'+id+'"][aria-expanded="false"]');
-    if(tg){ await tg.click(); await p.waitForTimeout(250); } };
+    if(tg){ await tg.click(); await p.waitForSelector('[data-action="toggleex"][data-id="rec:'+id+'"][aria-expanded="true"]'); } };
   var card=async id=>{ await openCard(id); return p.evaluate(function(i){
     var b=document.querySelector('[data-action="portions"][data-id="'+i+'"]');
     if(!b) return null; var c=b.closest('.libitem');
@@ -31,8 +44,8 @@ srv.listen(0,async function(){
             ings:Array.prototype.slice.call(c.querySelectorAll('li')).map(function(x){return x.textContent;}),
             macros:(c.querySelector('.macros')||{textContent:''}).textContent.replace(/\s+/g,' ').trim()};
   }, id); };
-  var bump=async(id,d,n)=>{ await openCard(id); for(var i=0;i<(n||1);i++){
-    await p.click('[data-action="portions"][data-id="'+id+'"][data-d="'+d+'"]'); await p.waitForTimeout(250);} };
+  var bump=async(id,d,n)=>{ for(var i=0;i<(n||1);i++){ await openCard(id);
+    await saving(()=>p.click('[data-action="portions"][data-id="'+id+'"][data-d="'+d+'"]')); } };
 
   try{
     var c=await card('p2'); assert.ok(c,'meal prep recipe p2 missing');
@@ -59,14 +72,14 @@ srv.listen(0,async function(){
   }catch(e){ bad('macros per portion',e); }
 
   try{
-    await p.click('[data-action="addmeal"][data-id="p2"]'); await p.waitForTimeout(2600);
+    await saving(()=>p.click('[data-action="addmeal"][data-id="p2"]'));
     var shop=await p.evaluate(function(){ return Array.prototype.slice.call(document.querySelectorAll('.shop')).map(function(x){return x.textContent.trim();}); });
     assert.ok(shop.some(x=>/Beef mince, 5% fat \(1.5kg\)/.test(x)),'shopping list not scaled: '+shop.join(' | '));
     ok('the shopping list uses the chosen portion count, not the recipe default');
   }catch(e){ bad('shopping list scales',e); }
 
   try{
-    await p.click('[data-action="addmeal"][data-id="p3"]'); await p.waitForTimeout(2600);
+    await saving(()=>p.click('[data-action="addmeal"][data-id="p3"]'));
     var shop2=await p.evaluate(function(){ return Array.prototype.slice.call(document.querySelectorAll('.shop')).map(function(x){return x.textContent.trim();}); });
     var toms=shop2.filter(x=>/Chopped tomatoes/.test(x));
     assert.strictEqual(toms.length,1,'tomatoes should aggregate to one line, got: '+toms.join(' / '));
@@ -75,8 +88,8 @@ srv.listen(0,async function(){
   }catch(e){ bad('shopping list aggregates',e); }
 
   try{
-    var key=await p.evaluate(function(){ var el=document.querySelector('.shop'); el.click(); return el.getAttribute('data-item'); });
-    await p.waitForTimeout(2600);
+    var n0=loads, key=await p.evaluate(function(){ var el=document.querySelector('.shop'); el.click(); return el.getAttribute('data-item'); });
+    await settle(n0); n0=loads;
     var stillTicked=await p.evaluate(function(k){ var e=document.querySelector('.shop[data-item="'+k+'"]'); return e&&/checked/.test(e.className); },key);
     assert.ok(stillTicked,'tick did not stick');
     // Portions live on the planned meal now, so changing THAT is the move that
@@ -85,7 +98,7 @@ srv.listen(0,async function(){
       var b=document.querySelector('[data-action="mealportions"][data-d="-1"]');
       if(!b) return false; b.click(); return true; });
     assert.ok(bumped,'no planned meal to change the portions of, so this proves nothing');
-    await p.waitForTimeout(2600);
+    await settle(n0);
     var afterBump=await p.evaluate(function(k){ var e=document.querySelector('.shop[data-item="'+k+'"]'); return e&&/checked/.test(e.className); },key);
     assert.ok(afterBump,'changing portions unticked the shopping list');
     ok('ticked items stay ticked when the portions change');
@@ -103,16 +116,14 @@ srv.listen(0,async function(){
   await t('an ingredient never appears on two rows, whatever the recipes', async function(){
     // Two rows for one thing is how something gets bought twice or missed.
     // One at a time, re-querying each round: ticking one re-renders the page,
-    // which detaches every other element collected up front.
-    for(var i=0;i<60;i++){
-      var more=await p.evaluate(function(i){
+    // which detaches every other element collected up front. All in one go, so
+    // the save they bring cannot start (and hold the page) half way through.
+    await saving(()=>p.evaluate(function(){
+      for(var i=0;i<60;i++){
         var all=[].slice.call(document.querySelectorAll('[data-action="addmeal"]'));
-        if(i>=all.length) return false; all[i].click(); return true;
-      }, i);
-      if(!more) break;
-      await p.waitForTimeout(60);
-    }
-    await p.waitForTimeout(1200);
+        if(i>=all.length) return; all[i].click();
+      }
+    }));
     var labels=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
     });
@@ -166,8 +177,7 @@ srv.listen(0,async function(){
   console.log('\nYOUR OWN SHOPPING ITEMS');
 
   await t('you can add something no recipe knows about', async function(){
-    await p.fill('#shop-add','Bin bags'); await p.click('[data-action="addextra"]');
-    await p.waitForTimeout(1600);
+    await p.fill('#shop-add','Bin bags'); await saving(()=>p.click('[data-action="addextra"]'));
     var labels=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
     });
@@ -185,11 +195,10 @@ srv.listen(0,async function(){
   });
 
   await t('ticking it works like any other row', async function(){
-    await p.evaluate(function(){
+    await saving(()=>p.evaluate(function(){
       var rows=[].slice.call(document.querySelectorAll('.shop'));
       for(var i=0;i<rows.length;i++){ if(/Bin bags/.test(rows[i].innerText)){ rows[i].click(); return; } }
-    });
-    await p.waitForTimeout(1600);
+    }));
     var checked=await p.evaluate(function(){
       var rows=[].slice.call(document.querySelectorAll('.shop'));
       for(var i=0;i<rows.length;i++){ if(/Bin bags/.test(rows[i].innerText)) return rows[i].className; }
@@ -201,7 +210,7 @@ srv.listen(0,async function(){
   await t('clearing the week keeps your own items but drops the recipe ones', async function(){
     var before=await p.evaluate(function(){ return document.querySelectorAll('.shop').length; });
     var btn=await p.$('[data-action="clearweek"]');
-    assert.ok(btn,'no clear button'); await btn.click(); await p.waitForTimeout(1800);
+    assert.ok(btn,'no clear button'); await saving(()=>btn.click());
     var after=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
     });
@@ -212,10 +221,9 @@ srv.listen(0,async function(){
   });
 
   await t('and you can remove one you no longer want', async function(){
-    await p.evaluate(function(){
+    await saving(()=>p.evaluate(function(){
       var b=document.querySelector('[data-action="delextra"]'); if(b) b.click();
-    });
-    await p.waitForTimeout(1600);
+    }));
     var after=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
     });
@@ -227,8 +235,7 @@ srv.listen(0,async function(){
     // sails straight past anything that goes wrong between keystrokes.
     await p.click('#shop-add');
     await p.type('#shop-add','Washing up liquid',{delay:30});
-    await p.press('#shop-add','Enter');
-    await p.waitForTimeout(1600);
+    await saving(()=>p.press('#shop-add','Enter'));
     var labels=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
     });
@@ -238,9 +245,8 @@ srv.listen(0,async function(){
   });
 
   await t('and it is still there after a reload', async function(){
-    await p.reload({waitUntil:'networkidle'}); await p.waitForTimeout(1800);
+    await p.reload({waitUntil:'networkidle'}); await p.waitForSelector('#app .wrap:not(.held)');
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
-    await p.waitForTimeout(400);
     var labels=await p.evaluate(function(){
       return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
     });
@@ -252,12 +258,9 @@ srv.listen(0,async function(){
     // The built-in batch recipes are topped up at load for anything missing,
     // which is also what a deleted one looks like.
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
-    await p.waitForTimeout(300);
     assert.ok(await p.$('[data-action="delrecipe"][data-id="p3"]'),'p3 is not there to delete');
-    await p.click('[data-action="delrecipe"][data-id="p3"]');
-    await p.waitForTimeout(2600);
+    await saving(()=>p.click('[data-action="delrecipe"][data-id="p3"]'));
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
-    await p.waitForTimeout(400);
     assert.ok(!(await p.$('[data-action="delrecipe"][data-id="p3"]')),'p3 came back');
     var seed=env.seedOf(published());
     assert.ok(!seed.recipes.some(function(r){ return r.id==='p3'; }),'p3 is in the saved recipes');
@@ -272,19 +275,19 @@ srv.listen(0,async function(){
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
     await p.fill('#rec-title','Built-in names');
     await p.fill('#rec-ing','Constructor (1)\n__proto__ (2)\nToString (3)\nhasOwnProperty');
-    await p.click('[data-action="addrecipe"]'); await p.waitForTimeout(2600);
+    await saving(()=>p.click('[data-action="addrecipe"]'));
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
     var rid=await p.evaluate(function(){ var b=[].filter.call(document.querySelectorAll('[data-action="delrecipe"]'),function(x){
       return /Built-in names/.test(x.getAttribute('aria-label')); })[0]; return b&&b.getAttribute('data-id'); });
     assert.ok(rid,'the recipe was not added');
-    await p.click('[data-action="addmeal"][data-id="'+rid+'"]'); await p.waitForTimeout(2600);
+    await saving(()=>p.click('[data-action="addmeal"][data-id="'+rid+'"]'));
     await p.click('[data-action="tab"][data-tab="meals"]').catch(function(){});
     var shop=await p.evaluate(function(){ return [].map.call(document.querySelectorAll('.shop'),function(x){ return x.textContent.trim(); }); });
     ['Constructor (1)','__proto__ (2)','ToString (3)','hasOwnProperty'].forEach(function(n){
       assert.ok(shop.some(function(x){ return x.indexOf(n)>-1; }),n+' is not on the shopping list: '+shop.join(' | '));
     });
     assert.deepStrictEqual(errs.slice(e0),[],'a render stopped');
-    await p.click('[data-action="delrecipe"][data-id="'+rid+'"]'); await p.waitForTimeout(2600);
+    await saving(()=>p.click('[data-action="delrecipe"][data-id="'+rid+'"]'));
   });
 
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');

@@ -312,6 +312,7 @@ version is published.
 | `fc.importing` | `localStorage` | what an unfinished import is writing |
 | `fc.logDate` | `sessionStorage` | the backfill date |
 | `fc.undo` | `sessionStorage` | the undo slot |
+| `fc.drafts` | `sessionStorage` | half-entered drafts, across a save without a store |
 
 Every read and write of these is wrapped, and the app works with them blocked;
 it only loses what they would have kept.
@@ -429,6 +430,22 @@ finished session is never cleared before its log is stored.
 backing off 2s, 4s, 8s up to 30s with a little jitter. A refusal in `DB_HARD`
 is named in the banner (`docLabel`: "your log for Fri 2 Oct", "the meal plan")
 and goes again with the next change. One in `DB_LOST` pauses the view.
+
+**Without a store.** In `local` a save publishes the whole document
+(`pubSave`), and the runtime reloads every open view onto it. One publish is
+out at a time, and a save asked for meanwhile goes when it is done. Once
+`publish` is called the page on screen is the one the reload brings back, so
+until the reload (or `PUB_RELOAD_MS` if none comes) taps that change data are
+refused and the controls are held, as while loading. A transient refusal is
+retried with the same backoff as `dbSave`, and every failure shows on the pill
+and the banner. A `conflict` means another view published a newer copy, which
+this whole document would overwrite: the view pauses and offers Reload. What
+the view is in the middle of goes across the reload: the sauna stints already
+added and the temperature, the shopping box, a prep option and its minutes
+(`fc.drafts` in `sessionStorage`, read back once). Where web storage is
+blocked, what it would have kept (ui state, the backfill date, the drafts)
+goes in the published document as `_view`, read only by a `localOnly` copy and
+never made state, put in the store or exported.
 
 **Going away.** A save still waiting on its timer goes at once when the page
 is hidden or closed. With no time to re-read, it sends only the fields this
@@ -706,6 +723,10 @@ the shipped `index.html`, so they test what ships.
   announcement, and the toast staying clear of the page.
 - `test-session.js`: prep steps, per-implement weights, sauna stints, search.
 - `test-meals.js`: recipe portions and the shopping list in the browser.
+- `test-publish.js`: the save without a store: one publish at a time, a
+  refusal retried and shown, a conflict, a publish that throws, a tap while one
+  is out, and the session screen and drafts kept across the reload, with web
+  storage and without.
 - `test-db.js`: seeding, small saves, reload survival, merge between views,
   save serialization and retry, every store state and how a failed save shows,
   imports in the browser: the backup, Put back and an unfinished import; the

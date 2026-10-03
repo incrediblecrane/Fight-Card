@@ -95,6 +95,9 @@ async function t(name,fn){
     await loadQuick(env.localOnly(env.readDoc()));
     await p.click('[data-action="tab"][data-tab="training"]');
     for(var ni=0;ni<NOTES.length;ni++){
+      // This stub does not reload, so the page holds taps for a while after
+      // each publish, as it would until the reload a real one brings.
+      await p.waitForSelector('#app .wrap:not(.held)',{timeout:10000});
       await p.fill('#lib-title','Note '+ni); await p.fill('#lib-notes',NOTES[ni]);
       await p.click('[data-action="addlib"]');
       await p.waitForFunction(function(k){ return (window.__pub||'').indexOf('Note '+k)>-1; },ni,{timeout:8000});

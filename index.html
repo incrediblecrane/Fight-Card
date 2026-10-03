@@ -908,7 +908,12 @@ var UI_KEY='fc.ui', uiSaved='';
 function readUi(){ try{ return JSON.parse(localStorage.getItem(UI_KEY)||'null')||{}; }catch(e){ return {}; } }
 function writeUi(v){ if(v===uiSaved) return; uiSaved=v; try{ localStorage.setItem(UI_KEY,v); }catch(e){} }
 ['uiTab','uiSlide','uiProgRange','uiViewingSession'].forEach(function(k){ delete state[k]; });
+// What a view with web storage blocked carried across its last publish (see
+// viewDoc). Only a copy with no store reads it, and it is never state.
+var view0=DATA.localOnly&&DATA._view&&typeof DATA._view==='object'?DATA._view:{};
+delete state._view;
 var ui0=readUi();
+if(!Object.keys(ui0).length && view0.ui && typeof view0.ui==='object') ui0=view0.ui;
 var tab=ui0.tab||'today';
 var viewingSession=!!ui0.viewingSession;
 // What is unfolded (an exercise's history, a recipe's ingredients) is this
@@ -948,6 +953,42 @@ var shopRange=7;
 // prepPick: the selects are re-rendered, and a choice that does not survive
 // that is a choice you have to make twice.
 var planPick={};
+/* A save with no store publishes the document, and the reload that follows
+   wipes every variable. What this view is in the middle of goes across it:
+   the stints already added and the temperature, the shopping box, a prep
+   option and its minutes, in sessionStorage, and read back once. Where web
+   storage is blocked, what it would have kept (the tab, the slide, the
+   session screen, what is unfolded, the backfill date, the drafts) goes in
+   the document as _view, for that reload only, never into the store or an
+   export. */
+var DRAFT_KEY='fc.drafts';
+function canStore(name){ try{ var s=window[name], k='fc.probe'; s.setItem(k,'1'); s.removeItem(k); return true; }catch(e){ return false; } }
+function draftNow(){
+  var te=document.getElementById('sauna-temp'), t=te?readNum(te):NaN;
+  return {sauna:saunaDraft, temp:te&&!isNaN(t)?(t===null?'':String(t)):saunaTemp, shop:shopDraft, pick:prepPick, mins:prepMins};
+}
+function viewDoc(st){
+  var v={}, d=draftNow(), out={};
+  if(canStore('sessionStorage')){ try{ sessionStorage.setItem(DRAFT_KEY,JSON.stringify(d)); }catch(e){ v.drafts=d; } }
+  else { v.drafts=d; if(logDate) v.logDate={k:logDate, on:logDateOn}; }
+  if(!canStore('localStorage')) v.ui=uiNow();
+  if(!Object.keys(v).length) return st;
+  Object.keys(st).forEach(function(k){ out[k]=st[k]; }); out._view=v; return out;
+}
+function dropDrafts(){ try{ sessionStorage.removeItem(DRAFT_KEY); }catch(e){} }
+function strMap(o){ var out={}; if(o && typeof o==='object') Object.keys(o).forEach(function(k){
+  if(k!=='__proto__' && typeof o[k]==='string') out[k]=o[k]; }); return out; }
+(function(){
+  var d=null; try{ d=JSON.parse(sessionStorage.getItem(DRAFT_KEY)||'null'); }catch(e){}
+  dropDrafts();
+  var cd=view0.logDate;
+  if(cd && typeof cd.k==='string' && cd.on===realToday() && !readStoredDate()) setLogDate(cd.k);
+  d=d||view0.drafts; if(!d || typeof d!=='object') return;
+  if(Array.isArray(d.sauna)) saunaDraft=d.sauna.filter(function(x){ return x && typeof x.mins==='number' && x.mins>0 && typeof x.position==='string'; });
+  if(typeof d.temp==='string' && !isNaN(+d.temp)) saunaTemp=d.temp;
+  if(typeof d.shop==='string') shopDraft=d.shop;
+  prepPick=strMap(d.pick); prepMins=strMap(d.mins);
+})();
 var poseFlip=false;
 var poseTimer=null;
 var saveTimer=null;
@@ -969,7 +1010,7 @@ function setSaving(on){
 }
 function paintSaving(){
   var el=document.getElementById('savepill'); if(!el) return;
-  var fail=!!dbErr&&(dbState==='db'||dbState==='paused'), txt=fail?(dbState==='db'&&!dbErrHard?'Not saved, retrying':'Not saved'):savingShown?'saving\u2026':'';
+  var fail=!!dbErr&&(dbState==='db'||dbState==='local'||dbState==='paused'), txt=fail?(dbState!=='paused'&&!dbErrHard?'Not saved, retrying':'Not saved'):savingShown?'saving\u2026':'';
   el.className='savepill'+(fail||savingShown?' on':'')+(fail?' fail':'');
   if(pillClear){ clearTimeout(pillClear); pillClear=null; }
   // Faded out with its words still on it, then emptied, so nothing is read
@@ -2413,15 +2454,49 @@ function persist(){
   // worst answer.
   if(dbHeld()) return;
   if(!window.claude || !window.claude.use){ render(); return; }
-  setSaving(true);
-  claude.use('artifact').then(function(ns){
+  pubSave();
+}
+/* With no store, a save publishes the whole document, and the runtime reloads
+   every open view onto it. One goes at a time, like dbSave: two out at once
+   could land in either order and leave the older copy as the page. Once
+   publish is called the page on screen is the one the reload brings back, so
+   a tap after that would be drawn and then thrown away: until the reload, or
+   PUB_RELOAD_MS if none comes, taps that change data are refused (held) and
+   the controls say so. A refusal it can get past is tried again, backing off
+   as dbSave does, and every failure shows on the pill and the banner. A
+   conflict means another view published a newer copy, which this whole
+   document would overwrite: nothing more is published, and Reload is offered. */
+var pubBusy=false, pubAgain=false, pubAttempt=0, publishing=false, PUB_RELOAD_MS=5000;
+function held(){ return dbHeld()||publishing; }
+function pubSave(){
+  if(pubBusy){ pubAgain=true; return; }
+  pubBusy=true; setSaving(true);
+  var retrying=false;
+  Promise.resolve().then(function(){ return artifactApi||claude.use('artifact'); }).then(function(ns){
+    if(!ns||typeof ns.publish!=='function') throw {code:'unavailable'};
     artifactApi=ns;
-    if(!ns){ setSaving(false); render(); return; }
-    return ns.publish(fullDocument(state)).then(function(){ setSaving(false); }).catch(function(err){
-      setSaving(false);
-      if(err && err.code==='conflict'){ return; }
-      render();
-    });
+    var html; try{ html=fullDocument(viewDoc(state)); }catch(e){ throw ownErr(e); }
+    publishing=true; render();
+    return ns.publish(html);
+  }).then(function(){
+    pubAttempt=0; dbErr=null; dbErrHard=false; dbErrPath=null;
+    // The runtime reloads the page now. Should it not, the page is let go.
+    setTimeout(function(){ publishing=false; pubBusy=false; setSaving(false); render();
+      if(pubAgain){ pubAgain=false; pubSave(); } },PUB_RELOAD_MS);
+  },function(e){
+    publishing=false; dropDrafts();
+    dbErr=(e&&e.code)||'unavailable'; dbErrHard=!!DB_HARD[dbErr]||!!DB_LOST[dbErr]||dbErr==='conflict'; dbErrPath=null;
+    if(DB_LOST[dbErr]||dbErr==='conflict'){ dbState='paused'; if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; } }
+    else if(!dbErrHard){
+      retrying=true;
+      if(saveTimer) clearTimeout(saveTimer);
+      saveTimer=setTimeout(persist, Math.min(30000,2000*Math.pow(2,pubAttempt++))+Math.random()*500);
+    }
+    setSaving(false); render();
+  }).then(null,function(){}).then(function(){
+    if(publishing) return;
+    pubBusy=false;
+    if(pubAgain){ pubAgain=false; if(!retrying) pubSave(); }
   });
 }
 /* ---------- export and import -------------------------------------------
@@ -4548,11 +4623,11 @@ function bodyContent(){
   var status=(dbState==='loading'?'<div class="banner" role="status">loading your data&hellip;</div>':'')+
       (dbState==='error'?'<div class="banner" role="alert" title="'+esc(dbErr||'unavailable')+'">Could not load your saved data: '+esc(errWords(dbErr||'unavailable'))+'. Changes are paused until it loads. <button data-action="retryload">Retry</button></div>':'')+
       // Why access went is the platform's to say, not this page's.
-      (dbState==='paused'?'<div class="banner" role="alert">Changes are no longer being saved, so they are paused. <button data-action="reload">Reload</button></div>':'')+
-      (dbErr&&dbState==='db'?'<div class="banner" role="alert" title="'+esc(dbErr)+'">'+(dbErrHard?
+      (dbState==='paused'?'<div class="banner" role="alert">'+(dbErr==='conflict'?'A newer copy was saved from another view, so your last change was not saved.':'Changes are no longer being saved, so they are paused.')+' <button data-action="reload">Reload</button></div>':'')+
+      (dbErr&&(dbState==='db'||dbState==='local')?'<div class="banner" role="alert" title="'+esc(dbErr)+'">'+(dbErrHard?
         (dbErrPath?'A change to '+esc(docLabel(dbErrPath)):'Your last change')+' could not be saved: '+esc(errWords(dbErr))+'. It goes again with your next change.':
         'Trouble reaching your saved data: '+esc(errWords(dbErr))+'. Trying again.')+'</div>':'');
-  return '<div class="wrap'+(offDay?' backfilling':'')+(dbHeld()?' held':'')+'">'+
+  return '<div class="wrap'+(offDay?' backfilling':'')+(held()?' held':'')+'">'+
       (status?'<div class="statusbar">'+status+'</div>':'')+
       (importBusy?'<div class="banner importprog" role="status">'+esc(importText())+'</div>':'')+
       (importStuck&&!importBusy&&dbState!=='paused'?'<div class="banner" role="alert">An import did not finish, so your data may be part old and part new.'+
@@ -4615,10 +4690,9 @@ function undoFit(){
   app.style.setProperty('--undo-h',bar?bar.offsetHeight+'px':'0px');
 }
 
-function syncUi(){
-  writeUi(JSON.stringify({tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange, nudgeOff:nudgeOff,
-    open:Object.keys(expanded).filter(function(k){ return expanded[k]; })}));
-}
+function uiNow(){ return {tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange, nudgeOff:nudgeOff,
+    open:Object.keys(expanded).filter(function(k){ return expanded[k]; })}; }
+function syncUi(){ writeUi(JSON.stringify(uiNow())); }
 
 /* Matching is forgiving about a trailing plural, because "shrugs" and "dips"
    are what a person actually types and neither matched the singular name. */
@@ -4816,7 +4890,9 @@ function onClick(e){
   // The desktop × on a history row only shows on hover. On touch it is never
   // seen, so a tap that reaches it anyway must not delete the row.
   if(t.classList.contains('swipe-x') && window.matchMedia && !matchMedia('(hover:hover)').matches) return;
-  if(dbHeld() && !UI_ONLY_WHILE_LOADING[action]) return;
+  // So is a tap while a save without a store is publishing: the reload that
+  // follows brings back the page as it was published, without it.
+  if(held() && !UI_ONLY_WHILE_LOADING[action]) return;
   // A removal moves the next row's x under the finger. A second tap on the
   // same spot straight after is that finger again, not a choice. Only a real
   // pointer has a spot (detail is 0 for a key or a script).
@@ -5231,7 +5307,7 @@ function onChange(e){
   }
   // Same reason as onClick: state is about to be replaced by the store, so a
   // change applied now would be thrown away rather than saved.
-  else if(dbHeld()){ render(); return; }
+  else if(held()){ render(); return; }
   // Picking a day or a slot plans nothing on its own, so there is nothing to
   // save and nothing to redraw: it is remembered until Add is pressed.
   else if(action==='planday'){ var id=t.getAttribute('data-id');
@@ -5418,7 +5494,7 @@ function boot(){
   if(!window.claude || !window.claude.use) dbState='local';
   render();
   dbBoot();
-  if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns; render(); });
+  if(window.claude && window.claude.use){ claude.use('artifact').then(function(ns){ artifactApi=ns||null; render(); },function(){});
     claude.use('downloads').then(null,function(){ return null; }).then(function(ns){
       if(downloadsApi===undefined) downloadsApi=ns||null; if(dataPane) render(); }); }
 }
