@@ -1668,6 +1668,101 @@ srv.listen(0,async function(){
     await leaveSession();
   });
 
+  console.log('\nLOGGING ON ONE SLIDE');
+
+  await t('machine intervals keep the machine, the efforts and the minutes from the set before, on the slide and in a superset', async function(){
+    await go(); await leaveSession(); await startWorkout('Cardio — gym');
+    assert.ok(await toSlide('Machine intervals'),'never reached the machine intervals');
+    await p.selectOption('#log-machine-cardio_gym_intervals','Rower');
+    await p.selectOption('#log-work-cardio_gym_intervals','Hard');
+    await p.selectOption('#log-rest-cardio_gym_intervals','Easy');
+    await p.fill('#log-v-cardio_gym_intervals','1');
+    await p.click('[data-action="logset"]'); await settle();
+    var got=function(){ return p.evaluate(function(){ return ['machine','work','rest','v'].map(function(k){ var e=document.getElementById('log-'+k+'-cardio_gym_intervals'); return e?e.value:null; }); }); };
+    assert.deepStrictEqual(await got(),['Rower','Hard','Easy','1'],'the next set starts empty');
+    assert.strictEqual(seedOf().activeSession.logs.cardio_gym_intervals[0].machine,'Rower');
+    await leaveSession(); await startWorkout('Own session');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.click('#ex-search'); await p.type('#ex-search','superset',{delay:35}); await p.waitForTimeout(500);
+    await p.click('[data-action="addex"][data-id="superset"]'); await settle();
+    await p.selectOption('.ssadd select','cardio_gym_intervals'); await p.click('[data-action="ssadd"]'); await settle();
+    await p.selectOption('#log-machine-cardio_gym_intervals','Bike');
+    await p.selectOption('#log-work-cardio_gym_intervals','Very hard');
+    await p.selectOption('#log-rest-cardio_gym_intervals','Moderate');
+    await p.fill('#log-v-cardio_gym_intervals','2');
+    await p.click('[data-action="loground"]'); await settle();
+    assert.strictEqual((seedOf().activeSession.logs.cardio_gym_intervals||[]).length,1,'the round did not log');
+    assert.deepStrictEqual(await got(),['Bike','Very hard','Moderate','2'],'the next round starts empty');
+    await leaveSession();
+  });
+
+  await t('a double tap on Log set logs one set, not two', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    assert.ok(await toSlide('Bench press'),'never reached the bench press');
+    await p.fill('#log-w-press_bench','40'); await p.fill('#log-v-press_bench','10');
+    await p.click('[data-action="logset"]'); await p.waitForTimeout(120);
+    await p.click('[data-action="logset"]'); await settle();
+    assert.strictEqual(seedOf().activeSession.logs.press_bench.length,1,'logged '+JSON.stringify(seedOf().activeSession.logs.press_bench));
+    assert.strictEqual(await p.evaluate(function(){ return document.querySelectorAll('.slide .setchip').length; }),1);
+    await leaveSession();
+  });
+
+  await t('a day logged after the fact takes Last time and the prefill from before it, not from later', async function(){
+    await go(); await leaveSession();
+    var today=await dayKey(0), st=seedOf();
+    st.workoutLogs.push({id:'wl-future-sq',workoutId:'w8',title:'Legs',tag:'Strength',date:today,
+      logs:{sq_back:[{v:8,w:137.5,t:Date.now()},{v:8,w:137.5,t:Date.now()}]}});
+    doc=env.withSeed(doc,st); await go(); await leaveSession();
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="pickday"][data-k="'+(await dayKey(3))+'"]'); await p.waitForTimeout(350);
+    await startWorkout('Legs');
+    assert.ok(await toSlide('Back squat'),'never reached the back squat');
+    var line=await p.evaluate(function(){ var e=document.querySelector('.slide .lasttime'); return e?e.textContent:''; });
+    assert.ok(!/137\.5|140/.test(line),'last time came from a later day: '+line);
+    var w=await p.inputValue('#log-w-sq_back');
+    assert.ok(w!=='137.5' && w!=='140','the weight came from a later day: '+w);
+    await leaveSession();
+    var tb=await p.$('.backfill-bar [data-action="today"]'); if(tb){ await tb.click(); await p.waitForTimeout(300); }
+    await startWorkout('Legs');
+    assert.ok(await toSlide('Back squat'),'never reached the back squat');
+    line=await p.evaluate(function(){ var e=document.querySelector('.slide .lasttime'); return e?e.textContent:''; });
+    assert.ok(/137\.5kg/.test(line),'today does not see the newest log: '+line);
+    await leaveSession();
+  });
+
+  await t('the rest clock stays marked over through a tap once the rest goal has passed', async function(){
+    await go(); await leaveSession();
+    var today=await dayKey(0), st=seedOf(), now=Date.now();
+    st.activeSession={workoutId:'w6',startedAt:today,t0:now-600000,exIds:['press_bench','press_ohp'],
+      targets:{press_bench:{sets:4,reps:'8'},press_ohp:{sets:3,reps:'8'}},logs:{press_bench:[{v:8,w:40,t:now-160000}]}};
+    doc=env.withSeed(doc,st); await go();
+    await startWorkout('Push');
+    assert.ok(await toSlide('Bench press'),'never reached the bench press');
+    var cls=await p.evaluate(function(){
+      document.querySelector('[data-action="togglewu"][data-i="0"]').click();
+      var r=document.getElementById('restline'); return r?r.className:'';
+    });
+    assert.ok(/\bover\b/.test(cls),'the rest line was drawn as "'+cls+'"');
+    await leaveSession();
+  });
+
+  await t('adding back an exercise just taken out puts it back with its sets and targets', async function(){
+    await go(); await leaveSession(); await startWorkout('Push');
+    var tgt=seedOf().activeSession.targets.press_bench;
+    await logBench(2);
+    await p.click('[data-action="removeex"][data-id="press_bench"]'); await settle();
+    assert.ok(!seedOf().activeSession.logs.press_bench,'the sets stayed after Remove');
+    await p.click('[data-action="openpicker"]'); await p.waitForTimeout(350);
+    await p.fill('#ex-search','bench press'); await p.waitForTimeout(400);
+    await p.click('[data-action="addex"][data-id="press_bench"]'); await settle();
+    var s=seedOf().activeSession;
+    assert.strictEqual((s.logs.press_bench||[]).length,2,'the sets were lost: '+JSON.stringify(s.logs.press_bench));
+    assert.deepStrictEqual(s.targets.press_bench,tgt,'the targets went back to the defaults');
+    assert.strictEqual(s.exIds.filter(function(x){ return x==='press_bench'; }).length,1);
+    assert.strictEqual(await slideTitle(),'Bench press','the slide is not the exercise added back');
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

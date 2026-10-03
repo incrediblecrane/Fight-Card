@@ -133,10 +133,15 @@ drives the "kg each" box, the "ea" in a set label, and doubling in total
 volume.
 
 **Last time**:
-The newest finished log holding working sets of the exercise. A lift's slide
-shows it with a double-progression hint (every working set at the top of the
-rep range: add weight; otherwise build the reps) and prefills kg and reps from
-the previous working set this session or, failing that, last time.
+The newest finished log holding working sets of the exercise, on or before the
+day the session is for, so a day logged after the fact never learns from a
+later one. A lift's slide shows it with a double-progression hint (every
+working set at the top of the rep range: add weight; otherwise build the reps)
+and prefills kg and reps from the previous working set this session or,
+failing that, last time. A cardio slide, or a cardio member of a superset,
+prefills its minutes, machine and efforts the same way. A second tap of Log
+set within 600ms that would log the same numbers again is taken as the same
+tap.
 _Avoid_: previous session, history
 
 **Rest clock**:
@@ -246,7 +251,8 @@ it took), `recipe` (with its planned meals), `lib` (a note), `meal` (a planned
 meal), `extra` (with its tick), `week` (a cleared week with its ticks),
 `session` (a discarded or replaced session), `sessionEx` (one exercise taken
 out of a session, tied to that session's `t0`, not the next of the same
-workout), and `many`.
+workout; adding that exercise back from the picker is this Undo, sets and
+targets and all), and `many`.
 
 **Many**:
 A run of list removals (`sauna`, `log`, `recipe`, `lib`, `meal`, `extra`)

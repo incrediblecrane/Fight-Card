@@ -1354,9 +1354,12 @@ function countsAsSet(id,st){
 }
 function countedSets(logs){ var n=0; Object.keys(logs||{}).forEach(function(k){
   (logs[k]||[]).forEach(function(st){ if(countsAsSet(k,st)) n++; }); }); return n; }
-function lastSetsFor(exId){
+// Before a date, when one is given: a day being logged after the fact never
+// learns from sessions that came after it.
+function lastSetsFor(exId,before){
   var best=null;
   state.workoutLogs.forEach(function(l){
+    if(before && l.date>before) return;
     var s=((l.logs||{})[exId]||[]).filter(function(x){ return !x.wu; });
     if(s.length && (!best || l.date>=best.date)) best={date:l.date, sets:s};
   });
@@ -1396,7 +1399,7 @@ function lastTimeLine(def,tgt,last){
 function prefillFor(exId,sess,tgt){
   var mine=((sess&&sess.logs||{})[exId]||[]).filter(function(x){ return !x.wu; });
   if(mine.length) return mine[mine.length-1];
-  var last=lastSetsFor(exId); if(!last) return null;
+  var last=lastSetsFor(exId,sess&&sess.startedAt); if(!last) return null;
   var a=aimFor(exDef(exId),tgt,last); if(a) return {w:a.w, v:a.v};
   var w=Math.max.apply(null,last.sets.map(function(s){ return s.w||0; }));
   var work=w?last.sets.filter(function(s){ return (s.w||0)===w; })[0]:last.sets[0];
@@ -1408,7 +1411,12 @@ function prefillFor(exId,sess,tgt){
 function restLineFor(sess,goal){
   var lastT=0;
   Object.keys(sess.logs).forEach(function(k){ (sess.logs[k]||[]).forEach(function(x){ if(x.t>lastT) lastT=x.t; }); });
-  return (goal&&lastT&&sessionLive(sess)&&Date.now()-lastT<REST_SHOW)?('<div class="restline" id="restline" data-t="'+lastT+'" data-goal="'+goal+'">'+restText(lastT,goal)+'</div>'):'';
+  return (goal&&lastT&&sessionLive(sess)&&Date.now()-lastT<REST_SHOW)?('<div class="restline'+((Date.now()-lastT)/1000>=goal?' over':'')+'" id="restline" data-t="'+lastT+'" data-goal="'+goal+'">'+restText(lastT,goal)+'</div>'):'';
+}
+// A cardio picker, drawn with the choice it should start on.
+function cardioSelect(id,hint,list,on){
+  return '<select id="'+id+'" class="cardio-select"><option value="">'+hint+'&hellip;</option>'+
+    list.map(function(x){ return '<option value="'+esc(x)+'"'+(x===on?' selected':'')+'>'+esc(x)+'</option>'; }).join('')+'</select>';
 }
 // A box with its unit under it, which stays when the box holds a number.
 function fieldBox(input,unit){ return '<label class="fld">'+input+'<span>'+esc(unit)+'</span></label>'; }
@@ -3458,6 +3466,10 @@ function logSet(exId,type,quiet){
   var entry={v:v,w:null,t:Date.now()};
   if(def && def.unit) entry.u=def.unit;
   if(type==='load') entry.w=wt;
+  // The boxes come back filled with the set just logged, so a second tap of a
+  // double tap would log it twice. One that quick is taken as the same tap.
+  var had=(state.activeSession.logs[exId]||[]), prev=had[had.length-1];
+  if(!quiet && prev && prev.v===entry.v && (prev.w||null)===entry.w && entry.t-prev.t>=0 && entry.t-prev.t<600) return true;
   if(type==='prep'){
     var oEl=document.getElementById('log-opt-'+exId); entry.opt=oEl?oEl.value:'';
     entry.lvlKind=prepLevelKind(entry.opt);
@@ -3626,6 +3638,14 @@ function addExToSession(exId){
     state.activeSession.supersets[exId]={ex:[], rounds:0};
   }
   else if(state.activeSession.exIds.indexOf(exId)>-1) return exId;
+  else {
+    // Taken out a moment ago and parked for Undo: adding it back is that Undo,
+    // sets, targets and all, not a bare copy that would make the Undo moot and
+    // leave its sets behind with it.
+    var back=readUndo();
+    if(back && back.kind==='sessionEx' && back.exId===exId && sameSession(state.activeSession,back.sess) &&
+      !(back.logs && (state.activeSession.logs[exId]||[]).length)){ undoOne(back); clearUndo(); return exId; }
+  }
   // Placed by role, not by id: Swim closes on its own cool-down swim, and a
   // warm-up added back belongs first. A cool-down that is not last is not a
   // cool-down.
@@ -4639,18 +4659,15 @@ function bodyContent(){
         var mChips=mSets.map(function(x){ return '<span class="setchip">'+esc(setLabel(d,x))+'</span>'; }).join('');
         var mVal=d.type==='load'?'reps':d.type==='time'?(d.unit==='min'?'mins':'secs'):d.type==='distance'?'metres':d.type==='cardio'?'mins':'reps';
         // Prefilled the way a lift slide is, so the next round is one tap.
-        var mPre=/^(load|reps|time|distance)$/.test(d.type)?prefillFor(m,sess,sess.targets[m]):null;
+        var mPre=/^(load|reps|time|distance|cardio)$/.test(d.type)?prefillFor(m,sess,sess.targets[m]):null;
         // A cardio member needs its machine and effort pickers here too: logSet
         // reads them by id, and without them the set is stored as a bare number
         // of minutes with the machine and effort silently dropped.
         var mCardio='';
         if(d.type==='cardio'){
-          mCardio='<div class="cardio-row"><select id="log-machine-'+m+'" class="cardio-select"><option value="">Machine&hellip;</option>'+
-            MACHINES.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>';}).join('')+'</select>'+
-            (d.interval?('<select id="log-work-'+m+'" class="cardio-select"><option value="">Work effort&hellip;</option>'+
-              EFFORT_LEVELS.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>'+
-              '<select id="log-rest-'+m+'" class="cardio-select"><option value="">Rest effort&hellip;</option>'+
-              EFFORT_LEVELS.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>'):'')+
+          mCardio='<div class="cardio-row">'+cardioSelect('log-machine-'+m,'Machine',MACHINES,mPre&&mPre.machine)+
+            (d.interval?(cardioSelect('log-work-'+m,'Work effort',EFFORT_LEVELS,mPre&&mPre.work)+
+              cardioSelect('log-rest-'+m,'Rest effort',EFFORT_LEVELS,mPre&&mPre.rest)):'')+
             '</div>';
         }
         return '<div class="ssrow">'+
@@ -4725,9 +4742,9 @@ function bodyContent(){
         : ('<span class="setchip">'+esc(setLabel(def2,s))+'</span>'); }).join('');
       var perImp=perImplement(exId);
       // The boxes start from the last working set, so a repeat is one tap.
-      var pre=/^(load|reps|time|distance)$/.test(def2.type)?prefillFor(exId,sess,tgt):null;
+      var pre=/^(load|reps|time|distance|cardio)$/.test(def2.type)?prefillFor(exId,sess,tgt):null;
       var preV=pre&&pre.v?' value="'+pre.v+'"':'';
-      var lastLine=lastTimeLine(def2,tgt,lastSetsFor(exId));
+      var lastLine=lastTimeLine(def2,tgt,lastSetsFor(exId,sess.startedAt));
       var restLine=restLineFor(sess,restGoal(def2,tgt));
       var weightInput=def2.type==='load'?fieldBox('<input id="log-w-'+exId+'" type="text" inputmode="decimal" placeholder="'+(perImp?'kg each':'kg')+'"'+(pre&&pre.w?' value="'+pre.w+'"':'')+'>',perImp?'kg each':'kg'):'';
       var perImpNote=(def2.type==='load'&&perImp)?('<div class="perimp">'+esc(perImplementNote(exId))+'</div>'):'';
@@ -4770,10 +4787,10 @@ function bodyContent(){
             opts.map(function(o){return '<option value="'+esc(o)+'"'+(o===picked?' selected':'')+'>'+esc(o)+'</option>';}).join('')+
           '</select>'+lvlControl+'</div>';
       }
-      var machineSelect=def2.type==='cardio'?('<select id="log-machine-'+exId+'" class="cardio-select"><option value="">Machine&hellip;</option>'+MACHINES.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('')+'</select>'):'';
+      // Picked as the set before was, so the next interval is one tap.
+      var machineSelect=def2.type==='cardio'?cardioSelect('log-machine-'+exId,'Machine',MACHINES,pre&&pre.machine):'';
       var effortSelects=(def2.type==='cardio'&&def2.interval)?(
-        '<select id="log-work-'+exId+'" class="cardio-select"><option value="">Work effort&hellip;</option>'+EFFORT_LEVELS.map(function(l){return '<option value="'+l+'">'+l+'</option>';}).join('')+'</select>'+
-        '<select id="log-rest-'+exId+'" class="cardio-select"><option value="">Rest effort&hellip;</option>'+EFFORT_LEVELS.map(function(l){return '<option value="'+l+'">'+l+'</option>';}).join('')+'</select>'
+        cardioSelect('log-work-'+exId,'Work effort',EFFORT_LEVELS,pre&&pre.work)+cardioSelect('log-rest-'+exId,'Rest effort',EFFORT_LEVELS,pre&&pre.rest)
       ):'';
       var cardioRow=(machineSelect||effortSelects)?('<div class="cardio-row">'+machineSelect+effortSelects+'</div>'):'';
       sessionHtml='<div class="story">'+storyBar()+storyHead+
