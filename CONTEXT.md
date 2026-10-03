@@ -229,6 +229,14 @@ One entry in `state.plan`: a recipe, a real date, a slot (breakfast, lunch,
 dinner) and its own portion count. Its own thing, not a flag on the recipe,
 which is what lets the same recipe be planned twice in a week at different
 portions. The shopping list buys these portions, not the recipe's.
+Add to plan starts a meal at the recipe's own size (`base`), or at the
+card's scale when the card is open and the scale is on screen (the button
+then says "Add 5 portions"); a scale left on a closed card is never bought
+for. The slot is the one picked, else the one the tag says (`slotFor`). The
+button stays under the finger while the week above it grows (`holdInView`),
+and says where the meal went ("Added for Today · Dinner"). A portion
+stepper reaches 20, or the recipe's own size if that is more, and never cuts
+a bigger count down; the Add recipe form keeps a new recipe to 1..20.
 
 **The week**:
 A rolling seven days from today, not a Mon-Sun week. A meal drops off the back
@@ -837,6 +845,9 @@ the shipped `index.html`, so they test what ships.
   ingredient lines the store or the page could not take.
 - `test-plan.js`: the meal planner in the browser: the same meal twice, slots,
   partial-week shopping.
+- `test-addplan.js`: Add to plan on a phone against the db stub: the
+  portions a new meal starts at, its slot, big batches on the steppers, the
+  week's count on a card, and the button held under the finger.
 - `test-ticks.js`: shopping ticks in the browser: what a tick is for, older
   ticks, spellings, the clears, and ticking from the keyboard.
 - `test-design.js`: computed contrast, tap target sizes, what touch can reach,

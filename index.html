@@ -968,6 +968,10 @@ var shopRange=7;
 // prepPick: the selects are re-rendered, and a choice that does not survive
 // that is a choice you have to make twice.
 var planPick={};
+// The last meal added, said beside its button until the next tap elsewhere:
+// {id, text}. A tap that plans a meal also holds its button where it was on
+// screen through the redraw (inView: the control and its offset from the top).
+var planAdded=null, inView=null;
 /* A save with no store publishes the document, and the reload that follows
    wipes every variable. What this view is in the middle of goes across it:
    the stints already added and the temperature, the shopping box, a prep
@@ -3212,8 +3216,8 @@ function addPlanEntry(recipeId,date,slot,portions){
   // Nothing here refuses a second copy: two of the same meal in a week is the
   // ordinary case, and it is the case the old model could not express.
   var e={id:'pl'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
-         recipeId:recipeId, date:date, slot:slot||'dinner',
-         portions:portions||recipePortions(r)};
+         recipeId:recipeId, date:date, slot:slot||slotFor(r),
+         portions:portions||recipeBase(r)};
   state.plan.push(e); state.plan.sort(planOrder);
   return e;
 }
@@ -3275,7 +3279,18 @@ function migrateMinutes(){
   return changed;
 }
 function recipeBase(r){ return r.base||1; }
+// The portions a new meal of r starts at: the scale shown on an open card,
+// else the recipe's own size. A scale left on a closed card is out of sight,
+// and buying for it is how one breakfast became six.
+function planAddPortions(r){ return expanded['rec:'+r.id]?recipePortions(r):recipeBase(r); }
 function recipePortions(r){ return r.portions||recipeBase(r); }
+/* One step of a portion stepper. Twenty is the ceiling a tap reaches, but a
+   recipe that makes more (from an import, or an older form) is not cut down
+   to it by a tap: the ceiling is never below the recipe's own size or the
+   count already there. */
+function stepPortions(n,d,base){
+  return Math.max(1, Math.min(Math.max(20,base||1,n), n+d));
+}
 // Round to something you can actually shop for. Weight and volume tolerate a
 // decimal; you cannot buy 1.6 tins or 4.8 peppers, and a recipe does not care
 // about a third of an onion either way.
@@ -4458,7 +4473,11 @@ function bodyContent(){
       var chosen=(planPick[r.id]&&planPick[r.id].slot)||slotFor(r);
       return '<option value="'+sl+'"'+(chosen===sl?' selected':'')+'>'+SLOT_LABEL[sl]+'</option>';
     }).join('');
-    var planned=(state.plan||[]).filter(function(e){return e.recipeId===r.id;}).length;
+    // Only the meals the week shows: one whose day has gone is not in it.
+    var planned=planEntries(planDays).filter(function(e){return e.recipeId===r.id;}).length;
+    // What a tap adds: the batch on show when the card is open, and the
+    // recipe's own size when it is closed and the scale cannot be seen.
+    var addN=planAddPortions(r), added=planAdded&&planAdded.id===r.id?planAdded.text:'';
     var m=r.macros;
     // Closed by default: what you scan the list for is the name, the macros
     // and the add button. The batch and the method open on a tap.
@@ -4477,8 +4496,8 @@ function bodyContent(){
       '<div class="recipe-controls">'+
         '<select data-action="planday" data-id="'+r.id+'">'+dayOptions+'</select>'+
         '<select data-action="planslot" data-id="'+r.id+'">'+slotOptions+'</select>'+
-        '<button class="addplan" data-action="addmeal" data-id="'+r.id+'">Add to plan</button>'+
-        (planned?'<span class="planned">'+planned+' in the week</span>':'')+
+        '<button class="addplan" data-action="addmeal" data-id="'+r.id+'">'+(addN===recipeBase(r)?'Add to plan':'Add '+addN+' portion'+(addN===1?'':'s'))+'</button>'+
+        (added||planned?'<span class="planned" role="status">'+esc(added)+(added&&planned?' &middot; ':'')+(planned?planned+' in the week':'')+'</span>':'')+
       '</div></div>';
   }
   var prepItems=state.recipes.filter(function(r){return r.prep;}).map(recipeCard).join('');
@@ -5169,7 +5188,9 @@ function drawPage(){
     if(dirty) typed[el.id]={tag:el.tagName, type:el.type, value:el.value, checked:el.checked};
   });
   clearOnRender={};
+  var hold=inView; inView=null;
   drawKeeping(app,bodyContent());
+  if(hold) keepInView(app,hold);
   BIG_BOXES.forEach(function(id){
     var el=document.getElementById(id), was=bigBox[id];
     if(!el) return;
@@ -5213,6 +5234,23 @@ function drawPage(){
   if(fitCharts() && chartPass<2){ chartPass++; renderAgain=true; } else chartPass=0;
 }
 var chartPass=0;
+/* #app takes no part in the browser's scroll anchoring, so a redraw keeps the
+   page's offset, and a control below something that grew moves down under the
+   finger. holdInView notes a control and where it is on screen; the next
+   redraw finds the same control (same action and data) and scrolls by however
+   far it moved. */
+function holdInView(el){
+  var key={}; [].forEach.call(el.attributes,function(a){ if(/^data-/.test(a.name)) key[a.name]=a.value; });
+  try{ inView={key:key, top:el.getBoundingClientRect().top}; }catch(err){ inView=null; }
+}
+function keepInView(app,hold){
+  var names=Object.keys(hold.key), hit=null;
+  [].forEach.call(app.querySelectorAll('[data-action]'),function(el){
+    if(!hit && names.every(function(n){ return el.getAttribute(n)===hold.key[n]; })) hit=el; });
+  if(!hit) return;
+  var by=hit.getBoundingClientRect().top-hold.top;
+  if(by) try{ window.scrollBy(0,by); }catch(err){}
+}
 /* Draws html into app. A big box on the page now that the new page has too
    is never taken out of it: moving it lays out all of its text again, which
    was most of a second a tap. Its ancestors stay, taking the new ones'
@@ -5263,6 +5301,7 @@ function onClick(e){
   // its change event can reach the document, so the change was silently lost.
   // The log date box is one of them: a tap opens the native picker on it.
   if(action==='planday'||action==='planslot'||action==='prepopt'||action==='logdate') return;
+  if(action!=='addmeal') planAdded=null;
   // Until we know where data lives, a tap would be applied to state that is
   // about to be replaced by the store. Reading and moving around is fine.
   var UI_ONLY_WHILE_LOADING={tab:1,prevslide:1,nextslide:1,toggleex:1,openpicker:1,
@@ -5477,7 +5516,7 @@ function onClick(e){
     var title2=(rt.value||'').trim(); if(!title2) return;
     var ings=(ri.value||'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
     var rp=parseInt((document.getElementById('rec-portions')||{}).value,10);
-    if(!(rp>0)) rp=1;
+    if(!(rp>0)) rp=1; if(rp>20) rp=20;
     var rec={id:'r'+Date.now(),title:title2,tag:'Recipe',ingredients:ings,base:rp,portions:rp,instructions:(rn.value||'').trim()};
     var longIng=ings.some(function(l){ return l.length>ING_MAX; });
     if(longIng||docFault(rec)){
@@ -5490,7 +5529,7 @@ function onClick(e){
   else if(action==='portions'){
     var pid=t.getAttribute('data-id'), pd=parseInt(t.getAttribute('data-d'),10);
     var pr=state.recipes.filter(function(x){return x.id===pid;})[0];
-    if(pr){ pr.portions = pd===0 ? recipeBase(pr) : Math.max(1, Math.min(20, recipePortions(pr)+pd)); }
+    if(pr){ pr.portions = pd===0 ? recipeBase(pr) : stepPortions(recipePortions(pr),pd,recipeBase(pr)); }
   }
   else if(action==='delrecipe'){
     var rid=t.getAttribute('data-id'), ri2=-1;
@@ -5535,7 +5574,12 @@ function onClick(e){
     // window. Planning onto it would put the meal somewhere nothing can show.
     var when=days.indexOf(pick.date)>-1?pick.date:days[0];
     var recA=state.recipes.filter(function(x){ return x.id===rid2; })[0];
-    addPlanEntry(rid2, when, pick.slot||(recA?slotFor(recA):'dinner'));
+    if(!recA) return;
+    var newMeal=addPlanEntry(rid2, when, pick.slot||slotFor(recA), planAddPortions(recA));
+    // The week and the list above the card grow, so the page is held to the
+    // button rather than to a scroll offset, and the tap says where it went.
+    planAdded={id:rid2, text:'Added for '+dayLabel(when,days.indexOf(when))+' \u00b7 '+(SLOT_LABEL[newMeal.slot]||newMeal.slot)};
+    holdInView(t);
   }
   else if(action==='delmeal'){
     var mealId=t.getAttribute('data-id'), mealGone=state.plan.filter(function(e){ return e.id===mealId; })[0];
@@ -5548,7 +5592,8 @@ function onClick(e){
     var mid=t.getAttribute('data-id'), md=parseInt(t.getAttribute('data-d'),10)||0;
     state.plan.forEach(function(e){
       if(e.id!==mid) return;
-      e.portions=Math.max(1, Math.min(20, planPortions(e)+md));
+      var mr2=planRecipe(e);
+      e.portions=stepPortions(planPortions(e),md,mr2?recipeBase(mr2):1);
     });
   }
   else if(action==='datapane'){
