@@ -335,7 +335,10 @@ recipe forms refuse what would not fit, with a reason, keeping what was typed.
 
 Declaring `db` makes the artifact organization-internal: it cannot be shared
 publicly. The app is always published with `db` declared, so a view without a
-store is not a reason to save some other way.
+store is not a reason to save some other way. It is also published with
+`downloads` declared (`capabilities: {db: {}, downloads: true}`, alongside
+the `artifact` capability it already uses): Export's Download goes through
+it, and without it Download is not offered.
 
 ## Store states
 
@@ -505,7 +508,22 @@ that write, as before.
 ```
 
 the same shape as the seed embedded in the document. It is shown as text with
-Copy and a download, and uses no capability other than `db`.
+Copy and Download, and both take the record as it is at the tap, not as it was
+when the pane opened; the text shown is worked out again when the pane opens,
+when Progress is shown again and after a change. Download saves
+`fight-card-<today>.json` through the `downloads` capability, which asks the
+viewer first, and says whether it was saved or declined: inside the artifact
+frame a plain download link is dropped without a word. A view with no
+`downloads` shows no Download and says to copy the text instead; a page
+opened outside the artifact runtime uses a plain download link.
+
+The export and a pasted import run to hundreds of KB, so their boxes are not
+drawn as markup. Each is drawn empty and the node itself is kept across
+renders (`drawKeeping`): a render that has the box on the page again leaves
+it, and its ancestors, in place and replaces everything around them, because
+taking a box of that size out of the page and putting it back lays all of its
+text out again, which was most of a second a tap. What was pasted stays in the
+box when Progress is left and shown again.
 
 **Import** takes pasted text, in one of two forms:
 
@@ -535,7 +553,11 @@ Copy and a download, and uses no capability other than `db`.
   summary counts its documents and any it left out.
 
 Everything an import carries is drawn escaped, as text. A good one shows a
-summary (days, sessions, planned meals, recipes, notes, sauna) and then:
+summary (when it was exported, on this device's calendar; days, sessions,
+planned meals, recipes, notes, sauna). Planned meals are counted as
+the import keeps them: an old recipe's `inPlan` becomes a meal, and meals
+whose day has gone are left out, as the summary says ("3 planned meals (9
+past, left out)"). Then:
 
 - **Replace** makes it the whole record.
 - **Merge** adds what is new and replaces anything with the same id or date,

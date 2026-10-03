@@ -76,6 +76,9 @@ Follow this on every change:
   organization-internal: it cannot be shared publicly. All store access goes
   through one Store object, so a different backend is a new Store, not a
   rewrite; CONTEXT.md describes the seam.
+- **Publish with `downloads` declared** as well as `db`
+  (`capabilities: {db: {}, downloads: true}`): Export's Download saves through
+  it, and a view without it offers no Download.
 - **The rig in `index.html` is generated.** `RIGFRAMES` comes from `pose/` by
   `pose/emit-rig.js`: change `pose/` and regenerate, never edit it in place.
 - **`App.toString()` must round-trip**, and the app is compact ES5 in one

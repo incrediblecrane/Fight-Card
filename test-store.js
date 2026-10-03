@@ -27,7 +27,7 @@ var src=[grabVar('SESS_ENDED_KEEP'), grabVar('DB_LISTS'), grabVar('SLOTS'), grab
   grab('stableJson'), grab('mergeKeyed'), grab('setKey'), grab('mergeSetLogs'), grab('mergeSession'), grab('mergeActive'), grab('mergeSessionDoc'), grab('dbMerge'), grab('foldPend'),
   grabVar('DAY_COUNTS'), grab('mergeDay'), grab('profShape'), grab('dayPair'), grab('dayWx'), grab('dayXp'), grab('waterTgt'), 'var state=null, pendFix=0;',
   h.match(/var DUMP_COLL=[^\n]*\n/)[0], grab('readDump'),
-  grabVar('DB_DOC_MAX'), grab('docBytes'), grab('docDepth'), grab('docFault'), grab('jsonDepth'), grabVar('ING_MAX'), grab('importLabel'),
+  grabVar('DB_DOC_MAX'), grab('docBytes'), grab('docDepth'), grab('docFault'), grab('jsonDepth'), grabVar('ING_MAX'), grab('importLabel'), grab('pad'), grab('dateKey'), grab('planDates'), grab('planMoved'), grab('planKept'),
   grab('MemoryStore'), grab('DbStore'), grab('exportData'), grab('exportText'), grab('readImport'), grab('readImportOf'), grabVar('XP_PER_WATER'), grab('hasId'), grab('mergeImport')].join('\n');
 var box={};
 new Function(src+'\nthis.MemoryStore=MemoryStore;this.exportData=exportData;this.exportText=exportText;'+
@@ -44,8 +44,10 @@ function rich(){
   st.shopExtras=[{id:'x1',text:'Bin bags'}]; st.shoppingChecked=['x|x1'];
   st.deletedRecipes=['p3']; st.weekTarget=4;
   var rid=st.recipes[0].id;
-  st.plan=[{id:'pl1',recipeId:rid,date:'2026-09-07',slot:'dinner',portions:2},
-           {id:'pl2',recipeId:rid,date:'2026-09-10',slot:'lunch',portions:1}];
+  // Days still to come, so an import keeps them.
+  var ahead=function(n){ var d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1)+'-'+(d.getDate()<10?'0':'')+d.getDate(); };
+  st.plan=[{id:'pl1',recipeId:rid,date:ahead(2),slot:'dinner',portions:2},
+           {id:'pl2',recipeId:rid,date:ahead(5),slot:'lunch',portions:1}];
   st.activeSession={workoutId:'w1',startedAt:'2026-09-05',exIds:['press_bench'],targets:{},logs:{press_bench:[{v:8,w:60,t:1}]}};
   st.recipes[1]._ings=[{n:'cached'}];
   return st;
@@ -349,7 +351,7 @@ t('a dump of the old artifact\'s store reads as a load of that store does', func
   assert.ok(!('_ings' in st.recipes[0]) && st.recipes[0].inPlan===true,'the recipe was not read as a load reads it');
   assert.deepStrictEqual(st.activeSession.supersets.ss1,{ex:['press_bench','sq_goblet'],rounds:0},'the old superset shape was not converted');
   assert.deepStrictEqual(st.shopExtras,[{id:'x1788500000000',text:'Bin bags'}]);
-  assert.deepStrictEqual(r.summary,{days:2,sessions:2,meals:1,recipes:2,notes:1,sauna:2,exportedAt:'',docs:13,unused:0});
+  assert.deepStrictEqual(r.summary,{days:2,sessions:2,meals:1,pastMeals:1,recipes:2,notes:1,sauna:2,exportedAt:'',docs:13,unused:0});
 });
 t('a dump as a list of {path, data} or of {collection, doc_id, data} reads the same', function(){
   var d=oldDump(), want=box.readImport(JSON.stringify(d));

@@ -95,8 +95,15 @@ var SHIM=`<script>(function(){
   var DB={doc:docRef, collection:collRef};
   var ART={publish:function(h){ return fetch('/publish',{method:'POST',body:h})
       .then(function(){ setTimeout(function(){location.reload();},0); }); }};
+  // downloads as the contract has it: save asks the viewer, resolves
+  // {status:'saved'} or rejects {code}. __DL_OFF: this view has none.
+  // __DL_SAY: the code it rejects with. What it was handed is in __saved.
+  var DL={save:function(r){ (window.__saved=window.__saved||[]).push({filename:r.filename, data:r.data});
+    if(typeof r.filename!=='string'||!r.data) return Promise.reject({code:'bad_request',message:'stub'});
+    return window.__DL_SAY?Promise.reject({code:window.__DL_SAY,message:'stub'}):Promise.resolve({status:'saved'}); }};
   window.claude={use:function(n){
     if(n==='db') window.__dbUses=(window.__dbUses||0)+1;
+    if(n==='downloads') return Promise.resolve(window.__DL_OFF?null:Object.freeze(DL));
     // A runtime that never answers at all, not even with null.
     if(window.__DB_HANG && n==='db') return new Promise(function(){});
     if(window.__DB_OFF && n==='db') return Promise.resolve(null);
@@ -1825,7 +1832,7 @@ srv.listen(0,async function(){
       'recipes/r1':{id:'r1',title:'Overnight oats',tag:'Breakfast',ingredients:['Porridge oats (80g)'],instructions:'Stir.',inPlan:true,day:'Mon',base:1,portions:6}};
     await importing(JSON.stringify(dump));
     var body=await text();
-    assert.ok(/A database dump of 8 documents: 1 day, 1 session, 0 planned meals, 1 recipe, 1 note, 1 sauna visit/.test(body),
+    assert.ok(/A database dump of 8 documents: 1 day, 1 session, 1 planned meal, 1 recipe, 1 note, 1 sauna visit/.test(body),
       'the summary does not describe the dump: '+body.slice(-500));
     await p.click('[data-action="doimport"][data-mode="replace"]'); await settle();
     var pr=store['state/profile'];
@@ -2668,6 +2675,119 @@ srv.listen(0,async function(){
       assert.ok(!(await notSaved(q)).length,'the notice stayed up after a save landed');
     } finally { errs.splice(e0); await q.context().close(); }
     await go();
+  });
+
+  console.log('\nTHE DATA CARD');
+  var onProgress=async function(){ await p.click('[data-action="tab"][data-tab="progress"]'); };
+  var pane=async function(which){ await onProgress();
+    if(!(await p.locator('#'+which+'-json').count())) await p.click('[data-action="datapane"][data-p="'+which+'"]'); };
+  var dayWater=function(json,day){ var d=JSON.parse(json).days[day]; return d?d.water:0; };
+  var noLoad=function(q){ return q.waitForFunction(function(){ return !/loading your data/.test(document.body.innerText); }); };
+  // A day d days from the page's today, worked out on the calendar alone.
+  var dayFrom=function(day,d){ var x=new Date(day+'T00:00:00Z'); x.setUTCDate(x.getUTCDate()+d); return x.toISOString().slice(0,10); };
+
+  // The export was drawn into the page as markup, so every tap on Progress
+  // parsed it again and laid all of it out: most of a second a tap on a year.
+  await t('with Export or a checked import open, a tap on Progress redraws the page around the text, not the text', async function(){
+    // Enough of a record that its text dwarfs the page around it.
+    var was=JSON.parse(JSON.stringify(store));
+    for(var i=1;i<=60;i++){ var bd=blank(); bd.water=i%9; store['days/'+dayFrom('2024-05-01',i)]=bd; }
+    try{
+    await go(); await onProgress();
+    var probe=function(){ return p.evaluate(function(){
+      var app=document.getElementById('app'), was=document.querySelector('#export-json,#import-json');
+      document.querySelector('[data-action="prange"]').click();
+      var now=document.querySelector('#export-json,#import-json');
+      return {same:!!was&&was===now, len:app.innerHTML.length, val:now?now.value.length:0}; }); };
+    var bare=await p.evaluate(function(){ return document.getElementById('app').innerHTML.length; });
+    await pane('export');
+    var r=await probe();
+    assert.ok(r.val>5000,'the export is only '+r.val+' characters, too small to tell');
+    assert.ok(r.same,'the export box was drawn afresh by a tap');
+    assert.ok(r.len-bare<3000,'the page grew by '+(r.len-bare)+' characters of markup with Export open');
+    var ex=await p.inputValue('#export-json');
+    // Pasted all at once, as a paste is: fill types a long text in slowly.
+    await pane('import'); await p.evaluate(function(v){ var e=document.getElementById('import-json'); e.focus(); e.value=v;
+      e.dispatchEvent(new Event('input',{bubbles:true})); },ex);
+    await p.click('[data-action="checkimport"]');
+    assert.ok(await p.locator('[data-action="doimport"]').count(),'the export did not check');
+    r=await probe();
+    assert.ok(r.same,'the import box was drawn afresh by a tap');
+    assert.strictEqual(r.val,ex.length,'the import box lost what was pasted');
+    assert.ok(r.len-bare<4000,'the page grew by '+(r.len-bare)+' characters of markup with an import checked');
+    assert.ok(await p.locator('[data-action="doimport"]').count(),'the summary went with the tap');
+    await toToday(); await onProgress();
+    assert.strictEqual(await p.inputValue('#import-json'),ex,'a look at Today lost what was pasted');
+    } finally { await putBack(was); }
+  });
+
+  await t('an Export left open shows, copies and saves the record as it is now', async function(){
+    await go(); var day=await today();
+    await p.evaluate(function(){ window.__copied=[]; window.__saved=[];
+      Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:function(v){ window.__copied.push(v); return Promise.resolve(); }}}); });
+    await pane('export'); var w0=dayWater(await p.inputValue('#export-json'),day);
+    await toToday(); await water(3); await onProgress();
+    assert.ok(await p.locator('#export-json').count(),'the pane closed');
+    assert.strictEqual(dayWater(await p.inputValue('#export-json'),day),w0+3,'the box shows the record from when it opened');
+    await p.click('[data-action="copyexport"]'); await p.waitForTimeout(200);
+    var c=await p.evaluate(function(){ return window.__copied; });
+    assert.strictEqual(c.length,1,'nothing was copied');
+    assert.strictEqual(dayWater(c[0],day),w0+3,'the copy is the record from when the pane opened');
+    await toToday(); await water(1); await onProgress();
+    await p.click('[data-action="downloadexport"]'); await p.waitForTimeout(300);
+    var sv=await p.evaluate(function(){ return window.__saved; });
+    assert.strictEqual(sv.length,1,'Download did not go through the downloads capability');
+    assert.strictEqual(sv[0].filename,'fight-card-'+day+'.json','the file is called '+sv[0].filename);
+    assert.strictEqual(dayWater(sv[0].data,day),w0+4,'the saved file is not the record as it is now');
+    assert.ok((await text()).indexOf('Saved fight-card-'+day+'.json.')>-1,'it does not say the file was saved');
+  });
+
+  // In the artifact frame a plain download link is dropped without a word.
+  await t('Download says when the save is declined, and a view that cannot save files says to copy instead', async function(){
+    await go(); await onProgress();
+    await pane('export');
+    await p.evaluate(function(){ window.__saved=[]; window.__DL_SAY='declined'; });
+    try{
+      await p.click('[data-action="downloadexport"]'); await p.waitForTimeout(300);
+      assert.strictEqual((await p.evaluate(function(){ return window.__saved; })).length,1,'no save was asked for');
+      assert.ok(/Not saved\./.test(await text()),'a declined save is not reported');
+    } finally { await p.evaluate(function(){ window.__DL_SAY=''; }); }
+    // As wide as the main view and not zoomed: what earlier checks stored
+    // can draw a Progress row wider than a phone, which zooms a mobile view
+    // out and puts its taps somewhere else.
+    var q=await (await b.newContext({viewport:{width:420,height:900},hasTouch:true,
+      timezoneId:process.env.FC_TZ||'Pacific/Kiritimati'})).newPage(); q.setDefaultTimeout(8000);
+    q.on('pageerror',function(e){errs.push('own view: '+e.message);});
+    await q.addInitScript('window.__DL_OFF=true;'); await q.goto(url); await q.waitForTimeout(400);
+    try{
+      await noLoad(q); await qToday(q);
+      await q.click('[data-action="tab"][data-tab="progress"]');
+      if(!(await q.locator('[data-action="datapane"][data-p="export"]').count())) throw new Error('no Export on Progress: '+(await q.evaluate(function(){ return document.body.innerText; })).slice(0,600));
+      await q.click('[data-action="datapane"][data-p="export"]');
+      await q.waitForTimeout(300);
+      assert.strictEqual(await q.locator('[data-action="downloadexport"]').count(),0,'Download is offered where it cannot work');
+      assert.ok(/This view cannot save files\. Copy the text instead\./.test(await q.evaluate(function(){ return document.body.innerText; })),'nothing says to copy instead');
+    } finally { await q.context().close(); }
+  });
+
+  await t('the import summary counts the planned meals it keeps, and how many past ones it leaves out', async function(){
+    await go(); var day=await today();
+    await pane('export'); var a=JSON.parse(await p.inputValue('#export-json')), rid=a.recipes[0].id;
+    a.plan=[];
+    for(var i=0;i<9;i++) a.plan.push({id:'past'+i, recipeId:rid, date:dayFrom(day,-20-i), slot:'dinner', portions:2});
+    for(i=0;i<3;i++) a.plan.push({id:'next'+i, recipeId:rid, date:dayFrom(day,i), slot:'lunch', portions:2});
+    await importing(JSON.stringify(a));
+    var body=await text();
+    assert.ok(/\b3 planned meals \(9 past, left out\)/.test(body),'the summary does not count the meals kept: '+(body.match(/[^,]*planned meal[^,]*/)||[''])[0]);
+  });
+
+  await t('the import summary gives the day the export was taken on this device\'s calendar', async function(){
+    await go();
+    var iso='2025-04-01T20:00:00.000Z', local=await p.evaluate(function(iso){ var d=new Date(iso), z=function(n){ return (n<10?'0':'')+n; };
+      return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); },iso);
+    await importing(JSON.stringify({schema:1, exportedAt:iso, days:{'2025-04-01':blank()}}));
+    var body=await text();
+    assert.ok(body.indexOf('Exported '+local+':')>-1,'the summary does not say Exported '+local+': '+(body.match(/Exported [^:]*/)||[''])[0]);
   });
 
   console.log('\nWITHOUT DB IT STILL WORKS THE OLD WAY');
