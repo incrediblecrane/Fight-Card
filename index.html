@@ -3066,31 +3066,71 @@ function parseIng(text){
     fr+=inside.slice(from,j)+(dg?dg+' ':'')+FR[inside.charAt(i)]; from=i+1;
   }
   inside=fr+inside.slice(from);
+  var said=inside;
+  // "1,5 l" is a litre and a half. "1,000ml" is refused, as the number boxes
+  // refuse it: read as a decimal it would buy one millilitre, so it is kept
+  // as words rather than guessed at.
+  if(/^\D{0,20}[1-9]\d{0,2},\d{3}(?![\d,])/.test(inside)) return {n:name, q:null, u:'', d:inside, raw:raw};
+  inside=inside.replace(/(^|[^\d.,])(\d+),(\d+)(?![\d,])/g,function(m,p,a,b){ return p+a+'.'+b; });
+  // "about 200g" is still 200g to shop for. The word stays on the card.
+  var pre=(inside.match(/^(?:~|(?:about|approx(?:imately|\.)?|roughly)(?![a-z]))\s*/i)||[''])[0];
+  inside=inside.slice(pre.length); pre=pre.trim();
   var N='\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:\\.\\d+)?';
-  var qm=inside.match(new RegExp('^('+N+')(?:\\s*-\\s*('+N+'))?'));
+  var qm=inside.match(new RegExp('^('+N+')'));
   function val(x){ var p=x.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/); return p ? (+(p[1]||0))+p[2]/p[3] : +x; }
-  var rest=qm?inside.slice(qm[0].length).trim():inside;
-  // A whole word, or "large" reads as litres and "grams" as g plus "rams".
-  var unit=(rest.match(/^([a-z]+)(?![a-z])/i)||[])[1]||'';
+  // "sticks" is a counting noun, not an instruction: dropping it turned
+  // "Celery (2 sticks)" into "Celery (2)" on the shopping list, which is two
+  // heads of celery rather than two sticks. Plurals of abbreviations ("kgs",
+  // "tbsps") are the unit, not things to count.
+  function unitOf(w){ var u=String(w||'').toLowerCase().replace(/\s+/g,' ')
+    .replace(/^(gram|gramme)s?$/,'g').replace(/^(kilogram|kilo)s?$/,'kg')
+    .replace(/^milli(litre|liter)s?$/,'ml').replace(/^(litre|liter)s?$/,'l')
+    .replace(/^tablespoons?$/,'tbsp').replace(/^teaspoons?$/,'tsp')
+    .replace(/^(kg|g|ml|l|tbsp|tsp)s$/,'$1').replace(/^gr?ms?$/,'g');
+    return /^((kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|stick|scoop|wedge|sprig|(large |small )?handful)s?|bunch(es)?)$/.test(u)?u:''; }
+  // The unit at the start of what follows a number: "large handful" before
+  // the first word, or "large" reads as no unit at all. A whole word, or
+  // "grams" reads as g plus "rams".
+  function unitAt(s){ var w=s.match(/^(?:large|small)\s+handfuls?(?![a-z])/i)||s.match(/^[a-z]+(?![a-z])/i)||[''];
+    return {w:w[0], u:unitOf(w[0])}; }
   if(!qm){
-    if(IMPLIED_ONE.test(inside)) return {n:name, q:1, u:inside.toLowerCase(), raw:raw};
+    if(IMPLIED_ONE.test(said)) return {n:name, q:1, u:said.toLowerCase(), raw:raw};
     // "drizzle", "mug, uncooked", "optional": no measurement, but the NAME is
     // still the name. Keeping the whole string as the name made "Honey
     // (drizzle)" a different ingredient from "Honey (2 tbsp)".
-    return {n:name, q:null, u:'', d:inside, raw:raw};
+    return {n:name, q:null, u:'', d:said, raw:raw};
   }
-  // "sticks" is a counting noun, not an instruction: dropping it turned
-  // "Celery (2 sticks)" into "Celery (2)" on the shopping list, which is two
-  // heads of celery rather than two sticks.
-  var u=unit.toLowerCase().replace(/^(gram|gramme)s?$/,'g').replace(/^(kilogram|kilo)s?$/,'kg')
-    .replace(/^milli(litre|liter)s?$/,'ml').replace(/^(litre|liter)s?$/,'l')
-    .replace(/^tablespoons?$/,'tbsp').replace(/^teaspoons?$/,'tsp');
-  if(!/^((kg|g|ml|l|tbsp|tsp|tin|can|head|clove|slice|stick|scoop|wedge|sprig|handful)s?|bunch(es)?)$/.test(u)){ u=''; unit=''; }
+  var q=val(qm[1]), qMax=null, rest=inside.slice(qm[0].length);
+  // "2-3", "2–3", "2 to 3" and "500g-1kg" are ranges. The card shows what the
+  // recipe says and the shopping list buys the top end. "1-1/2" is one and a
+  // half, not one down to a half.
+  var rg=rest.match(new RegExp('^(?:\\s*([a-z]+))?(\\s*[-\\u2013\\u2014]\\s*|\\s+to\\s+)('+N+')','i'));
+  if(rg){
+    var lo=rg[1]?unitOf(rg[1]):'', hi=unitAt(rest.slice(rg[0].length).trim()).u;
+    if(!rg[1] && !/to/i.test(rg[2]) && /^\d+$/.test(qm[1]) && /^\d+\s*\/\s*\d+$/.test(rg[3]) && val(rg[3])<1){ q+=val(rg[3]); rest=rest.slice(rg[0].length); }
+    else if(!rg[1] || (lo && hi && canonUnit(lo)===canonUnit(hi))){
+      if(rg[1]) q=canonQty(q,lo)/canonQty(1,hi);
+      qMax=val(rg[3]); rest=rest.slice(rg[0].length);
+    }
+  }
+  var gap=rest.match(/^\s*/)[0], size='';
+  rest=rest.trim();
+  // "2 x 400g tins" is two tins: the size is part of what to buy, not the unit.
+  var sz=rest.match(/^(?:[x×](?=[\s\d])\s*)?(?:(\d+(?:\.\d+)?)\s*(kg|g|ml|l)(?![a-z])\s*)?/i);
+  if(sz[0]){
+    var at2=unitAt(rest.slice(sz[0].length));
+    if(at2.u && !/^(kg|g|ml|l|tbsp|tsp)$/.test(at2.u)){ size=sz[1]?sz[1]+sz[2].toLowerCase():''; rest=rest.slice(sz[0].length); }
+  }
+  var ua=unitAt(rest), u=ua.u, out={n:name, q:q, u:u, raw:raw};
   // Keep whatever followed the quantity (", diced", ", optional"): it is
-  // instruction, not measurement, and dropping it loses the point.
-  var desc=rest.slice(unit.length).replace(/^[\s,]+/,'').trim();
-  var out={n:name, q:val(qm[1]), u:u, d:desc, raw:raw};
-  if(qm[2]) out.qMax=val(qm[2]);
+  // instruction, not measurement, and dropping it loses the point. Words that
+  // are not a unit ("2cm piece", "1 large") stay as they were written, with
+  // no comma pushed in after the number.
+  if(u||/^,/.test(rest)) out.d=rest.slice(u?ua.w.length:0).replace(/^[\s,]+/,'').trim();
+  else{ out.d=rest; if(rest) out.j=gap?' ':''; }
+  if(qMax>q) out.qMax=qMax;
+  if(size) out.size=size;
+  if(pre) out.pre=pre;
   return out;
 }
 function recipeIngs(r){
@@ -3230,7 +3270,8 @@ function roundQty(q,unit){
   // A pinch scaled down is still a pinch, not "0 tsp".
   if(/^(g|kg|ml|l)$/.test(unit)) return Math.max(q>0?0.1:0, Math.round(q*10)/10);
   if(/^(tbsp|tsp)$/.test(unit)) return Math.max(q>0?0.5:0, Math.round(q*2)/2);
-  if(q<1) return Math.max(0.5, Math.round(q*2)/2);
+  // A plain count keeps its half: "1 1/2 mugs" doubled is 3, tripled 4.5.
+  if(q<1 || !unit) return Math.max(0.5, Math.round(q*2)/2);
   return Math.round(q);
 }
 /* How much to BUY, which is a different question. Countable things are sold
@@ -3254,6 +3295,9 @@ function qtyText(q,unit,buying){
   // 1400g is a number you have to think about; 1.4kg is one you can shop with.
   if(unit==='g' && q>=1000){ q=q/1000; unit='kg'; }
   else if(unit==='ml' && q>=1000){ q=q/1000; unit='l'; }
+  // And 0.24kg is 240g, not a tenth-of-a-kilo guess at "0.2kg".
+  else if(unit==='kg' && q<1){ q=q*1000; unit='g'; }
+  else if(unit==='l' && q<1){ q=q*1000; unit='ml'; }
   q=buying?buyQty(q,unit):roundQty(q,unit);
   // A count of things pluralises; grams and millilitres do not. It has to
   // singularise too, or a recipe scaled down reads "1 tins".
@@ -3264,7 +3308,8 @@ function qtyText(q,unit,buying){
   return fmtQty(q)+(unit?(/^(kg|g|ml|l)$/.test(unit)?unit:' '+unit):'');
 }
 function scaledIng(ing,factor){
-  if(ing.q===null) return ing.raw;
+  // At the recipe's own size the line reads exactly as it was typed.
+  if(ing.q===null || factor===1) return ing.raw;
   var txt=qtyText((ing.qMax||ing.q)*factor,ing.u);
   if(ing.qMax){
     // "4-6" scales to "8-12". The unit is written once, after the top end.
@@ -3272,7 +3317,11 @@ function scaledIng(ing,factor){
     var sg=function(x){ return x.replace(/(ch|sh|x)es$/,'$1').replace(/s$/,''); };
     if(ln!==hn) txt=(sg(lo.slice(ln.length))===sg(txt.slice(hn.length))?ln:lo)+'-'+txt;
   }
-  return ing.n+' ('+txt+(ing.d?', '+ing.d:'')+')';
+  // "4 x 400g tins", "about 400g", "4cm piece": what was typed around the
+  // number comes back around the new one, so the card parses back the same.
+  if(ing.size) txt=txt.replace(/^([\d.]+(?:-[\d.]+)?)\s*/,'$1 x '+ing.size+' ');
+  if(ing.pre) txt=ing.pre+(ing.pre==='~'?'':' ')+txt;
+  return ing.n+' ('+txt+(ing.d?(ing.j==null?', ':ing.j)+ing.d:'')+')';
 }
 
 /* Adding up a shopping list is where an ingredient quietly goes missing, so
@@ -3287,9 +3336,9 @@ function scaledIng(ing,factor){
    as separate quantities, but on the SAME row: "Spinach (200g + 1 handful)".
    Nothing is invented, and nothing can hide. */
 var UNIT_SCALE={kg:{u:'g',mul:1000}, l:{u:'ml',mul:1000}};
-var COUNT_UNIT=/^(?:(tin|can|head|clove|slice|stick|scoop|wedge|sprig|handful)s|(bunch)es)$/;
+var COUNT_UNIT=/^(?:(tin|can|head|clove|slice|stick|scoop|wedge|sprig|(?:large |small )?handful)s|(bunch)es)$/;
 function canonUnit(u){
-  var x=String(u||'').trim().toLowerCase();
+  var x=String(u||'').trim().toLowerCase().replace(/\s+/g,' ');
   if(UNIT_SCALE[x]) return UNIT_SCALE[x].u;
   // "large handful" is deliberately NOT folded into "handful": they are
   // different amounts, and pretending otherwise would invent a quantity.

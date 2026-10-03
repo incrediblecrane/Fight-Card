@@ -39,7 +39,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 function sandbox(st){
   var box={};
   new Function('state', src+'\nthis.shoppingList=shoppingList;this.planDates=planDates;'+
-    'this.parseIng=parseIng;this.qtyText=qtyText;this.scaledIng=scaledIng;').call(box, st);
+    'this.parseIng=parseIng;this.qtyText=qtyText;this.scaledIng=scaledIng;this.canonUnit=canonUnit;this.canonQty=canonQty;').call(box, st);
   return box;
 }
 
@@ -304,19 +304,18 @@ console.log('\nREADING WHAT PEOPLE TYPE');
 // The add-recipe box says "Name (quantity unit)", so anything a person might
 // type there has to come back out meaning the same thing.
 function pi(txt){ var g=sandbox({recipes:[], plan:[], shopExtras:[]}).parseIng(txt);
-  return {q:g.q, qMax:g.qMax, u:g.u, d:g.d}; }
+  return {q:g.q, qMax:g.qMax, u:g.u, d:g.d, size:g.size, pre:g.pre}; }
 function sc(txt,f){ var b=sandbox({recipes:[], plan:[], shopExtras:[]}); return b.scaledIng(b.parseIng(txt),f); }
 
 t('a unit is a whole word, so "large" is not litres and "grams" is grams', function(){
   var g=pi('Spinach (2 large handfuls)');
-  assert.deepStrictEqual([g.q,g.u,g.d],[2,'','large handfuls'], JSON.stringify(g));
+  assert.deepStrictEqual([g.q,g.u,g.d],[2,'large handfuls',''], JSON.stringify(g));
   g=pi('Onion (1 large)'); assert.deepStrictEqual([g.u,g.d],['','large'], JSON.stringify(g));
   g=pi('Chillies (2 green)'); assert.deepStrictEqual([g.u,g.d],['','green'], JSON.stringify(g));
   g=pi('Garlic (3 garlic cloves)'); assert.deepStrictEqual([g.u,g.d],['','garlic cloves'], JSON.stringify(g));
   g=pi('Milk (1 litre)'); assert.deepStrictEqual([g.q,g.u,g.d],[1,'l',''], JSON.stringify(g));
   g=pi('Flour (200 grams)'); assert.deepStrictEqual([g.q,g.u,g.d],[200,'g',''], JSON.stringify(g));
   g=pi('Rice (400g)'); assert.deepStrictEqual([g.q,g.u,g.d],[400,'g',''], JSON.stringify(g));
-  assert.strictEqual(sc('Spinach (2 large handfuls)',3),'Spinach (6, large handfuls)');
 });
 
 t('a range keeps both ends on the card and buys the top end', function(){
@@ -385,7 +384,8 @@ t('Egg and Eggs are one row on the list, named as first written', function(){
 t('a long ingredient line is read in linear time', function(){
   var box=sandbox({recipes:[], plan:[], shopExtras:[]});
   ['x'+'('.repeat(40000), 'x ('+'('.repeat(40000)+')', 'x (1'+' '.repeat(40000)+'a)', 'x (½'+' '.repeat(40000)+'a)',
-   'x'+' ('.repeat(20000)+')'].forEach(function(txt,i){
+   'x'+' ('.repeat(20000)+')', 'x (1'+' '.repeat(40000)+'-a)', 'x (1a'+' '.repeat(40000)+'-2)',
+   'x (1'+' '.repeat(40000)+'large'+' '.repeat(40000)+'h)', 'x (2 x 4'+' '.repeat(40000)+'g)', 'x ('+'a,1'.repeat(15000)+')'].forEach(function(txt,i){
     var t0=Date.now(); box.parseIng(txt); var ms=Date.now()-t0;
     assert.ok(ms<50,'line '+i+' took '+ms+'ms');
   });
@@ -409,6 +409,122 @@ t('the bracket and fractions are read as the old patterns read them', function()
     // What is left of the bracket once the amount is read, or all of it.
     else if(g.q===null && g.u==='') assert.strictEqual(g.d===undefined?'':g.d,want[1]===''?'':want[1],'inside of '+JSON.stringify(txt));
   }
+});
+
+console.log('\nREADING QUANTITIES AND UNITS');
+
+// One meal of one recipe, so a list row can be read for a single line.
+function listOf(lines,portions,base){
+  var st={recipes:[{id:'a',title:'A',base:base||1,ingredients:lines}], plan:[], shopExtras:[]};
+  var box=sandbox(st);
+  st.plan.push({id:'x', recipeId:'a', date:box.planDates()[0], slot:'dinner', portions:portions||1});
+  return box.shoppingList().map(function(o){ return o.label; });
+}
+
+t('"1-1/2 tsp" is one and a half, not a range down to a half', function(){
+  var g=pi('Sugar (1-1/2 tsp)'); assert.deepStrictEqual([g.q,g.qMax,g.u],[1.5,undefined,'tsp'], JSON.stringify(g));
+  g=pi('Sugar (1-½ tsp)'); assert.deepStrictEqual([g.q,g.qMax,g.u],[1.5,undefined,'tsp'], JSON.stringify(g));
+  assert.deepStrictEqual(listOf(['Sugar (1-1/2 tsp)'],2),['Sugar (3 tsp)']);
+  // A top end that is not above the bottom is not a range.
+  g=pi('Eggs (3-2)'); assert.strictEqual(g.qMax,undefined, JSON.stringify(g));
+  g=pi('Eggs (2-2)'); assert.strictEqual(g.qMax,undefined, JSON.stringify(g));
+  g=pi('Eggs (1/2-3/4)'); assert.deepStrictEqual([g.q,g.qMax],[0.5,0.75], JSON.stringify(g));
+});
+
+t('a range written with a dash, "to", or a unit at each end still scales', function(){
+  assert.strictEqual(sc('Eggs (2–3)',2),'Eggs (4-6)');
+  assert.strictEqual(sc('Eggs (2 — 3)',2),'Eggs (4-6)');
+  assert.strictEqual(sc('Eggs (2 to 3)',2),'Eggs (4-6)');
+  assert.deepStrictEqual(listOf(['Eggs (2–3)'],2),['Eggs (6)']);
+  assert.deepStrictEqual(listOf(['Eggs (2 to 3)'],2),['Eggs (6)']);
+  var g=pi('Chicken (500g-1kg)'); assert.deepStrictEqual([g.q,g.qMax,g.u],[0.5,1,'kg'], JSON.stringify(g));
+  assert.deepStrictEqual(listOf(['Chicken (500g-1kg)'],2),['Chicken (2kg)']);
+  assert.strictEqual(sc('Chicken (500g-1kg)',2),'Chicken (1-2kg)');
+  g=pi('Oil (1 tbsp - 2 tbsp)'); assert.deepStrictEqual([g.q,g.qMax,g.u],[1,2,'tbsp'], JSON.stringify(g));
+  // Units that do not convert are not a range: nothing is invented.
+  g=pi('Rice (1 tin-200g)'); assert.strictEqual(g.qMax,undefined, JSON.stringify(g));
+  // "to serve" is an instruction, not a range.
+  g=pi('Lime (1, to serve)'); assert.deepStrictEqual([g.q,g.qMax,g.d],[1,undefined,'to serve'], JSON.stringify(g));
+});
+
+t('"about", "~", "approx" and "roughly" do not hide the amount', function(){
+  ['~','about ','approx ','approx. ','roughly '].forEach(function(w){
+    var g=pi('Rice ('+w+'200g)'); assert.deepStrictEqual([g.q,g.u],[200,'g'], w+': '+JSON.stringify(g));
+    assert.deepStrictEqual(listOf(['Rice ('+w+'200g)'],2),['Rice (400g)'], w);
+    assert.ok(/400g/.test(sc('Rice ('+w+'200g)',2)) && sc('Rice ('+w+'200g)',2).indexOf(w.trim())>-1, sc('Rice ('+w+'200g)',2));
+  });
+});
+
+t('a plural abbreviation is the unit, not a count', function(){
+  var g=pi('Chicken (1.5 kgs)'); assert.deepStrictEqual([g.q,g.u],[1.5,'kg'], JSON.stringify(g));
+  [['Flour (200 gs)','g'],['Flour (200 gms)','g'],['Flour (200 grms)','g'],['Milk (300 mls)','ml'],
+   ['Milk (2 ls)','l'],['Oil (2 tbsps)','tbsp'],['Salt (2 tsps)','tsp']].forEach(function(c){
+    assert.strictEqual(pi(c[0]).u,c[1],c[0]+' '+JSON.stringify(pi(c[0])));
+  });
+  assert.deepStrictEqual(listOf(['Chicken (1.5 kgs)','Chicken (500g)'],2),['Chicken (4kg)']);
+});
+
+t('"1 large handful" is read back as the unit it is', function(){
+  var g=pi('Spinach (1 large handful)'); assert.deepStrictEqual([g.q,g.u,g.d],[1,'large handful',''], JSON.stringify(g));
+  g=pi('Spinach (2 Small  Handfuls)'); assert.deepStrictEqual([g.q,g.u],[2,'small handfuls'], JSON.stringify(g));
+  assert.deepStrictEqual(listOf(['Spinach (1 large handful)','Spinach (large handful)']),['Spinach (2 large handfuls)']);
+  assert.deepStrictEqual(listOf(['Spinach (2 large handfuls)','Spinach (handful)']),['Spinach (1 handful + 2 large handfuls)']);
+  assert.strictEqual(sc('Spinach (2 large handfuls)',3),'Spinach (6 large handfuls)');
+});
+
+t('"2 x 400g tins" keeps its unit and its size', function(){
+  var g=pi('Chopped tomatoes (2 x 400g tins)'); assert.deepStrictEqual([g.q,g.u,g.size],[2,'tins','400g'], JSON.stringify(g));
+  g=pi('Chopped tomatoes (2×400g tins)'); assert.deepStrictEqual([g.q,g.u,g.size],[2,'tins','400g'], JSON.stringify(g));
+  assert.deepStrictEqual(listOf(['Chopped tomatoes (2 x 400g tins)','Chopped tomatoes (tin)']),['Chopped tomatoes (3 tins)']);
+  assert.strictEqual(sc('Chopped tomatoes (2 x 400g tins)',2),'Chopped tomatoes (4 x 400g tins)');
+  assert.strictEqual(sc('Chopped tomatoes (2 x 400g tins)',0.5),'Chopped tomatoes (1 x 400g tin)');
+});
+
+t('a comma decimal is a decimal, and a typed amount is not garbled on the card', function(){
+  var g=pi('Milk (1,5 l)'); assert.deepStrictEqual([g.q,g.u],[1.5,'l'], JSON.stringify(g));
+  g=pi('Flour (0,25 kg)'); assert.deepStrictEqual([g.q,g.u],[0.25,'kg'], JSON.stringify(g));
+  // A thousands separator is refused, as the number boxes refuse it.
+  assert.notStrictEqual(pi('Water (1,000ml)').q,1, JSON.stringify(pi('Water (1,000ml)')));
+  assert.notStrictEqual(pi('Water (1,000ml)').q,1.0, JSON.stringify(pi('Water (1,000ml)')));
+  assert.strictEqual(sc('Rice (1 1/2 mugs)',1),'Rice (1 1/2 mugs)');
+  assert.strictEqual(sc('Rice (1 1/2 mugs)',2),'Rice (3 mugs)');
+  assert.strictEqual(sc('Rice (1 1/2 mugs)',3),'Rice (4.5 mugs)');
+  assert.strictEqual(sc('Ginger (2cm piece)',1),'Ginger (2cm piece)');
+  assert.strictEqual(sc('Ginger (2cm piece)',2),'Ginger (4cm piece)');
+  assert.strictEqual(sc('Onion (1 large)',2),'Onion (2 large)');
+  assert.strictEqual(sc('Eggs (3, beaten)',2),'Eggs (6, beaten)');
+  assert.strictEqual(sc('Tomatoes (2 tins, drained)',2),'Tomatoes (4 tins, drained)');
+  // Under a kilo is written in grams, not rounded to a tenth of a kilo.
+  assert.strictEqual(sc('Sweet potato (1.2kg)',0.2),'Sweet potato (240g)');
+  assert.strictEqual(sc('Milk (1.5l)',0.5),'Milk (750ml)');
+});
+
+// Every line the app ships, scaled, has to read back as the amount it shows,
+// or a card copied into a new recipe quietly changes the recipe.
+t('every seed ingredient, scaled, reads back as the same amount and unit', function(){
+  var box=sandbox({recipes:[], plan:[], shopExtras:[]}), bad=[], n=0;
+  var extra=['Sugar (1-1/2 tsp)','Eggs (2–3)','Chicken (500g-1kg)','Chicken (1.5 kgs)','Spinach (1 large handful)',
+    'Chopped tomatoes (2 x 400g tins)','Milk (1,5 l)','Rice (1 1/2 mugs)','Ginger (2cm piece)','Rice (about 200g)'];
+  var lines=[]; SEED.recipes.forEach(function(r){ lines=lines.concat(r.ingredients||[]); });
+  lines.concat(extra).forEach(function(txt){
+    var p=box.parseIng(txt); if(p.q===null) return;
+    [0.2,0.5,1,1.5,2,3,4.4,7].forEach(function(f){
+      n++;
+      var out=box.scaledIng(p,f), b=box.parseIng(out), say=txt+' x'+f+' -> '+out+' -> ';
+      if(b.n!==p.n || b.q===null || box.canonUnit(b.u)!==box.canonUnit(p.u)) return bad.push(say+JSON.stringify(b));
+      [[b.qMax||b.q,(p.qMax||p.q)*f],[b.q,p.q*f]].forEach(function(x){
+        var got=box.canonQty(x[0],b.u), exp=box.canonQty(x[1],p.u);
+        // What the card can show: a tenth of a gram, a tenth of a kilo, half a spoon or count.
+        var tol=/^(g|ml)$/.test(box.canonUnit(p.u))?(exp>=950?50:0.051):/^(tbsp|tsp)$/.test(p.u)?0.25:0.5;
+        // and never less than the smallest amount it shows, so a pinch is not "0 tsp".
+        var least=/^(g|ml)$/.test(box.canonUnit(p.u))?0.1:0.5;
+        if(Math.abs(got-Math.max(exp,least))>tol+1e-9) bad.push(say+'reads '+got+', wants '+exp);
+      });
+      if((b.size||'')!==(p.size||'') || (b.d||'')!==(p.d||'') || (b.pre||'')!==(p.pre||'')) bad.push(say+JSON.stringify(b));
+    });
+  });
+  assert.ok(n>300,'only '+n+' lines swept');
+  assert.deepStrictEqual(bad.slice(0,8),[], bad.length+' lines do not read back, first few:\n        '+bad.slice(0,8).join('\n        '));
 });
 
 console.log(fails?('\n'+fails+' FAILING\n'):'\nAll shopping checks pass.\n');

@@ -200,8 +200,13 @@ typed as "Name (quantity unit)". Built-in recipes deleted are listed in
 
 **Ingredient**:
 One line of a recipe, read by `parseIng` into a name, a quantity and a unit.
-Fractions ("1 1/2", "½") and ranges ("2-3", bought at the top end) are read; a
-line with no number ("Honey (drizzle)") keeps its name and invents no
+Fractions ("1 1/2", "½", "1-1/2"), comma decimals ("1,5 l"; "1,000" is
+refused as `parseNum` refuses it), ranges ("2-3", "2–3", "2 to 3", "500g-1kg",
+bought at the top end), plural abbreviations ("kgs", "tbsps"), "large
+handful", a pack size ("2 x 400g tins": unit `tins`, `size` "400g") and a
+leading "about" or "~" (kept as `pre`) are read. A scaled card line parses
+back to the amount it shows, and at the recipe's own size is the line as
+typed. A line with no number ("Honey (drizzle)") keeps its name and invents no
 quantity; any name is allowed, `constructor` included. The bracket is found
 by index, not a pattern, so a long line cannot freeze the page; a line is
 kept to 500 characters (`ING_MAX`) by the Add recipe form. An import is not
