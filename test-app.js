@@ -9,6 +9,8 @@
 // Usage: node test-app.js   (expects the published document from build-publish.js)
 var http=require('http'), fs=require('fs'), assert=require('assert');
 var env=require('./test-env.js');
+// The sauna card is a Log sauna button until it is opened (and stays open).
+async function openSauna(q){ var b=await q.$('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]'); if(b){ await b.click(); await q.waitForSelector('#sauna-mins'); } }
 
 var doc=env.localOnly(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
 
@@ -253,7 +255,7 @@ server.listen(0, async function(){
   }catch(e){ bad('date survives repeated entries',e); }
 
   try{
-    await toToday(); await p.fill('#sauna-mins','15');
+    await toToday(); await openSauna(p); await p.fill('#sauna-mins','15');
     await p.click('[data-action="logsauna"]'); await p.waitForTimeout(2300);
     assert.ok(await bar()); ok('a sauna entry keeps the date too');
   }catch(e){ bad('sauna keeps the date',e); }

@@ -5,6 +5,8 @@
 // AND reloads, which is the thing that used to lose state silently.
 var http=require('http'),fs=require('fs'),assert=require('assert');
 var env=require('./test-env.js');
+// The sauna card is a Log sauna button until it is opened (and stays open).
+async function openSauna(q){ var b=await q.$('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]'); if(b){ await b.click(); await q.waitForSelector('#sauna-mins'); } }
 var doc=env.localOnly(env.readDoc());
 // What the app last saved, as the JSON its state is.
 function savedJson(){ return JSON.stringify(env.seedOf(doc)); }
@@ -205,12 +207,12 @@ srv.listen(0,async function(){
   await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
 
   await t('two stints at different heights log as ONE session', async function(){
-    await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','90');
+    await openSauna(p); await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','90');
     await p.selectOption('#sauna-pos','Top');
     await p.click('[data-action="addstint"]'); await p.waitForTimeout(300);
     var chip=await p.evaluate(function(){ var c=document.querySelector('.setchip'); return c?c.textContent:''; });
     assert.ok(/15 min/.test(chip) && /Top/.test(chip),'draft chip read: '+chip);
-    await p.fill('#sauna-mins','10'); await p.selectOption('#sauna-pos','Bottom');
+    await openSauna(p); await p.fill('#sauna-mins','10'); await p.selectOption('#sauna-pos','Bottom');
     await p.click('[data-action="logsauna"]'); await settle();
     var body=await text();
     assert.ok(/1 session/.test(body),'it counted as more than one session: '+(body.match(/\d+ sessions?/)||[])[0]);
@@ -241,7 +243,7 @@ srv.listen(0,async function(){
 
   await t('a single-stint session still logs in one tap and reads plainly', async function(){
     await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
-    await p.fill('#sauna-mins','12'); await p.selectOption('#sauna-pos','Floor');
+    await openSauna(p); await p.fill('#sauna-mins','12'); await p.selectOption('#sauna-pos','Floor');
     await p.click('[data-action="logsauna"]'); await settle();
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
     var body=await text();
@@ -1464,17 +1466,17 @@ srv.listen(0,async function(){
     await go(); await leaveSession();
     await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
     var n=seedOf().saunaSessions.length;
-    await p.click('#sauna-mins'); await p.keyboard.type('12,5');
-    await p.click('#sauna-temp'); await p.keyboard.type('80,5');
+    await openSauna(p); await p.click('#sauna-mins'); await p.keyboard.type('12,5');
+    await openSauna(p); await p.click('#sauna-temp'); await p.keyboard.type('80,5');
     await p.click('[data-action="logsauna"]'); await settle();
     assert.strictEqual(seedOf().saunaSessions.length,n+1,'nothing was logged');
     assert.strictEqual(lastSauna().mins,12.5); assert.strictEqual(lastSauna().temp,80.5);
   });
 
   await t('a sauna temperature cleared after another stint is cleared', async function(){
-    await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','80');
+    await openSauna(p); await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','80');
     await p.click('[data-action="addstint"]'); await p.waitForTimeout(300);
-    await p.fill('#sauna-temp',''); await p.fill('#sauna-mins','10');
+    await openSauna(p); await p.fill('#sauna-temp',''); await p.fill('#sauna-mins','10');
     await p.click('[data-action="logsauna"]'); await settle();
     assert.strictEqual(lastSauna().mins,25,'stints: '+JSON.stringify(lastSauna().stints));
     assert.strictEqual(lastSauna().temp,null,'the old temperature came back');
@@ -1482,7 +1484,7 @@ srv.listen(0,async function(){
 
   await t('a sauna temperature that is not a number refuses the log', async function(){
     var n=seedOf().saunaSessions.length;
-    await p.fill('#sauna-mins','10'); await p.fill('#sauna-temp','hot');
+    await openSauna(p); await p.fill('#sauna-mins','10'); await p.fill('#sauna-temp','hot');
     await p.click('[data-action="logsauna"]'); await settle();
     assert.strictEqual(seedOf().saunaSessions.length,n,'it logged anyway');
     assert.strictEqual(await invalid('#sauna-temp'),'true','the bad temperature is not marked');

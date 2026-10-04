@@ -186,12 +186,17 @@ srv.listen(0,async function(){
     assert.strictEqual(box,'','the box did not clear, so the next item appends to this one');
   });
 
-  await t('it sits in the one list, sorted with everything else', async function(){
-    var labels=await p.evaluate(function(){
-      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim().toLowerCase();});
+  await t('it sits in the one list, sorted with everything else, what is still to get before what is ticked', async function(){
+    var rows=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return {l:e.innerText.trim().toLowerCase(), c:/\bchecked\b/.test(e.className)};});
     });
-    var sorted=labels.slice().sort(function(a,b){return a.localeCompare(b);});
-    assert.deepStrictEqual(labels,sorted,'the list is not in one alphabetical order');
+    var labels=rows.map(function(r){ return r.l; }), firstTicked=rows.map(function(r){ return r.c; }).indexOf(true);
+    var byAbc=function(a,b){return a.localeCompare(b);};
+    assert.ok(firstTicked<0 || rows.slice(firstTicked).every(function(r){ return r.c; }),'a ticked row sits above one still to get');
+    var toGet=labels.slice(0,firstTicked<0?labels.length:firstTicked), got=firstTicked<0?[]:labels.slice(firstTicked);
+    assert.deepStrictEqual(toGet,toGet.slice().sort(byAbc),'what is still to get is not in alphabetical order');
+    assert.deepStrictEqual(got,got.slice().sort(byAbc),'the basket is not in alphabetical order');
+    assert.ok(toGet.some(function(l){ return /bin bags/.test(l); }),'Bin bags is not with the rest');
   });
 
   await t('ticking it works like any other row', async function(){

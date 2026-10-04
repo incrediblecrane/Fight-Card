@@ -5,6 +5,8 @@
 // data are no longer the same file.
 var http=require('http'),fs=require('fs'),assert=require('assert');
 var env=require('./test-env.js');
+// The sauna card is a Log sauna button until it is opened (and stays open).
+async function openSauna(q){ var b=await q.$('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]'); if(b){ await b.click(); await q.waitForSelector('#sauna-mins'); } }
 var doc=env.readDoc();
 
 // The stub store lives in the harness, not the page, so it outlives reloads.
@@ -561,10 +563,10 @@ srv.listen(0,async function(){
 
   console.log('\nA SESSION, A SAUNA AND A REMOVAL ALL ROUND-TRIP');
   await toToday();
-  await p.fill('#sauna-mins','14'); await p.fill('#sauna-temp','88');
+  await openSauna(p); await p.fill('#sauna-mins','14'); await p.fill('#sauna-temp','88');
   await p.selectOption('#sauna-pos','Top');
   await p.click('[data-action="addstint"]'); await p.waitForTimeout(400);
-  await p.fill('#sauna-mins','6'); await p.selectOption('#sauna-pos','Bottom');
+  await openSauna(p); await p.fill('#sauna-mins','6'); await p.selectOption('#sauna-pos','Bottom');
   await p.click('[data-action="logsauna"]'); await p.waitForTimeout(1800);
 
   await t('a two-stint sauna session lands in the store as one document', function(){
@@ -664,7 +666,7 @@ srv.listen(0,async function(){
   await t('an entry removed while its first save is in flight leaves no document behind', async function(){
     await go();
     setDelays.push({match:'sauna/',ms:2500});
-    await p.fill('#sauna-mins','9'); await p.selectOption('#sauna-pos','Top');
+    await openSauna(p); await p.fill('#sauna-mins','9'); await p.selectOption('#sauna-pos','Top');
     await p.click('[data-action="logsauna"]'); await p.waitForTimeout(1300);
     assert.strictEqual(setDelays.length,0,'the sauna save never started, so this proves nothing');
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
@@ -876,7 +878,7 @@ srv.listen(0,async function(){
 
   await t('half-typed fields on Today survive a tap that re-renders the page', async function(){
     await go();
-    await p.fill('#sauna-mins','12');
+    await openSauna(p); await p.fill('#sauna-mins','12');
     await p.selectOption('#sauna-pos','Bottom');
     await p.click('[data-action="water"][data-d="1"]'); await p.waitForTimeout(1600);
     var got=await p.evaluate(function(){ return [document.getElementById('sauna-mins').value, document.getElementById('sauna-pos').value]; });
@@ -1734,7 +1736,7 @@ srv.listen(0,async function(){
     await go();
     var q=await openView();
     try{
-      await q.fill('#sauna-mins','17'); await q.fill('#sauna-temp','77'); await q.selectOption('#sauna-pos','Top');
+      await openSauna(q); await q.fill('#sauna-mins','17'); await q.fill('#sauna-temp','77'); await q.selectOption('#sauna-pos','Top');
       await q.click('[data-action="logsauna"]'); await q.waitForTimeout(1800);
       var id=Object.keys(store).filter(function(k){ return k.indexOf('sauna/')===0 && store[k].mins===17 && store[k].temp===77; })[0];
       assert.ok(id,'B did not save its visit');

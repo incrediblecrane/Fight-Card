@@ -370,8 +370,9 @@ retrying", or "Not saved" when retrying cannot help) until a save lands.
 
 **Ui state**:
 What a device is looking at, not part of the record: tab, slide, chart range,
-whether the session screen is open, which exercise histories and recipe cards
-are unfolded, and the yesterday nudge waved off. Kept in `localStorage` under
+the shopping list's range (`shopRange`, 3 or 7 days; absent reads as 7),
+whether the session screen is open, which exercise histories, recipe cards and
+the sauna form are unfolded, and the yesterday nudge waved off. Kept in `localStorage` under
 `fc.ui` and never in the store, because writing it to the profile made every
 tab change carry this view's stale XP over another view's.
 It carries the day it was saved: a load on a later day, or the first draw

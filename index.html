@@ -128,6 +128,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .shoprow:last-child{border-bottom:none;}\
 .shop{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:7px 0;min-height:44px;cursor:pointer;font-size:0.9rem;}\
 .shop .box{width:20px;height:20px;border-radius:5px;border:1.5px solid var(--field-border);flex-shrink:0;}\
+.shopjump{color:var(--text);text-decoration:underline;text-underline-offset:3px;margin-top:0;}\
+.shopbasket{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);padding:14px 0 4px;border-bottom:1px solid var(--line);}\
 .shop.checked{color:var(--text-faint);text-decoration:line-through;}\
 .shop.checked .box{background:var(--good);border-color:var(--good);}\
 .shop .shop-t{flex:1;min-width:0;overflow-wrap:anywhere;}\
@@ -207,6 +209,12 @@ button.setchip{color:var(--text);min-height:44px;cursor:pointer;}\
 .chipundo{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;border-radius:20px;padding:4px 12px;background:none;color:var(--text-soft);border:1px solid var(--field-border);cursor:pointer;}\
 .cardio-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;}\
 .cardio-select{font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:9px 10px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
+.habit{display:flex;align-items:center;justify-content:space-between;gap:10px;}\
+.habit+.habit{margin-top:8px;}\
+.habit .hl{font-weight:600;font-size:0.92rem;}\
+.habit .hl small{display:block;font-weight:400;font-size:0.72rem;color:var(--text-faint);}\
+.habit .stepper{gap:8px;}\
+.habit .stepper .count{font-size:1.3rem;min-width:3ch;}\
 .sauna-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}\
 .sauna-row input{width:64px;min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);text-align:center;}\
 .sauna-row select{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:1rem;padding:8px;border-radius:8px;border:1px solid var(--field-border);background:var(--surface-raised);color:var(--text);}\
@@ -1006,10 +1014,10 @@ var saunaDraft=[], saunaTemp='';
 // the page, and an input rebuilt from HTML comes back empty, so the draft has
 // to live here to be written back into the field.
 var shopDraft='';
-// How much of the week the shopping list covers. UI only: you shop for the
-// next few days or the whole week depending on when you are next in a shop,
-// and that is not worth remembering between sessions.
-var shopRange=7;
+// How much of the week the shopping list covers: the next few days or the
+// whole week, depending on when you are next in a shop. Remembered with the
+// rest of the view, so a reload in the aisle keeps it.
+var shopRange=ui0.shopRange===3?3:7;
 // The day and slot picked on a recipe card but not yet added. Same reason as
 // prepPick: the selects are re-rendered, and a choice that does not survive
 // that is a choice you have to make twice.
@@ -4676,6 +4684,14 @@ function bodyContent(){
        '<span class="btns"><button class="go" data-action="pickday" data-k="'+yk+'">Log yesterday</button>'+
        '<button data-action="nudgeoff" data-k="'+yk+'">Nothing to log</button></span></div>')
     : '';
+  // One habit a row: the name, then - count +, the same buttons each had on
+  // a card of its own.
+  function habitRow(k,name,unit,less,more){
+    return '<div class="habit"><span class="hl">'+name+'<small>'+unit+'</small></span><div class="stepper">'+
+      '<button data-action="'+k+'" data-d="-1" aria-label="'+less+'">-</button><span class="count">'+t[k]+'</span>'+
+      '<button data-action="'+k+'" data-d="1" aria-label="'+more+'">+</button></div></div>';
+  }
+  var saunaOpen=!!expanded.sauna||saunaDraft.length>0;
   return resumeBannerHtml(false)+nudge+
     '<div class="grid">'+
       '<div class="card"><h3>Water</h3><div class="sub tgt"><button class="tgtopen" data-action="toggleex" data-id="watertgt" aria-expanded="'+!!expanded.watertgt+'">Target <b>'+litres(state.waterTarget)+'</b> a day</button>'+
@@ -4683,17 +4699,20 @@ function bodyContent(){
           '<button data-action="watertarget" data-d="1" aria-label="Raise the water target">+</button>':'')+'</div>'+
         '<div class="stepper"><button data-action="water" data-d="-1" aria-label="Less water">-</button><span class="count">'+litres(t.water)+'</span><button class="big" data-action="water" data-d="1" aria-label="More water">+</button></div>'+
         '<div class="dots">'+cupsRow+'</div></div>'+
+      // The counts logged most days sit together, straight under Water, so all
+      // of them are on the first screen of a phone.
+      '<div class="card habits"><h3>Habits</h3><div class="sub">Counted '+dayWord()+'</div>'+
+        habitRow('alcohol','Alcohol','units / drinks','One less drink','One more drink')+
+        habitRow('smoking','Smoking','cigarettes','One less cigarette','One more cigarette')+
+        habitRow('weed','Weed','sessions','One less session','One more session')+'</div>'+
       '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+esc(t.workout.type)):(t.rest?'Recovery day':weekLine(weekN,state.weekTarget)))+'</div>'+
         (t.workout.done&&dayHasLog(activeDate())?'<p class="note">From a logged session. Remove it on Progress to clear the day.</p>':'')+
         '<div class="pillgrid">'+typePills+'</div>'+
         '<button class="linklike" data-action="tab" data-tab="training" data-to="workouts">Or start a guided session &rarr;</button></div>'+
-      '<div class="card"><h3>Alcohol</h3><div class="sub">Units / drinks '+dayWord()+'</div>'+
-        '<div class="stepper"><button data-action="alcohol" data-d="-1" aria-label="One less drink">-</button><span class="count">'+t.alcohol+'</span><button data-action="alcohol" data-d="1" aria-label="One more drink">+</button></div></div>'+
-      '<div class="card"><h3>Smoking</h3><div class="sub">Cigarettes '+dayWord()+'</div>'+
-        '<div class="stepper"><button data-action="smoking" data-d="-1" aria-label="One less cigarette">-</button><span class="count">'+t.smoking+'</span><button data-action="smoking" data-d="1" aria-label="One more cigarette">+</button></div></div>'+
-      '<div class="card"><h3>Weed</h3><div class="sub">Sessions '+dayWord()+'</div>'+
-        '<div class="stepper"><button data-action="weed" data-d="-1" aria-label="One less session">-</button><span class="count">'+t.weed+'</span><button data-action="weed" data-d="1" aria-label="One more session">+</button></div></div>'+
-      '<div class="card"><h3>Sauna</h3><div class="sub">'+(todaySaunaCount?(todaySaunaCount+' session'+(todaySaunaCount===1?'':'s')+' '+dayWord()):'Mins, temp &amp; bench position'+(backfilling()?' '+esc(dayWord()):''))+'</div>'+
+      // Logged now and then, so it is a button until it is wanted. Open stays
+      // open, through a reload too, and a stint being built keeps it open.
+      '<div class="card"><h3>Sauna</h3><div class="sub">'+(todaySaunaCount?(todaySaunaCount+' session'+(todaySaunaCount===1?'':'s')+' '+dayWord()):saunaOpen?'Mins, temp &amp; bench position'+(backfilling()?' '+esc(dayWord()):''):'None '+esc(dayWord()))+'</div>'+
+        (!saunaOpen?'<button class="logbtn" data-action="toggleex" data-id="sauna" aria-expanded="false">Log sauna</button>':
         (saunaDraft.length?('<div class="setchips" style="justify-content:flex-start;">'+
           saunaDraft.map(function(st,i){ return '<span class="setchip stint">'+st.mins+' min &middot; '+esc(st.position)+
             '<button class="chipx" data-action="delstint" data-i="'+i+'" aria-label="Remove this stint">&times;</button></span>'; }).join('')+'</div>'):'')+
@@ -4701,7 +4720,8 @@ function bodyContent(){
           '<input id="sauna-temp" type="text" inputmode="decimal" placeholder="&deg;C" aria-label="Temperature &deg;C"'+(saunaTemp?(' value="'+saunaTemp+'"'):'')+'>'+
           '<select id="sauna-pos" aria-label="Bench position"><option value="Top">Top</option><option value="Bottom">Bottom</option><option value="Floor">Floor</option></select></div>'+
         '<button class="linklike" data-action="addstint">+ Another stint at a different height</button>'+
-        '<button class="logbtn" data-action="logsauna">'+(saunaDraft.length?'Log session':'Log sauna')+'</button></div>'+
+        '<button class="logbtn" data-action="logsauna">'+(saunaDraft.length?'Log session':'Log sauna')+'</button>'+
+        (saunaDraft.length?'':'<button class="linklike" data-action="toggleex" data-id="sauna" aria-expanded="true">Hide the sauna form</button>'))+'</div>'+
     '</div>'+
     '<div class="datepick"><label for="logdate">Logging for</label>'+
       '<input type="date" id="logdate" data-action="logdate" value="'+activeDate()+'" min="'+minLogDate()+'" max="'+realToday()+'">'+
@@ -4790,13 +4810,19 @@ function bodyContent(){
   // Ticked off by a key that does not move when the portions change; a tick
   // made for less than the row now asks for does not count (tickCovers). Each row is a checkbox to the keyboard and a screen reader; the x on your
   // own items sits beside it, not inside it.
-  var anyTicked=false;
-  var shopRows=listSL.map(function(it){
-    var checked=shopTicked(it); if(checked) anyTicked=true;
+  // What is still to find comes first and what is in the basket sinks under
+  // a line of its own. Only a full draw moves a row: a tick changes the row in
+  // place (shopcheck), so nothing slides out from under the finger.
+  var toGet=listSL.filter(function(it){ return !shopTicked(it); }), inBasket=listSL.filter(shopTicked);
+  var anyTicked=inBasket.length>0;
+  var shopRow=function(it){
+    var checked=shopTicked(it);
     return '<div class="shoprow"><div class="shop'+(checked?' checked':'')+'" role="checkbox" tabindex="0" aria-checked="'+checked+'" data-action="shopcheck" data-item="'+esc(it.key)+'">'+
       '<span class="box"></span><span class="shop-t">'+esc(it.label)+'</span></div>'+
       (it.extra?'<button class="shop-x" data-action="delextra" data-id="'+esc(it.extraId)+'" title="Remove" aria-label="Remove '+esc(it.label)+'">&times;</button>':'')+'</div>';
-  }).join('');
+  };
+  var shopRows=toGet.map(shopRow).join('')+
+    (anyTicked?'<div class="shopbasket">In the basket ('+inBasket.length+')</div>'+inBasket.map(shopRow).join(''):'');
   // Only the meals the week shows: one whose day has gone is not in it.
   var plannedN=Object.create(null);
   planEntries(planDays).forEach(function(e){ plannedN[e.recipeId]=(plannedN[e.recipeId]||0)+1; });
@@ -4839,9 +4865,12 @@ function bodyContent(){
   if(prepItems) prepItems='<div class="libgrid">'+prepItems+'</div>';
   if(recipeItems) recipeItems='<div class="libgrid">'+recipeItems+'</div>';
 
-  return '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
+  // The list is what this tab is opened for in a shop, and it sits under the
+  // week, so it is one tap away from the top.
+  return '<button class="linklike shopjump" data-action="jump" data-to="shopping">Shopping list &darr;</button>'+
+    '<p class="note" style="margin-top:0;">Macros are rough per-portion estimates from standard food composition values. Good enough to hit a protein target, not a measurement.</p>'+
     '<h2 class="sectiontitle">The week</h2><div class="weekbox cal">'+calRows+'</div>'+
-    '<h2 class="sectiontitle">Shopping list</h2><div class="weekbox">'+
+    '<h2 class="sectiontitle" id="shopping">Shopping list</h2><div class="weekbox">'+
       '<div class="rangebar shoprange">'+
         [[3,'Next 3 days'],[7,'Whole week']].map(function(o){
           return '<button data-action="shoprange" data-n="'+o[0]+'"'+(shopRange===o[0]?' class="on"':'')+' aria-pressed="'+(shopRange===o[0])+'">'+o[1]+'</button>';
@@ -5481,7 +5510,7 @@ function undoFit(){
   app.style.setProperty('--undo-h',bar?bar.offsetHeight+'px':'0px');
 }
 
-function uiNow(){ return {day:realToday(), tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange, nudgeOff:nudgeOff,
+function uiNow(){ return {day:realToday(), tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange, nudgeOff:nudgeOff, shopRange:shopRange,
     open:Object.keys(expanded).filter(function(k){ return expanded[k]; })}; }
 function syncUi(){ writeUi(JSON.stringify(uiNow())); }
 
@@ -5787,6 +5816,8 @@ function onClick(e){
   if(action==='retryload'){ if(dbState==='error') retryBoot(); return; }
   // Once the store has refused this view for good only a fresh load can reach it.
   if(action==='reload'){ location.reload(); return; }
+  // A link down the tab to a section of it: a scroll, nothing drawn.
+  if(action==='jump'){ landOn(t.getAttribute('data-to')); return; }
   // A chart mark only changes the line under its own chart, which has a
   // height of its own, so the head never reflows under the finger. Rendering
   // would put the line straight back, so this writes it and stops.
@@ -6040,6 +6071,8 @@ function onClick(e){
     var clr=app0.querySelector('[data-action="clearticks"]'), cw=app0.querySelector('[data-action="clearweek"]');
     if(!addedShown && app0.contains(t) && (!!clr===any || (any?cw:clr))){
       t.classList.toggle('checked',on); t.setAttribute('aria-checked',String(on));
+      // The row stays where it is until the next full draw; the count says now.
+      var bk=app0.querySelector('.shopbasket'); if(bk) bk.textContent='In the basket ('+sl.filter(shopTicked).length+')';
       if(any && !clr) cw.insertAdjacentHTML('beforebegin',CLEAR_TICKS);
       if(!any && clr){ if(clr.nextSibling && clr.nextSibling.nodeType===3) clr.parentNode.removeChild(clr.nextSibling); clr.parentNode.removeChild(clr); }
       drawn=true;

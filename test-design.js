@@ -9,6 +9,8 @@
 // Usage: node test-design.js   (expects the published document from build-publish.js)
 var http=require('http'), assert=require('assert');
 var env=require('./test-env.js');
+// The sauna card is a Log sauna button until it is opened (and stays open).
+async function openSauna(q){ var b=await q.$('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]'); if(b){ await b.click(); await q.waitForSelector('#sauna-mins'); } }
 var doc=env.readDoc();
 
 // The worlds are dated here, before any page loads, so every page runs in the
@@ -294,7 +296,7 @@ srv.listen(0,async function(){
   });
   await t('each sauna stint\'s remove is a 44px target that never reaches into the next chip', async function(){
     var p=await open('plain',{viewport:{width:360,height:740},touch:true,ui:'{"tab":"today"}'});
-    for(var i=0;i<5;i++){ await p.fill('#sauna-mins',String(10+i)); await p.click('[data-action="addstint"]'); await p.waitForTimeout(60); }
+    await openSauna(p); for(var i=0;i<5;i++){ await p.fill('#sauna-mins',String(10+i)); await p.click('[data-action="addstint"]'); await p.waitForTimeout(60); }
     var r=await p.evaluate(function(){ var chips=[].slice.call(document.querySelectorAll('.setchip')), xs=[].slice.call(document.querySelectorAll('.chipx')), bad=[], small=[];
       // Every point of each chip lands on that chip or its own x, never on another chip's x.
       chips.forEach(function(c,i){ var r=c.getBoundingClientRect();
@@ -308,6 +310,26 @@ srv.listen(0,async function(){
     assert.strictEqual(r.n,5,'stints drawn: '+r.n);
     assert.deepStrictEqual(r.bad,[],'a tap on one chip lands on another chip\'s x');
     assert.deepStrictEqual(r.small,[],'stint x hit heights');
+  });
+  await t('every daily counter is on the first screen of a 390x844 phone, with sauna one button until it is wanted', async function(){
+    var p=await open('plain',{viewport:{width:390,height:844},touch:true,ui:'{"tab":"today"}'});
+    var r=await p.evaluate(function(){
+      var bot=0; ['water','alcohol','smoking','weed'].forEach(function(a){ [].forEach.call(document.querySelectorAll('[data-action="'+a+'"]'),function(b){
+        bot=Math.max(bot,b.getBoundingClientRect().bottom+window.scrollY); }); });
+      var cards=[].map.call(document.querySelectorAll('.grid > .card h3'),function(h){ return h.textContent; });
+      return {bot:Math.round(bot), h:window.innerHeight, steppers:document.querySelectorAll('.habits .stepper [data-action]').length, cards:cards,
+        form:!!document.getElementById('sauna-mins'), open:!!document.querySelector('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]')}; });
+    assert.ok(r.bot<=r.h,'the last counter button ends at y='+r.bot+', below the '+r.h+'px screen');
+    assert.strictEqual(r.steppers,6,'the Habits card has '+r.steppers+' buttons');
+    assert.deepStrictEqual(r.cards.slice(0,2),['Water','Habits'],'cards in order: '+r.cards.join(', '));
+    assert.ok(!r.form && r.open,'the sauna form is drawn before it is asked for');
+    await p.click('[data-action="toggleex"][data-id="sauna"]'); await p.waitForSelector('#sauna-mins');
+    var ui=await p.evaluate(function(){ try{ return JSON.parse(localStorage.getItem('fc.ui')).open; }catch(e){ return null; } });
+    assert.ok(ui && ui.indexOf('sauna')>-1,'opening the sauna form is not remembered: '+JSON.stringify(ui));
+    await close(p);
+    p=await open('plain',{viewport:{width:390,height:844},touch:true,ui:'{"tab":"today","open":["sauna"]}'});
+    assert.ok(await p.$('#sauna-mins'),'the sauna form remembered open came back closed');
+    await close(p);
   });
   await t('Start, the Workout link, Log sauna, the plan boxes and the day dots are 44px to a thumb at 390px', async function(){
     var all=[];
@@ -751,7 +773,7 @@ srv.listen(0,async function(){
     var all=[];
     var need=async function(p,sel,w,h){ (await rects(p,sel)).forEach(function(x){ if(x.w||x.h) all.push({s:sel,w:x.w,h:x.h,need:[w,h]}); }); };
     var p=await open('plain',{viewport:{width:360,height:740},touch:true});
-    await need(p,'.dot.pickable',36,36); await need(p,'.linklike',0,44); await need(p,'#sauna-mins',0,44); await need(p,'#sauna-temp',0,44);
+    await need(p,'.dot.pickable',36,36); await openSauna(p); await need(p,'.linklike',0,44); await need(p,'#sauna-mins',0,44); await need(p,'#sauna-temp',0,44);
     await p.click('[data-action="pickday"][data-k="'+key(1)+'"]'); await p.waitForTimeout(150);
     await need(p,'.backfill-bar button',0,44);
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(150);

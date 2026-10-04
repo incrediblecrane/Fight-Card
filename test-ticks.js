@@ -42,7 +42,9 @@ srv.listen(0,async function(){
   var saving=async fn=>{ var n0=loads; await fn(); await settle(n0); };
   var go=async()=>{ await p.goto('http://127.0.0.1:'+srv.address().port+'/'); await p.waitForSelector('#app .wrap:not(.held)');
     var back=await p.$('[data-action="cancelsession"]'); if(back) await saving(()=>back.click());
-    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForSelector('.shoprange'); };
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForSelector('.shoprange');
+    // The range is remembered with the view, so each check starts on the week.
+    if(!(await p.$('[data-action="shoprange"][data-n="7"].on'))) await range(7); };
   var range=async n=>{ await p.click('[data-action="shoprange"][data-n="'+n+'"]'); await p.waitForSelector('[data-action="shoprange"][data-n="'+n+'"].on'); };
   // Each row as shown: its words, and whether it is ticked.
   var rows=()=>p.evaluate(function(){ return [].map.call(document.querySelectorAll('.shop'),function(e){
@@ -69,6 +71,7 @@ srv.listen(0,async function(){
     seed([[['Onion (2)'],0],[['Onion (3)'],4,2]]); await go();
     await tick('Onion (8)');
     await range(3); assert.ok((await row('Onion (2)')).ticked,'5 bought does not cover the 2 for three days');
+    await range(7);
     await saving(()=>p.click('[data-action="mealportions"][data-id="pl1"][data-d="-1"]'));
     var r=await row('Onion'); assert.ok(r.ticked,'fewer portions unticked '+r.label);
     await saving(()=>p.click('[data-action="mealportions"][data-id="pl1"][data-d="1"]'));
@@ -103,7 +106,7 @@ srv.listen(0,async function(){
     await tick('Eggs'); await tick('Butter'); await tick('Bin bags');
     await range(3); assert.ok((await row('Eggs (2)')).ticked,'the tick did not cover the three days');
     await saving(()=>p.click('[data-action="clearweek"]'));
-    var r=await row('Eggs'); assert.ok(r,'the day-five eggs were cleared too');
+    await range(7); var r=await row('Eggs'); assert.ok(r,'the day-five eggs were cleared too');
     assert.ok(r.ticked,'Eggs still needed on day five lost its tick');
     assert.ok((await row('Bin bags')).ticked,'your own item lost its tick');
     assert.ok(!await row('Butter'),'the cleared day\'s butter is still listed');
@@ -184,6 +187,47 @@ srv.listen(0,async function(){
     assert.strictEqual(now.clear,0,'Clear the ticks stayed with nothing ticked');
     await settle(n0);
     back=await row('Garlic'); assert.ok(!back.ticked,'the untick was not saved');
+  });
+
+  console.log('\nIN THE SHOP');
+
+  await t('ticked rows sink under In the basket (n) on the next draw, and a tick itself moves nothing', async function(){
+    seed([[['Apples (4)','Bread (1)','Carrots (6)','Dates (200g)'],0]]); await go();
+    var order=async()=>p.evaluate(function(){ return [].map.call(document.querySelectorAll('.shop-t, .shopbasket'),function(e){ return e.textContent; }); });
+    assert.deepStrictEqual(await order(),['Apples (4)','Bread (1)','Carrots (6)','Dates (200g)']);
+    var n0=loads; await p.click('.shop[data-item="'+(await row('Apples')).key+'"]');
+    assert.strictEqual(loads,n0,'the page reloaded before it could be looked at');
+    assert.deepStrictEqual(await order(),['Apples (4)','Bread (1)','Carrots (6)','Dates (200g)'],'the row moved under the finger');
+    await settle(n0);
+    assert.deepStrictEqual(await order(),['Bread (1)','Carrots (6)','Dates (200g)','In the basket (1)','Apples (4)'],'the next draw did not sink the tick');
+    n0=loads; await p.click('.shop[data-item="'+(await row('Carrots')).key+'"]');
+    assert.deepStrictEqual(await order(),['Bread (1)','Carrots (6)','Dates (200g)','In the basket (2)','Apples (4)'],'the tick moved a row, or the count did not follow');
+    await settle(n0);
+    assert.deepStrictEqual(await order(),['Bread (1)','Dates (200g)','In the basket (2)','Apples (4)','Carrots (6)']);
+    assert.ok((await row('Apples')).ticked && (await row('Carrots')).ticked,'a sunk row lost its tick');
+    await saving(()=>p.click('[data-action="clearticks"]'));
+    assert.deepStrictEqual(await order(),['Apples (4)','Bread (1)','Carrots (6)','Dates (200g)'],'Clear the ticks left the basket line or the order');
+  });
+
+  await t('Next 3 days is still picked after a reload', async function(){
+    seed([[['Onion (2)'],0],[['Rice (200g)'],5]]); await go();
+    await range(3); await p.reload(); await p.waitForSelector('#app .wrap:not(.held)');
+    await p.click('[data-action="tab"][data-tab="meals"]'); await p.waitForSelector('.shoprange');
+    assert.ok(await p.$('[data-action="shoprange"][data-n="3"].on'),'the range went back to the week');
+    assert.deepStrictEqual((await rows()).map(function(x){ return x.label; }),['Onion (2)'],'the list is not the three days');
+    await range(7);
+  });
+
+  await t('the link at the top of Meals lands on the shopping list', async function(){
+    seed([[['Onion (2)'],0],[['Rice (200g)'],1],[['Eggs (2)'],2],[['Flour (100g)'],3]]); await go();
+    await p.evaluate(function(){ window.scrollTo(0,0); });
+    var jump=await p.$('[data-action="jump"][data-to="shopping"]'); assert.ok(jump,'no link to the list');
+    var y0=await p.evaluate(function(){ return document.getElementById('shopping').getBoundingClientRect().top; });
+    var n0=loads; await jump.click(); await p.waitForTimeout(150);
+    var y=await p.evaluate(function(){ return document.getElementById('shopping').getBoundingClientRect().top; });
+    assert.ok(y0>200,'the list was already at the top ('+y0+'), so this proves nothing');
+    assert.ok(y>=0 && y<80,'the list heading is at '+y+' after the jump');
+    assert.strictEqual(loads,n0,'the jump saved');
   });
 
   await t('nothing threw', async function(){ assert.deepStrictEqual(errs,[]); });

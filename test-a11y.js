@@ -8,6 +8,8 @@
 // Usage: node test-a11y.js   (expects the published document from build-publish.js)
 var http=require('http'), assert=require('assert');
 var env=require('./test-env.js');
+// The sauna card is a Log sauna button until it is opened (and stays open).
+async function openSauna(q){ var b=await q.$('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]'); if(b){ await b.click(); await q.waitForSelector('#sauna-mins'); } }
 var doc=env.readDoc();
 
 function key(o){ var d=new Date(); d.setDate(d.getDate()-(o||0));
@@ -77,8 +79,11 @@ srv.listen(0,async function(){
   console.log('\nNAMES');
   await t('Today has no unnamed field, and the sauna boxes say what they are', async function(){
     var p=await open('plain');
+    var shut=await p.locator('#app').ariaSnapshot();
+    await openSauna(p);
     var snap=await p.locator('#app').ariaSnapshot();
     await close(p);
+    assert.deepStrictEqual(unnamed(shut),[],'unnamed controls on Today with the sauna form shut');
     assert.deepStrictEqual(unnamed(snap),[],'unnamed controls on Today');
     assert.ok(/combobox "Bench position"/.test(snap),'the bench select reads:\n'+snap.split('\n').filter(function(l){ return /combobox/.test(l); }).join('\n'));
     assert.ok(/textbox "Minutes"/.test(snap) && /textbox "Temperature °C"/.test(snap),'the sauna boxes are not named Minutes and Temperature');
@@ -195,7 +200,7 @@ srv.listen(0,async function(){
     var p=await open('meal');
     await p.fill('#rec-title','My curry'); await p.fill('#rec-ing','Onion (1)');
     await p.click('[data-tab="today"]'); await p.waitForTimeout(150);
-    await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','85');
+    await openSauna(p); await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','85');
     await p.click('[data-tab="meals"]'); await p.waitForTimeout(150);
     var rec=await p.evaluate(function(){ return [document.getElementById('rec-title').value,document.getElementById('rec-ing').value]; });
     await p.click('[data-tab="today"]'); await p.waitForTimeout(150);
@@ -242,8 +247,8 @@ srv.listen(0,async function(){
   console.log('\nSAUNA ROW');
   await t('sauna stints of 1,1 and 1,3 min read 2.4 min on Progress, without float noise', async function(){
     var p=await open('plain');
-    await p.fill('#sauna-mins','1,1'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(150);
-    await p.fill('#sauna-mins','1,3'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
+    await openSauna(p); await p.fill('#sauna-mins','1,1'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(150);
+    await openSauna(p); await p.fill('#sauna-mins','1,3'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
     var txt=await p.evaluate(function(){ return document.getElementById('app').textContent; });
     await close(p);
@@ -252,11 +257,11 @@ srv.listen(0,async function(){
   });
   await t('Log sauna with only a temperature, or 0 minutes, marks and focuses the minutes box', async function(){
     var p=await open('plain');
-    await p.fill('#sauna-temp','90'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
+    await openSauna(p); await p.fill('#sauna-temp','90'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
     var r1=await p.evaluate(function(){ var e=document.getElementById('sauna-mins'); return [e.getAttribute('aria-invalid'),document.activeElement===e]; });
-    await p.fill('#sauna-mins','0'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(150);
+    await openSauna(p); await p.fill('#sauna-mins','0'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(150);
     var r2=await p.evaluate(function(){ var e=document.getElementById('sauna-mins'); return [e.getAttribute('aria-invalid'),document.activeElement===e]; });
-    await p.fill('#sauna-mins',''); await p.fill('#sauna-temp',''); await p.click('#sauna-pos'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
+    await openSauna(p); await p.fill('#sauna-mins',''); await p.fill('#sauna-temp',''); await p.click('#sauna-pos'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
     var r3=await p.evaluate(function(){ return document.getElementById('sauna-mins').getAttribute('aria-invalid'); });
     await close(p);
     assert.deepStrictEqual(r1,['true',true],'temperature only');

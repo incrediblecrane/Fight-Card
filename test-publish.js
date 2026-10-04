@@ -9,6 +9,8 @@
 // Usage: node test-publish.js [document]   (defaults to build-publish.js's output)
 var http=require('http'), fs=require('fs'), assert=require('assert');
 var env=require('./test-env.js');
+// The sauna card is a Log sauna button until it is opened (and stays open).
+async function openSauna(q){ var b=await q.$('[data-action="toggleex"][data-id="sauna"][aria-expanded="false"]'); if(b){ await b.click(); await q.waitForSelector('#sauna-mins'); } }
 var base=env.localOnly(process.argv[2]?fs.readFileSync(process.argv[2],'utf8'):env.readDoc());
 
 // The faithful stub: a publish saves the document AND reloads the page onto
@@ -163,7 +165,7 @@ srv.listen(0,async function(){
       var p=await open({noStorage:blocked});
       await p.click('[data-action="tab"][data-tab="meals"]'); await p.fill('#shop-add','Bin ba');
       await p.click('[data-action="tab"][data-tab="today"]');
-      await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','90'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(200);
+      await openSauna(p); await p.fill('#sauna-mins','15'); await p.fill('#sauna-temp','90'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(200);
       assert.strictEqual(await p.$$eval('.setchip',function(x){ return x.length; }),1);
       var n0=loads;
       await p.click('[data-action="water"][data-d="1"]');
