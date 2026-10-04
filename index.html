@@ -1841,10 +1841,15 @@ function MemoryStore(init){
   Object.keys(init||{}).forEach(function(k){ m[k]=JSON.stringify(init[k]); });
   function out(path){ return m[path]===undefined?undefined:JSON.parse(m[path]); }
   function tell(path){ subs.forEach(function(fn){ fn(path,out(path)); }); }
+  /* update's merge: plain objects merge, anything else replaces. A key read
+     from JSON (__proto__, constructor) is data like any other, so only an
+     own field is merged into and each is written as an own property rather
+     than through the setter, which would reach Object.prototype. */
+  function plain(v){ return !!v&&typeof v==='object'&&!Array.isArray(v); }
   function deep(a,b){
     Object.keys(b).forEach(function(k){
-      var v=b[k];
-      a[k]=(v&&typeof v==='object'&&!Array.isArray(v)&&a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k]))?deep(a[k],v):v;
+      var v=b[k], o=Object.prototype.hasOwnProperty.call(a,k)?a[k]:undefined;
+      Object.defineProperty(a,k,{value:plain(v)&&plain(o)?deep(o,v):v, enumerable:true, writable:true, configurable:true});
     });
     return a;
   }

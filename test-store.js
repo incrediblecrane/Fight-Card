@@ -291,6 +291,20 @@ t('MemoryStore keeps the db contract: copies out, update needs the document', as
   assert.deepStrictEqual(heard,['state/profile','state/profile']);
 });
 
+t('MemoryStore update takes a __proto__ or constructor field as data, not as the prototype', async function(){
+  var s=box.MemoryStore({'state/profile':{a:{b:1}}});
+  try{
+    await s.update('state/profile',JSON.parse('{"__proto__":{"polluted":"yes"},"a":{"constructor":{"x":1}}}'));
+    assert.strictEqual(({}).polluted,undefined,'the update reached Object.prototype');
+    assert.strictEqual(typeof ({}).constructor,'function','the update replaced Object.prototype.constructor');
+    var body=await s.get('state/profile');
+    assert.ok(Object.prototype.hasOwnProperty.call(body,'__proto__'),'the __proto__ field was dropped');
+    assert.strictEqual(JSON.stringify(body),'{"a":{"b":1,"constructor":{"x":1}},"__proto__":{"polluted":"yes"}}');
+    await s.update('state/profile',JSON.parse('{"__proto__":{"more":1}}'));
+    assert.strictEqual(JSON.stringify(await s.get('state/profile')),'{"a":{"b":1,"constructor":{"x":1}},"__proto__":{"polluted":"yes","more":1}}','an own __proto__ field did not merge');
+  } finally { delete Object.prototype.polluted; delete Object.prototype.more; delete Object.prototype.x; }
+});
+
 /* A dump of the old artifact's store, as ArtifactData reads it out: every
    document under its path. OLD_DOCS is dbDocs as it was at 5aba0f6, the
    handoff, verbatim, so the documents are shaped exactly as that version

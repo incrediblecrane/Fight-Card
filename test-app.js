@@ -341,12 +341,15 @@ server.listen(0, async function(){
   }catch(e){ bad('session start date',e); }
 
   console.log('\nA TAB LEFT OPEN PAST MIDNIGHT');
-  var mctx=null, mp=null, seedOf=null, day0=null;
+  var mctx=null, mp=null, seedOf=null, day0=null, water1=0;
   // Today mode used to hold the date string read at load, so after midnight a
   // tap still went to yesterday, with the backfill bar claiming it was chosen.
   try{
     seedOf=env.seedOf;
     day0=JSON.stringify(seedOf(doc).days['2026-09-30']||null);
+    // The backfill checks above log on a day three back from the real date,
+    // which is 2026-10-01 when the suite runs on 4 October: count from there.
+    water1=(seedOf(doc).days['2026-10-01']||{}).water||0;
     mctx=await b.newContext({viewport:{width:420,height:900},timezoneId:'UTC'});
     mctx.setDefaultTimeout(8000);
     mp=await mctx.newPage(); mp.on('pageerror',function(e){errs.push(e.message);});
@@ -366,7 +369,7 @@ server.listen(0, async function(){
     await mp.waitForFunction(function(){ return !!window.__pub; });
     var got=seedOf(await mp.evaluate(function(){ return window.__pub; })).days;
     assert.ok(!(await mp.$('.backfill-bar')),'the backfill bar is up though nobody picked a day');
-    assert.strictEqual((got['2026-10-01']||{}).water,1,'the tap did not land on 2026-10-01');
+    assert.strictEqual((got['2026-10-01']||{}).water,water1+1,'the tap did not land on 2026-10-01');
     // An untouched blank day for the day the tab was opened is not a write to
     // it; whether the seed already has one depends on the real date the suite runs.
     var y0=got['2026-09-30']||null; if(day0==='null' && y0 && !y0.touched && !y0.water) y0=null;

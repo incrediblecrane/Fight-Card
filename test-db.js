@@ -39,6 +39,29 @@ function depthOf(v){ if(v===null||typeof v!=='object') return 0;
   return 1+Object.keys(v).reduce(function(d,k){ return Math.max(d,depthOf(v[k])); },0); }
 function tooBig(v){ return Buffer.byteLength(JSON.stringify(v))>DOC_MAX || depthOf(v)>DOC_DEPTH; }
 var limitRefused=0;
+// update() is a merge-write: plain objects merge all the way down, anything
+// else (arrays too) replaces, and a key such as __proto__ is data. The merge
+// is MemoryStore's own, taken from index.html, so the stub and the in-memory
+// store cannot come to disagree; checkMerge below holds both to the contract.
+function memoryStore(){
+  var h=fs.readFileSync(__dirname+'/index.html','utf8'), i=h.indexOf('function MemoryStore('), depth=0;
+  for(var k=i;k<h.length;k++){ if(h[k]==='{') depth++;
+    else if(h[k]==='}'&&!--depth) return new Function('var DB_STATE_DOCS=[],DB_COLLECTIONS=[];'+h.slice(i,k+1)+'\nreturn MemoryStore;')(); }
+  throw new Error('could not find MemoryStore in index.html');
+}
+var MemoryStore=memoryStore();
+// What update would leave at a document holding cur. Synchronous: the write
+// lands before MemoryStore's promise is handed back.
+function merged(cur,data){ var m=MemoryStore({d:cur}); m.update('d',data); return m.dump().d; }
+// Records every write path (set and update) in the order it reached the store.
+var order=[];
+(function checkMerge(){
+  assert.deepStrictEqual(merged({a:{b:1,c:[1,2]},e:1},{a:{d:2,c:[3]},f:{g:1}}),{a:{b:1,c:[3],d:2},e:1,f:{g:1}},'the stub update does not deep-merge');
+  assert.deepStrictEqual(merged({a:{b:1}},{a:null}),{a:null},'null does not replace');
+  assert.deepStrictEqual(merged({a:[{x:1}]},{a:[{y:2}]}),{a:[{y:2}]},'an array merged rather than replaced');
+  assert.strictEqual(JSON.stringify(merged({a:1},JSON.parse('{"__proto__":{"polluted":"yes"}}'))),'{"a":1,"__proto__":{"polluted":"yes"}}','__proto__ was not kept as data');
+  assert.strictEqual(({}).polluted,undefined,'the stub update reached Object.prototype');
+})();
 function srvJson(r,body){ var b=JSON.stringify(body); r.setHeader('content-type','application/json'); r.setHeader('content-length',Buffer.byteLength(b)); r.end(b); }
 
 var SHIM=`<script>(function(){
@@ -135,7 +158,7 @@ var srv=http.createServer(function(q,r){
       // error, as a write whose answer was lost on the way back is.
       if(f){ if(op==='set'||op==='update') calls.set++;
         if(f.land && op==='set') store[body.path]=body.data;
-        if(f.land && op==='update' && Object.prototype.hasOwnProperty.call(store,body.path)) store[body.path]=Object.assign({},store[body.path],body.data);
+        if(f.land && op==='update' && Object.prototype.hasOwnProperty.call(store,body.path)) store[body.path]=merged(store[body.path],body.data);
         return srvJson(r,{err:f.code}); }
       // The real store hands documents back with their keys in alphabetical
       // order, observed directly against it. A stub that echoed insertion
@@ -159,8 +182,9 @@ var srv=http.createServer(function(q,r){
         leases[body.path]={holder:body.holder, exp:now+ttl, version:((l&&l.version)||0)+1};
         return srvJson(r,{acquired:true, holder:body.holder, version:leases[body.path].version, expiresAt:new Date(now+ttl).toISOString()}); }
       if(op==='set'&&tooBig(body.data)){ calls.set++; limitRefused++; return srvJson(r,{err:'invalid_argument'}); }
-      if(op==='update'&&Object.prototype.hasOwnProperty.call(store,body.path)&&tooBig(Object.assign({},store[body.path],body.data))){
+      if(op==='update'&&Object.prototype.hasOwnProperty.call(store,body.path)&&tooBig(merged(store[body.path],body.data))){
         calls.set++; limitRefused++; return srvJson(r,{err:'invalid_argument'}); }
+      if(op==='set'||op==='update') order.push(body.path);
       if(op==='set'){ calls.set++; inflight++; peak=Math.max(peak,inflight);
         var held=take(setDelays,op,body.path);
         if(held){ return setTimeout(function(){ store[body.path]=body.data; inflight--; srvJson(r,{ok:1}); },held.ms); }
@@ -170,9 +194,12 @@ var srv=http.createServer(function(q,r){
       // is refused for one that does not.
       if(op==='update'){ calls.set++;
         if(!Object.prototype.hasOwnProperty.call(store,body.path)) return srvJson(r,{err:'invalid_argument'});
-        var hold=take(setDelays,op,body.path), apply=function(){ store[body.path]=Object.assign({},store[body.path],body.data); };
-        if(hold){ return setTimeout(function(){ apply(); srvJson(r,{ok:1}); },hold.ms); }
-        apply(); return srvJson(r,{ok:1}); }
+        var hold=take(setDelays,op,body.path), apply=function(){
+          // A held update whose document went meanwhile is refused as it lands.
+          if(!Object.prototype.hasOwnProperty.call(store,body.path)) return srvJson(r,{err:'invalid_argument'});
+          store[body.path]=merged(store[body.path],body.data); srvJson(r,{ok:1}); };
+        if(hold){ return setTimeout(apply,hold.ms); }
+        return apply(); }
       if(op==='del'){ calls.del++; delete store[body.path]; return srvJson(r,{ok:1}); }
       if(op==='coll'){ calls.collGet++;
         var pre=body.path+'/', docs=Object.keys(store).filter(function(k){
@@ -276,8 +303,14 @@ srv.listen(0,async function(){
   });
 
   await t('the seeded marker is written last, so a half migration is retried', function(){
-    // The stub records order: meta must not be the first write.
-    assert.ok(Object.keys(store).indexOf('state/meta')>0,'meta was written first');
+    // The stub records every write in order: the marker lands once, after
+    // every other document the seed wrote.
+    var at=order.indexOf('state/meta'), seeded=Object.keys(store).filter(function(k){ return k!=='state/meta'; });
+    assert.ok(at>-1,'the marker was never written');
+    assert.strictEqual(order.lastIndexOf('state/meta'),at,'the marker was written more than once');
+    var late=seeded.filter(function(k){ var i=order.indexOf(k); return i<0||i>at; });
+    assert.ok(seeded.length>40,'only '+seeded.length+' documents were seeded');
+    assert.deepStrictEqual(late,[],'written after the marker, or never: '+late.slice(0,5).join(', '));
   });
 
   await t('seeding writes in batches rather than firing every document at once', async function(){
@@ -549,15 +582,20 @@ srv.listen(0,async function(){
     assert.ok(/14 min Top \+ 6 min Bottom/.test(body),'the session did not read back:\n'+body.slice(0,500));
   });
 
+  var saunaCount=function(){ return Object.keys(store).filter(function(k){return k.indexOf('sauna/')===0;}).length; };
+  var removed=null, saunaBefore=0, removedBody=null;
   await t('deleting an entry deletes its document rather than leaving an orphan', async function(){
-    var saunaBefore=Object.keys(store).filter(function(k){return k.indexOf('sauna/')===0;}).length;
-    var removed=await p.evaluate(function(){
+    saunaBefore=saunaCount();
+    removed=await p.evaluate(function(){
       var btn=document.querySelector('[data-action="delsauna"]');
-      if(!btn) return null; var id=btn.getAttribute('data-id'); btn.click(); return id;
+      return btn?btn.getAttribute('data-id'):null;
     });
     assert.ok(removed,'no sauna row to remove');
+    removedBody=JSON.parse(JSON.stringify(store['sauna/'+removed]||null));
+    assert.ok(removedBody,'the row to remove has no document');
+    await p.evaluate(function(id){ document.querySelector('[data-action="delsauna"][data-id="'+id+'"]').click(); },removed);
     await p.waitForTimeout(1800);
-    var saunaAfter=Object.keys(store).filter(function(k){return k.indexOf('sauna/')===0;}).length;
+    var saunaAfter=saunaCount();
     assert.strictEqual(saunaAfter,saunaBefore-1,'documents went from '+saunaBefore+' to '+saunaAfter);
     assert.ok(!store['sauna/'+removed],'the removed document is still in the store');
   });
@@ -565,8 +603,10 @@ srv.listen(0,async function(){
   await t('undo puts the document back', async function(){
     assert.ok(await tap('[data-action="undo"]'),'no undo offer');
     await p.waitForTimeout(1800);
-    var n=Object.keys(store).filter(function(k){return k.indexOf('sauna/')===0;}).length;
-    assert.ok(n>0,'undo did not restore a document');
+    assert.ok(removed,'nothing was removed to put back');
+    assert.ok(store['sauna/'+removed],'undo did not restore sauna/'+removed);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(store['sauna/'+removed])),removedBody,'the restored document is not the one removed');
+    assert.strictEqual(saunaCount(),saunaBefore,'undo left '+saunaCount()+' sauna documents, there were '+saunaBefore);
   });
 
   console.log('\nSHIPPING NEW CODE DOES NOT TOUCH DATA');
