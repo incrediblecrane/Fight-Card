@@ -1887,6 +1887,68 @@ srv.listen(0,async function(){
     await leaveSession();
   });
 
+  console.log('\nEXERCISE LIBRARY: RAMP, ROUNDS AND WORKOUT PREP');
+
+  await t('light sets ramping up on a dumbbell lift are logged per dumbbell', async function(){
+    // Strength opens on the push press, one dumbbell in each hand.
+    await go(); await leaveSession(); await startWorkout('Strength \u2014 functional full body');
+    assert.strictEqual(await slideTitle(),'Warm-up');
+    await p.selectOption('[data-action="prepopt"][data-ex="warmup"]','Light sets of the first lift');
+    await p.waitForTimeout(500);
+    assert.strictEqual(await p.getAttribute('#log-w-warmup','placeholder'),'kg each');
+    var hint=await p.evaluate(function(){ var h=document.querySelector('.slide .perimp'); return h?h.textContent:''; });
+    assert.ok(/Push press/.test(hint) && /one dumbbell, not the pair/i.test(hint),'the hint reads "'+hint+'"');
+    await p.fill('#log-w-warmup','15'); await p.fill('#log-v-warmup','10');
+    await p.click('[data-action="logset"]'); await settle();
+    var chip=await p.evaluate(function(){ var c=document.querySelector('.setchip'); return c?c.textContent.trim():''; });
+    assert.ok(/^15kg ea \u00d7 10/.test(chip),'the light set reads "'+chip+'"');
+    var set=(seedOf().activeSession.logs.warmup||[])[0]||{};
+    assert.strictEqual(set.of,'press_push','the lift it ramped up on was not kept: '+JSON.stringify(set));
+    await leaveSession();
+  });
+
+  await t('boxing rounds are logged and read back as rounds', async function(){
+    await go(); await leaveSession(); await startWorkout('Boxing/MMA technical');
+    assert.ok(await toSlide('Rounds (pad/drill/spar)'),'never reached the rounds');
+    assert.strictEqual(await p.getAttribute('#log-v-rounds','placeholder'),'rounds');
+    await p.fill('#log-v-rounds','5');
+    await p.click('[data-action="logset"]'); await settle();
+    var chip=await p.evaluate(function(){ var c=document.querySelector('.setchip'); return c?c.textContent.trim():''; });
+    assert.strictEqual(chip,'5 rounds');
+    await leaveSession();
+  });
+
+  var cues=function(){ return p.evaluate(function(){
+    return [].slice.call(document.querySelectorAll('.slide .cue')).map(function(c){ return c.textContent; }).join(' | '); }); };
+
+  await t('Swim shows its poolside warm-up and cool-down on its own swim steps', async function(){
+    await go(); await leaveSession(); await startWorkout('Swim');
+    assert.strictEqual(await slideTitle(),'Warm-up swim','Swim gained a generic warm-up');
+    var c=await cues();
+    assert.ok(/poolside mobility/.test(c) && /Easy, relaxed pace/.test(c),'the warm-up swim reads: '+c);
+    assert.ok(await toSlide('Cool-down swim'),'never reached the cool-down swim');
+    c=await cues();
+    assert.ok(/Stretch shoulders and lats/.test(c),'the cool-down swim reads: '+c);
+    await leaveSession();
+  });
+
+  await t('Cardio gym shows its warm-up words on its machine warm-up', async function(){
+    await go(); await leaveSession(); await startWorkout('Cardio \u2014 gym');
+    assert.strictEqual(await slideTitle(),'Machine warm-up');
+    var c=await cues();
+    assert.ok(/rehearses them/.test(c),'the machine warm-up reads: '+c);
+    await leaveSession();
+  });
+
+  await t('Reset starts on its first stretch, with no warm-up step', async function(){
+    await go(); await leaveSession(); await startWorkout('Reset \u2014 10 min');
+    var ids=seedOf().activeSession.exIds;
+    assert.ok(ids.indexOf('warmup')<0,'Reset was given a warm-up: '+ids.join(','));
+    assert.strictEqual(ids[ids.length-1],'cooldown','Reset lost its cool-down: '+ids.join(','));
+    assert.notStrictEqual(await slideTitle(),'Warm-up');
+    await leaveSession();
+  });
+
   await t('no page errors', function(){
     assert.deepStrictEqual(errs,[],errs.join(' | '));
   });

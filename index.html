@@ -429,8 +429,16 @@ var PER_IMPLEMENT={
 function perImplement(id){ return hasOwn(PER_IMPLEMENT,id)?PER_IMPLEMENT[id]:null; }
 /* Volume is weight actually moved, so a set recorded per implement moved twice
    what it says: two 20kg dumbbells for 10 is 400kg, not 200. Without this a
-   dumbbell day reads as half a barbell day of the same work. */
-function volumeOf(id,st){ return st.w*st.v*(perImplement(id)?2:1); }
+   dumbbell day reads as half a barbell day of the same work. And a set whose
+   reps are per side (`sides:2` on the exercise) was done on both sides: 8 each
+   side of a Bulgarian split squat holding two 20kg dumbbells is 20x8x2x2.
+   'side' is one implement per side, so its two come from the sides when they
+   take turns and from the two handles when they work together (a cable fly).
+   A light set on the warm-up counts as the lift it ramped up on (`of`). */
+function volumeOf(id,st){
+  var src=(st.lvlKind==='load'&&st.of)?st.of:id, k=perImplement(src), d=exDef(src), n=(d&&d.sides)||1;
+  return st.w*st.v*(k==='dumbbell'||(k==='side'&&n<2)?2:1)*n;
+}
 /* Light sets on the warm-up are a weight for reps, logged against the prep
    step rather than the lift, so they used to fall out of the total: a ramp of
    3 sets at 40kg for 5 was invisible on a chart labelled "weight moved". The
@@ -498,16 +506,16 @@ var EX=[
 {id:"dl_rdl",name:"Romanian deadlift",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"8-10",pose:"HINGE",cue:"Slight knee bend, hinge at the hips keeping the weight close to your legs, lower until your hamstrings stretch, drive hips forward to stand."},
 {id:"dl_conv",name:"Conventional deadlift",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"5",pose:"HINGE",cue:"Bar over mid-foot, flat back, drive through the floor and stand tall, hips and shoulders rising together."},
 {id:"hipthrust",name:"Hip thrust",cat:"Strength",area:"Legs & glutes",type:"load",sets:4,reps:"10",pose:"HIPBRIDGE",cue:"Upper back on a bench, bar over your hips, drive through your heels to full hip extension, squeeze at the top."},
-{id:"splitsq_bulg",name:"Bulgarian split squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:3,reps:"8 each side",pose:"LUNGE",cue:"Rear foot up on a bench, front foot forward. Drop straight down through the front leg, drive back up."},
+{id:"splitsq_bulg",name:"Bulgarian split squat",cat:"Strength",area:"Legs & glutes",type:"load",sets:3,reps:"8 each side",sides:2,pose:"LUNGE",cue:"Rear foot up on a bench, front foot forward. Drop straight down through the front leg, drive back up."},
 {id:"lunge_walk",name:"Walking lunge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"10 each side",pose:"LUNGE",cue:"Step forward into a lunge, both knees near 90 degrees, drive up and step through to the next lunge."},
 {id:"press_push",name:"Push press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8",pose:"PRESS",cue:"Dumbbells at your shoulders, dip your knees slightly then drive up explosively, press overhead as your legs extend."},
 {id:"raise_front",name:"Front dumbbell raise",cat:"Strength",area:"Push",type:"load",sets:3,reps:"12-15",pose:"PRESS",cue:"Dumbbells at your thighs, palms down. Raise them straight out in front to shoulder height, arms long, and lower under control. It is a small muscle doing a long lever, so it needs far less weight than you think. If your lower back is swinging, it is too heavy."},
 {id:"raise_lateral",name:"Side lateral raise",cat:"Strength",area:"Push",type:"load",sets:3,reps:"12-15",pose:"PRESS",cue:"Dumbbells at your sides, soft bend at the elbow that does not change. Lift out to the sides to about shoulder height, leading with the elbows, and lower slowly. Go light: the moment you are heaving it up, your traps have taken over and the side delt has stopped working."},
-{id:"press_ohp",name:"Overhead press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"PRESS",cue:"Bar or dumbbells at shoulder height, press straight overhead without arching your lower back, lower under control."},
+{id:"press_ohp",name:"Overhead press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"PRESS",cue:"Barbell at shoulder height, hands just outside your shoulders, press straight overhead without arching your lower back, lower under control."},
 {id:"press_bench",name:"Bench press",cat:"Strength",area:"Push",type:"load",sets:4,reps:"8",pose:"BENCH",cue:"Bar over your chest, lower with control to your sternum, press back up keeping your feet planted."},
 {id:"press_incline",name:"Incline dumbbell press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"10",pose:"BENCH",cue:"On an incline bench, press dumbbells up and slightly together, lower under control to chest level."},
-{id:"row_bent",name:"Bent-over row",cat:"Strength",area:"Pull",type:"load",sets:4,reps:"8-10",pose:"ROW",cue:"Hinge forward with a flat back, pull the bar or dumbbells to your ribs, squeeze your shoulder blades together."},
-{id:"row_single",name:"Single-arm row",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10 each side",pose:"ROW",cue:"One hand and knee on a bench, pull the dumbbell to your hip keeping your torso still."},
+{id:"row_bent",name:"Bent-over row",cat:"Strength",area:"Pull",type:"load",sets:4,reps:"8-10",pose:"ROW",cue:"Hinge forward with a flat back, pull the bar to your ribs, squeeze your shoulder blades together."},
+{id:"row_single",name:"Single-arm row",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10 each side",sides:2,pose:"ROW",cue:"One hand and knee on a bench, pull the dumbbell to your hip keeping your torso still."},
 {id:"facepull",name:"Face pull",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"15",pose:"ROW",cue:"Cable or band at face height, rope held thumbs back. Pull toward your face with elbows high, hands finishing beside your ears, and rotate your forearms up so your knuckles point at the ceiling. Squeeze your rear shoulders, return slowly."},
 {id:"pulldown_straight",name:"Standing lat pulldown",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"12-15",pose:"ROW",cue:"Standing at a high pulley, bar at arms length, small hinge at the hips and a long spine. Keep the arms STRAIGHT and pull the bar down in an arc to your thighs with the lats, then let it rise without the elbows bending. The moment they bend it is a triceps pushdown."},
 {id:"pulldown",name:"Lat pulldown",cat:"Strength",area:"Pull",type:"load",sets:3,reps:"10",pose:"ROW",cue:"Pull the bar down to your upper chest, lead with your elbows, control it back up."},
@@ -561,11 +569,11 @@ var EX=[
 {id:"shadowbox",name:"Shadowboxing",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:6,reps:"120s",pose:"GUARD",cue:"Move and throw combinations at pace, keep your guard up between combos, work your footwork."},
 {id:"burpee",name:"Burpee",cat:"Conditioning",area:"Conditioning & cardio",type:"reps",sets:4,reps:"10",pose:"JUMP",cue:"Squat and put your hands on the floor, jump your feet back to a plank, lower your chest to the floor, push up, jump your feet back in, then jump up to finish. Keep it smooth rather than rushed."},
 {id:"technique",name:"Technique / drilling block",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",unit:"min",sets:1,reps:"20-30 min",pose:"GUARD",cue:"Coach-led, or your own focus if training solo. Quality of movement over speed."},
-{id:"rounds",name:"Rounds (pad/drill/spar)",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"reps",sets:1,reps:"3-6 rounds",pose:"GUARD",cue:"Set intensity by the session's goal, technical or live, one minute rest between rounds."},
+{id:"rounds",name:"Rounds (pad/drill/spar)",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"reps",unit:"rounds",sets:1,reps:"3-6 rounds",pose:"GUARD",cue:"Set intensity by the session's goal, technical or live, one minute rest between rounds."},
 {id:"jabcross",name:"Jab-cross combo drill",cat:"Boxing/MMA",area:"Boxing/MMA technique",type:"time",sets:6,reps:"60s",pose:"JAB",cue:"Sharp jab-cross combinations at pace, reset your guard between every combo."},
-{id:"kb_clean",name:"Kettlebell clean",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"8 each side",pose:"HINGE",cue:"Hike the bell back, drive your hips forward and pull it up close to your body, catching it softly at your shoulder."},
-{id:"kb_snatch",name:"Kettlebell snatch",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"6 each side",pose:"HINGE",cue:"One explosive hip drive takes the bell from between your legs straight overhead, punching your hand through at the top."},
-{id:"kb_press",name:"Kettlebell single-arm press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8 each side",pose:"PRESS",cue:"Bell racked at your shoulder, press straight overhead without leaning away from it, lower under control."},
+{id:"kb_clean",name:"Kettlebell clean",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"8 each side",sides:2,pose:"HINGE",cue:"Hike the bell back, drive your hips forward and pull it up close to your body, catching it softly at your shoulder."},
+{id:"kb_snatch",name:"Kettlebell snatch",cat:"Power",area:"Power & explosive",type:"load",sets:3,reps:"6 each side",sides:2,pose:"HINGE",cue:"One explosive hip drive takes the bell from between your legs straight overhead, punching your hand through at the top."},
+{id:"kb_press",name:"Kettlebell single-arm press",cat:"Strength",area:"Push",type:"load",sets:3,reps:"8 each side",sides:2,pose:"PRESS",cue:"Bell racked at your shoulder, press straight overhead without leaning away from it, lower under control."},
 {id:"kb_tgu",name:"Turkish get-up",cat:"Strength",area:"Core & rotation",type:"reps",sets:2,reps:"3 each side",pose:"REACH",cue:"From lying down to standing, weight locked out overhead the whole way, moving slowly through each step. Start light, this one's about control, not load."},
 {id:"pistol",name:"Pistol squat",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"5 each side",pose:"PISTOL",cue:"One leg extended in front, squat down on the standing leg keeping your heel down. Hold a doorframe or rail for balance while you build this up."},
 {id:"glutebridge",name:"Glute bridge",cat:"Strength",area:"Legs & glutes",type:"reps",sets:3,reps:"15",pose:"HIPBRIDGE",cue:"On your back, knees bent, drive your hips up by squeezing your glutes, pause at the top, lower with control."},
@@ -581,9 +589,9 @@ var EX=[
 {id:"jumpingjack",name:"Jumping jacks",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"40s",pose:"JJACK",cue:"Feet and arms out together, back in together, steady rhythm, no equipment needed."},
 {id:"highknees",name:"High knees",cat:"Conditioning",area:"Conditioning & cardio",type:"time",sets:4,reps:"30s",pose:"HIGHKNEE",cue:"Drive your knees up toward your chest quickly on the spot, stay light on your feet."},
 {id:"briskwalkjog",name:"Brisk walk or jog",cat:"Conditioning",area:"Conditioning & cardio",type:"time",unit:"min",sets:1,reps:"10-15min",pose:"CARRY",cue:"Outside, a corridor, wherever you've got, steady pace you could just about hold a conversation at."},
-{id:"woodchopper",name:"Cable or band woodchopper",cat:"Power",area:"Core & rotation",type:"load",sets:3,reps:"10 each side",pose:"TWIST",cue:"Rotate diagonally from high to low (or low to high) through your torso, arms follow, control the return, don't let momentum do the work."},
-{id:"russiantwist",name:"Russian twist",cat:"Strength",area:"Core & rotation",type:"load",sets:3,reps:"16 each side",pose:"TWIST",cue:"Seated, leaning back slightly, feet up or down, rotate a weight or your hands side to side, keep the movement in your torso not your arms."},
-{id:"palloffpress",name:"Pallof press",cat:"Strength",area:"Core & rotation",type:"load",sets:3,reps:"10 each side",pose:"PRESS",cue:"Band or cable at your chest, press straight out and resist it pulling you round, that resistance to rotation is the whole point."},
+{id:"woodchopper",name:"Cable or band woodchopper",cat:"Power",area:"Core & rotation",type:"load",sets:3,reps:"10 each side",sides:2,pose:"TWIST",cue:"Rotate diagonally from high to low (or low to high) through your torso, arms follow, control the return, don't let momentum do the work."},
+{id:"russiantwist",name:"Russian twist",cat:"Strength",area:"Core & rotation",type:"load",sets:3,reps:"16 each side",sides:2,pose:"TWIST",cue:"Seated, leaning back slightly, feet up or down, rotate a weight or your hands side to side, keep the movement in your torso not your arms."},
+{id:"palloffpress",name:"Pallof press",cat:"Strength",area:"Core & rotation",type:"load",sets:3,reps:"10 each side",sides:2,pose:"PRESS",cue:"Band or cable at your chest, press straight out and resist it pulling you round, that resistance to rotation is the whole point."},
 {id:"hangingkneeraise",name:"Hanging knee raise",cat:"Strength",area:"Core & rotation",type:"reps",sets:3,reps:"10-12",pose:"HANG",cue:"Hang from a bar, raise your knees toward your chest without swinging, lower under control."},
 {id:"platepinch",name:"Plate pinch hold",cat:"Isometric",area:"Grip & carries",type:"time",sets:3,reps:"20-30s",pose:"HANG",cue:"Pinch two weight plates together smooth-side-out at your sides, hold without letting them slip."},
 {id:"kb_bottomsup",name:"Kettlebell bottoms-up carry",cat:"Strength",area:"Grip & carries",type:"distance",sets:2,reps:"15-20m each side",pose:"CARRY",cue:"Hold the kettlebell upside down by the handle, walk keeping it stable and vertical, don't let it tip over."}
@@ -644,7 +652,7 @@ var WORKOUTS=[
     plan:[{ex:"pullup",sets:3,reps:"6-8"},{ex:"pushup",sets:3,reps:"12-15"},{ex:"pistol",sets:3,reps:"5 each side"},{ex:"sq_air",sets:3,reps:"15"},{ex:"glutebridge",sets:3,reps:"15"},{ex:"plank",sets:3,reps:"30-45s"},{ex:"burpee",sets:3,reps:"10"}]},
   {id:"w11",tag:"Conditioning",title:"Swim",warmup:"5 min poolside mobility: shoulder circles, arm swings.",cooldown:"Stretch shoulders and lats poolside or after.",
     plan:[{ex:"swim_warmup",sets:1,reps:"200-400m"},{ex:"swim_drill",sets:1,reps:"200m"},{ex:"swim_main",sets:1,reps:"4-8 x 50-100m"},{ex:"swim_cooldown",sets:1,reps:"100-200m"}]},
-  {id:"w12",tag:"Conditioning",title:"Cardio — gym",warmup:"2-3 min easy on whichever machine you're starting on.",cooldown:"2-3 min easy pace to bring your heart rate down, then stretch.",
+  {id:"w12",tag:"Conditioning",title:"Cardio — gym",warmup:"Start on the machine you will do the intervals on, so the warm-up rehearses them.",cooldown:"2-3 min easy pace to bring your heart rate down, then stretch.",
     plan:[{ex:"cardio_gym_warmup",sets:1,reps:"5min"},{ex:"cardio_gym_intervals",sets:8,reps:"1min hard / 1min easy"},{ex:"cardio_gym_steady",sets:1,reps:"10-15min"}]},
   {id:"w13",tag:"Conditioning",title:"Cardio — anywhere",warmup:"2-3 min easy jog on the spot or a brisk walk, arm circles.",cooldown:"Walk it off, stretch your calves and hips.",
     plan:[{ex:"jumpingjack",sets:4,reps:"40s"},{ex:"highknees",sets:4,reps:"30s"},{ex:"mtnclimb",sets:4,reps:"40s"},{ex:"burpee",sets:4,reps:"10"},{ex:"briskwalkjog",sets:1,reps:"10-15min"}]},
@@ -658,7 +666,7 @@ var WORKOUTS=[
      very little for the other. */
   {id:"w18",tag:"Strength",title:"Forearms",warmup:"2-3 min easy, then wrist circles and a gentle wrist flexor and extensor stretch. Cold forearms and heavy curls is how you end up with sore elbows.",cooldown:"Wrist flexor and extensor stretch, 30s each, and shake the hands out.",
     plan:[{ex:"curl_reverse",sets:3,reps:"12-15"},{ex:"curl_hammer",sets:3,reps:"10-12"},{ex:"platepinch",sets:3,reps:"20-30s"},{ex:"farmerscarry",sets:3,reps:"30-40m"},{ex:"deadhang",sets:3,reps:"20-40s"}]},
-  {id:"w16",tag:"Flexibility",title:"Reset — 10 min",warmup:"None needed, ease into it.",cooldown:"Stay in child's pose or lie flat for a minute, breathe.",
+  {id:"w16",tag:"Flexibility",title:"Reset — 10 min",prep:{warmup:false},cooldown:"Stay in child's pose or lie flat for a minute, breathe.",
     plan:[{ex:"catcow",sets:2,reps:"10"},{ex:"worldsgreatest",sets:2,reps:"5 each side"},{ex:"hipflexor",sets:1,reps:"30s each side"},{ex:"childspose",sets:1,reps:"45-60s"}]},
   /* Your own thing. The plan is empty on purpose: the warm-up and cool-down
      are still injected, and anything you add lands between them, so a session
@@ -1464,8 +1472,10 @@ function bestSet(type,sets){
 }
 function bestValue(type,s){ return type==='load'?(s.w||0):s.v; }
 // A time block can be logged in minutes (`unit:'min'` on the exercise): a
-// drilling block of 25 is 25 minutes, not 25 seconds.
-function bestUnit(type,def){ return type==='load'?'kg':type==='time'?(def&&def.unit==='min'?'min':'s'):type==='distance'?'m':(type==='cardio'||type==='prep')?'min':'reps'; }
+// drilling block of 25 is 25 minutes, not 25 seconds. A count can be of rounds
+// (`unit:'rounds'`): five rounds of pads are not five reps.
+function bestUnit(type,def){ return type==='load'?'kg':type==='time'?(def&&def.unit==='min'?'min':'s'):type==='distance'?'m':(type==='cardio'||type==='prep')?'min':repsWord(def); }
+function repsWord(def){ return def&&def.unit==='rounds'?'rounds':'reps'; }
 /* ---------- coaching ----------------------------------------------------
    What a lift slide knows about last time. A warm-up set (`wu`) is real work
    but not the measure: it is left out of last time, the prefill, PBs and set
@@ -2827,7 +2837,7 @@ var EXPORT_LISTS=['workoutLogs','saunaSessions','library','recipes','plan'];
 // checked on their own. Every field of a set is drawn, so every one logSet
 // writes is here. A count is drawn once per unit and a round count rebuilds
 // one entry per round, so those have a top.
-var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',machine:'s',work:'s',rest:'s',wu:'b',ss:'i'}]};
+var IMPORT_SET={'*':[{v:'n',w:'n',t:'n',u:'s',opt:'s',lvl:'s',lvlKind:'s',of:'i',machine:'s',work:'s',rest:'s',wu:'b',ss:'i'}]};
 var IMPORT_FIELDS={
   days:{water:{'#':[0,DAY_MAX.water]},wx:{'#':[0,DAY_MAX.water]},alcohol:{'#':[0,DAY_MAX.alcohol]},smoking:{'#':[0,DAY_MAX.smoking]},
     weed:{'#':[0,DAY_MAX.weed]},rest:'b',touched:'b',workout:{done:'b',type:{'|':WORKOUT_TYPES}}},
@@ -3682,7 +3692,7 @@ function setLabel(def,e){
   if(type==='distance') return e.v+'m';
   if(type==='prep'){
     if(e.lvlKind==='load'){
-      return (e.w?(e.w+'kg × '+e.v):(e.v+' reps'))+(e.opt?' · '+e.opt:'');
+      return (e.w?(e.w+'kg'+(e.of&&perImplement(e.of)?' ea':'')+' × '+e.v):(e.v+' reps'))+(e.opt?' · '+e.opt:'');
     }
     var pl=e.v+' min'+(e.opt?' · '+e.opt:'');
     if(e.lvl) pl+=' · '+(e.lvlKind==='resistance'?('resistance '+e.lvl):e.lvlKind==='speed'?(e.lvl+' km/h'):e.lvl);
@@ -3693,11 +3703,20 @@ function setLabel(def,e){
     if(e.work||e.rest) label+=' · '+(e.work||'—')+'/'+(e.rest||'—');
     return label;
   }
-  return e.v+' reps';
+  return e.v+' '+repsWord(def);
 }
 
 /* Runs once per session, never on every render: if it ran every time, removing
    the cool-down would silently put it straight back. */
+function workoutOf(sess){ return WORKOUTS.filter(function(x){ return x.id===sess.workoutId; })[0]; }
+/* A workout's own warm-up or cool-down words, for the slide of a step with that
+   role: the generic step that stands in for one, or the plan's own (Swim's
+   easy lengths), where they say what to do around it. */
+function workoutProse(w,id){
+  var d=exDef(id), r=d&&d.role;
+  if(!w || !r || typeof w[r]!=='string') return '';
+  return (d.type==='prep' || w.plan.some(function(p){ return p.ex===id; }))?w[r]:'';
+}
 function hasRole(sess,role){
   for(var i=0;i<sess.exIds.length;i++){
     var d=exDef(sess.exIds[i]);
@@ -3705,17 +3724,37 @@ function hasRole(sess,role){
   }
   return false;
 }
+/* The first thing in the session you actually put weight on, looking inside a
+   superset if one leads: what "Light sets of the first lift" ramps up on.
+   Anything else is not a lift to ramp up on, and naming a stretch would be
+   worse than naming nothing. */
+function firstLiftOf(sess){
+  var first=null;
+  (sess&&sess.exIds||[]).forEach(function(x){
+    if(first) return;
+    (isSuperset(x)?supersetMembers(x):[x]).forEach(function(id){
+      if(first) return;
+      var fd=exDef(id); if(fd && fd.type==='load') first=fd;
+    });
+  });
+  return first;
+}
+// Whether a light set on the warm-up is one dumbbell of a pair, as the lift is.
+function prepEach(sess){ var f=firstLiftOf(sess); return !!(f && perImplement(f.id)); }
 function ensurePrep(sess){
   if(!sess || sess.prep) return;
   sess.prep=1;
   // Only where the plan does not already have one: Swim opens and closes with
   // its own easy lengths, and Cardio gym starts on the machine, so bolting a
-  // generic step onto those would be asking for the same thing twice.
-  if(!hasRole(sess,'warmup')){
+  // generic step onto those would be asking for the same thing twice. A
+  // workout can also opt out (`prep:{warmup:false}`): a ten-minute reset is
+  // its own warm-up.
+  var w=workoutOf(sess), off=(w&&w.prep)||{};
+  if(!hasRole(sess,'warmup') && off.warmup!==false){
     sess.exIds.unshift('warmup');
     sess.targets.warmup={sets:1,reps:'5-10 min'};
   }
-  if(!hasRole(sess,'cooldown')){
+  if(!hasRole(sess,'cooldown') && off.cooldown!==false){
     sess.exIds.push('cooldown');
     sess.targets.cooldown={sets:1,reps:'5-10 min'};
   }
@@ -3786,7 +3825,7 @@ function logSet(exId,type,quiet){
   if(isNaN(wt)||isNaN(lv)||isNaN(v)) return false;
   if(v===null||v<=0){ if(!quiet) markBad(valInput); return false; }
   var entry={v:v,w:null,t:Date.now()};
-  if(def && def.unit) entry.u=def.unit;
+  if(def && def.unit==='min') entry.u=def.unit;
   if(type==='load') entry.w=wt;
   // The boxes come back filled with the set just logged, so a second tap of a
   // double tap would log it twice. One that quick is taken as the same tap.
@@ -3797,8 +3836,10 @@ function logSet(exId,type,quiet){
     entry.lvlKind=prepLevelKind(entry.opt);
     if(entry.lvlKind==='load'){
       // v is reps here, not minutes, which is why the label and the trend
-      // chart both have to ask what kind of prep entry this is.
+      // chart both have to ask what kind of prep entry this is. `of` is the
+      // lift it ramped up on, so a dumbbell's weight counts as the pair.
       entry.w=wt; entry.lvl='';
+      var fl=firstLiftOf(state.activeSession); if(fl) entry.of=fl.id;
     } else {
       entry.lvl=!lEl?'':lv!==null?String(lv):lEl.value;
     }
@@ -4925,7 +4966,7 @@ function bodyContent(){
       // A lift never logged with a weight has nothing to chart in kg, so its
       // reps are the measure instead of a flat line of 0kg.
       var byReps=def.type==='load' && !hist.some(function(h){ return h.w>0 && !h.wu; });
-      var kind=byReps?'reps':def.type, u=bestUnit(def.type,def), unit=byReps?' reps':((u==='reps'||u==='min')?' '+u:u);
+      var kind=byReps?'reps':def.type, u=bestUnit(def.type,def), unit=byReps?' reps':(/^(reps|min|rounds)$/.test(u)?' '+u:u);
       // A lift done some days with no weight has nothing to say in kg on
       // those days: it is left out of the line, the best and the change,
       // rather than drawn as a drop to 0kg.
@@ -5047,7 +5088,7 @@ function bodyContent(){
   var sessionHtml='';
   if(viewingSession && state.activeSession){
     var sess=state.activeSession;
-    var w2=WORKOUTS.filter(function(x){return x.id===sess.workoutId;})[0];
+    var w2=workoutOf(sess);
     var n=sess.exIds.length;
     if(slide>=n) slide=Math.max(0,n-1);
     var logged=countedSets(sess.logs);
@@ -5084,7 +5125,7 @@ function bodyContent(){
         var mSets=sess.logs[m]||[];
         var mPer=perImplement(m);
         var mChips=mSets.map(function(x){ return '<span class="setchip">'+esc(setLabel(d,x))+'</span>'; }).join('');
-        var mVal=d.type==='load'?'reps':d.type==='time'?(d.unit==='min'?'mins':'secs'):d.type==='distance'?'metres':d.type==='cardio'?'mins':'reps';
+        var mVal=d.type==='load'?'reps':d.type==='time'?(d.unit==='min'?'mins':'secs'):d.type==='distance'?'metres':d.type==='cardio'?'mins':repsWord(d);
         // Prefilled the way a lift slide is, so the next round is one tap.
         var mPre=/^(load|reps|time|distance|cardio)$/.test(d.type)?prefillFor(m,sess,sess.targets[m]):null;
         // A cardio member needs its machine and effort pickers here too: logSet
@@ -5170,7 +5211,7 @@ function bodyContent(){
       var chips=sets.map(function(s,i){ return canWu
         ? ('<button class="setchip'+(s.wu?' wu':'')+'" data-action="togglewu" data-ex="'+exId+'" data-i="'+i+'" aria-pressed="'+!!s.wu+'">'+(s.wu?'Warm-up ':'')+esc(setLabel(def2,s))+'</button>')
         : ('<span class="setchip">'+esc(setLabel(def2,s))+'</span>'); }).join('');
-      var perImp=perImplement(exId);
+      var perImp=perImplement(exId), prose2=workoutProse(w2,exId);
       // The boxes start from the last working set, so a repeat is one tap.
       var pre=/^(load|reps|time|distance|cardio)$/.test(def2.type)?prefillFor(exId,sess,tgt):null;
       var preV=pre&&pre.v?' value="'+pre.v+'"':'';
@@ -5179,7 +5220,7 @@ function bodyContent(){
       var weightInput=def2.type==='load'?fieldBox('<input id="log-w-'+exId+'" type="text" inputmode="decimal" placeholder="'+(perImp?'kg each':'kg')+'"'+(pre&&pre.w?' value="'+pre.w+'"':'')+'>',perImp?'kg each':'kg'):'';
       var perImpNote=(def2.type==='load'&&perImp)?('<div class="perimp">'+esc(perImplementNote(exId))+'</div>'):'';
       var prepIsLoad=def2.type==='prep' && prepLevelKind(prepPick[exId]||'')==='load';
-      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?(def2.unit==='min'?'mins':'secs'):def2.type==='distance'?'metres':prepIsLoad?'reps':(def2.type==='cardio'||def2.type==='prep')?'mins':'reps';
+      var valPlaceholder=def2.type==='load'?'reps':def2.type==='time'?(def2.unit==='min'?'mins':'secs'):def2.type==='distance'?'metres':prepIsLoad?'reps':(def2.type==='cardio'||def2.type==='prep')?'mins':repsWord(def2);
       var prepRow='', prepHint='';
       if(def2.type==='prep'){
         var opts=hasOwn(PREP_OPTIONS,exId)?PREP_OPTIONS[exId]:[];
@@ -5189,28 +5230,16 @@ function bodyContent(){
         var lvlHint=kind==='resistance'?'Resistance&hellip;':kind==='speed'?'km/h':'How hard&hellip;';
         var lvlControl=!picked?''
           : kind==='load'
-            ? fieldBox('<input id="log-w-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="kg">','kg')
+            ? fieldBox('<input id="log-w-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="'+(prepEach(sess)?'kg each':'kg')+'">',prepEach(sess)?'kg each':'kg')
           : kind==='speed'
             ? fieldBox('<input id="log-lvl-'+exId+'" class="cardio-select" type="text" inputmode="decimal" placeholder="'+lvlHint+'">','km/h')
             : ('<select id="log-lvl-'+exId+'" class="cardio-select" aria-label="'+(kind==='resistance'?'Resistance':'How hard')+'"><option value="">'+lvlHint+'</option>'+
                lvlList.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('')+'</select>');
-        // Which lift, by name: the first thing in the session that is not a
-        // prep step. Saves guessing what "the first lift" meant afterwards.
-        if(kind==='load'){
-          // The first thing in the session you actually put weight on, looking
-          // inside a superset if one leads. Anything else is not a lift to ramp
-          // up on, and naming a stretch would be worse than naming nothing.
-          var firstLift=null;
-          sess.exIds.forEach(function(x){
-            if(firstLift) return;
-            var ids=isSuperset(x)?supersetMembers(x):[x];
-            ids.forEach(function(id){
-              if(firstLift) return;
-              var fd=exDef(id); if(fd && fd.type==='load') firstLift=fd;
-            });
-          });
-          if(firstLift) prepHint='<div class="perimp">Ramping up on '+esc(firstLift.name)+'</div>';
-        }
+        // Which lift, by name, and whether its weight is one dumbbell of a
+        // pair. Saves guessing what "the first lift" meant afterwards.
+        var firstLift=kind==='load'?firstLiftOf(sess):null, flPer=firstLift&&perImplement(firstLift.id);
+        if(firstLift) prepHint='<div class="perimp">Ramping up on '+esc(firstLift.name)+
+          (flPer?('. '+esc(perImplementNote(firstLift.id))):'')+'</div>';
         prepRow='<div class="cardio-row">'+
           '<select id="log-opt-'+exId+'" class="cardio-select" data-action="prepopt" data-ex="'+exId+'">'+
             '<option value="">'+(exId==='cooldown'?'Cool-down&hellip;':'Warm-up&hellip;')+'</option>'+
@@ -5239,8 +5268,9 @@ function bodyContent(){
           '<span class="cat">'+esc(def2.cat)+'</span>'+
           '<h4>'+esc(def2.name)+'</h4>'+
           '<div class="target">Target: '+tgt.sets+' x '+esc(tgt.reps)+'</div>'+
-          (lastLine?'<div class="lasttime">'+esc(lastLine).replace(/(\d+(?:\.\d+)?kg(?: ea)? × \d+|\d+ reps)/g,'<span class="nw">$1</span>')+'</div>':'')+
-          '<div class="cue">'+esc((def2.type==='prep'&&w2&&w2[exId])?w2[exId]:def2.cue)+'</div>'+
+          (lastLine?'<div class="lasttime">'+esc(lastLine).replace(/(\d+(?:\.\d+)?kg(?: ea)? × \d+|\d+ (?:reps|rounds))/g,'<span class="nw">$1</span>')+'</div>':'')+
+          '<div class="cue">'+esc((def2.type==='prep'&&prose2)?prose2:def2.cue)+'</div>'+
+          (prose2&&def2.type!=='prep'?'<div class="cue">'+esc(prose2)+'</div>':'')+
           restLine+
           (chips?'<div class="setchips">'+chips+'<button class="chipundo" data-action="undoset" data-ex="'+exId+'" aria-label="Undo last '+esc(def2.name)+' set">Undo</button></div>':'')+
           (chips&&canWu?'<div class="perimp">Tap a set to mark it as a warm-up.</div>':'')+

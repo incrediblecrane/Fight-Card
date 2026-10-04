@@ -90,6 +90,32 @@ t('a single-arm kettlebell lift counts per side, like a single-arm row', functio
   });
 });
 
+t('reps per side count both sides: a Bulgarian split squat is not half a squat', function(){
+  // Two 20kg dumbbells for 8 each side moved 20 x 8 x 2 dumbbells x 2 sides.
+  assert.strictEqual(box.volumeOf('splitsq_bulg',{w:20,v:8}), 640, 'got '+box.volumeOf('splitsq_bulg',{w:20,v:8}));
+  // One implement per side, both sides: a woodchopper, a Russian twist and a
+  // Pallof press at 10kg for 10 each side moved 200kg.
+  ['woodchopper','russiantwist','palloffpress'].forEach(function(id){
+    assert.strictEqual(box.volumeOf(id,{w:10,v:10}), 200, id+' got '+box.volumeOf(id,{w:10,v:10}));
+  });
+  // Unchanged: a single-arm row counts its two sides once, and a cable fly,
+  // per side with both hands at once, counts its two handles once.
+  assert.strictEqual(box.volumeOf('row_single',{w:20,v:10}), 400);
+  assert.strictEqual(box.volumeOf('fly_cable',{w:15,v:12}), 360);
+});
+
+t('a light set ramping up on a dumbbell lift counts like the lift', function(){
+  // Strength opens on the push press, logged per dumbbell: 15 x 10 on the
+  // ramp moved what 15 x 10 on the working set moved.
+  var ramp={v:10, w:15, opt:'Light sets of the first lift', lvlKind:'load', of:'press_push'};
+  assert.strictEqual(box.volumeOf('warmup',ramp), box.volumeOf('press_push',{w:15,v:10}), 'got '+box.volumeOf('warmup',ramp));
+  assert.strictEqual(box.volumeOf('warmup',{v:10, w:16, lvlKind:'load', of:'kb_clean'}), box.volumeOf('kb_clean',{w:16,v:10}));
+  // One from before the lift was kept counts as it always did.
+  assert.strictEqual(box.volumeOf('warmup',{v:10, w:15, lvlKind:'load'}), 150);
+  // A minutes entry never reads `of`.
+  assert.strictEqual(box.volumeOf('warmup',{v:10, w:15, lvlKind:'effort', of:'press_push'}), 150);
+});
+
 t('an unknown exercise id is refused rather than counted blind', function(){
   assert.strictEqual(box.movesWeight('nope',{w:100,v:5}), false);
 });

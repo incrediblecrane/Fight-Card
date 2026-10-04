@@ -56,10 +56,50 @@ t('every workout names exercises that exist', function(){
   assert.deepStrictEqual(missing,[], 'planned but not in the library: '+missing.join(', '));
 });
 
-t('every workout has a title, a warm-up and a cool-down', function(){
-  var thin=WORKOUTS.filter(function(w){ return !w.title||!w.warmup||!w.cooldown; })
+t('every workout has a title, a warm-up and a cool-down, unless it opts out of one', function(){
+  var thin=WORKOUTS.filter(function(w){ var off=w.prep||{};
+    return !w.title||(!w.warmup&&off.warmup!==false)||(!w.cooldown&&off.cooldown!==false); })
     .map(function(w){ return w.id; });
   assert.deepStrictEqual(thin,[], 'incomplete: '+thin.join(', '));
+});
+
+// A workout's warm-up and cool-down words are shown on a slide with that role:
+// the generic step put into a session without one of its own, or the plan's
+// own step (workoutProse). Words for a step no session has are never read, and
+// Reset used to say "None needed" above a warm-up it then put in anyway.
+t('every workout warm-up and cool-down is shown on some slide', function(){
+  var byId={}; EX.forEach(function(e){ byId[e.id]=e; });
+  var dead=[];
+  WORKOUTS.forEach(function(w){
+    ['warmup','cooldown'].forEach(function(r){
+      var own=(w.plan||[]).some(function(p){ return byId[p.ex] && byId[p.ex].role===r; });
+      var generic=!own && !(w.prep && w.prep[r]===false);
+      if(w[r]!==undefined && !own && !generic) dead.push(w.id+' '+r+' "'+w[r]+'"');
+    });
+  });
+  assert.deepStrictEqual(dead,[], 'never shown: '+dead.join(', '));
+});
+
+t('the app shows a plan step its workout words, and leaves the generic step out where asked', function(){
+  assert.ok(/function workoutProse\(w,id\)[\s\S]{0,300}w\.plan\.some/.test(h), 'workoutProse no longer reads the plan');
+  assert.ok(/off\.warmup!==false/.test(h) && /off\.cooldown!==false/.test(h), 'ensurePrep no longer reads the opt-out');
+});
+
+// A weight is one implement only where PER_IMPLEMENT says so. A cue offering
+// dumbbells on a lift logged as one barbell is a pair logged as half of itself.
+t('no lift logged as one weight tells you to use dumbbells', function(){
+  var PER=eval('('+h.slice(h.indexOf('{',h.indexOf('\nvar PER_IMPLEMENT=')),h.indexOf('}',h.indexOf('\nvar PER_IMPLEMENT='))+1)+')');
+  var bad=EX.filter(function(e){ return e.type==='load' && !PER[e.id] && /dumbbells/i.test(e.cue); })
+    .map(function(e){ return e.id; });
+  assert.deepStrictEqual(bad,[], 'cue offers dumbbells: '+bad.join(', '));
+});
+
+// Volume multiplies by `sides`, so a lift whose reps are per side and does not
+// say so counts half.
+t('every lift with reps per side says so with sides:2', function(){
+  var bad=EX.filter(function(e){ return e.type==='load' && /each side/.test(e.reps||'')!==(e.sides===2); })
+    .map(function(e){ return e.id+' "'+e.reps+'" sides '+e.sides; });
+  assert.deepStrictEqual(bad,[], bad.join(', '));
 });
 
 t('no two workouts share a title, so a card can be told apart', function(){
@@ -75,9 +115,10 @@ console.log('\nTARGETS AND UNITS');
 // seconds, is a number typed in one unit and read back in another.
 function unitOf(e){
   return e.type==='time'?(e.unit==='min'?'min':'s'):e.type==='distance'?'m':
-    (e.type==='cardio'||e.type==='prep')?'min':'reps';
+    (e.type==='cardio'||e.type==='prep')?'min':e.unit==='rounds'?'rounds':'reps';
 }
 function targetUnit(r){
+  if(/\d\s*rounds?\b/.test(r)) return 'rounds';
   if(/\d\s*min\b/.test(r)) return 'min';
   if(/\d\s*s\b/.test(r)) return 's';
   if(/\d\s*m\b/.test(r)) return 'm';

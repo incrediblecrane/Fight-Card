@@ -122,7 +122,9 @@ _Avoid_: light set (that is a prep option, below)
 
 **Units**:
 Weight in kg, time in seconds, distance in metres, cardio and prep in minutes,
-a treadmill's level in km/h. A `time` exercise marked `unit: 'min'` (the
+a treadmill's level in km/h. A `reps` exercise marked `unit: 'rounds'` (boxing
+rounds) is a count of rounds in its box, set labels and progress. A `time`
+exercise marked `unit: 'min'` (the
 drilling block, the brisk walk) is logged in minutes, and its sets carry
 `u: 'min'` so the one-off conversion of older sets typed as seconds runs once.
 Every number is typed into a text box and read by `parseNum`, which takes a
@@ -133,6 +135,18 @@ comma decimal ("62,5") and refuses a thousands comma or dot ("1,000",
 A logged weight is one dumbbell, not the pair. Declared in `PER_IMPLEMENT`;
 drives the "kg each" box, the "ea" in a set label, and doubling in total
 volume.
+
+**Sides**:
+`sides: 2` on a lift whose reps are per side ("8 each side"). Volume
+(`volumeOf`) is weight x reps x implements x sides: a pair of dumbbells
+(`dumbbell`) is two implements; `side` is one implement per side, so a
+single-arm row or kettlebell lift (`sides: 2`) counts its two sides once and a
+cable fly (no `sides`, both hands at once) its two handles once. The Bulgarian
+split squat (two dumbbells, each side) counts x4. The woodchopper, Russian
+twist and Pallof press are one implement done to each side, so x2. Before
+this, those four counted half, so logged volume for them doubled with this
+change; nothing stored was rewritten. A catalogue check keeps every load
+exercise with "each side" reps and `sides: 2` in step.
 
 **Last time**:
 The newest finished log holding working sets of the exercise, on or before the
@@ -178,7 +192,11 @@ own. Superset ids are never reused while a removal can be undone.
 
 **Prep step**:
 The warm-up and cool-down put into every session that does not already have
-its own; `role: "warmup"|"cooldown"` marks the ones a plan provides. A prep
+its own; `role: "warmup"|"cooldown"` marks the ones a plan provides. A workout
+can opt out of one (`prep: {warmup: false}` on Reset). A workout's `warmup`
+and `cooldown` words are the cue of the generic step, and an extra cue line on
+a plan's own role step (Swim's swims, Cardio gym's machine warm-up); a
+catalogue check keeps every such string shown on some slide. A prep
 option and minutes picked but not logged belong to that session and go when it
 starts, finishes or is discarded.
 
@@ -187,7 +205,10 @@ What second number a prep option has, from `PREP_LEVEL`: a bike a resistance,
 a treadmill a speed, a stretch how hard it felt, and "Light sets of the first
 lift" a weight. That last is `load`, the only prep entry whose `v` is REPS
 rather than minutes, so it is left off the minutes chart and listed in the
-table.
+table. Such an entry keeps the lift it ramped up on (`of`, from
+`firstLiftOf`), so a dumbbell lift's ramp reads "kg each" and "ea" and counts
+as the pair in volume. One logged before `of` was kept counts once, as it
+always did.
 
 **Stint**:
 One continuous spell at one bench height inside a sauna visit. A visit has
