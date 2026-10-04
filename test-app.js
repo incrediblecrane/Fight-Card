@@ -348,6 +348,47 @@ server.listen(0, async function(){
     ok('a session is logged against the day it STARTED, not the day it finished');
   }catch(e){ bad('session start date',e); }
 
+  console.log('\nA NEW DAY OPENS ON TODAY');
+  // The tab is kept per device, so a look at Meals last night used to be where
+  // the phone opened in the morning, a tap away from the water and habits.
+  var nctx=null;
+  try{
+    nctx=await b.newContext({viewport:{width:420,height:900}});
+    nctx.setDefaultTimeout(8000);
+    var np=await nctx.newPage(); np.on('pageerror',function(e){errs.push(e.message);});
+    await np.addInitScript(function(d){ try{ if(!sessionStorage.getItem('fc.t.seeded')){ sessionStorage.setItem('fc.t.seeded','1');
+      localStorage.setItem('fc.ui',JSON.stringify({day:d,tab:'meals'})); } }catch(e){} },localKey(1));
+    await np.goto(URL+'capture'); await np.waitForSelector('#app *');
+    var on=await np.$eval('[data-action="tab"].active',function(e){ return e.getAttribute('data-tab'); });
+    assert.strictEqual(on,'today','a ui stored yesterday on Meals opened on '+on);
+    ok('a ui stored yesterday on Meals opens on Today');
+    await np.evaluate(function(d){ localStorage.setItem('fc.ui',JSON.stringify({day:d,tab:'meals'})); },localKey(0));
+    await np.reload(); await np.waitForSelector('#app *');
+    on=await np.$eval('[data-action="tab"].active',function(e){ return e.getAttribute('data-tab'); });
+    assert.strictEqual(on,'meals','within the same day the tab is restored, got '+on);
+    ok('within the same day the stored tab is still restored');
+  }catch(e){ bad('a new day opens on Today',e); }
+  console.log('\nTODAY SHOWS THE SESSION IN PROGRESS');
+  try{
+    var np2=nctx.pages()[0];
+    if(!(await np2.$('[data-action="resumesession"]'))){
+      await np2.click('[data-action="tab"][data-tab="training"]');
+      if(!(await np2.$('[data-action="resumesession"]'))) await np2.click('[data-action="startworkout"]:not([disabled])');
+      else await np2.click('[data-action="resumesession"]');
+      await np2.click('[data-action="cancelsession"]');
+    }
+    await np2.click('[data-action="tab"][data-tab="today"]');
+    var tb=await np2.evaluate(function(){ var b=document.querySelector('.resume-banner');
+      return b?{text:b.textContent, resume:!!b.querySelector('[data-action="resumesession"]'), discard:!!b.querySelector('[data-action="discardsession"]')}:null; });
+    assert.ok(tb && /In progress/.test(tb.text),'Today does not name the session in progress');
+    assert.ok(tb.resume,'Today offers no Resume');
+    assert.ok(!tb.discard,'Today offers to discard the session');
+    await np2.click('.resume-banner [data-action="resumesession"]');
+    assert.ok(await np2.$('[data-action="cancelsession"]'),'Resume on Today did not go into the session');
+    ok('Today shows the session in progress with Resume only, and Resume goes straight in');
+  }catch(e){ bad('today shows the session in progress',e); }
+  if(nctx) await nctx.close();
+
   console.log('\nA TAB LEFT OPEN PAST MIDNIGHT');
   var mctx=null, mp=null, seedOf=null, day0=null, water1=0;
   // Today mode used to hold the date string read at load, so after midnight a
@@ -384,6 +425,14 @@ server.listen(0, async function(){
     assert.strictEqual(JSON.stringify(y0),day0,'yesterday was written to');
     ok('after midnight a tap lands on the new day, not yesterday');
   }catch(e){ bad('past midnight, on the next tap',e); }
+  try{
+    await mp.click('[data-action="tab"][data-tab="meals"]');
+    await mp.clock.fastForward('24:00:00');
+    await mp.evaluate(function(){ document.dispatchEvent(new Event('visibilitychange')); });
+    var mt=await mp.$eval('[data-action="tab"].active',function(e){ return e.getAttribute('data-tab'); });
+    assert.strictEqual(mt,'today','the first draw of a new day stayed on '+mt);
+    ok('the first draw of a new day goes back to Today');
+  }catch(e){ bad('past midnight, back to Today',e); }
   if(mctx) await mctx.close();
 
   if(errs.length){ fails++; console.log('\n  FAIL  page errors: '+errs.join(' | ')); }

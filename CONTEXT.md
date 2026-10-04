@@ -366,6 +366,10 @@ whether the session screen is open, which exercise histories and recipe cards
 are unfolded, and the yesterday nudge waved off. Kept in `localStorage` under
 `fc.ui` and never in the store, because writing it to the profile made every
 tab change carry this view's stale XP over another view's.
+It carries the day it was saved: a load on a later day, or the first draw
+after the day turns, starts on Today instead of the stored tab, unless the
+session screen is open. A `fc.ui` saved before the day was kept restores as
+it was.
 
 **Typed drafts** (`drafts`):
 What was typed into a box and not yet logged or added (the recipe and note

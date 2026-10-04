@@ -951,8 +951,12 @@ var view0=DATA.localOnly&&DATA._view&&typeof DATA._view==='object'?DATA._view:{}
 delete state._view;
 var ui0=readUi();
 if(!Object.keys(ui0).length && view0.ui && typeof view0.ui==='object') ui0=view0.ui;
-var tab=ui0.tab||'today';
 var viewingSession=!!ui0.viewingSession;
+// A new day opens on Today, where the day is logged, unless a session is
+// open: last night's look at Meals is not where the morning starts. The saved
+// session may not be read yet, so the open session is the one this view had.
+// A ui saved before the day was kept in it restores as it was.
+var tab=ui0.day&&ui0.day!==realToday()&&!viewingSession?'today':ui0.tab||'today';
 // What is unfolded (an exercise's history, a recipe's ingredients) is this
 // device's view too, kept with the tab so a save-and-reload keeps it open.
 var expanded=Object.create(null); (ui0.open||[]).forEach(function(k){ expanded[k]=true; });
@@ -3813,6 +3817,18 @@ function startWorkout(id){
 function sessionDay(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s.startedAt||'')?s.startedAt:activeDate(); }
 // ' for Mon 28 Sep' when that is not today, so the screen names it.
 function sessionFor(s){ var k=sessionDay(s); return k===realToday()?'':' for '+prettyKey(k); }
+// The session in progress, named wherever it can be picked up again. Today
+// offers only Resume: a stray tap on the daily screen cannot throw it away.
+function resumeBannerHtml(canDiscard){
+  var s=state.activeSession; if(!s) return '';
+  var aw=WORKOUTS.filter(function(x){return x.id===s.workoutId;})[0];
+  var cnt=0; Object.keys(s.logs).forEach(function(k){cnt+=s.logs[k].length;});
+  var from=sessionDay(s);
+  return '<div class="resume-banner"><span>In progress: <strong>'+(aw?esc(aw.title):'Workout')+'</strong>'+
+    (from!==realToday()?' from '+esc(prettyKey(from)):'')+' ('+cnt+' set'+(cnt===1?'':'s')+' logged)</span>'+
+    '<span class="btns"><button class="go" data-action="resumesession">Resume</button>'+
+    (canDiscard?'<button class="x" data-action="discardsession" title="Discard" aria-label="Discard this session">&times;</button>':'')+'</span></div>';
+}
 // A session belongs to the day it started. One started while logging an
 // earlier day is being typed in after the fact, so its clock means nothing.
 function sessionLive(s){
@@ -4601,7 +4617,7 @@ function bodyContent(){
        '<span class="btns"><button class="go" data-action="pickday" data-k="'+yk+'">Log yesterday</button>'+
        '<button data-action="nudgeoff" data-k="'+yk+'">Nothing to log</button></span></div>')
     : '';
-  return nudge+
+  return resumeBannerHtml(false)+nudge+
     '<div class="grid">'+
       '<div class="card"><h3>Water</h3><div class="sub tgt"><span>Target <b>'+litres(state.waterTarget)+'</b> a day</span>'+
           '<button data-action="watertarget" data-d="-1" aria-label="Lower the water target">&minus;</button>'+
@@ -4653,15 +4669,7 @@ function bodyContent(){
       '<button class="x" data-action="dellib" data-id="'+item.id+'" aria-label="Remove '+esc(item.title)+'">&times;</button></div>'+(item.notes?notesHtml(item.notes):'')+'</div>';
   }).join('');
 
-  var resumeBanner='';
-  if(state.activeSession){
-    var aw=WORKOUTS.filter(function(x){return x.id===state.activeSession.workoutId;})[0];
-    var cnt=0; Object.keys(state.activeSession.logs).forEach(function(k){cnt+=state.activeSession.logs[k].length;});
-    var from=sessionDay(state.activeSession);
-    resumeBanner='<div class="resume-banner"><span>In progress: <strong>'+(aw?esc(aw.title):'Workout')+'</strong>'+
-      (from!==realToday()?' from '+esc(prettyKey(from)):'')+' ('+cnt+' set'+(cnt===1?'':'s')+' logged)</span>'+
-      '<span class="btns"><button class="go" data-action="resumesession">Resume</button><button class="x" data-action="discardsession" title="Discard" aria-label="Discard this session">&times;</button></span></div>';
-  }
+  var resumeBanner=resumeBannerHtml(true);
   var workoutCards=WORKOUTS.map(function(w){
     var meta=w.plan.length?(w.plan.length+' exercises'):'Build it as you go', ago=lastDoneAgo(w.id);
     if(ago) meta+=' &middot; '+ago;
@@ -5394,7 +5402,7 @@ function undoFit(){
   app.style.setProperty('--undo-h',bar?bar.offsetHeight+'px':'0px');
 }
 
-function uiNow(){ return {tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange, nudgeOff:nudgeOff,
+function uiNow(){ return {day:realToday(), tab:tab, viewingSession:viewingSession, slide:slide, progRange:progRange, nudgeOff:nudgeOff,
     open:Object.keys(expanded).filter(function(k){ return expanded[k]; })}; }
 function syncUi(){ writeUi(JSON.stringify(uiNow())); }
 
@@ -5478,6 +5486,8 @@ function render(){
   if(renderAgain) render();
 }
 function drawPage(){
+  // The first draw of a new day starts on Today, as a load would (see tab).
+  if(drawnDay && drawnDay!==realToday() && !(viewingSession && state.activeSession)) tab='today';
   drawnDay=realToday();
   syncUi();
   var app=document.getElementById('app');
