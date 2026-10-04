@@ -1,10 +1,17 @@
 # Fight Card
 
 A personal training, nutrition and habit tracker, published as a Claude Artifact
-with the `db` capability. It is being republished on a new account: the new
-artifact URL is to be filled in here on publish. The old artifact,
-https://claude.ai/code/artifact/23eff3ea-c353-489a-a4eb-ae644cea2838, belongs
-to the old account and is only read, to move the data across (MIGRATION.md).
+with the `db` capability (declared: `{db: {}, downloads: true, artifact: {}}`):
+https://claude.ai/artifact/NLzk1XouRCoBuuUE69EBAY
+
+It was first published on 2026-10-04 as a fresh start, built with
+`node build-publish.js out.html --state seed-fresh.json`: no days, sessions,
+sauna visits or XP, only the recipes and the weekly-template note. The owner
+chose not to migrate the old account's data, so the old artifact
+(claude.ai/code/artifact/23eff3ea-...) and MIGRATION.md are history. The seed
+embedded in index.html still holds the six sample days the test suites rely on;
+once the store holds `state/meta`, the embedded seed is ignored, so republishing
+from index.html does not bring those days back.
 
 Built for one user (Andy) to sustain a routine, not to be a general fitness app.
 Design bias throughout: low friction, forgiving mechanics, nothing that needs
