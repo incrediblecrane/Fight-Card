@@ -1522,7 +1522,7 @@ srv.listen(0,async function(){
     assert.ok(await toSlide('Bench press'),'never reached the bench press');
     var line=await p.evaluate(function(){ var e=document.querySelector('.slide .lasttime'); return e?e.textContent:''; });
     assert.ok(/^Last time: 60kg × 8\./.test(line),'last time line: '+line);
-    assert.ok(/Aim for 8 on every set|try \+2\.5kg/.test(line),'no progression hint: '+line);
+    assert.ok(/ Next: 4×8 at 60kg\.$/.test(line),'one set of 4 at the top asks for the other three: '+line);
     assert.deepStrictEqual([await p.inputValue('#log-w-press_bench'),await p.inputValue('#log-v-press_bench')],['60','8']);
     await leaveSession();
   });

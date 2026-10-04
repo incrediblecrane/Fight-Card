@@ -70,12 +70,17 @@ WORLDS.benchtop=withSeed(function(st){ recent(st);
   st.workoutLogs.forEach(function(l){ if(l.logs.press_bench) l.logs.press_bench=[{v:8,w:60},{v:8,w:60},{v:8,w:60},{v:8,w:60}]; });
   st.activeSession={workoutId:'w6', startedAt:key(0), t0:NOW-600000, exIds:['warmup','press_bench','cooldown'],
     targets:{warmup:{sets:1,reps:'5-10 min'},press_bench:{sets:4,reps:'8'},cooldown:{sets:1,reps:'5-10 min'}}, logs:{}}; });
+// A bicep curl slide, last done at 41kg a dumbbell, short of the top on the last set.
+WORLDS.curl=withSeed(function(st){
+  st.activeSession={workoutId:'w7', startedAt:key(0), t0:NOW-600000, exIds:['warmup','curl_bicep','cooldown'],
+    targets:{warmup:{sets:1,reps:'5-10 min'},curl_bicep:{sets:3,reps:'12'},cooldown:{sets:1,reps:'5-10 min'}}, logs:{}}; });
 // 45 sauna visits over the last 90 days: more than the chart used to keep.
 WORLDS.sauna=withSeed(function(st){ st.activeSession=null; st.saunaSessions=[];
   for(var i=1;i<=45;i++) st.saunaSessions.push({date:key(i*2-1), mins:15, temp:80, position:'Top', id:'sa-t'+i}); });
 var UI={benchtop:'{"tab":"today","viewingSession":true,"slide":1}', sauna:'{"tab":"progress"}', plain:'{"tab":"today"}', meal:'{"tab":"meals"}', recent:'{"tab":"progress"}', empty:'{"tab":"progress"}',
   press:'{"tab":"today","viewingSession":true,"slide":1}', bench:'{"tab":"today","viewingSession":true,"slide":1}',
   bench0:'{"tab":"today","viewingSession":true,"slide":1}', ss:'{"tab":"today","viewingSession":true,"slide":1}'};
+UI.curl='{"tab":"today","viewingSession":true,"slide":1}';
 // Three hundred bench sessions over three years, the history open.
 WORLDS.years=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
   for(var i=0;i<300;i++) st.workoutLogs.push({id:'wl-y'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(1+Math.floor(i*3.6)),
@@ -89,6 +94,11 @@ WORLDS.mixed=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
   [[12],[14],[13]].forEach(function(v,i){
     st.workoutLogs.push({id:'wl-q'+i, workoutId:'w6', title:'Legs', tag:'Strength', date:key(7-i*2), logs:{sq_air:[{v:v[0],w:null}]}}); }); });
 UI.mixed='{"tab":"progress","open":["press_bench","sq_air"]}';
+// Hammer curls on two days, 10kg then 12kg a dumbbell.
+WORLDS.dbchart=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
+  [10,12].forEach(function(w,i){
+    st.workoutLogs.push({id:'wl-h'+i, workoutId:'w7', title:'Pull', tag:'Strength', date:key(6-i*2), logs:{curl_hammer:[{v:10,w:w}]}}); }); });
+UI.dbchart='{"tab":"progress","open":["curl_hammer"]}';
 // The same bench press with just one weighted session among the bodyweight ones.
 WORLDS.mixed1=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
   [[{v:15,w:null}],[{v:12,w:5}],[{v:20,w:null}]].forEach(function(s,i){
@@ -805,6 +815,29 @@ srv.listen(0,async function(){
     assert.strictEqual(r.pts,0,'one weighted session drew a line');
     assert.ok(/one session with a weight/i.test(r.empty||''),'the chart says '+r.empty);
     assert.ok(/Personal best 5kg/.test(r.pb) && !/0kg/.test(r.pb.replace('Personal best 5kg','')),'the PB row says '+r.pb);
+  });
+  await t('per-dumbbell weights say "ea" on the aim line, the personal best, the points and the change', async function(){
+    var p=await open('curl');
+    var aim=await p.evaluate(function(){ return (document.querySelector('.slide .lasttime')||{}).textContent||''; });
+    await close(p);
+    assert.ok(/Aim for 12 on every set at 41kg ea\./.test(aim),'the curl slide says "'+aim+'"');
+    p=await open('plain',{ui:'{"tab":"progress","open":["curl_hammer","row_bent"]}'});
+    var r=await p.evaluate(function(){
+      var row=function(n){ return [].slice.call(document.querySelectorAll('.exrow')).filter(function(x){ return x.querySelector('h3').textContent.trim()===n; })[0].querySelector('.exdetail'); };
+      var ham=row('Hammer curl'), bar=row('Bent-over row');
+      return {pb:ham.querySelector('.pbrow').textContent, row:bar.querySelector('.pbrow').textContent}; });
+    await close(p);
+    assert.ok(/Personal best 12 kg ea/.test(r.pb),'the hammer curl PB row says '+r.pb);
+    assert.ok(/Personal best 50kg/.test(r.row) && !/ea/.test(r.row),'a barbell PB row says '+r.row);
+  });
+  await t('charts: a per-dumbbell chart labels its points and its change in kg ea', async function(){
+    var p=await open('dbchart',{viewport:{width:360,height:740}});
+    var r=await p.evaluate(function(){ var ex=document.querySelector('.exdetail');
+      return {pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }), vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; })}; });
+    await close(p);
+    assert.deepStrictEqual(r.vals,['10 kg ea','12 kg ea']);
+    assert.ok(r.pb.indexOf('Personal best 12 kg ea')>-1,'the PB row says '+r.pb.join(' / '));
+    assert.ok(r.pb.some(function(x){ return /^Change \+2 kg ea since /.test(x); }),'the change says '+r.pb.join(' / '));
   });
   await t('charts: reps and minutes read with a space ("14 reps"), and so does the change', async function(){
     var p=await open('mixed',{viewport:{width:360,height:740}});

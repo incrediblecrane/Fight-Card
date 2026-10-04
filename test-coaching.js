@@ -31,7 +31,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
   catch(e){ fails++; console.log('  FAIL  '+name+'\n        '+e.message); } }
 
 var box={};
-var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','isSuperset','supersetMembers',
+var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','equipFor','isSuperset','supersetMembers',
   'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','aimFor','lastTimeLine','prefillFor',
   'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','dayWx','minLogDate','unloggedYesterday'];
 var loaded=null;
@@ -40,6 +40,7 @@ try{
     'var EX='+literal('var EX')+';\n'+
     'var WORKOUTS='+literal('var WORKOUTS')+';\n'+
     'var PER_IMPLEMENT='+literal('var PER_IMPLEMENT')+';\n'+
+    'var EQUIP='+literal('var EQUIP')+';\n'+
     'var BACKFILL_DAYS='+h.match(/BACKFILL_DAYS=(\d+)/)[1]+';\n'+
     'var XP_PER_WATER='+h.match(/XP_PER_WATER=(\d+)/)[1]+';\n'+
     'var DAY_MAX='+literal('var DAY_MAX')+';\n'+
@@ -148,6 +149,32 @@ if(loaded===true){
     var l={date:keyAgo(1),sets:[{v:12,w:12},{v:12,w:12},{v:12,w:12}]};
     var line=box.lastTimeLine(box.exDef('curl_bicep'),{sets:3,reps:'12'},l);
     assert.ok(/\+2kg ea/.test(line),line);
+  });
+
+  t('a kettlebell goes up to the next bell, not by plates', function(){
+    var l={date:keyAgo(1),sets:[{v:12,w:16},{v:12,w:16},{v:12,w:16},{v:12,w:16}]};
+    var line=box.lastTimeLine(box.exDef('kb_swing'),{sets:4,reps:'12'},l);
+    assert.ok(/next bell up \(\+4kg\)/.test(line) && !/2\.5kg|2kg/.test(line),line);
+    assert.strictEqual(box.aimFor(box.exDef('kb_swing'),{sets:4,reps:'12'},l).w,20);
+    l={date:keyAgo(1),sets:[{v:8,w:12},{v:8,w:12},{v:8,w:12}]};
+    line=box.lastTimeLine(box.exDef('kb_press'),{sets:3,reps:'8'},l);
+    assert.ok(/next bell up \(\+4kg ea\)/.test(line),line);
+  });
+
+  t('reps already hit on fewer sets than the target asks for the missing sets', function(){
+    var l={date:keyAgo(1),sets:[{v:10,w:30},{v:10,w:30},{v:10,w:50},{v:10,w:50}]};
+    var line=box.lastTimeLine(box.exDef('row_bent'),{sets:4,reps:'8-10'},l);
+    assert.ok(!/Aim for 10 on every set at 50kg/.test(line),line);
+    assert.ok(/Next: 4×10 at 50kg\./.test(line),line);
+  });
+
+  t('a dumbbell aim says the weight is each', function(){
+    var l={date:keyAgo(1),sets:[{v:12,w:41},{v:12,w:41},{v:11,w:41}]};
+    var line=box.lastTimeLine(box.exDef('curl_bicep'),{sets:3,reps:'12'},l);
+    assert.ok(/Aim for 12 on every set at 41kg ea\./.test(line),line);
+    l={date:keyAgo(1),sets:[{v:12,w:14}]};
+    line=box.lastTimeLine(box.exDef('curl_bicep'),{sets:3,reps:'12'},l);
+    assert.ok(/Next: 3×12 at 14kg ea\./.test(line),line);
   });
 
   t('nothing last time, nothing said', function(){

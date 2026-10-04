@@ -1514,17 +1514,24 @@ function aimFor(def,tgt,last){
   if(!top || !w) return null;
   var work=last.sets.filter(function(s){ return (s.w||0)===w; });
   var n=(tgt&&tgt.sets)||work.length;
-  if(work.length<n || !work.every(function(s){ return s.v>=top; })) return {w:w, v:top};
-  var step=perImplement(def.id)?2:2.5;
+  var hit=work.every(function(s){ return s.v>=top; });
+  if(work.length<n || !hit) return {w:w, v:top, n:n, more:hit};
+  // The step is the next implement up: bells come 4kg apart, a pair of
+  // dumbbells 2kg each, and a bar takes the smallest plates either side.
+  var step=equipFor(def.id)==='kettlebell'?4:perImplement(def.id)?2:2.5;
   return {w:Math.round((w+step)*100)/100, v:+String(tgt.reps).match(/\d+/)[0], n:n, top:top, step:step};
 }
+// Every weight here says 'ea' when it is one of a pair or one per side, and a
+// set count short of the target asks for the missing sets, not reps already hit.
 function lastTimeLine(def,tgt,last){
   if(!def || !last || !last.sets.length) return '';
   var line='Last time: '+last.sets.map(function(s){ return setLabel(def,s); }).join(', ')+'.';
   var a=aimFor(def,tgt,last);
   if(!a) return line;
-  if(a.step) return line+' Hit '+a.n+'×'+a.top+': try '+(a.step===2?'+2kg ea':'+2.5kg')+'.';
-  return line+' Aim for '+a.v+' on every set at '+a.w+'kg.';
+  var ea=perImplement(def.id)?' ea':'';
+  if(a.step) return line+' Hit '+a.n+'×'+a.top+': try '+(a.step===4?'the next bell up (+4kg'+ea+')':'+'+a.step+'kg'+ea)+'.';
+  if(a.more) return line+' Next: '+a.n+'×'+a.v+' at '+a.w+'kg'+ea+'.';
+  return line+' Aim for '+a.v+' on every set at '+a.w+'kg'+ea+'.';
 }
 // What the boxes start with: the previous working set this session, or else
 // what the line above them aims for (the working weight at the top of the
@@ -4966,7 +4973,7 @@ function bodyContent(){
       // A lift never logged with a weight has nothing to chart in kg, so its
       // reps are the measure instead of a flat line of 0kg.
       var byReps=def.type==='load' && !hist.some(function(h){ return h.w>0 && !h.wu; });
-      var kind=byReps?'reps':def.type, u=bestUnit(def.type,def), unit=byReps?' reps':(/^(reps|min|rounds)$/.test(u)?' '+u:u);
+      var kind=byReps?'reps':def.type, u=bestUnit(def.type,def), unit=byReps?' reps':(kind==='load'&&perImplement(exId))?' kg ea':(/^(reps|min|rounds)$/.test(u)?' '+u:u);
       // A lift done some days with no weight has nothing to say in kg on
       // those days: it is left out of the line, the best and the change,
       // rather than drawn as a drop to 0kg.
