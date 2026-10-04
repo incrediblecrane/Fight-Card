@@ -1761,9 +1761,10 @@ function undoOne(u){
 // the cups that earned XP (wx), so a target moved in between cannot leave XP
 // behind or take back more than was given. A day saved before wx existed
 // earned up to the target as it was then, which is not kept: it is taken as
-// the default of 8, so a target raised since cannot take back cups never paid.
+// the lower of today's target and the default of 8, so a target moved since
+// cannot take back cups never paid.
 function waterStep(e,d,tgt){
-  var prev=e.water, got=e.wx!==undefined?e.wx:Math.min(prev,8), x=0;
+  var prev=e.water, got=e.wx!==undefined?e.wx:Math.min(prev,tgt,8), x=0;
   if(d>0 && prev>=DAY_MAX.water) return 0;
   e.water=Math.max(0,prev+d); if(e.water>0) e.touched=true;
   if(d>0 && prev<tgt){ got++; x=XP_PER_WATER; }
@@ -2196,8 +2197,9 @@ function mergeDay(base,mine,theirs){
 }
 function dayPair(d){ var w=d.workout||{}; return stableJson([!!d.rest,!!w.done,w.type||null]); }
 // The cups that earned XP. A day saved before wx existed earned up to the
-// target of the time, taken as the default 8, as waterStep takes it.
-function dayWx(d,tgt){ return d.wx!=null?+d.wx||0:Math.min(+d.water||0,8); }
+// target of the time, taken as the lower of today's and the default 8, as
+// waterStep takes it.
+function dayWx(d,tgt){ return d.wx!=null?+d.wx||0:Math.min(+d.water||0,tgt||8,8); }
 // What a day pays in XP, as the taps that made it paid it.
 function dayXp(d,tgt){ if(!d) return 0;
   return dayWx(d,tgt)*XP_PER_WATER+(d.workout&&d.workout.done?XP_WORKOUT:0)+(d.rest?XP_REST:0); }

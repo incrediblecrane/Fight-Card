@@ -25,7 +25,8 @@ blank.
 One water tap, 0.25L. The water target is a count of cups (`waterTarget`, 4 to
 20, so 1 to 5L; 8 by default). XP for water follows the cups that earned it
 (`wx` on the day), so untapping takes back only what was paid. A day saved
-before `wx` existed is taken to have paid for at most 8 cups, the default.
+before `wx` existed is taken to have paid for at most 8 cups, the default,
+or the current target if that is lower.
 _Avoid_: glass, unit
 
 **Log date**:

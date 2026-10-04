@@ -33,7 +33,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 var box={};
 var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','isSuperset','supersetMembers',
   'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','aimFor','lastTimeLine','prefillFor',
-  'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','minLogDate','unloggedYesterday'];
+  'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','dayWx','minLogDate','unloggedYesterday'];
 var loaded=null;
 try{
   new Function(
@@ -325,6 +325,15 @@ if(loaded===true){
     var e=day(true), xp=0, k; e.water=10;
     for(k=0;k<10;k++) xp+=box.waterStep(e,-1,12);
     assert.strictEqual(e.water,0); assert.ok(xp>=-16,'took back '+(-xp)+' XP');
+  });
+
+  // A target below 8 paid fewer cups than the default: the guess takes the lower of the two.
+  t('a day saved before the count was kept takes back no more than a lower target paid', function(){
+    var e=day(true), xp=0, k, XPW=+h.match(/XP_PER_WATER=(\d+)/)[1]; e.water=6;
+    for(k=0;k<6;k++) xp+=box.waterStep(e,-1,4);
+    assert.strictEqual(e.water,0); assert.ok(xp>=-4*XPW,'took back '+(-xp)+' XP, paid '+(4*XPW));
+    assert.strictEqual(box.dayWx({water:6},4),4); assert.strictEqual(box.dayWx({water:10},12),8);
+    assert.strictEqual(box.dayWx({water:3},4),3); assert.strictEqual(box.dayWx({water:6,wx:5},4),5);
   });
 
   // An import refuses more than this, so a tap stops here and the export goes back in.
