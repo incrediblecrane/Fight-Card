@@ -43,18 +43,21 @@ Follow this on every change:
    `/diagnosing-bugs` to find the root cause first. This project's repeated
    failure mode is treating symptoms: three cosmetic passes on the figures
    before finding that the rig had floating feet.
-2. **Test it.** Run `npm test` (about ten minutes): `test:pose` is the rig
-   suite (`pose/build.js`, `emit-rig.js --check`, then `pose/checks/`:
-   analyse, adversarial, continuous, views, render) and `test:app` builds the
-   document and runs every suite over it: build, tooling, shopping, planmodel,
-   catalog, volume, coaching, roundtrip, app, removal, undo, session, meals,
-   publish, db, store, plan, addplan, ticks, design, dates, touch, slideview, a11y (`test-<name>.js`). A new suite goes
+2. **Test it.** Run `npm test` (about 35 minutes, so in the background with
+   its output to a log: `npm test > log 2>&1; echo EXIT $? >> log`):
+   `test:pose` is the rig suite (`pose/build.js`, `emit-rig.js --check`, then
+   `pose/checks/`: analyse, adversarial, continuous, views, render) and
+   `test:app` builds the document and runs every suite over it: build,
+   tooling, shopping, planmodel, catalog, volume, coaching, roundtrip, app,
+   removal, undo, session, meals, publish, db, store, plan, addplan, ticks,
+   design, dates, touch, slideview, a11y (`test-<name>.js`). A new suite goes
    into `test:app` in `package.json` and into CONTEXT.md's list. Use
    `npm run test:pose` alone only for the fast loop while authoring a rig, never
    as the gate before publishing: `npm test` used to be the rig suites only, so
    a change to the app could ship green with none of its own checks run. When
    fixing a bug, add a check that fails first and passes after, so it cannot
-   silently return.
+   silently return: run it against the build with the bug put back, since
+   several checks once passed whatever the app did.
 3. **Review before publishing.** Run `/code-review` on the diff. Publishing
    overwrites a live app holding real logged data, so a defect gate is cheap
    relative to the cost of shipping one.

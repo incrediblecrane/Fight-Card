@@ -12,6 +12,9 @@ to using the app.
 **Day**:
 One dated record (`days/<YYYY-MM-DD>`): water, workout, rest, alcohol,
 smoking, weed. `touched` separates "nothing happened" from "not logged".
+Today counts alcohol, smoking and weed on one Habits card under Water, so
+every counter is on a phone's first screen; the sauna form stays folded
+behind Log sauna until opened (`sauna` in the open list).
 _Avoid_: entry, log (a log is a finished session)
 
 **Blank day**:
@@ -19,7 +22,8 @@ A day untouched and with nothing on it. It is no record: looking at a day
 draws it blank without making one, only a tap that logs something does, and a
 blank day is neither saved nor exported. One the store already holds is left
 there, never deleted unread. Water averages start at the first day that is not
-blank.
+blank, and count every date from there to today by the calendar, a day not
+logged as no water, so an old first day never leaves the recent ones out.
 
 **Cup**:
 One water tap, 0.25L. The water target is a count of cups (`waterTarget`, 4 to
@@ -63,13 +67,23 @@ longest first; the header keeps one tile, the longest run with its name
 
 **Day streak**:
 Touched days in a row. It lets one untouched day go and ends on two in a row.
-Both streaks count from yesterday until today is touched.
+Both streaks count from yesterday until today is touched, and neither has a
+cap: the count walks back as far as the oldest day held.
 
 **Week target**:
 Sessions wanted in the rolling last seven days (`weekTarget`, 1 to 7, 3 by
 default). A day counts its finished sessions, or one for a quick log with no
-finished session, so two sessions in a day are two.
+finished session, so two sessions in a day are two (`weekSessions`). The
+HUD's third tile is this count against the target ("2 / 3 this week", "4 / 3
+week hit").
 _Avoid_: weekly goal, Mon-Sun week
+
+**Trained day**:
+A day with sets logged, a finished session, or a quick log. It counts the same
+everywhere: in the week target, in Progress's trained-days count, as a faint
+accent column ("trained, no sets") on the Sets per day chart when it has no
+sets, and as a mark on its dot in Today's week strip. A rest day is not one;
+the Sets chart draws it as a faint column of its own ("rest day").
 
 **Quick log**:
 A workout type tapped on Today's card, marking the day trained without a
@@ -90,6 +104,9 @@ A finished session (`workoutLogs/<id>`). Named after its session (`wl` and the
 session's start time) and carrying `sessionId`, so two views finishing the same
 session write one log, keep the sets of both, and pay its XP once. It holds
 only exercises with sets, and records sets, not which were supersetted.
+Progress's Recent sessions lists them newest first, within a day too
+(`byDateId` reversed), the latest six until Show all; an exercise's history
+shows its latest four sessions until Show all.
 _Avoid_: history entry
 
 **Ended session**:
@@ -108,7 +125,15 @@ left at, unless that session is from an earlier day that is not the log date
 and has no sets: then a new one starts on the log date. A session from
 another day is named with its date on the banner and in its title, and while
 it is open the log date bar is hidden, since Finish writes the session's own
-day.
+day. While a session is in progress Today shows its banner ("In progress")
+with Resume only; Discard is offered on Training alone, so a stray tap on the
+daily screen cannot throw a session away.
+
+**Recent workouts**:
+Training opens on its workouts: the three finished most recently
+(`recentWorkouts`, newest first, ties in catalogue order) in a Recent group
+above the full list, then the Overview notes. Today's "Or start a guided
+session" lands on them.
 
 **A day's sessions**:
 The day's workout type reads as its newest session. Removing a log that
@@ -141,7 +166,8 @@ comma decimal ("62,5") and refuses a thousands comma or dot ("1,000",
 
 **Per implement**:
 A logged weight is one dumbbell, not the pair. Declared in `PER_IMPLEMENT`;
-drives the "kg each" box, the "ea" in a set label, and doubling in total
+drives the "kg each" box, the "ea" in a set label and in the progression
+hints, "kg ea" on its Progress chart, best and change, and doubling in total
 volume.
 
 **Sides**:
@@ -154,7 +180,9 @@ split squat (two dumbbells, each side) counts x4. The woodchopper, Russian
 twist and Pallof press are one implement done to each side, so x2. Before
 this, those four counted half, so logged volume for them doubled with this
 change; nothing stored was rewritten. A catalogue check keeps every load
-exercise with "each side" reps and `sides: 2` in step.
+exercise with "each side" reps and `sides: 2` in step. Weight moved reads in
+kg below a thousand and in tonnes from 999.5kg (`massText`, "21.7t"), never
+with the locale's thousands mark.
 
 **Last time**:
 The newest finished log holding working sets of the exercise, on or before the
@@ -169,6 +197,43 @@ prefills its minutes, machine and efforts the same way. A second tap of Log
 set within 600ms that would log the same numbers again is taken as the same
 tap.
 _Avoid_: previous session, history
+
+**Estimated 1RM**:
+What a lift with a weight is charted as on Progress: each session's best
+estimated one-rep max (`e1rm`, Epley, reps past 12 counted as 12), so more
+reps at the same weight read as progress. The tap names the best set and its
+estimate; the row under the chart gives the best estimate, the heaviest set
+and the **rep PB** (`repPb`), the most reps ever done at the current working
+weight, that being the heaviest working set of the latest session with a
+weight. Warm-up sets stay out of all three. A day of a lift logged with no
+weight is left out of the line, the best and the change, and the chart head
+says how many; a lift never logged with a weight is charted in reps. Nothing
+stored changes.
+_Avoid_: max, PR
+
+**Chart**:
+An inline SVG on Progress (no library), one measure each. Every bar and line
+chart carries its rows as a list a screen reader can step through; the clean
+day squares name each day, and Today's week dots say clean, used or not
+logged. Sliding a finger along a chart reads each bar or point it passes. A
+trend's dates carry the year when not this year, and all do on a trend
+longer than a year (`shortDay`). Reps and minutes are spaced from their
+number ("14 reps").
+
+**Slide target met**:
+Once a slide's target sets (a superset's target rounds) are logged, Next or
+Finish takes the filled style and Log set (Log round) steps back to an
+outlined one. Nothing moves on by itself.
+
+**Exercise search**:
+The picker's filter (`pickerMatches`). Hyphens, spaces and apostrophes are
+dropped on both sides ("pushups", "push ups" find Push-up), a term must start
+a word or, from four letters, sit whole inside one, and a trailing "s" is
+also tried without it. It reads the name, category, area, the id, and a few
+everyday names per exercise (`PICK_ALIAS`: rdl, ohp, tgu, swim, jump rope, the
+gym machines); `PICK_SYN` maps abs, crunch, run, jog, cycling, rowing and yoga
+onto the library's words. A picker preview is open under its own key
+(`pick:<id>`), apart from the exercise's history on Progress.
 
 **Rest clock**:
 The line on a lift or reps slide counting up from the newest set of the live
@@ -222,7 +287,11 @@ always did.
 
 **Stint**:
 One continuous spell at one bench height inside a sauna visit. A visit has
-many; its `mins` is their total.
+many; its `mins` is their total, summed to hundredths (`minsSum`) so 1.1 and
+1.3 read 2.4. A stint of 0 minutes, or Log sauna with only a temperature,
+marks the minutes box; an empty row is a stray tap and does nothing. Progress
+lists visits newest first, the latest six until Show all, while the minutes
+chart runs in time order.
 
 ### Meals and shopping
 
@@ -239,11 +308,14 @@ commas ("1,000ml" is a litre: unlike a logged weight, read as a decimal it
 would make the list short), ranges ("2-3", "2–3", "2 to 3", "500g-1kg",
 bought at the top end), plural abbreviations ("kgs", "tbsps"), "large
 handful", a pack size ("2 x 400g tins": unit `tins`, `size` "400g") and a
-leading "about" or "~" (kept as `pre`) are read. Counting units include
+leading "about", "approx.", "approximately" or "~" (kept as `pre`) are
+read. Counting units include
 pint, cup, mug, bag, pack, packet, jar, bottle, carton, punnet and pot. A
 line with no bracket amount that starts with one ("500g beef mince", "1 tin
 of chickpeas") is read amount first, its name the words after the unit, and
-its card keeps the amount first (`lead`); "7up" and "2cm ginger" stay names.
+its card keeps the amount first (`lead`); "7up", "00 flour" and "2cm ginger"
+stay names. An amount-first count scaled to one reads in the singular ("2
+onions" halved is "1 onion", "2 large eggs" "1 large egg").
 A scaled card shows spoons in eighths below a quarter and quarters below two
 ("0.25 tsp"), and counts in halves; only the list rounds counts up. Only the amounts read are
 rewritten; any later number stays as typed. On the shopping list packs of
@@ -285,9 +357,12 @@ into ml; amounts that do not add (200g and a handful) share the row
 ("Spinach (200g + 1 handful)"). Names are grouped with a known instruction
 after a comma dropped ("Cheddar cheese, grated", "Potatoes, for mash"; not
 "Carrot, parsnip, potato") and plurals folded ("Eggs", "Chillies",
-"Berries"); the row shows the first name without its instruction. Countable amounts (tins, cloves, onions)
+"Berries", "Cookies", "Pies"); the row shows the first name without its instruction. Countable amounts (tins, cloves, onions)
 always round UP, since 0.4 of a tin cannot be bought and being short costs a
-trip; weights, volumes and spoons stay fractional.
+trip; weights, volumes and spoons stay fractional. On a full draw the rows
+still to get come first and ticked ones sink under an "In the basket (n)"
+line; a tick itself changes only its own row and the count, so nothing moves
+under the finger. A link at the top of Meals jumps down to the list.
 
 **Tick**:
 A string in `state.shoppingChecked`: the row's key, a line break, and what it
@@ -530,7 +605,7 @@ Every read and write of saved data goes through one object, `dbStore`:
 | `get(path)` | the body, or `undefined` when there is none (not an error) |
 | `readAll()` | `{path: body}` for every document in the six collections and the three `state/*` documents: read at load, when the page is looked at again, and before an import is written |
 | `put(path, body)` | write the whole document |
-| `update(path, fields)` | merge fields into a document that exists; rejects `invalid_argument` if it does not |
+| `update(path, fields)` | merge fields into a document that exists, plain objects all the way down and anything else (arrays included) replacing; rejects `invalid_argument` if it does not exist |
 | `remove(path)` | delete it; deleting nothing is fine |
 | `subscribe(fn)` | optional: `fn(path, body or undefined)` on every change, returns a stop function |
 
@@ -538,7 +613,10 @@ Every read and write of saved data goes through one object, `dbStore`:
 handed over has `onSnapshot`, and nothing calls it yet: a view picks up other
 views' changes before each save and with `readAll` when it is looked at again.
 `MemoryStore(init)` is the same contract over a plain object, used by the
-headless suite (`test-store.js`). `dbDocs`/`dbApply` stay the serialisation
+headless suite (`test-store.js`); its merge is the one the browser suites' db
+stub uses, so the two cannot drift. A key read from JSON (`__proto__`,
+`constructor`) is merged as an own field like any other, never through
+`Object.prototype`. `dbDocs`/`dbApply` stay the serialisation
 layer either side: state in, `{path: body}` out, and back. A rejection carries
 `{code}`; `dbSave` treats the codes in `DB_HARD` (`invalid_argument`,
 `quota_exceeded`, `transform_error`) as final for that change, those in
@@ -555,7 +633,8 @@ calls over `fetch`, with the same paths as REST resources:
 - `put` is `PUT /docs/<path>` with the JSON body; `remove` is
   `DELETE /docs/<path>` (204 whether or not it existed); `get` is
   `GET /docs/<path>`, 404 meaning `undefined`.
-- `update` is `PATCH /docs/<path>` with the fields, a shallow merge, 404 when
+- `update` is `PATCH /docs/<path>` with the fields, merged as `update` above
+  (plain objects deep, arrays replace), 404 when
   absent (mapped to `invalid_argument`, which is what tells a save to put the
   document whole instead). A field sent as `null` is stored as `null`.
 - `readAll` is `GET /docs`, answering `{path: body}` for the paths above.
@@ -858,13 +937,18 @@ is being authored.
 ## Test suites
 
 `npm test` runs both halves: `test:pose` for the rig, then `test:app`, which
-builds the document (`build-publish.js`) and runs every suite over it. It takes
-about ten minutes. Browser suites launch Chromium through `test-env.js`
-(`launch()`, `PUBLISH`; `FC_CHROMIUM` and `FC_PUBLISH` override) and stub the
-artifact capability faithfully: a publish saves AND reloads, and a db stub
-survives the reload while the document does not. Tests that skipped the
-reload once hid a whole class of bug. Headless suites pull functions out of
-the shipped `index.html`, so they test what ships.
+builds the document (`build-publish.js`) and runs every suite over it. It
+takes about 35 minutes, so run it in the background and read its log. Browser
+suites launch Chromium through `test-env.js` (`launch()`, `PUBLISH`;
+`FC_CHROMIUM` and `FC_PUBLISH` override) and stub the artifact capability
+faithfully: a publish saves AND reloads, and a db stub survives the reload
+while the document does not. Tests that skipped the reload once hid a whole
+class of bug. The db stub's `update` is `MemoryStore`'s own merge, refused
+for a missing document (also when a held update lands after a delete), and it
+records every write in order. Headless suites pull functions out of the
+shipped `index.html`, so they test what ships. A check is written to fail
+against a build with its bug put back, and is run that way once: several
+checks once passed whatever the app did.
 
 `test:pose`:
 
@@ -879,24 +963,36 @@ the shipped `index.html`, so they test what ships.
 - `test-tooling.js`: `build-publish.js` and `emit-rig.js` refuse a mistyped
   command rather than overwrite a file.
 - `test-shopping.js`: shopping arithmetic swept over every recipe and pair;
-  countable amounts checked against what you have to BUY. Ingredient parsing,
-  in linear time on a long line.
+  countable amounts checked against what you have to BUY, through the list's
+  own name fold, so merged spellings, rows of several units and two-word units
+  are covered and a countable need with no row fails. Ingredient parsing, in
+  linear time on a long line, and a scaled card read back to what it shows.
 - `test-planmodel.js`: the plan model, including the one-way migration off the
   old `inPlan`/`day` pair.
 - `test-catalog.js`: the exercise and workout catalogues as data: no duplicate
   ids, every planned exercise in the library, targets that match what the box
-  logs, minute units.
-- `test-volume.js`: what counts as weight moved, and what a log keeps of
-  supersets.
-- `test-coaching.js`: last time and the prefill, warm-up sets, the rest clock,
-  session length, streaks, the week target, form cues.
+  logs, minute and round units, `sides` against "each side" reps, every
+  workout's prep words shown on a slide, and exercise search terms.
+- `test-volume.js`: what counts as weight moved (per implement, per side, a
+  dumbbell ramp), and what a log keeps of supersets.
+- `test-coaching.js`: last time, the prefill and the progression hint per
+  equipment, warm-up sets, the rest clock, session length, streaks (per
+  substance, past 400 days), the estimated 1RM and rep PB, recent workouts and
+  the week target, water XP for old days, form cues.
 - `test-roundtrip.js`: state survives `dbDocs`/`dbApply` with every key.
-- `test-app.js`: the real save cycle, backfill dates and session dating.
-- `test-removal.js`: swipe-to-remove and undo.
+- `test-app.js`: the real save cycle, backfill dates (a tap moves only that
+  day), session dating, a new day opening on Today, and Today's in-progress
+  banner.
+- `test-removal.js`: swipe-to-remove and undo, XP given back, a superset's
+  rounds taken back exactly, and Progress's lists (Show all, newest first)
+  and trained-day counts.
 - `test-undo.js`: the undo offer on a phone: quick runs of removals, blocked
   storage, a shopping item, which session an undo belongs to, the
   announcement, and the toast staying clear of the page.
-- `test-session.js`: prep steps, per-implement weights, sauna stints, search.
+- `test-session.js`: prep steps, per-implement weights, sauna stints and their
+  minutes, exercise search and picker previews, supersets, logging on one slide
+  (interval picks, a double tap, backfills), the warm-up's ramp and rounds,
+  Recent sessions newest first, and the water target's -/+.
 - `test-meals.js`: recipe portions and the shopping list in the browser.
 - `test-publish.js`: the save without a store: one publish at a time, a
   refusal retried and shown, a conflict, a publish that throws, a tap while one
@@ -909,12 +1005,14 @@ the shipped `index.html`, so they test what ships.
   imports in the browser: the backup, Put back and an unfinished import; the
   store's per-document limits, which the stub keeps, and the forms and imports
   that would pass them.
-- `test-store.js`: the Store contract over `MemoryStore`; export then import
+- `test-store.js`: the Store contract over `MemoryStore` (an update carrying
+  `__proto__` merges it as data); export then import
   reproducing the record exactly; raw dumps and state as 5aba0f6 held it;
   malformed imports refused with a reason, including ids, depth, size and
   ingredient lines the store or the page could not take.
-- `test-plan.js`: the meal planner in the browser: the same meal twice, slots,
-  partial-week shopping.
+- `test-plan.js`: the meal planner in the browser: seven calendar days across a
+  clock change, the same meal twice, slots, partial-week shopping, and no
+  recipe keeping the old `inPlan`/`day`.
 - `test-addplan.js`: Add to plan on a phone against the db stub: the
   portions a new meal starts at, its slot, big batches on the steppers, the
   week's count on a card, and the button held under the finger. What a tap
@@ -922,9 +1020,17 @@ the shipped `index.html`, so they test what ships.
   their choice until reached, and a tap on Today builds only Today.
 - `test-ticks.js`: shopping ticks in the browser: what a tick is for, older
   ticks, spellings, the clears, and ticking from the keyboard. A tick
-  changes its row and the Clear button in place, without drawing the tab.
-- `test-design.js`: computed contrast, tap target sizes, what touch can reach,
-  and layout at phone width.
+  changes its row and the Clear button in place, without drawing the tab;
+  the next draw sinks it under In the basket. The 3-day range survives a
+  reload, and the link at the top of Meals lands on the list.
+- `test-design.js`, in the time zone the test worlds are dated in: computed
+  contrast in both themes (accent words and buttons, sub-labels), 44px tap
+  targets, 16px fields that do not zoom an iPhone, layout at 320 to 390px
+  (long titles wrap, every counter above the fold at 390x844), exercise
+  charts (no 0kg days, units, years, the estimated 1RM, "kg ea", sliding along
+  bars), streak and water-average figures, charts a screen reader can step
+  through, the HUD's week tile and week-strip marks, and Next leading once a
+  slide's target is met.
 - `test-dates.js`: the log date picked by a real tap and typed, a backfill left
   from yesterday, a view open across midnight, a past day looked at without
   leaving a blank record.
@@ -941,5 +1047,7 @@ the shipped `index.html`, so they test what ships.
   superset boxes, picker rows and Adds, plan selects), one Remove per history
   row in the tab order, headings that go h1, h2, h3 without a skip, the focus
   kept on a button pressed from the keyboard (or moved to Undo when its row
-  went), the shopping box kept in sight as items are added, and typed drafts
-  kept across tabs, Back and Resume, Prev and Next, but not into a new session.
+  went), the shopping box kept in sight as items are added, typed drafts
+  kept across tabs, Back and Resume, Prev and Next, but not into a new
+  session, and the sauna row: minutes summed without float noise, and the
+  minutes box marked when the row holds nothing to log.
