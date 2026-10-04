@@ -210,14 +210,19 @@ srv.listen(0,async function(){
   await t('clearing the week keeps your own items but drops the recipe ones', async function(){
     var before=await p.evaluate(function(){ return document.querySelectorAll('.shop').length; });
     var btn=await p.$('[data-action="clearweek"]');
-    assert.ok(btn,'no clear button'); await saving(()=>btn.click());
-    var after=await p.evaluate(function(){
-      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return e.innerText.trim();});
+    assert.ok(btn,'no clear button');
+    // The whole week clears every tick, your own items' too; three days keeps those.
+    assert.ok(/the week/.test(await btn.textContent()),'the list is not on the whole week: '+await btn.textContent());
+    await saving(()=>btn.click());
+    var rows=await p.evaluate(function(){
+      return [].slice.call(document.querySelectorAll('.shop')).map(function(e){return {l:e.innerText.trim(),c:e.className};});
     });
+    var after=rows.map(function(r){ return r.l; });
     assert.ok(after.length<before,'clearing removed nothing');
     assert.ok(after.some(function(l){return /Bin bags/.test(l);}),
       'clearing the week threw away an item you added by hand');
-    assert.ok(after.every(function(l){return !/checked/.test(l);}),'ticks survived the clear');
+    var ticked=rows.filter(function(r){ return /\bchecked\b/.test(r.c); }).map(function(r){ return r.l; });
+    assert.deepStrictEqual(ticked,[],'ticks survived the clear');
   });
 
   await t('and you can remove one you no longer want', async function(){

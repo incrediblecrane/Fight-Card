@@ -116,7 +116,10 @@ srv.listen(0,async function(){
     assert.strictEqual(cal[1].day,'Tomorrow','second day is '+cal[1].day);
     // Real dates, consecutive, so the list can be asked about a range.
     for(var i=1;i<7;i++){
-      var gap=(new Date(dates[i]+'T00:00:00')-new Date(dates[i-1]+'T00:00:00'))/86400000;
+      // Counted on the calendar, not the clock: a week with a clock change in
+      // it has a 23 or 25 hour day between two local midnights.
+      var utc=function(k){ var x=k.split('-'); return Date.UTC(+x[0],x[1]-1,+x[2]); };
+      var gap=(utc(dates[i])-utc(dates[i-1]))/86400000;
       assert.strictEqual(gap,1,'days '+dates[i-1]+' and '+dates[i]+' are not consecutive');
     }
   });
@@ -269,8 +272,14 @@ srv.listen(0,async function(){
   });
 
   await t('nothing still carries the old inPlan/day fields', async function(){
-    assert.ok(JSON.stringify(env.seedOf(published())).indexOf('"inPlan"')<0,'a recipe is still storing inPlan');
-    assert.ok(JSON.stringify(env.seedOf(published())).indexOf('"day":"Mon"')<0,'a recipe is still storing a weekday');
+    // Read off the saved seed itself: the fixture planted day 'Thu', so a
+    // search for any one weekday's text can miss the very field it is after.
+    var st=env.seedOf(published());
+    assert.ok(st.recipes.length,'the saved state has no recipes to look at');
+    var inPlan=st.recipes.filter(function(r){ return 'inPlan' in r; }).map(function(r){ return r.id; });
+    var day=st.recipes.filter(function(r){ return 'day' in r; }).map(function(r){ return r.id+':'+r.day; });
+    assert.deepStrictEqual(inPlan,[],'a recipe is still storing inPlan');
+    assert.deepStrictEqual(day,[],'a recipe is still storing a weekday');
   });
 
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');

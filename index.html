@@ -3532,6 +3532,19 @@ function canonQty(q,u){
 // Mass and volume first, then named units, then the unitless count, so a row
 // reads the same way every time.
 function unitRank(u){ return u==='g'?0 : u==='ml'?1 : u===''?3 : 2; }
+// "Cheddar cheese, grated" is cheddar to buy: a known instruction after a
+// comma is not part of the name. "Carrot, parsnip, potato" keeps its commas,
+// since none of those is an instruction.
+function shopName(n){
+  var bare=String(n).trim(), dm;
+  while((dm=bare.match(ING_TAIL)) && dm.index>0) bare=bare.slice(0,dm.index);
+  return bare;
+}
+// "Egg" and "Eggs", "Chilli" and "Chillies", "Berry" and "Berries" are one
+// thing to buy: one row, under this one name.
+function shopFold(bare){
+  return bare.toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/(ie|y)$/,'i');
+}
 // The shopping list adds the same ingredient across every planned MEAL, at
 // that meal's own portion count. Reading the plan rather than the recipes is
 // what makes the same recipe twice in a week add up to two lots, and what lets
@@ -3547,16 +3560,10 @@ function shoppingList(dates){
     recipeIngs(r).forEach(function(ing){
       var nameKey=String(ing.n||'').trim().toLowerCase();
       if(!nameKey) return;
-      // "Cheddar cheese, grated" is cheddar to buy: a known instruction after
-      // a comma is not part of the name. "Carrot, parsnip, potato" keeps its
-      // commas, since none of those is an instruction.
-      var bare=String(ing.n).trim(), dm;
-      while((dm=bare.match(ING_TAIL)) && dm.index>0) bare=bare.slice(0,dm.index);
-      // "Egg" and "Eggs", "Chilli" and "Chillies", "Berry" and "Berries" are
-      // one thing to buy. The row keeps the first spelling; its tick is keyed
-      // on the folded name, so which meal says it first cannot untick it. A
-      // tick made by older code under any spelling in the group still counts.
-      var fold=bare.toLowerCase().replace(/ies$/,'i').replace(/(ch|sh|x|o)es$/,'$1').replace(/([^su])s$/,'$1').replace(/(ie|y)$/,'i');
+      // The row keeps the first spelling; its tick is keyed on the folded
+      // name, so which meal says it first cannot untick it. A tick made by
+      // older code under any spelling in the group still counts.
+      var bare=shopName(ing.n), fold=shopFold(bare);
       var slot=byName[fold];
       if(!slot){ slot=byName[fold]={key:'i|'+fold, raws:[], n:bare.charAt(0).toUpperCase()+bare.slice(1), parts:{}, order:[], plain:null, ents:[]}; order.push(slot); }
       if(slot.raws.indexOf('i|'+nameKey)<0) slot.raws.push('i|'+nameKey);

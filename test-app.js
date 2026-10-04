@@ -297,7 +297,14 @@ server.listen(0, async function(){
 
   console.log('\nDATA LANDS ON THE RIGHT DAY');
   try{
+    // Totals read off the saved document either side of one tap: the back day
+    // already holds water from the taps above, so "has some" proves nothing.
+    var today=await key(0);
+    var saved=function(k){ var d=(env.seedOf(doc).days||{})[k]; return d?+d.water||0:0; };
+    var back0w=saved(back), today0w=saved(today);
     await pick(back); await tap('[data-action="water"][data-d="1"]');
+    assert.strictEqual(saved(back),back0w+1,'the picked day went from '+back0w+' to '+saved(back)+' steps');
+    assert.strictEqual(saved(today),today0w,'today went from '+today0w+' to '+saved(today)+' steps');
     await toToday(); await p.click('.backfill-bar button'); await p.waitForTimeout(600);
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
     var tips=await p.$$eval('.chart svg title',function(n){return n.map(function(x){return x.textContent;});});
@@ -305,11 +312,12 @@ server.listen(0, async function(){
     var pretty=function(k){ var d=new Date(k+'T12:00:00');
       return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]; };
     var onBack=tips.filter(function(t){return t.indexOf(pretty(back)+':')===0 && t.indexOf('L')>-1;});
-    var today=await key(0);
     var onToday=tips.filter(function(t){return t.indexOf(pretty(today)+':')===0 && t.indexOf('L')>-1;});
-    assert.ok(onBack.length,'backdated water missing from '+back);
-    console.log('        '+back+': '+onBack.join(' | '));
-    console.log('        '+today+': '+onToday.join(' | '));
+    // And the chart says the same: the back day shows its new total, today its old one.
+    var lit=function(u){ return (Math.round(u*25)/100)+'L'; };
+    var says=function(tt,k,u){ return tt.some(function(t){ return t.indexOf(pretty(k)+': '+lit(u)+' ')===0; }); };
+    assert.ok(says(onBack,back,back0w+1),'the chart shows '+back+' as '+onBack.join(' | '));
+    assert.ok(says(onToday,today,today0w),'the chart shows '+today+' as '+onToday.join(' | '));
     ok('backdated entries land on the picked day, today is untouched');
   }catch(e){ bad('backdated data lands correctly',e); }
 

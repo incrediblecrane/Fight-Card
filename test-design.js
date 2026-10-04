@@ -11,6 +11,10 @@ var http=require('http'), assert=require('assert');
 var env=require('./test-env.js');
 var doc=env.readDoc();
 
+// The worlds are dated here, before any page loads, so every page runs in the
+// zone this clock reads: a page in another zone has a different today, and the
+// meal planned for today lands on its tomorrow.
+var ZONE=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
 function key(o){ var d=new Date(); d.setDate(d.getDate()-(o||0));
   var q=function(n){return String(n).padStart(2,'0');};
   return d.getFullYear()+'-'+q(d.getMonth()+1)+'-'+q(d.getDate()); }
@@ -150,7 +154,7 @@ srv.listen(0,async function(){
   var open=async function(world,o){
     o=o||{};
     var ctx=await b.newContext({viewport:o.viewport||{width:390,height:844}, colorScheme:o.scheme||'light',
-      hasTouch:!!o.touch, isMobile:!!o.touch});
+      hasTouch:!!o.touch, isMobile:!!o.touch, timezoneId:ZONE});
     var ui=o.ui||UI[world]||'{}';
     await ctx.addInitScript(function(u){ try{ localStorage.setItem('fc.ui',u); }catch(e){} }, ui);
     await ctx.addInitScript(HELPERS);

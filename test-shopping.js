@@ -30,7 +30,7 @@ var src=[grabVar('IMPLIED_ONE'), grabVar('UNIT_SCALE'), grabVar('ING_TAIL'), gra
   grab('recipeIngs'), grab('recipeBase'), grab('recipePortions'),
   grab('slotRank'), grab('planOrder'), grab('pad'), grab('dateKey'), grab('planDates'),
   grab('planEntries'), grab('planRecipe'), grab('planPortions'),
-  grab('shoppingList'), grabVar('TICK_SEP'), grab('planWindow'), grab('tickOf'), grab('tickParts'), grab('tickCovers'),
+  grab('shopName'), grab('shopFold'), grab('shoppingList'), grabVar('TICK_SEP'), grab('planWindow'), grab('tickOf'), grab('tickParts'), grab('tickCovers'),
   grab('shopTicked'), grab('tickFor'), grab('pruneTicks')].join('\n');
 
 var fails=0;
@@ -41,7 +41,7 @@ function sandbox(st){
   var box={};
   new Function('state', src+'\nthis.shoppingList=shoppingList;this.planDates=planDates;'+
     'this.shopTicked=shopTicked;this.tickFor=tickFor;this.pruneTicks=pruneTicks;'+
-    'this.parseIng=parseIng;this.qtyText=qtyText;this.scaledIng=scaledIng;this.canonUnit=canonUnit;this.canonQty=canonQty;').call(box, st);
+    'this.shopName=shopName;this.shopFold=shopFold;this.parseIng=parseIng;this.qtyText=qtyText;this.scaledIng=scaledIng;this.canonUnit=canonUnit;this.canonQty=canonQty;').call(box, st);
   return box;
 }
 
@@ -215,7 +215,14 @@ var SEED=require('./test-env.js').seedOf(h);
 var ALL=SEED.recipes.filter(function(r){ return (r.ingredients||[]).length; });
 
 // What a set of planned meals genuinely consumes, computed straight from the
-// source text rather than from anything the shopping list does.
+// source text rather than from anything the shopping list does. Keyed by the
+// list's own name fold (so "Egg" and "Eggs" meet on one row), the unit as the
+// list counts it (so "tins" and "tin", "large handfuls" and "large handful"
+// meet) and any pack size.
+var MEASURED=/^(g|ml|tbsp|tsp)$/;   // may be fractional, so not swept here
+function shopKey(box,name,unit,size){
+  return box.shopFold(box.shopName(name))+'|'+box.canonUnit(unit)+(size?'|'+String(size).toLowerCase():'');
+}
 function needed(meals){
   var box=sandbox({recipes:ALL, plan:[], shopExtras:[]});
   var want={};
@@ -224,14 +231,16 @@ function needed(meals){
     var f=m.portions/(r.base||1);
     (r.ingredients||[]).forEach(function(txt){
       var g=box.parseIng(txt);
-      if(g.q===null) return;
-      if(/^(g|kg|ml|l|tbsp|tsp)$/.test(g.u)) return;   // measured, may be fractional
-      var key=g.n.toLowerCase()+'|'+g.u.replace(/s$/,'');
-      want[key]=(want[key]||0)+g.q*f;
+      if(g.q===null || MEASURED.test(box.canonUnit(g.u))) return;
+      var key=shopKey(box,g.n,g.u,g.size);
+      want[key]=(want[key]||0)+(g.qMax||g.q)*f;
     });
   });
   return want;
 }
+// What the list says to buy, read back off its labels: "Spinach (245g + 1
+// handful + 2 large handfuls)" is three amounts, "Tomatoes (2 x 400g tins)"
+// one of a pack size.
 function listed(meals){
   var st={recipes:ALL, plan:[], shopExtras:[]};
   var box=sandbox(st);
@@ -241,22 +250,50 @@ function listed(meals){
   });
   var out={};
   box.shoppingList().forEach(function(row){
-    var m=row.label.match(/^(.*?) \(([\d.]+)\s*([a-z]*)\)$/i);
-    if(!m) return;
-    out[m[1].toLowerCase()+'|'+(m[3]||'').replace(/s$/,'')]=+m[2];
+    // A row with no amount ("Honey (drizzle)") is the recipe's own text.
+    if(row.extra || !row.order.length) return;
+    var m=row.label.match(/^(.*) \(([^()]*)\)$/);
+    if(!m) throw new Error('the list row "'+row.label+'" has no amount this sweep can find');
+    m[2].split(' + ').forEach(function(part){
+      var pm=part.match(/^([\d.]+)(?: x (\S+))?(?:\s*([a-z][a-z ]*))?$/i);
+      if(!pm) throw new Error('the list row "'+row.label+'" has an amount this sweep cannot read: '+part);
+      var k=shopKey(box,m[1],pm[3]||'',pm[2]);
+      out[k]=(out[k]||0)+(+pm[1]);
+    });
   });
   return out;
 }
+// Every countable thing a meal needs has to be on the list as a count it can
+// be checked against. Nothing is allowed to slip past unchecked.
 function shortfalls(meals){
   var want=needed(meals), got=listed(meals), bad=[];
   Object.keys(want).forEach(function(k){
     if(want[k]<=0) return;
     var have=got[k];
-    if(have===undefined) return;   // not a countable row in the output
-    if(have < want[k]-0.001) bad.push(k+': list says '+have+', meals need '+(Math.round(want[k]*100)/100));
+    if(have===undefined) bad.push(k+': no countable row on the list, meals need '+(Math.round(want[k]*100)/100));
+    else if(have < want[k]-0.001) bad.push(k+': list says '+have+', meals need '+(Math.round(want[k]*100)/100));
   });
   return bad;
 }
+
+t('the sweep reads merged spellings, mixed units and two-word units', function(){
+  // The rows the sweeps below used to pass over without a word.
+  var r={id:'sw', title:'Sweep', base:1, ingredients:['Egg (1)','Eggs (2)','Spinach (100g)','Spinach (2 large handfuls)',
+    'Spinach (1 handful)','Sweet potato (300g)','Sweet potatoes (3)','Chopped tomatoes (1 tin)','Chopped tomatoes (2 tins)']};
+  var keep=ALL; ALL=ALL.concat([r]);
+  try{
+    var meals=[{recipeId:'sw', portions:1}], want=needed(meals), got=listed(meals);
+    assert.deepStrictEqual(Object.keys(want).sort(), ['chopped tomato|tin','egg|','spinach|handful','spinach|large handful','sweet potato|'],
+      'needed: '+JSON.stringify(want));
+    Object.keys(want).forEach(function(k){ assert.strictEqual(got[k],want[k],k+' listed as '+got[k]+': '+JSON.stringify(got)); });
+    assert.deepStrictEqual(shortfalls(meals),[]);
+    // And a row the list left out is a failure, not a skip.
+    var was=listed;
+    listed=function(m){ var o=was(m); delete o['egg|']; return o; };
+    try{ assert.deepStrictEqual(shortfalls(meals),['egg|: no countable row on the list, meals need 3']); }
+    finally{ listed=was; }
+  }finally{ ALL=keep; }
+});
 
 t('no single recipe is ever short, at any portion count', function(){
   var bad=[];
