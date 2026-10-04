@@ -108,8 +108,13 @@ srv.listen(0,async function(){
   var go=async function(){ await p.goto(url); await p.waitForTimeout(600);
     var bk=await p.$('[data-action="cancelsession"]'); if(bk){ await bk.click(); await p.waitForTimeout(300); } };
   var tabTo=async function(n){ await p.click('[data-action="tab"][data-tab="'+n+'"]'); await p.waitForTimeout(400); };
+  // The total, as the HUD's level and XP bar give it: LV n is 150 each, and the
+  // bar says how far into the next. Not there throws, so it never reads NaN on both sides.
   var hudXp=function(){ return p.evaluate(function(){
-    var n=document.querySelectorAll('.streaks .streak .n'); return n.length?+n[n.length-1].textContent:NaN; }); };
+    var lv=document.querySelector('.hud .lvl-badge'), x=document.querySelector('.hud .xp-num');
+    var a=lv&&lv.textContent.match(/LV (\d+)/), b=x&&x.textContent.match(/(\d+) \/ (\d+) xp/);
+    if(!a||!b) throw new Error('no level or XP in the HUD');
+    return (+a[1]-1)*(+b[2])+(+b[1]); }); };
   var tap=function(sel){ return p.evaluate(function(s){ var e=document.querySelector(s); if(!e) return false; e.click(); return true; },sel); };
   var t=async function(name,fn){ try{ await fn(); ok(name); }catch(e){ bad(name,e); } };
   var dayKey=function(){ return p.evaluate(function(){ var a=document.querySelector('.week .dot.active'); return a?a.getAttribute('data-k'):''; }); };

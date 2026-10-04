@@ -138,6 +138,26 @@ WORLDS.longword=withSeed(function(st){ st.activeSession=null;
   st.recipes[0].title='Supercalifragilisticexpialidociouschickenandricebowlwithextrasauce';
   st.plan=[{id:'pl-d1', recipeId:st.recipes[0].id, date:key(0), slot:'dinner', portions:2},
            {id:'pl-b1', recipeId:st.recipes[1].id, date:key(0), slot:'breakfast', portions:1}]; });
+// This week: one session logged three days ago and yesterday ticked as
+// trained from Today with no log behind it, against a target of three; and
+// the same with two sessions two days ago, which is over it.
+function wkWorld(more){ return withSeed(function(st){ st.activeSession=null; st.weekTarget=3; st.totalXp=4321;
+  st.days={}; st.days[key(1)]=cleanDay(); st.days[key(1)].workout={done:true,type:'Strength'}; st.days[key(5)]=cleanDay();
+  st.workoutLogs=[{id:'wl-w1', workoutId:'w6', title:'Push', tag:'Strength', date:key(3), logs:{press_bench:[{v:8,w:60}]}}];
+  if(more) [1,2].forEach(function(i){ st.workoutLogs.push({id:'wl-w2'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(2), logs:{press_bench:[{v:8,w:60}]}}); }); }); }
+WORLDS.wk=wkWorld(false); WORLDS.wkhit=wkWorld(true); UI.wk=UI.wkhit='{"tab":"today"}';
+// A bench press, the last slide, with a warm-up and three of its four working
+// sets logged; and a superset two rounds into three.
+WORLDS.bench3=withSeed(function(st){ recent(st);
+  st.activeSession={workoutId:'w6', startedAt:key(0), t0:NOW-600000, exIds:['warmup','cooldown','press_bench'],
+    targets:{warmup:{sets:1,reps:'5-10 min'},cooldown:{sets:1,reps:'5-10 min'},press_bench:{sets:4,reps:'8'}},
+    logs:{press_bench:[{v:10,w:40,wu:true,t:NOW-90000},{v:8,w:60,t:NOW-80000},{v:8,w:60,t:NOW-60000},{v:8,w:60,t:NOW-40000}]}}; });
+WORLDS.ss2=withSeed(function(st){ recent(st);
+  st.activeSession={workoutId:'w6', startedAt:key(0), t0:NOW-600000, exIds:['warmup','ss1','cooldown'],
+    targets:{warmup:{sets:1,reps:'5-10 min'},ss1:{sets:3,reps:'rounds'},cooldown:{sets:1,reps:'5-10 min'}},
+    supersets:{ss1:{ex:['press_bench','row_bent'],rounds:2,roundLog:[['press_bench','row_bent'],['press_bench','row_bent']]}},
+    logs:{press_bench:[{v:8,w:60,t:NOW-90000},{v:8,w:60,t:NOW-30000}],row_bent:[{v:10,w:50,t:NOW-80000},{v:10,w:50,t:NOW-20000}]}}; });
+UI.bench3='{"tab":"today","viewingSession":true,"slide":2}'; UI.ss2='{"tab":"today","viewingSession":true,"slide":1}';
 // A runtime whose store answers null: the page cannot load and says so.
 var NO_STORE='<script>window.claude={use:function(n){ return Promise.resolve(null); }};<\/script>';
 
@@ -1081,6 +1101,62 @@ srv.listen(0,async function(){
     assert.strictEqual((sets.match(/listitem/g)||[]).length,14,'Sets per day reads:\n'+sets);
     assert.ok(/^- list "Clean days/.test(strip) && (strip.match(/listitem/g)||[]).length===14 && /listitem ".*: clean"/.test(strip) && /listitem ".*: not logged"/.test(strip),'the clean days read:\n'+strip);
     assert.ok(/, clean"/.test(week) && /, not logged"/.test(week),'the week reads:\n'+week);
+  });
+
+  console.log('\nTHIS WEEK AND THE NEXT STEP');
+  for(var wk of [['wk','1'],['wkhit','3']]) await (function(w){ return t('the HUD counts this week\'s sessions against the target, and the week dots mark the days trained ('+w[0]+')', async function(){
+    var p=await open(w[0],{viewport:{width:360,height:740}});
+    var r=await p.evaluate(function(){ var s=[].slice.call(document.querySelectorAll('.streaks .streak')).pop();
+      return {row:[].reduce.call(document.querySelectorAll('.streaks .streak'),function(a,e){ a[Math.round(e.getBoundingClientRect().top)]=1; return a; },{}), n:s.querySelector('.n').textContent, l:s.querySelector('.l').textContent, hit:s.classList.contains('hit'), hud:document.querySelector('.hud').textContent,
+        dots:[].map.call(document.querySelectorAll('.week .dot'),function(d){ return {k:d.getAttribute('data-k'), tr:d.classList.contains('trained'), al:d.getAttribute('aria-label'),
+          mark:getComputedStyle(d,'::after').content}; })}; });
+    var week=await p.locator('.week').ariaSnapshot();
+    await close(p);
+    r.row=Object.keys(r.row).length;
+    var hit=w[0]==='wkhit', want=hit?'4 / 3':'2 / 3';
+    assert.strictEqual(r.n,want,'the tile reads '+r.n);
+    assert.strictEqual(r.l,hit?'week hit':'this week','the tile is labelled '+r.l);
+    assert.strictEqual(r.row,1,'the streak tiles take '+r.row+' lines on a 360px phone');
+    assert.strictEqual(r.hit,hit,'hit is '+r.hit);
+    assert.ok(!/total xp/i.test(r.hud) && r.hud.indexOf('4321')<0,'the HUD still shows the total XP: '+r.hud);
+    var trained=[key(1),key(3)].concat(hit?[key(2)]:[]);
+    r.dots.forEach(function(d){ var on=trained.indexOf(d.k)>-1;
+      assert.strictEqual(d.tr,on,d.k+' trained is '+d.tr);
+      assert.strictEqual(/, trained$/.test(d.al),on,d.k+' reads '+d.al);
+      assert.strictEqual(d.mark!=='none' && d.mark!=='normal',on,d.k+' mark is '+d.mark); });
+    assert.ok(/clean, trained"/.test(week) && /not logged, trained"/.test(week),'the week reads:\n'+week);
+  }); })(wk);
+  for(var sch5 of ['light','dark']) await (function(sch){ return t('once the target sets are logged, Finish takes the fill and Log set steps back, still one tap away ('+sch+')', async function(){
+    var p=await open('bench3',{scheme:sch});
+    var st=function(){ return p.evaluate(function(){ var l=document.querySelector('[data-action="logset"]'), f=document.querySelector('.storynav .finish');
+      return {lalt:l.classList.contains('alt'), fgo:f.classList.contains('go'), lbg:getComputedStyle(l).backgroundColor, fbg:getComputedStyle(f).backgroundColor,
+        fc:__contrast(f), lc:__contrast(l), chips:document.querySelectorAll('.setchip').length}; }); };
+    var a=await st();
+    assert.ok(!a.lalt && !a.fgo,'three of four sets: '+JSON.stringify(a));
+    await p.click('[data-action="logset"]'); await p.waitForTimeout(150);
+    var b2=await st();
+    assert.strictEqual(b2.chips,5,'the set did not log');
+    assert.ok(b2.lalt && b2.fgo,'four of four sets: '+JSON.stringify(b2));
+    assert.notStrictEqual(b2.fbg,b2.lbg,'Finish and Log set look the same');
+    assert.ok(b2.fc>=4.5 && b2.lc>=4.5,'contrast Finish '+b2.fc.toFixed(2)+', Log set '+b2.lc.toFixed(2));
+    // Past the double-tap guard: a deliberate extra set.
+    await p.waitForTimeout(700); await p.click('[data-action="logset"]'); await p.waitForTimeout(150);
+    var c=await st();
+    await close(p);
+    assert.strictEqual(c.chips,6,'an extra set could not be logged');
+    assert.ok(c.lalt && c.fgo,'after an extra set: '+JSON.stringify(c));
+  }); })(sch5);
+  await t('a superset\'s last round puts the fill on Next, not Log round', async function(){
+    var p=await open('ss2');
+    var st=function(){ return p.evaluate(function(){ var l=document.querySelector('[data-action="loground"]'), nx=document.querySelector('.storynav .next');
+      return {lalt:l.classList.contains('alt'), go:nx.classList.contains('go'), lbg:getComputedStyle(l).backgroundColor, nbg:getComputedStyle(nx).backgroundColor, slide:document.querySelector('.story-title').textContent}; }); };
+    var a=await st();
+    assert.ok(!a.lalt && !a.go,'two of three rounds: '+JSON.stringify(a));
+    await p.click('[data-action="loground"]'); await p.waitForTimeout(150);
+    var b2=await st();
+    await close(p);
+    assert.ok(b2.lalt && b2.go && b2.lbg!==b2.nbg,'three of three rounds: '+JSON.stringify(b2));
+    assert.ok(/2\/3/.test(b2.slide),'it moved on by itself: '+b2.slide);
   });
 
   // Not assertions: pictures for a person to look at.

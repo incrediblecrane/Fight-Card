@@ -51,6 +51,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .dot.touched{border-color:var(--accent);color:var(--text);}\
 .dot.clean{background:var(--good);border-color:var(--good);color:var(--good-ink);}\
 .dot.used{background:var(--surface-raised);border-color:var(--text-faint);color:var(--text);}\
+.dot.trained::after{content:'';position:absolute;bottom:3px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:currentColor;}\
+.streak.hit .n{color:var(--good);}\
 .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:14px;}\
 .tab{min-width:0;min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.03em;background:none;border:1px solid var(--line);color:var(--text-soft);padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}@media (max-width:359px){.tab{font-size:0.7rem;letter-spacing:0;padding:8px 2px;}}\
 .tab.active{background:var(--text);color:var(--bg);border-color:var(--text);}\
@@ -214,6 +216,8 @@ input[aria-invalid=\"true\"]{border-color:var(--accent);box-shadow:0 0 0 1px var
 .storynav button{flex:1;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;text-transform:uppercase;border-radius:10px;padding:13px;cursor:pointer;border:1px solid var(--line);background:var(--surface-raised);color:var(--text);}\
 .storynav button.next{border-color:var(--accent);color:var(--text);}\
 .storynav button.finish{background:var(--text);border-color:var(--text);color:var(--bg);flex:1.6;white-space:nowrap;padding:13px 8px;letter-spacing:0;}\
+.storynav button.go{background:var(--good);border-color:var(--good);color:var(--good-ink);font-weight:600;}\
+.logrow button.alt,.loground.alt{background:var(--surface-raised);color:var(--text);border:1px solid var(--field-border);font-weight:400;}\
 .storynav button.skip{background:none;color:var(--text-faint);border-style:dashed;flex:0.7;}\
 .storynav button:disabled{opacity:0.35;cursor:default;}\
 .ssrow{background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;}\
@@ -4639,9 +4643,12 @@ function bodyContent(){
   var todaySaunaCount=state.saunaSessions.filter(function(s){return s.date===activeDate();}).length;
   var lvl=levelInfo();
   var streaks=computeStreaks(), weekN=weekSessions();
+  // Trained as Progress counts it: a session logged that day, or the day ticked as trained.
+  var loggedOn={}; state.workoutLogs.forEach(function(l){ loggedOn[l.date]=1; });
   var week=last7Keys().map(function(k){
     var e=state.days[k]; var cls='dot'; var dd=k.slice(8,10), said='not logged';
     if(e && e.touched){ cls+=' touched'; if(e.alcohol===0&&e.smoking===0&&e.weed===0){ cls+=' clean'; said='clean'; } else { cls+=' used'; said='used'; } }
+    if(loggedOn[k] || (e && e.workout && e.workout.done)){ cls+=' trained'; said+=', trained'; }
     if(k===activeDate()) cls+=' active';
     // The strip is where you notice a gap, so it is also how you fix one.
     var pickable=k>=minLogDate() && k<=realToday();
@@ -5172,10 +5179,12 @@ function bodyContent(){
     var n=sess.exIds.length;
     if(slide>=n) slide=Math.max(0,n-1);
     var logged=countedSets(sess.logs);
-    var storyNav=function(id){ return '<div class="storynav">'+
+    // Once the slide's target is met, moving on is the next thing to press:
+    // Next (or Finish) takes the fill and logging another set steps back.
+    var storyNav=function(id,met){ var go=met?' go':''; return '<div class="storynav">'+
       '<button data-action="prevslide"'+(slide===0?' disabled':'')+'>&larr; Prev</button>'+
       (slide<n-1?'<button class="skip" data-action="skipex" data-ex="'+esc(id)+'">Skip</button>':'')+
-      (slide<n-1?'<button class="next" data-action="nextslide">Next &rarr;</button>':'<button class="finish" data-action="finishworkout">Finish ('+logged+' set'+(logged===1?'':'s')+')</button>')+
+      (slide<n-1?'<button class="next'+go+'" data-action="nextslide">Next &rarr;</button>':'<button class="finish'+go+'" data-action="finishworkout">Finish ('+logged+' set'+(logged===1?'':'s')+')</button>')+
       '</div>'; };
     var storyBar=function(){ return '<div class="story-bar">'+sess.exIds.map(function(id,i){
       return '<i class="'+(i===slide?'now':(slideLogged(sess,id)?'done':''))+'"><b></b></i>'; }).join('')+'</div>'; };
@@ -5198,7 +5207,7 @@ function bodyContent(){
       var ssId=sess.exIds[slide];
       var members=supersetMembers(ssId);
       var ssTgt=sess.targets[ssId]||{sets:3,reps:'rounds'};
-      var roundsDone=supersetRounds(ssId);
+      var roundsDone=supersetRounds(ssId), ssMet=ssTgt.sets>0 && roundsDone>=ssTgt.sets;
 
       var memberRows=members.map(function(m){
         var d=exDef(m); if(!d) return '';
@@ -5259,9 +5268,9 @@ function bodyContent(){
           (memberRows||'<p class="note" style="text-align:center;">Nothing paired up yet. Pick the exercises you are doing back to back.</p>')+
           '<div class="ssadd"><select id="ss-pick-'+ssId+'" aria-label="Add an exercise to this superset"><option value="">Add an exercise&hellip;</option>'+ssOptions+'</select>'+
             '<button data-action="ssadd" data-ss="'+ssId+'" aria-label="Add to this superset">Add</button></div>'+
-          (members.length?'<button class="loground" data-action="loground" data-ss="'+ssId+'">Log round '+(roundsDone+1)+'</button>':'')+
+          (members.length?'<button class="loground'+(ssMet?' alt':'')+'" data-action="loground" data-ss="'+ssId+'">Log round '+(roundsDone+1)+'</button>':'')+
           (roundsDone?'<button class="chipundo roundundo" data-action="undoround" data-ss="'+ssId+'">Undo round '+roundsDone+'</button>':'')+
-          storyNav(ssId)+
+          storyNav(ssId,ssMet)+
           '<button class="addex-btn" data-action="openpicker">+ Add exercise to this session</button>'+
           '<button class="discard-btn" data-action="removeex" data-id="'+ssId+'">Remove this superset from today&#39;s session</button>'+
         '</div>'+
@@ -5285,6 +5294,9 @@ function bodyContent(){
       var def2=exDef(exId);
       var sets=sess.logs[exId]||[];
       var tgt=sess.targets[exId]||{sets:def2.sets,reps:def2.reps};
+      // A warm-up or cool-down step done once is done, whatever it was done on.
+      var setsDone=sets.filter(function(st){ return !st.wu && (def2.type==='prep' || countsAsSet(exId,st)); }).length;
+      var met=tgt.sets>0 && setsDone>=tgt.sets;
       // A lift's sets can be tapped to mark a warm-up, which then stays out
       // of PBs, set counts, last time and the prefill.
       var canWu=def2.type==='load';
@@ -5361,9 +5373,9 @@ function bodyContent(){
           '<div class="logrow">'+weightInput+
             fieldBox('<input id="log-v-'+exId+'" type="text" inputmode="decimal" placeholder="'+valPlaceholder+'"'+
               (def2.type==='prep'?(' data-prepmins="'+exId+'" value="'+esc(prepMins[exId]||'')+'"'):preV)+'>',valPlaceholder)+
-            '<button data-action="logset" data-ex="'+exId+'" data-type="'+def2.type+'">Log set</button>'+
+            '<button'+(met?' class="alt"':'')+' data-action="logset" data-ex="'+exId+'" data-type="'+def2.type+'">Log set</button>'+
           '</div>'+
-          storyNav(exId)+
+          storyNav(exId,met)+
           '<button class="addex-btn" data-action="openpicker">+ Add exercise to this session</button>'+
           '<button class="discard-btn" data-action="removeex" data-id="'+exId+'">Remove this exercise from today&#39;s session</button>'+
         '</div>'+
@@ -5425,7 +5437,9 @@ function bodyContent(){
           '<div class="xp-num">'+lvl.into+' / '+lvl.span+' xp</div></div>'+
         '<div class="streaks"><div class="streak"><span class="n">'+streaks.dayStreak+'</span><span class="l">day streak</span></div>'+
           '<div class="streak"><span class="n">'+cleanTile(streaks).n+'</span><span class="l">'+cleanTile(streaks).l+'</span></div>'+
-          '<div class="streak"><span class="n">'+state.totalXp+'</span><span class="l">total xp</span></div></div>'+
+          // Sessions against the week's target: the XP bar above already says the XP.
+          // Kept as short as the tile it replaced, so the row fits one line on a phone.
+          '<div class="streak wk'+(weekN>=state.weekTarget?' hit':'')+'"><span class="n">'+weekN+' / '+state.weekTarget+'</span><span class="l">'+(weekN>=state.weekTarget?'week hit':'this week')+'</span></div></div>'+
         '<div class="week" role="group" aria-label="The last seven days">'+week+'</div>'+
         '<div class="week-hint">Tap a day to log it</div></div>')+
       tabsBar+current+undoToast()+
