@@ -495,6 +495,121 @@ srv.listen(0,async function(){
     await endIt();
   });
 
+  console.log('\nPROGRESS LISTS AND COUNTS');
+  var chartOf=function(title){ return p.evaluate(function(t){
+    var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ var h=x.querySelector('.chart-head h3'); return h&&h.textContent===t; })[0];
+    if(!c) return null;
+    return {sub:(c.querySelector('.sub')||{}).textContent||'', items:[].slice.call(c.querySelectorAll('ul.sr-only li')).map(function(l){ return l.textContent; }),
+      done:c.querySelectorAll('rect.done').length, legend:(c.querySelector('.legend')||{}).textContent||''}; },title); };
+  var saunaIds=function(){ return p.evaluate(function(){
+    return [].slice.call(document.querySelectorAll('.swipe-del[data-action="delsauna"]')).map(function(e){ return e.getAttribute('data-id'); }); }); };
+  var visit=function(id,date,mins){ return {id:id,date:date,mins:mins,temp:80,position:'Top'}; };
+  await t('a day quick-logged as trained counts in Progress as it does in the week target', async function(){
+    clearToday();
+    setSeed(function(st){ st.days[todayK]={water:0,workout:{done:true,type:'Boxing/MMA'},rest:false,alcohol:0,smoking:0,weed:0,touched:true}; });
+    await go(); await tabTo('training');
+    var wk=await p.evaluate(function(){ var w=document.querySelector('.weekgoal'); return w?w.textContent:''; });
+    var m=/Last 7 days: (\d+)/.exec(wk); assert.ok(m,'no week line: '+wk);
+    await tabTo('progress');
+    var c=await chartOf('Sets per day');
+    assert.ok(c,'no Sets per day chart: a chart of only a quick-logged day reads as empty');
+    assert.ok(new RegExp('^'+m[1]+' of \\d+ days trained').test(c.sub),'Training says '+m[1]+' sessions this week, Progress says '+c.sub);
+    assert.strictEqual(m[1],'1','expected one trained day, the week says '+wk);
+    assert.ok(c.items.some(function(x){ return /trained \(Boxing\/MMA\), no sets logged$/.test(x); }),'no bar says the day was trained with no sets: '+c.items.slice(-2).join(' | '));
+    assert.strictEqual(c.done,1,'the quick-logged day is not drawn as a muted bar');
+    assert.ok(/trained, no sets/.test(c.legend),'the legend does not say what the muted bar is: '+c.legend);
+    var sw=await p.evaluate(function(){
+      var i=document.querySelector('.legend i.done'), bar=document.querySelector('rect.done'), cs=getComputedStyle(i,'::before');
+      var mix=[].slice.call(document.styleSheets).some(function(sh){ try{ return [].slice.call(sh.cssRules).some(function(r){ return /color-mix/.test(r.cssText); }); }catch(e){ return false; } });
+      return {mix:mix, tint:cs.backgroundColor, op:cs.opacity, bar:getComputedStyle(bar).fill, barOp:bar.getAttribute('fill-opacity')}; });
+    assert.ok(!sw.mix,'the stylesheet leans on color-mix, which iOS Safari before 16.2 drops, leaving the swatch blank');
+    assert.strictEqual(sw.tint,sw.bar,'the swatch is not tinted with the bar colour: '+sw.tint+' vs '+sw.bar);
+    assert.strictEqual(String(sw.op),sw.barOp,'the swatch tint is not as faint as the bar: '+sw.op);
+    clearToday();
+  });
+  await t('with seven sauna visits, Show all reveals the oldest, and it can be removed and put back', async function(){
+    var old=visit('sa1000000000000','2026-08-01',7);
+    setSeed(function(st){ st.saunaSessions=[old].concat(st.saunaSessions.filter(function(x){ return x.id!==old.id; })); });
+    assert.strictEqual(seedOf().saunaSessions.length,7,'the seed does not hold seven visits');
+    await go(); await tabTo('progress');
+    assert.strictEqual((await saunaIds()).length,6,'more than six listed before Show all');
+    assert.ok(await tap('.showall[data-id="list:sauna"]'),'no Show all under the sauna list'); await p.waitForTimeout(300);
+    var ids=await saunaIds();
+    assert.strictEqual(ids.length,7,'Show all lists '+ids.length);
+    assert.strictEqual(ids[6],old.id,'the oldest visit is not last: '+ids.join(','));
+    var before=seedOf().saunaSessions;
+    assert.ok(await tap('.swipe-del[data-action="delsauna"][data-id="'+old.id+'"]'),'no Remove on the seventh visit'); await settle();
+    assert.ok(!seedOf().saunaSessions.some(function(x){ return x.id===old.id; }),'the seventh visit was not removed');
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
+    assert.deepStrictEqual(seedOf().saunaSessions.map(function(x){ return x.id; }),before.map(function(x){ return x.id; }),'Undo did not put the visit back where it was');
+    assert.ok((await saunaIds()).indexOf(old.id)>-1,'the visit is back but not listed');
+    assert.ok(await tap('.showall[data-id="list:sauna"]'),'no way back to the latest six'); await p.waitForTimeout(300);
+    assert.strictEqual((await saunaIds()).length,6,'Show the latest 6 still lists them all');
+    setSeed(function(st){ st.saunaSessions=st.saunaSessions.filter(function(x){ return x.id!==old.id; }); });
+  });
+  await t('with seven sessions, Show all lists the oldest with its Remove', async function(){
+    var n0=seedOf().workoutLogs.length, extra=[];
+    for(var i=n0;i<7;i++) extra.push({id:'wl100000000000'+i,workoutId:'w12',title:'Old '+i,tag:'Conditioning',date:'2026-07-0'+(i+1),logs:{cardio_gym_steady:[{v:2,w:null}]}});
+    setSeed(function(st){ st.workoutLogs=extra.concat(st.workoutLogs); });
+    await go(); await tabTo('progress');
+    var logIds=function(){ return p.evaluate(function(){ return [].slice.call(document.querySelectorAll('.swipe-del[data-action="dellog"]')).map(function(e){ return e.getAttribute('data-id'); }); }); };
+    var n=seedOf().workoutLogs.length;
+    assert.ok(n>6,'the seed holds only '+n+' sessions');
+    assert.strictEqual((await logIds()).length,6,'more than six listed before Show all');
+    assert.ok(await tap('.showall[data-id="list:recent"]'),'no Show all under Recent sessions'); await p.waitForTimeout(300);
+    var ids=await logIds();
+    assert.strictEqual(ids.length,n,'Show all lists '+ids.length+' of '+n);
+    assert.ok(ids.indexOf(extra[0].id)>-1,'the oldest session is not listed');
+    await tap('.showall[data-id="list:recent"]'); await p.waitForTimeout(200);
+    var keep=extra.map(function(x){ return x.id; });
+    setSeed(function(st){ st.workoutLogs=st.workoutLogs.filter(function(x){ return keep.indexOf(x.id)<0; }); });
+  });
+  await t('sauna visits on one day list newest first and chart in time order; a removal goes back in place', async function(){
+    var three=[visit('sa1900000000001',todayK,11),visit('sa1900000000002',todayK,22),visit('sa1900000000003',todayK,33)];
+    setSeed(function(st){ st.saunaSessions=st.saunaSessions.concat(three); });
+    await go(); await tabTo('progress');
+    var mins=await p.evaluate(function(){ return [].slice.call(document.querySelectorAll('.swipe-del[data-action="delsauna"]')).slice(0,3)
+      .map(function(e){ return e.parentNode.querySelector('.swipe-inner span').textContent.split(' ')[0]; }); });
+    assert.deepStrictEqual(mins,['33','22','11'],'the newest visit does not lead');
+    var c=await chartOf('Minutes per session');
+    assert.deepStrictEqual(c.items.slice(-3).map(function(x){ return x.split(': ')[1].split(' ')[0]; }),['11','22','33'],'the chart does not run in time order');
+    var before=seedOf().saunaSessions;
+    assert.ok(await tap('.swipe-del[data-action="delsauna"][data-id="sa1900000000002"]'),'no Remove on the 22 min visit'); await settle();
+    assert.ok(await tap('[data-action="undo"]'),'no undo offer'); await settle();
+    assert.deepStrictEqual(seedOf().saunaSessions.map(function(x){ return x.id; }),before.map(function(x){ return x.id; }),'Undo put the visit back somewhere else');
+    var ids=three.map(function(x){ return x.id; });
+    setSeed(function(st){ st.saunaSessions=st.saunaSessions.filter(function(x){ return ids.indexOf(x.id)<0; }); });
+  });
+  await t('Weight moved reads the same in a German locale, not as 21.737kg, and just under a tonne reads 1t', async function(){
+    clearToday();
+    setSeed(function(st){ st.workoutLogs.push({id:'wl1999999999999',workoutId:'w1',title:'Heavy',tag:'Strength',date:todayK,
+      logs:{press_bench:[{v:10,w:100},{v:10,w:100},{v:10,w:100}]}}); });
+    var dctx=await b.newContext({viewport:{width:420,height:900},locale:'de-DE'}), dp=await dctx.newPage();
+    try{
+      await dp.goto(url); await dp.waitForTimeout(600);
+      var bk=await dp.$('[data-action="cancelsession"]'); if(bk){ await bk.click(); await dp.waitForTimeout(300); }
+      await dp.click('[data-action="tab"][data-tab="progress"]'); await dp.waitForTimeout(400);
+      assert.strictEqual(await dp.evaluate(function(){ return (3000).toLocaleString(); }),'3.000','this context is not German, so it proves nothing');
+      var sub=await dp.evaluate(function(){
+        var c=[].slice.call(document.querySelectorAll('.chart')).filter(function(x){ var h=x.querySelector('.chart-head h3'); return h&&h.textContent==='Weight moved per day'; })[0];
+        return c?c.querySelector('.sub').textContent:''; });
+      assert.ok(/^3t in \d+ days$/.test(sub),'Weight moved reads '+sub);
+      // A lifetime total just under a thousand rounds up, so it reads as a tonne, not 1000kg.
+      var kept=seedOf().workoutLogs;
+      setSeed(function(st){ st.workoutLogs=[{id:'wl1999999999999',workoutId:'w1',title:'Heavy',tag:'Strength',date:todayK,logs:{press_bench:[{v:1,w:999.6}]}}]; });
+      try{
+        await dp.reload(); await dp.waitForTimeout(600);
+        var bk2=await dp.$('[data-action="cancelsession"]'); if(bk2){ await bk2.click(); await dp.waitForTimeout(300); }
+        await dp.click('[data-action="tab"][data-tab="progress"]'); await dp.waitForTimeout(400);
+        var tile=await dp.evaluate(function(){
+          var t=[].slice.call(document.querySelectorAll('.stat-tile')).filter(function(x){ var l=x.querySelector('.l'); return l&&l.textContent==='total lifted'; })[0];
+          return t?t.querySelector('.n').textContent:''; });
+        assert.strictEqual(tile,'1t','999.6kg lifted in all reads '+tile);
+      } finally { setSeed(function(st){ st.workoutLogs=kept; }); }
+    } finally { await dctx.close(); }
+    setSeed(function(st){ st.workoutLogs=st.workoutLogs.filter(function(x){ return x.id!=='wl1999999999999'; }); });
+  });
+
   console.log(errs.length?('  FAIL  page errors: '+errs.join(' | ')):'  PASS  no page errors');
   await b.close(); srv.close();
   console.log(fails||errs.length?'\nFAILING\n':'\nAll removal checks pass.\n');
