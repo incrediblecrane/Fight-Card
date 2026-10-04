@@ -1539,14 +1539,43 @@ srv.listen(0,async function(){
     assert.strictEqual(seedOf().weekTarget,4,'the weekly target did not save');
   });
 
+  await t('the water target is text on the Water card until tapped, so a water tap cannot land on it', async function(){
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    if(await p.$('[data-action="toggleex"][data-id="watertgt"][aria-expanded="true"]')){ await p.click('[data-action="toggleex"][data-id="watertgt"]'); await p.waitForTimeout(300); }
+    assert.strictEqual((await p.$$('[data-action="watertarget"]')).length,0,'the target -/+ show before the target is tapped');
+    var line=await p.evaluate(function(){ return document.querySelector('.sub.tgt').textContent; });
+    assert.ok(/^Target [\d.]+L a day$/.test(line),'the target line: '+line);
+    await p.click('[data-action="toggleex"][data-id="watertgt"]'); await p.waitForTimeout(300);
+    assert.strictEqual((await p.$$('[data-action="watertarget"]')).length,2,'tapping the target did not open its -/+');
+    assert.strictEqual(await p.getAttribute('[data-id="watertgt"]','aria-expanded'),'true');
+    await p.click('[data-action="water"][data-d="1"]'); await settle();
+    assert.strictEqual((await p.$$('[data-action="watertarget"]')).length,0,'a water tap did not put the target away');
+    await p.click('[data-action="water"][data-d="-1"]'); await settle();
+  });
+
   await t('the water target can be changed from the Water card, inside 1-5L', async function(){
     await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    if(!(await p.$('[data-action="watertarget"]'))){ await p.click('[data-action="toggleex"][data-id="watertgt"]'); await p.waitForTimeout(300); }
     var w0=seedOf().waterTarget;
     await p.click('[data-action="watertarget"][data-d="1"]'); await settle();
     assert.strictEqual(seedOf().waterTarget,Math.min(20,w0+1));
     for(var k=0;k<20;k++){ await p.click('[data-action="watertarget"][data-d="-1"]'); await p.waitForTimeout(40); }
     await settle();
     assert.strictEqual(seedOf().waterTarget,4,'the target went below 1L');
+  });
+
+  await t('a drink shows as its own run on Progress and leaves the other substances theirs', async function(){
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="alcohol"][data-d="1"]'); await settle();
+    var hud=await p.evaluate(function(){ var s=document.querySelectorAll('.hud .streak')[1]; return s.querySelector('.n').textContent+' '+s.querySelector('.l').textContent; });
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(400);
+    var line=await p.evaluate(function(){ var e=document.querySelector('.cleanruns'); return e?e.textContent:''; });
+    var runs=line.split(' \u00b7 ').map(function(x){ var m=x.match(/^No (cigarettes|alcohol|weed): (\d+) days?$/); assert.ok(m,'a run reads: '+x); return m; });
+    assert.ok(runs.some(function(m){ return m[1]==='alcohol' && m[2]==='0'; }),'no alcohol run of 0 after a drink today: '+line);
+    var best=runs[0], free={cigarettes:'smoke-free',alcohol:'alcohol-free',weed:'weed-free'}[best[1]];
+    assert.strictEqual(hud,best[2]+' '+free,'the header tile is not the longest run: '+hud+' vs '+line);
+    await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+    await p.click('[data-action="alcohol"][data-d="-1"]'); await settle();
   });
 
   await t('yesterday not logged is offered once, and waved off for good', async function(){

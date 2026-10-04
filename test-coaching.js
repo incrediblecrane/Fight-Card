@@ -32,7 +32,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 
 var box={};
 var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','equipFor','isSuperset','supersetMembers',
-  'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','aimFor','lastTimeLine','prefillFor',
+  'supersetBox','exDef','setLabel','computeStreaks','cleanTile','cleanRunsLine','lastSetsFor','topReps','aimFor','lastTimeLine','prefillFor',
   'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','recentWorkouts','e1rm','bestE1rm','repPb','weekSessions','stepTarget','waterStep','dayWx','minLogDate','unloggedYesterday'];
 var loaded=null;
 try{
@@ -44,6 +44,7 @@ try{
     'var BACKFILL_DAYS='+h.match(/BACKFILL_DAYS=(\d+)/)[1]+';\n'+
     'var XP_PER_WATER='+h.match(/XP_PER_WATER=(\d+)/)[1]+';\n'+
     'var DAY_MAX='+literal('var DAY_MAX')+';\n'+
+    'var CLEAN_KINDS='+literal('var CLEAN_KINDS')+';\n'+
     'var state={days:{},workoutLogs:[],activeSession:null};\n'+
     NAMES.map(grab).join('\n')+'\n'+
     'this.state=function(s){ state=s; };\n'+
@@ -106,7 +107,50 @@ if(loaded===true){
     var s=box.computeStreaks();
     assert.strictEqual(s.dayStreak,450); assert.strictEqual(s.cleanStreak,450);
     box.state({days:{},workoutLogs:[]});
-    assert.deepStrictEqual(box.computeStreaks(),{dayStreak:0,cleanStreak:0});
+    assert.deepStrictEqual(box.computeStreaks(),{dayStreak:0,cleanStreak:0,clean:{smoking:0,alcohol:0,weed:0},runs:[]});
+  });
+
+  function used(touched,u){ var e=day(touched); for(var k in u) e[k]=u[k]; return e; }
+
+  t('each substance has its own run: a drink does not end the days without a cigarette', function(){
+    var days={};
+    for(var i=0;i<41;i++) days[keyAgo(i)]=day(true);
+    days[keyAgo(2)]=used(true,{alcohol:1});
+    days[keyAgo(41)]=used(true,{smoking:5}); days[keyAgo(50)]=used(true,{alcohol:2});
+    box.state({days:days,workoutLogs:[]});
+    var s=box.computeStreaks();
+    assert.strictEqual(s.clean.smoking,41,'smoke-free days: '+JSON.stringify(s));
+    assert.strictEqual(s.clean.alcohol,2);
+    assert.strictEqual(s.cleanStreak,2,'all three at once is still the shortest');
+    assert.deepStrictEqual(s.runs.map(function(r){ return r.k+':'+r.n; }),['smoking:41','alcohol:2'],'longest first, weed never used is left out');
+    assert.deepStrictEqual(box.cleanTile(s),{n:41,l:'smoke-free'});
+    assert.strictEqual(box.cleanRunsLine(s),'No cigarettes: <b>41 days</b> &middot; No alcohol: <b>2 days</b>');
+  });
+
+  t('each run skips days not logged and ends after more than a week with nothing logged', function(){
+    var days={}; days[keyAgo(0)]=day(true); days[keyAgo(3)]=used(true,{weed:1,alcohol:0}); days[keyAgo(4)]=day(true);
+    days[keyAgo(13)]=day(true); days[keyAgo(14)]=used(true,{alcohol:3});
+    box.state({days:days,workoutLogs:[]});
+    var s=box.computeStreaks();
+    assert.deepStrictEqual(s.clean,{smoking:3,alcohol:3,weed:1});
+    assert.deepStrictEqual(s.runs.map(function(r){ return r.k; }),['alcohol','weed']);
+  });
+
+  t('a substance used today has a run of 0, the others keep theirs', function(){
+    var days={}; days[keyAgo(0)]=used(true,{smoking:2}); days[keyAgo(1)]=day(true); days[keyAgo(2)]=used(true,{weed:1});
+    box.state({days:days,workoutLogs:[]});
+    var s=box.computeStreaks();
+    assert.deepStrictEqual(s.clean,{smoking:0,alcohol:3,weed:2});
+    assert.deepStrictEqual(s.runs.map(function(r){ return r.k+':'+r.n; }),['weed:2','smoking:0']);
+  });
+
+  t('with nothing ever used, the tile and line keep the clean streak', function(){
+    var days={}; days[keyAgo(0)]=day(true); days[keyAgo(1)]=day(true);
+    box.state({days:days,workoutLogs:[]});
+    var s=box.computeStreaks();
+    assert.deepStrictEqual(s.runs,[]);
+    assert.deepStrictEqual(box.cleanTile(s),{n:2,l:'clean streak'});
+    assert.strictEqual(box.cleanRunsLine(s),'Current streak <b>2 days</b>');
   });
 
   console.log('\nLAST TIME, PREFILL AND DOUBLE PROGRESSION');

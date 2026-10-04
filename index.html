@@ -187,7 +187,9 @@ button.setchip{color:var(--text);min-height:44px;cursor:pointer;}\
 .tgt{display:flex;align-items:center;gap:6px;}\
 .tgt button{width:44px;height:44px;border-radius:999px;border:1px dashed var(--field-border);background:none;color:var(--text-soft);font-size:0.9rem;cursor:pointer;}\
 .tgt b{font-family:'IBM Plex Mono',monospace;color:var(--text);font-weight:600;}\
-.sub.tgt button:first-of-type{margin-left:auto;}\
+.sub.tgt button:nth-of-type(2){margin-left:auto;}\
+.tgt .tgtopen{width:auto;height:auto;min-height:44px;border:none;border-radius:0;padding:0;font:inherit;color:inherit;text-align:left;}\
+.tgt .tgtopen b{text-decoration:underline dotted;text-underline-offset:3px;}\
 .weekgoal{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 8px 6px 14px;margin-bottom:12px;font-size:0.86rem;}\
 .nudge{background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:0.86rem;}\
 .nudge .btns{display:flex;gap:8px;}\
@@ -1647,26 +1649,47 @@ function unloggedYesterday(){
 }
 function stepTarget(v,d,lo,hi){ return Math.max(lo,Math.min(hi,(v||lo)+(v?d:0))); }
 /* Forgiving on purpose. A day not logged is not a day something was used, so
-   the clean streak steps over it and only a day with something used ends
-   it, or more than a week with nothing logged, since that is no longer a
-   current streak. The day streak lets one missed day go; two in a row end it.
-   The walk goes back as far as the oldest day held, not a fixed number of
-   days, so a streak longer than that number is not cut off at it. */
+   a clean run steps over it and only a day with that thing used ends it, or
+   more than a week with nothing logged, since that is no longer a current
+   run. Each substance has its own run: one drink is not a cigarette, and a
+   slip with one does not take the others' days away. cleanStreak is all
+   three at once. runs lists, longest first, only what has ever been logged
+   as used, so a count of days without something never used is not shown.
+   The day streak lets one missed day go; two in a row end it. The walk goes
+   back as far as the oldest day held, not a fixed number of days, so a
+   streak longer than that number is not cut off at it. */
+var CLEAN_KINDS=[['smoking','cigarettes','smoke-free'],['alcohol','alcohol','alcohol-free'],['weed','weed','weed-free']];
 function computeStreaks(){
-  var d=new Date(), oldest=null;
-  for(var k in state.days){ if(hasOwn(state.days,k) && (oldest===null || k<oldest)) oldest=k; }
+  var d=new Date(), oldest=null, ever={};
+  for(var k in state.days){ if(hasOwn(state.days,k)){
+    if(oldest===null || k<oldest) oldest=k;
+    CLEAN_KINDS.forEach(function(c){ if(state.days[k][c[0]]>0) ever[c[0]]=true; });
+  } }
   var todayEntry=state.days[dateKey(d)];
   if(!todayEntry || !todayEntry.touched){ d.setDate(d.getDate()-1); }
-  var dayStreak=0, cleanStreak=0, missed=0, gap=0, breakingDay=false, breakingClean=false;
+  var dayStreak=0, missed=0, gap=0, breakingDay=false, breakingClean=false, clean={}, ended={};
+  CLEAN_KINDS.forEach(function(c){ clean[c[0]]=0; });
   while(oldest!==null && dateKey(d)>=oldest){
     var entry=state.days[dateKey(d)], on=!!(entry && entry.touched);
     if(!breakingDay){ if(on){ dayStreak++; missed=0; } else if(++missed>1) breakingDay=true; }
     if(!breakingClean && !on && ++gap>7) breakingClean=true;
-    if(!breakingClean && on){ gap=0; if(entry.alcohol===0 && entry.smoking===0 && entry.weed===0) cleanStreak++; else breakingClean=true; }
+    if(!breakingClean && on){ gap=0; breakingClean=true;
+      CLEAN_KINDS.forEach(function(c){ if(ended[c[0]]) return;
+        if(entry[c[0]]>0) ended[c[0]]=true; else { clean[c[0]]++; breakingClean=false; } }); }
     if(breakingDay && breakingClean) break;
     d.setDate(d.getDate()-1);
   }
-  return {dayStreak:dayStreak,cleanStreak:cleanStreak};
+  var runs=CLEAN_KINDS.filter(function(c){ return ever[c[0]]; }).map(function(c,i){ return {k:c[0],name:c[1],free:c[2],n:clean[c[0]],i:i}; });
+  runs.sort(function(a,b){ return b.n-a.n || a.i-b.i; });
+  return {dayStreak:dayStreak,cleanStreak:Math.min(clean.alcohol,clean.smoking,clean.weed),clean:clean,
+    runs:runs.map(function(r){ return {k:r.k,name:r.name,free:r.free,n:r.n}; })};
+}
+// The streak tile in the header and on Progress: the longest run going, by
+// name, or all three at once when nothing has ever been logged as used.
+function cleanTile(s){ var r=s.runs[0]; return r?{n:r.n,l:r.free}:{n:s.cleanStreak,l:'clean streak'}; }
+function cleanRunsLine(s){
+  if(!s.runs.length) return 'Current streak <b>'+s.cleanStreak+' day'+(s.cleanStreak===1?'':'s')+'</b>';
+  return s.runs.map(function(r){ return 'No '+r.name+': <b>'+r.n+' day'+(r.n===1?'':'s')+'</b>'; }).join(' &middot; ');
 }
 // Removing an entry is destructive and the app has no history, so every
 // removal parks the item where it can be put back. The variable is what is
@@ -4648,9 +4671,9 @@ function bodyContent(){
     : '';
   return resumeBannerHtml(false)+nudge+
     '<div class="grid">'+
-      '<div class="card"><h3>Water</h3><div class="sub tgt"><span>Target <b>'+litres(state.waterTarget)+'</b> a day</span>'+
-          '<button data-action="watertarget" data-d="-1" aria-label="Lower the water target">&minus;</button>'+
-          '<button data-action="watertarget" data-d="1" aria-label="Raise the water target">+</button></div>'+
+      '<div class="card"><h3>Water</h3><div class="sub tgt"><button class="tgtopen" data-action="toggleex" data-id="watertgt" aria-expanded="'+!!expanded.watertgt+'">Target <b>'+litres(state.waterTarget)+'</b> a day</button>'+
+          (expanded.watertgt?'<button data-action="watertarget" data-d="-1" aria-label="Lower the water target">&minus;</button>'+
+          '<button data-action="watertarget" data-d="1" aria-label="Raise the water target">+</button>':'')+'</div>'+
         '<div class="stepper"><button data-action="water" data-d="-1" aria-label="Less water">-</button><span class="count">'+litres(t.water)+'</span><button class="big" data-action="water" data-d="1" aria-label="More water">+</button></div>'+
         '<div class="dots">'+cupsRow+'</div></div>'+
       '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+esc(t.workout.type)):(t.rest?'Recovery day':weekLine(weekN,state.weekTarget)))+'</div>'+
@@ -4977,7 +5000,7 @@ function bodyContent(){
       '<div class="stat-tile"><div class="n">'+logs.length+'</div><div class="l">sessions</div></div>'+
       '<div class="stat-tile"><div class="n">'+totalSets+'</div><div class="l">sets logged</div></div>'+
       '<div class="stat-tile"><div class="n">'+massText(totalVolume)+'</div><div class="l">total lifted</div></div>'+
-      '<div class="stat-tile"><div class="n">'+pStreaks.cleanStreak+'</div><div class="l">clean streak</div></div>'+
+      '<div class="stat-tile"><div class="n">'+cleanTile(pStreaks).n+'</div><div class="l">'+cleanTile(pStreaks).l+'</div></div>'+
     '</div>';
 
   // Newest first within a day too (ids are made from the time), or a day
@@ -5130,7 +5153,7 @@ function bodyContent(){
     '<div class="chart">'+chartHead('Day by day',cleanCount+' clean of '+loggedCount+' logged')+
       '<div class="daystrip" role="list" aria-label="Clean days over the last '+progRange+' days">'+cleanStrip+'</div>'+
       '<div class="legend"><span><i class="clean"></i>clean</span><span><i class="used"></i>used</span><span><i></i>not logged</span></div>'+
-      '<div class="pbrow"><span>Current streak <b>'+pStreaks.cleanStreak+' day'+(pStreaks.cleanStreak===1?'':'s')+'</b></span>'+
+      '<div class="pbrow"><span class="cleanruns">'+cleanRunsLine(pStreaks)+'</span>'+
         '<span>Day streak <b>'+pStreaks.dayStreak+'</b></span></div></div>'+
     '<h2 class="sectiontitle">Sauna</h2>'+
     (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaRows.length+' in '+progRange+' days · '+saunaRows.reduce(function(a,r){ return minsSum(a,r.v); },0)+' min',
@@ -5401,7 +5424,7 @@ function bodyContent(){
           '<div class="xp-track"><div class="xp-fill" style="width:'+Math.round((lvl.into/lvl.span)*100)+'%"></div></div>'+
           '<div class="xp-num">'+lvl.into+' / '+lvl.span+' xp</div></div>'+
         '<div class="streaks"><div class="streak"><span class="n">'+streaks.dayStreak+'</span><span class="l">day streak</span></div>'+
-          '<div class="streak"><span class="n">'+streaks.cleanStreak+'</span><span class="l">clean streak</span></div>'+
+          '<div class="streak"><span class="n">'+cleanTile(streaks).n+'</span><span class="l">'+cleanTile(streaks).l+'</span></div>'+
           '<div class="streak"><span class="n">'+state.totalXp+'</span><span class="l">total xp</span></div></div>'+
         '<div class="week" role="group" aria-label="The last seven days">'+week+'</div>'+
         '<div class="week-hint">Tap a day to log it</div></div>')+
@@ -5883,6 +5906,7 @@ function onClick(e){
   }
   else if(action==='removeex'){ removeExFromSession(t.getAttribute('data-id')); }
   else if(action==='water'){
+    expanded.watertgt=false;
     var x=waterStep(today,parseInt(t.getAttribute('data-d'),10),state.waterTarget); if(x) addXp(x);
   }
   else if(action==='watertarget'){ state.waterTarget=stepTarget(state.waterTarget,parseInt(t.getAttribute('data-d'),10),4,20); }

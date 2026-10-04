@@ -27,6 +27,9 @@ One water tap, 0.25L. The water target is a count of cups (`waterTarget`, 4 to
 (`wx` on the day), so untapping takes back only what was paid. A day saved
 before `wx` existed is taken to have paid for at most 8 cups, the default,
 or the current target if that is lower.
+The target shows on the Water card as text; tapping it opens its -/+ in
+place (`watertgt` in the open list), and the next water tap puts them away,
+so a tap meant for water does not change the setting.
 _Avoid_: glass, unit
 
 **Log date**:
@@ -52,6 +55,11 @@ Touched days in a row with nothing used. Forgiving: it steps over a day not
 logged, and only a touched day with something used ends it (or more than seven
 days in a row with nothing logged, which is no longer a current streak). A day
 with something used is shown as "used" in a neutral colour, not as a failure.
+Each substance (alcohol, smoking, weed) has its own run by the same rules, so
+a drink ends only the days without alcohol, not the days without a cigarette.
+Progress > Clean days lists a run for each substance ever logged as used,
+longest first; the header keeps one tile, the longest run with its name
+("smoke-free"), or the all-three clean streak when nothing was ever used.
 
 **Day streak**:
 Touched days in a row. It lets one untouched day go and ends on two in a row.
