@@ -8,6 +8,19 @@ var env=require('./test-env.js');
 var doc=env.localOnly(env.readDoc());
 // What the app last saved, as the JSON its state is.
 function savedJson(){ return JSON.stringify(env.seedOf(doc)); }
+// A literal App declares, such as the rig frames, read out of the document the
+// way test-coaching.js reads one out of index.html: App keeps it to itself, so
+// the page cannot be asked for it, and a page error must not pass as a skip.
+function literal(decl){
+  var i=doc.indexOf('\n'+decl+'='); if(i<0) throw new Error('could not find '+decl+' in the document');
+  var open=doc.indexOf('=',i)+1, oc=doc[open], cc=oc==='['?']':'}', depth=0;
+  if(oc!=='{' && oc!=='[') throw new Error(decl+' is not a literal');
+  for(var k=open;k<doc.length;k++){
+    if(doc[k]===oc) depth++;
+    else if(doc[k]===cc){ depth--; if(!depth) return doc.slice(open,k+1); }
+  }
+  throw new Error(decl+' never closed');
+}
 var SHIM='<script>(function(){var ns={publish:function(h){return fetch("/publish",{method:"POST",body:h})'
  +'.then(function(){setTimeout(function(){location.reload();},0);});}};'
  +'window.claude={use:function(n){return Promise.resolve(n==="artifact"?ns:null);}};})();<\/script>';
@@ -204,10 +217,18 @@ srv.listen(0,async function(){
   });
 
   await t('the temperature carries between stints without retyping', async function(){
+    // 90 was typed once, for the first stint. A bare /90/ on the page would
+    // also match the 90 days range button, so the saved session is read, and
+    // then its own row on Progress.
+    var ss=env.seedOf(doc).saunaSessions, s=ss[ss.length-1];
+    assert.strictEqual(s.mins,25,'the session saved is not the two stints: '+JSON.stringify(s));
+    assert.strictEqual(s.temp,90,'the session saved '+s.temp+' for the temperature');
     await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
-    var body=await text();
-    assert.ok(/25 min/.test(body),'total was not 25 min:\n'+body.slice(0,600));
-    assert.ok(/90/.test(body),'the temperature did not stick');
+    var row=await p.evaluate(function(id){
+      var r=document.querySelector('.swipe[data-swipe="'+id+'"] .swipe-inner'); return r?r.innerText:null; },s.id);
+    assert.ok(row!==null,'the session has no row on Progress');
+    assert.ok(/^25 min/.test(row),'total was not 25 min: '+row);
+    assert.ok(/90°C/.test(row),'the temperature did not stick: '+row);
   });
 
   await t('the breakdown survives the save and reads back per stint', async function(){
@@ -315,12 +336,24 @@ srv.listen(0,async function(){
     await p.selectOption('#log-lvl-warmup','6');
     await p.fill('#log-v-warmup','9');
     await p.click('[data-action="logset"]'); await settle();
-    await p.click('[data-action="cancelsession"]'); await p.waitForTimeout(400);
-    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(600);
-    await p.click('[data-action="finishworkout"]').catch(function(){});
-    var body=await text();
-    assert.ok(!/9reps/.test(body),'warm-up minutes rendered as reps:\n'+
-      (body.match(/.{0,60}9reps.{0,40}/)||[''])[0]);
+    // A warm-up alone is no session and goes the way a discard does, so one
+    // real set is logged too, or nothing would ever reach Progress.
+    assert.ok(await toSlide('Bicep curl'),'never reached the bicep curl');
+    await p.fill('#log-w-curl_bicep','20'); await p.fill('#log-v-curl_bicep','10');
+    await p.click('[data-action="logset"]'); await settle();
+    assert.ok(await toSlide('Cool-down'),'never reached the cool-down');
+    await p.click('[data-action="finishworkout"]'); await settle();
+    var last=await p.evaluate(function(){
+      var rows=[].slice.call(document.querySelectorAll('.exrow'));
+      for(var i=0;i<rows.length;i++){
+        var h=rows[i].querySelector('.top h3');
+        if(h && h.textContent.trim()==='Warm-up') return rows[i].querySelector('.top .last').textContent;
+      }
+      return null;
+    });
+    assert.ok(last!==null,'the warm-up is not on the progress page');
+    assert.ok(/^9 min/.test(last),'the warm-up reads "'+last+'", not 9 min');
+    assert.ok(!/9\s*reps/.test(last),'warm-up minutes rendered as reps: "'+last+'"');
   });
 
   await t('a paired-dumbbell set counts the weight in both hands', async function(){
@@ -484,16 +517,16 @@ srv.listen(0,async function(){
   await t('the two flys are different movements, not one with two labels', async function(){
     // The high fly's hands start high and finish low; the mid fly's stay at
     // chest height. If the front frames matched, one of them would be a lie.
-    var same=await p.evaluate(function(){
-      var a=RIGFRAMES['fly_cable'].front, b=RIGFRAMES['fly_cable_high'].front;
-      return JSON.stringify(a)===JSON.stringify(b);
-    }).catch(function(){ return null; });
-    if(same!==null) assert.ok(!same,'both flys share identical front frames');
-    var drop=await p.evaluate(function(){
-      var b=RIGFRAMES['fly_cable_high'].front;
-      return b[2].handL[1]-b[0].handL[1];
-    }).catch(function(){ return null; });
-    if(drop!==null) assert.ok(drop>40,'the high fly only travels '+drop+' downward');
+    // The frames and the map from exercise to rig live inside App, out of the
+    // page's reach, so they are read out of the document under test, and
+    // through the map, so this is the figure each exercise actually draws.
+    var M=new Function('return '+literal('var RIGMAP'))(), R=JSON.parse(literal('var RIGFRAMES'));
+    var a=R[M.fly_cable], b=R[M.fly_cable_high];
+    assert.ok(a && a.front && a.front.length,'the cable fly has no front frames');
+    assert.ok(b && b.front && b.front.length>2,'the high cable fly has no front frames');
+    assert.notStrictEqual(JSON.stringify(a.front),JSON.stringify(b.front),'both flys share identical front frames');
+    var drop=b.front[2].handL[1]-b.front[0].handL[1];
+    assert.ok(drop>40,'the high fly only travels '+drop+' downward');
   });
 
   console.log('\nLIGHT SETS ON THE WARM-UP');
@@ -611,11 +644,20 @@ srv.listen(0,async function(){
   });
 
   await t('a light set survives a reload reading as weight by reps', async function(){
+    // What was saved is checked above; a reload does not change it, so this
+    // reads what the reloaded page shows. The table lists today's sets in one
+    // group, so the light set is in it however many sessions today holds.
     await go();
-    // Read straight out of what was saved, so this does not depend on the
-    // history table's window at all.
-    assert.ok(/"lvlKind":"load"/.test(savedJson()),'the light set did not survive the reload');
-    assert.ok(/"w":42.5/.test(savedJson()),'the weight did not survive the reload');
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(500);
+    var top='.exrow .top[data-action="toggleex"][data-id="warmup"]';
+    assert.ok(await p.$(top),'the warm-up is not in the exercise history after the reload');
+    if(await p.getAttribute(top,'aria-expanded')!=='true'){ await p.click(top); await p.waitForTimeout(500); }
+    var sets=await p.evaluate(function(){
+      var t=document.querySelector('.exrow .top[data-id="warmup"]'), d=t&&t.parentNode.querySelector('.exdetail table');
+      return d?[].slice.call(d.querySelectorAll('td:not(.dt)')).map(function(e){ return e.textContent.trim(); }):[];
+    });
+    assert.ok(sets.some(function(x){ return /^42\.5kg × 5 · Light sets of the first lift$/.test(x); }),
+      'after the reload the warm-up lists: '+sets.join(' | '));
   });
 
   console.log('\nPICKER SEARCH AND PREVIEWS');
@@ -844,7 +886,8 @@ srv.listen(0,async function(){
   });
 
   await t('one Log round button records a set against each of them', async function(){
-    await p.fill('#log-w-press_bench','60'); await p.fill('#log-v-press_bench','10');
+    // A bench set the seed does not hold, so finding it later proves it landed.
+    await p.fill('#log-w-press_bench','62.5'); await p.fill('#log-v-press_bench','11');
     await p.fill('#log-w-row_bent','50'); await p.fill('#log-v-row_bent','12');
     await p.click('[data-action="loground"]'); await settle();
     var rows=await p.evaluate(function(){
@@ -855,7 +898,7 @@ srv.listen(0,async function(){
     });
     assert.strictEqual(rows[0].chips.length,1,rows[0].name+' logged '+rows[0].chips.length+' sets');
     assert.strictEqual(rows[1].chips.length,1,rows[1].name+' logged '+rows[1].chips.length+' sets');
-    assert.ok(/60/.test(rows[0].chips[0]),'the weight did not stick: '+rows[0].chips[0]);
+    assert.ok(/62\.5kg × 11/.test(rows[0].chips[0]),'the weight did not stick: '+rows[0].chips[0]);
     var label=await p.evaluate(function(){
       var b=document.querySelector('[data-action="loground"]'); return b?b.textContent.trim():''; });
     assert.ok(/round 2/i.test(label),'the button still offers round 1: "'+label+'"');
@@ -868,8 +911,19 @@ srv.listen(0,async function(){
     await p.click('[data-action="finishworkout"]'); await settle();
     var tabBtn=await p.$('[data-action="tab"][data-tab="progress"]');
     if(tabBtn){ await tabBtn.click(); await p.waitForTimeout(600); }
+    var l=env.seedOf(doc).workoutLogs; l=l[l.length-1];
+    assert.ok(l && l.logs,'no session was logged');
+    var on=(l.logs.press_bench||[]).filter(function(x){ return x.w===62.5 && x.v===11; });
+    assert.strictEqual(on.length,1,'the bench set is not on the bench: '+JSON.stringify(l.logs));
+    var own=Object.keys(l.logs).filter(function(k){ return /^ss\d+$/.test(k); });
+    assert.deepStrictEqual(own,[],'the superset logged sets as itself: '+own.join(', '));
+    var last=await p.evaluate(function(){
+      var h=[].filter.call(document.querySelectorAll('.exrow .top h3'),function(x){ return x.textContent.trim()==='Bench press'; })[0];
+      return h?h.closest('.top').querySelector('.last').textContent:null;
+    });
+    assert.ok(last!==null,'the bench press is not on the progress page');
+    assert.ok(/^62\.5kg × 11/.test(last),'the bench press reads "'+last+'"');
     var body=await text();
-    assert.ok(/60kg × 10/.test(body),'the bench set did not read back: '+body.slice(0,300));
     assert.ok(!/Superset/i.test(body),'the superset itself leaked into the history as an exercise');
   });
 
@@ -1032,6 +1086,9 @@ srv.listen(0,async function(){
     });
     assert.ok(rows.some(function(r){ return /Bicep curl/.test(r) && /Bent-over row/.test(r); }),
       'no session row says what was supersetted:\n        '+rows.join('\n        '));
+    // Today holds many sessions by now; the one just finished still leads.
+    assert.ok(/Bicep curl/.test(rows[0]) && /Bent-over row/.test(rows[0]),
+      'the session just finished is not the first recent row: '+rows[0]);
     // And it has to survive the save, not just the render that made it.
     assert.ok(/"supersets":\[\{"ex":\["curl_bicep","row_bent"\],"rounds":1\}\]/.test(savedJson()),
       'the superset was not written into the finished log');
@@ -1493,23 +1550,44 @@ srv.listen(0,async function(){
   });
 
   await t('yesterday not logged is offered once, and waved off for good', async function(){
-    var yk=await p.evaluate(function(){ var d=new Date(); d.setDate(d.getDate()-1);
-      return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); });
-    var lo=await p.evaluate(function(){ var d=new Date(); d.setDate(d.getDate()-13);
-      return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); });
+    var keys=await p.evaluate(function(){ return [1,2,13].map(function(o){ var d=new Date(); d.setDate(d.getDate()-o);
+      return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }); });
+    var yk=keys[0], dk=keys[1], lo=keys[2];
     var days=seedOf().days, yd=days[yk], shown=!!(await p.$('.nudge'));
     // Only a gap in logging that is going on: something logged before it, recently.
     var before=Object.keys(days).some(function(k){ return k<yk && k>=lo && days[k].touched; });
     assert.strictEqual(shown,!(yd&&yd.touched)&&before,'nudge shown: '+shown+', yesterday: '+JSON.stringify(yd)+', logged before it: '+before);
-    if(!shown) return;
-    await p.click('.nudge [data-action="pickday"]'); await p.waitForTimeout(300);
-    assert.ok(await p.$('.backfill-bar'),'Log yesterday did not switch to yesterday');
-    assert.strictEqual(await p.$('.nudge'),null,'the nudge stayed while logging yesterday');
-    await p.click('.backfill-bar [data-action="today"]'); await p.waitForTimeout(300);
-    await p.click('.nudge [data-action="nudgeoff"]'); await p.waitForTimeout(300);
-    assert.strictEqual(await p.$('.nudge'),null,'Nothing to log did not dismiss it');
-    await go();
-    assert.strictEqual(await p.$('.nudge'),null,'the dismissal did not survive a reload');
+    // The seed's days are older than that, so the gap is made here, on the
+    // page's own calendar: the day before yesterday logged, yesterday not.
+    // The two days go back as they were afterwards.
+    var st=seedOf(), was={};
+    [yk,dk].forEach(function(k){ was[k]=Object.prototype.hasOwnProperty.call(st.days,k)?st.days[k]:undefined; });
+    delete st.days[yk];
+    st.days[dk]={water:2,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true};
+    doc=env.withSeed(doc,st);
+    try{
+      await go(); await leaveSession();
+      await p.click('[data-action="tab"][data-tab="today"]'); await p.waitForTimeout(350);
+      var tb=await p.$('.backfill-bar [data-action="today"]'); if(tb){ await tb.click(); await p.waitForTimeout(300); }
+      assert.ok(await p.$('.nudge'),'no nudge with yesterday not logged and the day before it logged');
+      assert.strictEqual(await p.getAttribute('.nudge [data-action="pickday"]','data-k'),yk,'the nudge offers another day');
+      await p.click('.nudge [data-action="pickday"]'); await p.waitForTimeout(300);
+      assert.ok(await p.$('.backfill-bar'),'Log yesterday did not switch to yesterday');
+      assert.strictEqual(await p.$('.nudge'),null,'the nudge stayed while logging yesterday');
+      await p.click('.backfill-bar [data-action="today"]'); await p.waitForTimeout(300);
+      assert.ok(await p.$('.nudge'),'back on today with yesterday still not logged, the nudge did not come back');
+      await p.click('.nudge [data-action="nudgeoff"]'); await p.waitForTimeout(300);
+      assert.strictEqual(await p.$('.nudge'),null,'Nothing to log did not dismiss it');
+      await go();
+      var d2=seedOf().days;
+      assert.ok(!(d2[yk]&&d2[yk].touched) && d2[dk] && d2[dk].touched,'the gap is gone, so the reload proves nothing');
+      assert.ok(await p.$('[data-action="water"]'),'the reload did not land on Today');
+      assert.strictEqual(await p.$('.nudge'),null,'the dismissal did not survive a reload');
+    } finally {
+      st=seedOf();
+      [yk,dk].forEach(function(k){ if(was[k]===undefined) delete st.days[k]; else st.days[k]=was[k]; });
+      doc=env.withSeed(doc,st); await go();
+    }
   });
 
   await t('a day with something used reads as used, in a neutral colour, never flagged', async function(){

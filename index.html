@@ -4858,7 +4858,9 @@ function bodyContent(){
       '<div class="stat-tile"><div class="n">'+pStreaks.cleanStreak+'</div><div class="l">clean streak</div></div>'+
     '</div>';
 
-  var recent=logs.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);}).slice(0,6);
+  // Newest first within a day too (ids are made from the time), or a day
+  // with more than six sessions would leave out the one just finished.
+  var recent=logs.slice().sort(byDateId).reverse().slice(0,6);
   var recentHtml=recent.map(function(l){
     var setCount=0; Object.keys(l.logs).forEach(function(k){ l.logs[k].forEach(function(st){ if(isSet(k,st)) setCount++; }); });
     var ss=supersetSummary(l);
