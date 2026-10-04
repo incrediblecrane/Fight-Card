@@ -239,6 +239,31 @@ srv.listen(0,async function(){
     assert.strictEqual(again,fresh);
   });
 
+  console.log('\nSAUNA ROW');
+  await t('sauna stints of 1,1 and 1,3 min read 2.4 min on Progress, without float noise', async function(){
+    var p=await open('plain');
+    await p.fill('#sauna-mins','1,1'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(150);
+    await p.fill('#sauna-mins','1,3'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
+    await p.click('[data-action="tab"][data-tab="progress"]'); await p.waitForTimeout(300);
+    var txt=await p.evaluate(function(){ return document.getElementById('app').textContent; });
+    await close(p);
+    assert.ok(!/\d\.\d{5,}/.test(txt),'float noise: '+(txt.match(/[\d.]*\d\.\d{5,}[^\d]{0,6}/)||[''])[0]);
+    assert.ok(/(^|[^\d.])2\.4 min/.test(txt),'no "2.4 min" on Progress');
+  });
+  await t('Log sauna with only a temperature, or 0 minutes, marks and focuses the minutes box', async function(){
+    var p=await open('plain');
+    await p.fill('#sauna-temp','90'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
+    var r1=await p.evaluate(function(){ var e=document.getElementById('sauna-mins'); return [e.getAttribute('aria-invalid'),document.activeElement===e]; });
+    await p.fill('#sauna-mins','0'); await p.click('[data-action="addstint"]'); await p.waitForTimeout(150);
+    var r2=await p.evaluate(function(){ var e=document.getElementById('sauna-mins'); return [e.getAttribute('aria-invalid'),document.activeElement===e]; });
+    await p.fill('#sauna-mins',''); await p.fill('#sauna-temp',''); await p.click('#sauna-pos'); await p.click('[data-action="logsauna"]'); await p.waitForTimeout(150);
+    var r3=await p.evaluate(function(){ return document.getElementById('sauna-mins').getAttribute('aria-invalid'); });
+    await close(p);
+    assert.deepStrictEqual(r1,['true',true],'temperature only');
+    assert.deepStrictEqual(r2,['true',true],'0 minutes on Add');
+    assert.strictEqual(r3,null,'an empty row is a stray tap, not an error');
+  });
+
   await b.close(); srv.close();
   console.log('\n'+(n-fails)+'/'+n+' passed');
   process.exit(fails?1:0);

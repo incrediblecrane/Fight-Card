@@ -732,8 +732,10 @@ function prettyDate(){var d=new Date();return d.toLocaleDateString('en-GB',{week
 // attribute early and mangle the rest of the tag.
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Rounded to hundredths, so 1.1 and 1.3 read as 2.4 and not 2.4000000000000004.
+function minsSum(a,b){ return Math.round((a+b)*100)/100; }
 function saunaTotal(x){
-  if(x.stints && x.stints.length) return x.stints.reduce(function(a,st){ return a+(st.mins||0); },0);
+  if(x.stints && x.stints.length) return x.stints.reduce(function(a,st){ return minsSum(a,st.mins||0); },0);
   return x.mins||0;
 }
 /* "15 min Top + 10 min Bottom", or just "15 min Top" when there is one stint,
@@ -741,9 +743,11 @@ function saunaTotal(x){
 /* Number boxes are plain text boxes read here. A number input drops a comma
    decimal, so "22,5" was logged as 225; anything that is not a number now is
    refused and the box marked, rather than guessed at. "1,000" is refused too:
-   read as a decimal it would log a 1000m row as 1m. */
+   read as a decimal it would log a 1000m row as 1m. So is "1.000", the same
+   thousands mark written with a dot: no weight, rep, second or metre is ever
+   typed with exactly three decimals. */
 function parseNum(s){ s=String(s==null?'':s).trim();
-  if(/^[1-9]\d{0,2},\d{3}$/.test(s)) return NaN;
+  if(/^[1-9]\d{0,2}[,.]\d{3}$/.test(s)) return NaN;
   s=s.replace(',','.');
   return /^(\d+\.?\d*|\.\d+)$/.test(s)?+s:NaN; }
 // Ids of boxes holding something that is not a number, marked until retyped.
@@ -778,6 +782,13 @@ function readStint(){
   saunaDraft.push({mins:mins, position:posEl?posEl.value:'Top'});
   consumed(['sauna-mins','sauna-pos']);
   return true;
+}
+/* A sauna row with 0 minutes, or (when logging) only a temperature, has
+   nothing to log, so the minutes box is marked rather than the tap doing
+   nothing. An empty row is just a stray tap and stays one. */
+function noMins(orTemp){
+  var el=document.getElementById('sauna-mins'); if(!el) return;
+  if(String(el.value).trim()!==''||(orTemp&&saunaTemp!=='')){ markBad(el); focusBad(['sauna-mins']); }
 }
 function saunaStintText(x){
   var st=(x.stints&&x.stints.length)?x.stints:[{mins:x.mins||0,position:x.position||''}];
@@ -1749,9 +1760,10 @@ function undoOne(u){
 // A tap of water, and the XP it gives or takes back. The day keeps count of
 // the cups that earned XP (wx), so a target moved in between cannot leave XP
 // behind or take back more than was given. A day saved before wx existed
-// earned up to the target, as it was then.
+// earned up to the target as it was then, which is not kept: it is taken as
+// the default of 8, so a target raised since cannot take back cups never paid.
 function waterStep(e,d,tgt){
-  var prev=e.water, got=e.wx!==undefined?e.wx:Math.min(prev,tgt), x=0;
+  var prev=e.water, got=e.wx!==undefined?e.wx:Math.min(prev,8), x=0;
   if(d>0 && prev>=DAY_MAX.water) return 0;
   e.water=Math.max(0,prev+d); if(e.water>0) e.touched=true;
   if(d>0 && prev<tgt){ got++; x=XP_PER_WATER; }
@@ -2183,8 +2195,9 @@ function mergeDay(base,mine,theirs){
   return out;
 }
 function dayPair(d){ var w=d.workout||{}; return stableJson([!!d.rest,!!w.done,w.type||null]); }
-// The cups that earned XP. A day saved before wx existed earned up to the target.
-function dayWx(d,tgt){ return d.wx!=null?+d.wx||0:Math.min(+d.water||0,tgt); }
+// The cups that earned XP. A day saved before wx existed earned up to the
+// target of the time, taken as the default 8, as waterStep takes it.
+function dayWx(d,tgt){ return d.wx!=null?+d.wx||0:Math.min(+d.water||0,8); }
 // What a day pays in XP, as the taps that made it paid it.
 function dayXp(d,tgt){ if(!d) return 0;
   return dayWx(d,tgt)*XP_PER_WATER+(d.workout&&d.workout.done?XP_WORKOUT:0)+(d.rest?XP_REST:0); }
@@ -4995,7 +5008,7 @@ function bodyContent(){
       '<div class="pbrow"><span>Current streak <b>'+pStreaks.cleanStreak+' day'+(pStreaks.cleanStreak===1?'':'s')+'</b></span>'+
         '<span>Day streak <b>'+pStreaks.dayStreak+'</b></span></div></div>'+
     '<h2 class="sectiontitle">Sauna</h2>'+
-    (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaRows.length+' in '+progRange+' days · '+saunaRows.reduce(function(a,r){ return a+r.v; },0)+' min',
+    (saunaAll.length?barChart(saunaRows,{title:'Minutes per session',sub:saunaRows.length+' in '+progRange+' days · '+saunaRows.reduce(function(a,r){ return minsSum(a,r.v); },0)+' min',
       empty:'No sauna visits in the last '+progRange+' days.',hint:'Tap a bar, or slide along them, for that visit',
       aria:'Sauna minutes per session over the last '+progRange+' days'}):'')+saunaHtml+
     '<h2 class="sectiontitle">Exercise progression</h2>'+
@@ -5753,6 +5766,7 @@ function onClick(e){
   else if(action==='nudgeoff'){ nudgeOff=t.getAttribute('data-k'); uiOnly=true; }
   else if(action==='addstint'){
     var rs=readStint(); if(rs==='bad') focusBad(['sauna-mins','sauna-temp']);
+    else if(rs===false) noMins(false);   // 0 minutes is no stint
     if(rs!==true) return;   // nothing typed, nothing to add
     uiOnly=true;
   }
@@ -5762,11 +5776,12 @@ function onClick(e){
   else if(action==='logsauna'){
     // Whatever is still in the row counts as the last stint, so a single-stint
     // session is one tap and never needs Add first.
-    if(readStint()==='bad'){ focusBad(['sauna-mins','sauna-temp']); return; }
-    if(!saunaDraft.length) return;
+    var ls=readStint();
+    if(ls==='bad'){ focusBad(['sauna-mins','sauna-temp']); return; }
+    if(!saunaDraft.length){ noMins(true); return; }
     var stints=saunaDraft.slice();
     state.saunaSessions.push({id:'sa'+Date.now(),date:activeDate(),
-      mins:stints.reduce(function(a,st){return a+st.mins;},0),
+      mins:saunaTotal({stints:stints}),
       temp:saunaTemp===''?null:parseFloat(saunaTemp),
       position:stints[0].position, stints:stints});
     saunaDraft=[]; saunaTemp=''; consumed(['sauna-temp']);

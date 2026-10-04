@@ -317,6 +317,14 @@ function mergeSandbox(extra,out){
     console.log('  PASS  a comma decimal reads as a decimal; a thousands comma is refused, not scaled down');
   else { fails++; console.log('  FAIL  parseNum\n        got '+JSON.stringify(got.map(String))); }
 })();
+// The same thousands mark written with a dot: "1.000" m is not 1 m.
+(function(){
+  var m={}; new Function(grab('parseNum')+'\nthis.parseNum=parseNum;').call(m);
+  var got=['1.000','2.500','22.5','1.25','0.125','1000.5'].map(function(x){ return m.parseNum(x); });
+  if(isNaN(got[0]) && isNaN(got[1]) && got[2]===22.5 && got[3]===1.25 && got[4]===0.125 && got[5]===1000.5)
+    console.log('  PASS  a thousands dot is refused, not read as a decimal; real decimals still parse');
+  else { fails++; console.log('  FAIL  parseNum thousands dot\n        got '+JSON.stringify(got.map(String))); }
+})();
 
 console.log(fails?('\n'+fails+' FAILING'):'\nRound-trip is lossless.');
 process.exit(fails?1:0);

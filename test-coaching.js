@@ -321,6 +321,12 @@ if(loaded===true){
     assert.strictEqual(box.waterStep(e,1,8),0);
   });
 
+  t('a day saved before the count was kept takes back no more than the default target paid, once the target is raised', function(){
+    var e=day(true), xp=0, k; e.water=10;
+    for(k=0;k<10;k++) xp+=box.waterStep(e,-1,12);
+    assert.strictEqual(e.water,0); assert.ok(xp>=-16,'took back '+(-xp)+' XP');
+  });
+
   // An import refuses more than this, so a tap stops here and the export goes back in.
   t('water stops at the most an import takes', function(){
     var e=day(true); e.water=99;

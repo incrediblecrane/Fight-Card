@@ -24,7 +24,8 @@ blank.
 **Cup**:
 One water tap, 0.25L. The water target is a count of cups (`waterTarget`, 4 to
 20, so 1 to 5L; 8 by default). XP for water follows the cups that earned it
-(`wx` on the day), so untapping takes back only what was paid.
+(`wx` on the day), so untapping takes back only what was paid. A day saved
+before `wx` existed is taken to have paid for at most 8 cups, the default.
 _Avoid_: glass, unit
 
 **Log date**:
@@ -124,8 +125,8 @@ a treadmill's level in km/h. A `time` exercise marked `unit: 'min'` (the
 drilling block, the brisk walk) is logged in minutes, and its sets carry
 `u: 'min'` so the one-off conversion of older sets typed as seconds runs once.
 Every number is typed into a text box and read by `parseNum`, which takes a
-comma decimal ("62,5") and refuses a thousands comma ("1,000") and anything
-else, marking the box.
+comma decimal ("62,5") and refuses a thousands comma or dot ("1,000",
+"1.000") and anything else, marking the box.
 
 **Per implement**:
 A logged weight is one dumbbell, not the pair. Declared in `PER_IMPLEMENT`;
