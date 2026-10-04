@@ -104,6 +104,17 @@ WORLDS.mixed1=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
   [[{v:15,w:null}],[{v:12,w:5}],[{v:20,w:null}]].forEach(function(s,i){
     st.workoutLogs.push({id:'wl-m'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(6-i*2), logs:{press_bench:s}}); }); });
 UI.mixed1='{"tab":"progress","open":["press_bench"]}';
+// Double progression on the bench: 60kg for three sessions, the reps going
+// 6, 8, 10, a warm-up at 40kg x 10 first.
+WORLDS.reps=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
+  [[{v:10,w:40,wu:true},{v:6,w:60},{v:6,w:60}],[{v:8,w:60}],[{v:10,w:60},{v:9,w:60}]].forEach(function(s,i){
+    st.workoutLogs.push({id:'wl-r'+i, workoutId:'w6', title:'Push', tag:'Strength', date:key(7-i*3), logs:{press_bench:s}}); }); });
+UI.reps='{"tab":"progress","open":["press_bench"]}';
+// Legs yesterday, Pull three days ago, Push five, the full body ten.
+WORLDS.lately=withSeed(function(st){ st.activeSession=null; st.workoutLogs=[];
+  [['w1',10],['w6',5],['w7',3],['w8',1]].forEach(function(x,i){
+    st.workoutLogs.push({id:'wl-l'+i, workoutId:x[0], title:x[0], tag:'Strength', date:key(x[1]), logs:{}}); }); });
+UI.lately='{"tab":"training"}';
 // Five hundred clean days in a row, up to today.
 function cleanDay(w){ return {water:w||0,workout:{done:false,type:null},rest:false,alcohol:0,smoking:0,weed:0,touched:true}; }
 WORLDS.long=withSeed(function(st){ st.activeSession=null; st.days={}; for(var i=0;i<500;i++) st.days[key(i)]=cleanDay(); });
@@ -576,6 +587,26 @@ srv.listen(0,async function(){
     assert.ok(r.w<100,'a disabled start is '+r.w+'px wide');
     assert.ok(/\(1 set logged\)/.test(r.banner),'banner: '+r.banner);
   });
+  await t('Training: workouts come before the notes, the three done lately first, and the Today link lands on them', async function(){
+    var p=await open('lately',{viewport:{width:390,height:844}});
+    var r=await p.evaluate(function(){
+      var hs=[].map.call(document.querySelectorAll('.sectiontitle'),function(e){ return e.textContent; });
+      var seq=[].map.call(document.querySelectorAll('.wgroup, .wcard h3'),function(e){ return (e.classList.contains('wgroup')?'#':'')+e.textContent.trim(); });
+      return {hs:hs, seq:seq}; });
+    await close(p);
+    assert.ok(r.hs.indexOf('Workouts')>-1 && r.hs.indexOf('Workouts')<r.hs.indexOf('Overview'),'sections: '+r.hs.join(', '));
+    assert.deepStrictEqual(r.seq.slice(0,5),['#Recent','Legs','Pull','Push','#All workouts'],'cards: '+r.seq.slice(0,8).join(', '));
+    assert.ok(/^Strength/.test(r.seq[5]),'the rest start with '+r.seq[5]);
+    assert.strictEqual(r.seq.filter(function(x){ return x==='Legs'; }).length,1,'Legs is listed twice');
+    p=await open('lately',{viewport:{width:390,height:844},ui:'{"tab":"today"}'});
+    await p.evaluate(function(){ document.querySelector('[data-to="workouts"]').scrollIntoView({block:'center'}); });
+    await p.click('[data-action="tab"][data-to="workouts"]'); await p.waitForTimeout(200);
+    var at=await p.evaluate(function(){ var h=document.getElementById('workouts'), app=document.getElementById('app');
+      return {tab:!!h, top:h?h.getBoundingClientRect().top:null, bar:parseFloat(app.style.getPropertyValue('--status-h'))||0, y:window.scrollY}; });
+    await close(p);
+    assert.ok(at.tab,'the link did not open Training');
+    assert.ok(at.y>0 && Math.abs(at.top-at.bar-8)<2,'the Workouts heading is at '+at.top+' under a bar of '+at.bar+' (scrolled '+at.y+')');
+  });
   await t('kg and reps keep a visible label once prefilled, and the prefill is the weight the aim line names', async function(){
     var p=await open('bench0');
     var r=await p.evaluate(function(){
@@ -771,12 +802,12 @@ srv.listen(0,async function(){
       var svg=ex.querySelector('svg'), hit=svg.querySelector('[data-xs]');
       return {nodes:svg.getElementsByTagName('*').length, titles:svg.querySelectorAll('title').length,
         pts:hit?hit.getAttribute('data-xs').split(' ').length:svg.querySelectorAll('.mark').length,
-        sub:ex.querySelector('.chart-head .sub').textContent, pb:ex.querySelector('.pbrow b').textContent, hint:ex.querySelector('.c-tip').textContent}; });
+        sub:ex.querySelector('.chart-head .sub').textContent, pb:[].map.call(ex.querySelectorAll('.pbrow b'),function(e){ return e.textContent; }).slice(0,2).join(' '), hint:ex.querySelector('.c-tip').textContent}; });
     assert.ok(r,'the bench press history is not open');
     assert.ok(r.pts<=60 && r.pts>=50,'it draws '+r.pts+' points for 300 sessions');
     assert.ok(r.nodes<20 && r.titles===0,'the chart is '+r.nodes+' nodes with '+r.titles+' titles');
     assert.ok(/^300 sessions/.test(r.sub),'the head says '+r.sub);
-    assert.strictEqual(r.pb,'89kg','the best of every session is not the PB');
+    assert.strictEqual(r.pb,'112.7kg 89kg','the best of every session is not the PB: '+r.pb);
     assert.ok(/best of about 5 sessions/.test(r.hint),'the hint says '+r.hint);
     var at=await p.evaluate(function(){ var svg=document.querySelector('.exdetail svg'), hit=svg.querySelector('[data-xs]');
       svg.scrollIntoView({block:'center'});
@@ -805,8 +836,8 @@ srv.listen(0,async function(){
     await close(p);
     assert.strictEqual(r.tips.length,2,'the chart has '+r.tips.length+' points: '+r.tips.join(' | '));
     assert.ok(r.vals.every(function(v){ return !/^0kg/.test(v); }),'a point reads '+r.vals.join(', '));
-    assert.ok(r.pb.indexOf('Personal best 7.5kg')>-1,'the PB row says '+r.pb.join(' / '));
-    assert.ok(r.pb.some(function(x){ return /^Change \+2\.5kg since /.test(x); }),'the change says '+r.pb.join(' / '));
+    assert.ok(r.pb.indexOf('Best est. 1RM 10kg')>-1 && r.pb.indexOf('Heaviest 7.5kg')>-1,'the PB row says '+r.pb.join(' / '));
+    assert.ok(r.pb.some(function(x){ return /^Change \+3kg since /.test(x); }),'the change says '+r.pb.join(' / '));
     assert.ok(/2 without a weight/.test(r.sub),'the head says '+r.sub);
     p=await open('mixed1',{viewport:{width:360,height:740}});
     r=await p.evaluate(function(){ var ex=document.querySelector('.exdetail');
@@ -814,7 +845,23 @@ srv.listen(0,async function(){
     await close(p);
     assert.strictEqual(r.pts,0,'one weighted session drew a line');
     assert.ok(/one session with a weight/i.test(r.empty||''),'the chart says '+r.empty);
-    assert.ok(/Personal best 5kg/.test(r.pb) && !/0kg/.test(r.pb.replace('Personal best 5kg','')),'the PB row says '+r.pb);
+    assert.ok(/Heaviest 5kg/.test(r.pb) && !/ 0kg/.test(r.pb),'the PB row says '+r.pb);
+  });
+  await t('charts: a lift charts its estimated 1RM, so more reps at the same weight read as a gain', async function(){
+    var p=await open('reps',{viewport:{width:360,height:740}});
+    var r=await p.evaluate(function(){ var ex=document.querySelector('.exdetail'), hit=ex.querySelector('[data-xs]');
+      return {tips:hit?JSON.parse(hit.getAttribute('data-tips')):[], title:ex.querySelector('.chart-head h3').textContent,
+        vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; }),
+        pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; })}; });
+    await close(p);
+    assert.strictEqual(r.title,'Estimated 1RM by session');
+    assert.deepStrictEqual(r.vals,['72kg','80kg']);
+    assert.strictEqual(r.tips.length,3,'tips: '+r.tips.join(' | '));
+    assert.ok(/: best set 60kg × 6 of 2 sets, est\. 1RM 72kg$/.test(r.tips[0]),'the first tip says '+r.tips[0]);
+    assert.ok(/: best set 60kg × 10 of 2 sets, est\. 1RM 80kg$/.test(r.tips[2]),'the last tip says '+r.tips[2]);
+    ['Best est. 1RM 80kg','Heaviest 60kg','Rep PB at 60kg 10 reps'].forEach(function(x){
+      assert.ok(r.pb.indexOf(x)>-1,'the PB row has no "'+x+'": '+r.pb.join(' / ')); });
+    assert.ok(r.pb.some(function(x){ return /^Change \+8kg since /.test(x); }),'the change says '+r.pb.join(' / '));
   });
   await t('per-dumbbell weights say "ea" on the aim line, the personal best, the points and the change', async function(){
     var p=await open('curl');
@@ -827,17 +874,17 @@ srv.listen(0,async function(){
       var ham=row('Hammer curl'), bar=row('Bent-over row');
       return {pb:ham.querySelector('.pbrow').textContent, row:bar.querySelector('.pbrow').textContent}; });
     await close(p);
-    assert.ok(/Personal best 12 kg ea/.test(r.pb),'the hammer curl PB row says '+r.pb);
-    assert.ok(/Personal best 50kg/.test(r.row) && !/ea/.test(r.row),'a barbell PB row says '+r.row);
+    assert.ok(/Heaviest 12 kg ea/.test(r.pb) && /Rep PB at 12 kg ea /.test(r.pb),'the hammer curl PB row says '+r.pb);
+    assert.ok(/Heaviest 50kg/.test(r.row) && !/ ea\b/.test(r.row),'a barbell PB row says '+r.row);
   });
   await t('charts: a per-dumbbell chart labels its points and its change in kg ea', async function(){
     var p=await open('dbchart',{viewport:{width:360,height:740}});
     var r=await p.evaluate(function(){ var ex=document.querySelector('.exdetail');
       return {pb:[].map.call(ex.querySelectorAll('.pbrow span'),function(e){ return e.textContent; }), vals:[].map.call(ex.querySelectorAll('.c-val'),function(e){ return e.textContent; })}; });
     await close(p);
-    assert.deepStrictEqual(r.vals,['10 kg ea','12 kg ea']);
-    assert.ok(r.pb.indexOf('Personal best 12 kg ea')>-1,'the PB row says '+r.pb.join(' / '));
-    assert.ok(r.pb.some(function(x){ return /^Change \+2 kg ea since /.test(x); }),'the change says '+r.pb.join(' / '));
+    assert.deepStrictEqual(r.vals,['13.3 kg ea','16 kg ea']);
+    assert.ok(r.pb.indexOf('Best est. 1RM 16 kg ea')>-1 && r.pb.indexOf('Heaviest 12 kg ea')>-1,'the PB row says '+r.pb.join(' / '));
+    assert.ok(r.pb.some(function(x){ return /^Change \+2\.7 kg ea since /.test(x); }),'the change says '+r.pb.join(' / '));
   });
   await t('charts: reps and minutes read with a space ("14 reps"), and so does the change', async function(){
     var p=await open('mixed',{viewport:{width:360,height:740}});

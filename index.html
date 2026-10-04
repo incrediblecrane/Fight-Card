@@ -148,6 +148,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .resume-banner button.go{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.74rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:8px 12px;cursor:pointer;}\
 .resume-banner button.x{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:1.1rem;padding:0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}\
 .wcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}\
+.wgroup{margin:16px 0 8px;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);}\
 .wcard .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}\
 .wcard h3{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:1.05rem;margin:0 0 4px;}\
 .wcard .meta{font-size:0.78rem;color:var(--text-faint);}\
@@ -1475,6 +1476,24 @@ function bestSet(type,sets){
   return best;
 }
 function bestValue(type,s){ return type==='load'?(s.w||0):s.v; }
+// An estimated one-rep max (Epley), so a set at the same weight with more reps
+// reads as stronger: 60kg x 10 is past 60kg x 6. Reps past 12 count as 12,
+// since the estimate runs high on long sets.
+function e1rm(s){ return Math.round((s.w||0)*(1+Math.min(+s.v||0,12)/30)*10)/10; }
+function bestE1rm(sets){
+  var best=null;
+  sets.forEach(function(s){ var a=e1rm(s), b=best?e1rm(best):-1; if(a>b || (a===b && (s.w||0)>(best.w||0))) best=s; });
+  return best;
+}
+// The most reps ever done at the working weight: the heaviest working set of
+// the latest session that had a weight. Warm-ups are not the measure.
+function repPb(hist){
+  var at=null;
+  hist.forEach(function(h){ if(h.wu || !(h.w>0)) return; if(!at || h.date>at.date || (h.date===at.date && h.w>at.w)) at=h; });
+  if(!at) return null;
+  var n=0; hist.forEach(function(h){ if(!h.wu && h.w===at.w && +h.v>n) n=+h.v; });
+  return {w:at.w, v:n};
+}
 // A time block can be logged in minutes (`unit:'min'` on the exercise): a
 // drilling block of 25 is 25 minutes, not 25 seconds. A count can be of rounds
 // (`unit:'rounds'`): five rounds of pads are not five reps.
@@ -1594,6 +1613,16 @@ function sessionMinutes(sess,now){
   var end=now;
   if(end-t0>4*3600000) end=ts.length?Math.max.apply(null,ts):t0;
   return Math.max(1,Math.round((end-t0)/60000));
+}
+// The workouts done lately, newest first, at most n: the ones a week is
+// actually made of, so they are not a long scroll down the catalogue. A tie
+// keeps catalogue order.
+function recentWorkouts(n){
+  var at={}; state.workoutLogs.forEach(function(l){ if(!at[l.workoutId] || l.date>at[l.workoutId]) at[l.workoutId]=l.date; });
+  return WORKOUTS.map(function(w,i){ return {w:w,i:i,d:hasOwn(at,w.id)?at[w.id]:''}; })
+    .filter(function(x){ return x.d; })
+    .sort(function(a,b){ return a.d<b.d?1:a.d>b.d?-1:a.i-b.i; })
+    .slice(0,n).map(function(x){ return x.w; });
 }
 function lastDoneAgo(wid){
   var k=''; state.workoutLogs.forEach(function(l){ if(l.workoutId===wid && l.date>k) k=l.date; });
@@ -4627,7 +4656,7 @@ function bodyContent(){
       '<div class="card"><h3>Workout</h3><div class="sub">'+(t.workout.done?('Logged: '+esc(t.workout.type)):(t.rest?'Recovery day':weekLine(weekN,state.weekTarget)))+'</div>'+
         (t.workout.done&&dayHasLog(activeDate())?'<p class="note">From a logged session. Remove it on Progress to clear the day.</p>':'')+
         '<div class="pillgrid">'+typePills+'</div>'+
-        '<button class="linklike" data-action="tab" data-tab="training">Or start a guided session &rarr;</button></div>'+
+        '<button class="linklike" data-action="tab" data-tab="training" data-to="workouts">Or start a guided session &rarr;</button></div>'+
       '<div class="card"><h3>Alcohol</h3><div class="sub">Units / drinks '+dayWord()+'</div>'+
         '<div class="stepper"><button data-action="alcohol" data-d="-1" aria-label="One less drink">-</button><span class="count">'+t.alcohol+'</span><button data-action="alcohol" data-d="1" aria-label="One more drink">+</button></div></div>'+
       '<div class="card"><h3>Smoking</h3><div class="sub">Cigarettes '+dayWord()+'</div>'+
@@ -4670,7 +4699,8 @@ function bodyContent(){
   }).join('');
 
   var resumeBanner=resumeBannerHtml(true);
-  var workoutCards=WORKOUTS.map(function(w){
+  var recentW=recentWorkouts(3);
+  var card=function(w){
     var meta=w.plan.length?(w.plan.length+' exercises'):'Build it as you go', ago=lastDoneAgo(w.id);
     if(ago) meta+=' &middot; '+ago;
     // Logged sets are never swapped out silently: finish or discard them first.
@@ -4680,13 +4710,19 @@ function bodyContent(){
       (busy?' disabled title="Finish or discard the session in progress first">Start':resumesOnStart(w.id)?'>Resume':'>Start')+'</button>';
     return '<div class="wcard"><div class="row"><div><h3>'+esc(w.title)+'</h3><div class="meta">'+meta+' &middot; '+esc(w.tag)+'</div></div>'+
       start+'</div></div>';
-  }).join('');
-  return '<h2 class="sectiontitle">Overview</h2>'+trainingItems+
-    '<h2 class="sectiontitle">Workouts</h2>'+
+  };
+  // The few done lately come first, the rest follow in catalogue order.
+  var workoutCards=recentW.length
+    ? '<h3 class="wgroup">Recent</h3>'+recentW.map(card).join('')+'<h3 class="wgroup">All workouts</h3>'+
+      WORKOUTS.filter(function(w){ return recentW.indexOf(w)<0; }).map(card).join('')
+    : WORKOUTS.map(card).join('');
+  // Workouts first: they are what this tab is opened for. The notes follow.
+  return '<h2 class="sectiontitle" id="workouts">Workouts</h2>'+
     '<div class="weekgoal"><span>Last 7 days: '+(weekN>=state.weekTarget?('<b>'+weekN+' session'+(weekN===1?'':'s')+'</b>, target '+state.weekTarget+' hit'):('<b>'+weekN+' of '+state.weekTarget+'</b> sessions'))+'</span><span class="tgt">'+
       '<button data-action="weektarget" data-d="-1" aria-label="Fewer sessions a week">-</button>'+
       '<button data-action="weektarget" data-d="1" aria-label="More sessions a week">+</button></span></div>'+
     resumeBanner+workoutCards+
+    '<h2 class="sectiontitle">Overview</h2>'+trainingItems+
     '<div class="addform"><strong class="formhead">Add a note or adjustment</strong>'+
       '<input id="lib-title" placeholder="Title" maxlength="80">'+
       '<select id="lib-tag" aria-label="Kind"><option>Note</option><option>Adjustment</option><option>Other</option></select>'+
@@ -4988,10 +5024,13 @@ function bodyContent(){
       var bare=0;
       if(kind==='load') dates=dates.filter(function(dt){ var b=bestSet(kind,byDate[dt]); if(b.w>0) return true; bare++; return false; });
       var yr=dates.length>1 && (new Date(dates[dates.length-1]+'T12:00:00')-new Date(dates[0]+'T12:00:00'))>365*86400000;
+      // A lift with a weight is charted as its estimated 1RM, so reps climbing
+      // at a weight that stays put show as the gain they are.
+      var est=kind==='load';
       var pts=dates.map(function(dt){
-        var b=bestSet(kind,byDate[dt]);
-        return {k:shortDay(dt,yr), v:bestValue(kind,b), lbl:bestValue(kind,b)+unit,
-                tip:rowDate(dt)+': best set '+setLabel(def,b)+' of '+byDate[dt].length+' set'+(byDate[dt].length===1?'':'s')};
+        var b=est?bestE1rm(byDate[dt]):bestSet(kind,byDate[dt]), v=est?e1rm(b):bestValue(kind,b);
+        return {k:shortDay(dt,yr), v:v, lbl:v+unit,
+                tip:rowDate(dt)+': best set '+setLabel(def,b)+' of '+byDate[dt].length+' set'+(byDate[dt].length===1?'':'s')+(est?', est. 1RM '+v+unit:'')};
       });
       // Can be empty now: a warm-up whose every entry was a set at a weight
       // leaves nothing for a minutes chart, and reading .lbl off nothing would
@@ -4999,7 +5038,8 @@ function bodyContent(){
       var pb=pts.length?pts.reduce(function(a,p){return p.v>a.v?p:a;},pts[0]):null;
       var delta=pts.length>1?pts[pts.length-1].v-pts[0].v:0;
       var deltaTxt=pts.length>1?((delta>0?'+':'')+Math.round(delta*10)/10+unit+' since '+pts[0].k):'first session';
-      var pbLabel=kind==='load'?'Heaviest set':'Best set';
+      var pbLabel=est?'Estimated 1RM':'Best set';
+      var heavy=est&&dates.length?dates.reduce(function(a,dt){ return Math.max(a,bestSet(kind,byDate[dt]).w); },0):0, rp=est?repPb(hist):null;
       // One date per session, its sets under it in the order they were done,
       // newest session first. Four sessions unless all are asked for.
       var byDay=[], dayAt={};
@@ -5023,7 +5063,9 @@ function bodyContent(){
                          : bare?'Only one session with a weight so far. Log another to see the trend.'
                          : 'Logged once so far. Log it again to see the trend.'})+
         '<div class="pbrow">'+
-          (pb?('<span>Personal best <b>'+esc(pb.lbl)+'</b></span>'):'')+
+          (pb?('<span>'+(est?'Best est. 1RM':'Personal best')+' <b>'+esc(pb.lbl)+'</b></span>'):'')+
+          (heavy?('<span>Heaviest <b>'+esc(heavy+unit)+'</b></span>'):'')+
+          (rp?('<span>Rep PB at '+esc(rp.w+unit)+' <b>'+rp.v+' rep'+(rp.v===1?'':'s')+'</b></span>'):'')+
           (pts.length>1?('<span>Change <b>'+esc(deltaTxt)+'</b></span>'):'')+
           '<span>Sets <b>'+hist.filter(function(x){ return !x.wu; }).length+'</b></span></div>'+
         '<table><tr><th>Date</th><th>Set</th></tr>'+rows+'</table>'+more+'</div>';
@@ -5615,6 +5657,13 @@ function focusAt(el,top){
    page where it is. The top is only brought down to, never pushed up past
    the bar fixed above the page. */
 var slideTop=false;
+// A link to a section of a tab lands with that section's top just under the
+// bar fixed above the page, wherever the page was scrolled to.
+function landOn(id){
+  var app=document.getElementById('app'), el=document.getElementById(id);
+  if(!app || !el) return;
+  try{ window.scrollBy(0,el.getBoundingClientRect().top-(parseFloat(app.style.getPropertyValue('--status-h'))||0)-8); }catch(err){}
+}
 function storyTop(app){
   var st=app.querySelector('.story');
   try{
@@ -5723,7 +5772,8 @@ function onClick(e){
   // Moving to another tab is moving on: a full undo offer shrinks to its
   // button rather than sitting over the next screen.
   if(action==='tab'){ var uT=readUndo(); if(uT) undoMini=uT.at;
-    tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; exportDirty=true; render(); return; }
+    tab=t.getAttribute('data-tab'); viewingSession=false; addingExercise=false; exportDirty=true;
+    var toT=t.getAttribute('data-to'); render(); if(toT) landOn(toT); return; }
   else if(action==='today'){ setLogDate(null); tab='today'; render(); return; }
   else if(action==='pickday'){ setLogDate(t.getAttribute('data-k')); tab='today'; render(); return; }
   else if(action==='delsauna'){ if(!removeSauna(t.getAttribute('data-id'))) { uiOnly=true; } swipeOpen=null; }

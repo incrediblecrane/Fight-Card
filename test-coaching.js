@@ -33,7 +33,7 @@ function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
 var box={};
 var NAMES=['pad','dateKey','realToday','lastNKeys','last7Keys','hasOwn','perImplement','equipFor','isSuperset','supersetMembers',
   'supersetBox','exDef','setLabel','computeStreaks','lastSetsFor','topReps','aimFor','lastTimeLine','prefillFor',
-  'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','weekSessions','stepTarget','waterStep','dayWx','minLogDate','unloggedYesterday'];
+  'countsAsSet','restGoal','clock','sessionMinutes','lastDoneAgo','recentWorkouts','e1rm','bestE1rm','repPb','weekSessions','stepTarget','waterStep','dayWx','minLogDate','unloggedYesterday'];
 var loaded=null;
 try{
   new Function(
@@ -269,12 +269,45 @@ if(loaded===true){
     assert.strictEqual(box.sessionMinutes({logs:{press_bench:[{v:8,w:60}]}},Date.now()),null);
   });
 
+  console.log('\nESTIMATED 1RM AND THE REP PB');
+
+  t('an estimated 1RM puts more reps at one weight above fewer, and counts no more than 12 reps', function(){
+    assert.strictEqual(box.e1rm({w:60,v:6}),72);
+    assert.strictEqual(box.e1rm({w:60,v:10}),80);
+    assert.strictEqual(box.e1rm({w:89,v:8}),112.7);
+    assert.strictEqual(box.e1rm({w:20,v:30}),box.e1rm({w:20,v:12}));
+    assert.strictEqual(box.e1rm({w:null,v:12}),0);
+  });
+
+  t('a session is charted by its best estimated set, the heavier one on a tie', function(){
+    assert.deepStrictEqual(box.bestE1rm([{w:65,v:5},{w:60,v:10},{w:60,v:8}]),{w:60,v:10});
+    assert.deepStrictEqual(box.bestE1rm([{w:30,v:12},{w:36,v:5}]),{w:36,v:5});
+  });
+
+  t('the rep PB is the most reps at the latest working weight, warm-ups left out', function(){
+    var hist=[{date:'2026-09-01',w:60,v:11},{date:'2026-09-08',w:60,v:9},{date:'2026-09-08',w:40,v:15,wu:true},
+      {date:'2026-09-15',w:60,v:20,wu:true},{date:'2026-09-15',w:60,v:8},{date:'2026-09-15',w:50,v:12},{date:'2026-09-20',w:null,v:30}];
+    assert.deepStrictEqual(box.repPb(hist),{w:60,v:11});
+    assert.strictEqual(box.repPb([{date:'2026-09-01',w:null,v:10}]),null);
+  });
+
   console.log('\nWORKOUT CARDS AND THE WEEK');
 
   t('a workout card says when it was last done', function(){
     assert.strictEqual(box.lastDoneAgo('w6'),'last done 2 days ago');
     assert.strictEqual(box.lastDoneAgo('w7'),'last done 5 days ago');
     assert.strictEqual(box.lastDoneAgo('w1'),'');
+  });
+
+  t('the three workouts done most lately come first, newest first, a tie in catalogue order', function(){
+    var ids=function(){ return box.recentWorkouts(3).map(function(w){ return w.id; }); };
+    box.state({days:{},workoutLogs:[]});
+    assert.deepStrictEqual(ids(),[]);
+    box.state({days:{},workoutLogs:[{id:'a',workoutId:'w1',date:keyAgo(20),logs:{}},{id:'b',workoutId:'w8',date:keyAgo(1),logs:{}},
+      {id:'c',workoutId:'w18',date:keyAgo(3),logs:{}},{id:'d',workoutId:'w7',date:keyAgo(3),logs:{}},{id:'e',workoutId:'w8',date:keyAgo(9),logs:{}},
+      {id:'f',workoutId:'gone',date:keyAgo(0),logs:{}}]});
+    assert.deepStrictEqual(ids(),['w8','w7','w18']);
+    assert.deepStrictEqual(box.recentWorkouts(9).map(function(w){ return w.id; }),['w8','w7','w18','w1']);
   });
 
   t('today and yesterday read as words', function(){
