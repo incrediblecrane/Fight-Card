@@ -8,15 +8,15 @@ function get(id){ return EX.filter(function(e){return e.id===id;})[0]; }
 
 // --- user-flagged: bench must press straight up ---
 (function(){
-  var S=get('bench').frames.map(rig.solve);
+  var S=get('bench').frames.map(rig.solve), T=rig.turn(get('bench'));
   var xs=S.map(function(s){return s.handN.x;});
   ck('bench','bar path is vertical, no sideways drift',
     Math.max.apply(null,xs)-Math.min.apply(null,xs)<2,'drift '+r(Math.max.apply(null,xs)-Math.min.apply(null,xs)));
   ck('bench','bar sits over the chest, not the face or belly',
     S[0].handN.x>S[0].sh.x+8 && S[0].handN.x<S[0].hip.x-12,
     'bar '+r(S[0].handN.x)+' shoulder '+r(S[0].sh.x)+' hip '+r(S[0].hip.x));
-  ck('bench','elbow drops below the bench line at the bottom', S[2].elbN.y>S[2].sh.y,
-    'elbow '+r(S[2].elbN.y)+' torso '+r(S[2].sh.y));
+  ck('bench','elbow drops below the bench line at the bottom', S[T].elbN.y>S[T].sh.y,
+    'elbow '+r(S[T].elbN.y)+' torso '+r(S[T].sh.y));
   ck('bench','locks out near full arm extension', d(S[0].sh,S[0].handN)>36,
     'reach '+r(d(S[0].sh,S[0].handN)));
 })();
@@ -83,7 +83,7 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
       'shoulders '+r(s.shR.x-s.shL.x)+' hips '+r(s.hipR.x-s.hipL.x));
 
   }
-  var A=rig.solveFront(ex.front[0]), B=rig.solveFront(ex.front[2]);
+  var A=rig.solveFront(ex.front[0]), B=rig.solveFront(ex.front[rig.turn(ex,true)]);
   if(['backsquat','frontsquat','goblet','kbswing'].indexOf(ex.id)>=0){
     ck(ex.id+' front','knees track outside the hips at depth',
       B.kneeL.x < B.hipL.x && B.kneeR.x > B.hipR.x,
@@ -159,6 +159,50 @@ EX.forEach(function(ex){
   ck(ex.id+' front','limbs never over-extend anywhere in the rep', n===0,
     n+' samples, worst +'+r(worst)+' at '+at+'/120');
 });
+
+// FRONTS is one object literal, and a key written twice in it is not an
+// error: the later one silently wins. The dead bug had two, so the panel the
+// app drew was not the one its comment described, and nothing said so. The
+// same goes for a hand-authored view that the derived lists below the literal
+// then overwrite with frontFromSide.
+(function(){
+  var src=require('fs').readFileSync(require('path').join(__dirname,'..','exercises.js'),'utf8');
+  var at=src.indexOf('var FRONTS = {'); if(at<0){ ck('FRONTS','the literal is where this check looks',false,'no "var FRONTS = {"'); return; }
+  var i=src.indexOf('{',at)+1, depth=1, keys={}, dup=[], tok='';
+  for(;i<src.length && depth>0;i++){
+    var c=src[i];
+    if(c==='/'&&src[i+1]==='/'){ i=src.indexOf('\n',i); continue; }
+    if(c==='/'&&src[i+1]==='*'){ i=src.indexOf('*/',i)+1; continue; }
+    if(c==='"'||c==="'"){ var q=c, j=i+1; while(src[j]!==q) j+=src[j]==='\\'?2:1; tok=depth===1?src.slice(i+1,j):''; i=j; continue; }
+    if(/[A-Za-z0-9_$]/.test(c)){ var m=/^[A-Za-z0-9_$]+/.exec(src.slice(i,i+80))[0]; tok=depth===1?m:''; i+=m.length-1; continue; }
+    if(c===':'&&depth===1&&tok){ if(keys[tok]) dup.push(tok); keys[tok]=1; }
+    if(/\S/.test(c)) tok='';
+    if(c==='{'||c==='['||c==='(') depth++;
+    if(c==='}'||c===']'||c===')') depth--;
+  }
+  ck('FRONTS','no view is authored twice (the second silently wins)',dup.length===0,'twice: '+dup.join(', '));
+  var later=[], re=/id:\s*'([A-Za-z0-9_]+)'/g, m2, rest=src.slice(i);
+  while((m2=re.exec(rest))) if(keys[m2[1]]) later.push(m2[1]);
+  ck('FRONTS','no authored view is overwritten by a derived one',later.length===0,'overwritten: '+later.join(', '));
+  ck('FRONTS','the scan found the literal',Object.keys(keys).length>20,Object.keys(keys).length+' keys');
+})();
+
+// placeJoint settles a front knee or elbow at a wanted height. Asked for a
+// height one segment cannot reach, it used to pin the joint over that
+// segment's root and return it anyway, so the drawn thigh came out longer than
+// a thigh (an authored split-squat knee at y 170 gave a 54-unit thigh).
+(function(){
+  var pj=EX.placeJoint, worst=0, where='';
+  [[L.THIGH,L.SHIN],[L.UPPER,L.FORE]].forEach(function(l){
+    for(var bx=-30;bx<=30;bx+=5) for(var by=10;by<=l[0]+l[1]-2;by+=4) for(var w=-80;w<=80;w+=8){
+      if(Math.hypot(bx,by)>(l[0]+l[1])*0.99) continue; // an end no limb reaches has no answer
+      var j=pj(70,100,70+bx,100+by,l[0],l[1],100+w,70+bx/2);
+      var over=Math.max(Math.hypot(j[0]-70,j[1]-100)-l[0],Math.hypot(j[0]-70-bx,j[1]-100-by)-l[1]);
+      if(over>worst){ worst=over; where='end ('+bx+','+by+') want y '+w; }
+    }
+  });
+  ck('placeJoint','never returns a joint a segment cannot reach',worst<=0.5+1e-9,'+'+r(worst)+' at '+where);
+})();
 
 console.log('=== VIEW + FLAGGED-FIX CHECK ===');
 if(!fails.length) console.log('PASS: bench presses vertically, jab and cross differ, all front views valid.');

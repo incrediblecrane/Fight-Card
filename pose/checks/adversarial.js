@@ -6,7 +6,7 @@ var fails=[];
 function ck(id,label,cond,detail){ if(!cond) fails.push(id+' :: '+label+'  ['+detail+']'); }
 
 EX.forEach(function(ex){
-  var S=ex.frames.map(solve);
+  var S=ex.frames.map(solve), T=rig.turn(ex); // T: the keyframe the rep turns around at
   S.forEach(function(s,i){
     var tag=ex.id+' f'+i;
     // RIG INTEGRITY: limbs must be exactly their anatomical length (no IK stretching).
@@ -19,12 +19,22 @@ EX.forEach(function(ex){
       'got '+r(d(s.sh,s.elbN))+' of '+r(L.UPPER*aN));
     ck(tag,'forearm length intact', Math.abs(d(s.elbN,s.handN)-L.FORE*aN)<0.6,
       'got '+r(d(s.elbN,s.handN))+' of '+r(L.FORE*aN));
+    // The far limbs too. Checking only the near ones let a broad-jump
+    // take-off draw the far shin 2 units (7%) long through every suite: the
+    // far ankle sat 10 behind the near one while the far hip is only 5 behind.
+    var aF=s.armScaleF===undefined?1:s.armScaleF;
+    ck(tag,'far thigh length intact', Math.abs(d(s.hipF,s.kneeF)-L.THIGH)<0.6,'got '+r(d(s.hipF,s.kneeF)));
+    ck(tag,'far shin length intact', Math.abs(d(s.kneeF,s.ankF)-L.SHIN)<0.6,'got '+r(d(s.kneeF,s.ankF)));
+    ck(tag,'far upper arm length intact', Math.abs(d(s.shF,s.elbF)-L.UPPER*aF)<0.6,
+      'got '+r(d(s.shF,s.elbF))+' of '+r(L.UPPER*aF));
+    ck(tag,'far forearm length intact', Math.abs(d(s.elbF,s.handF)-L.FORE*aF)<0.6,
+      'got '+r(d(s.elbF,s.handF))+' of '+r(L.FORE*aF));
     // PROPORTION: 7.5-head canon sanity, head must be small relative to the body.
     ck(tag,'head is not oversized', L.HEAD_R*2 < L.TORSO*0.55,'head dia '+(L.HEAD_R*2)+' vs torso '+L.TORSO);
   });
 
   if(ex.id==='backsquat'||ex.id==='frontsquat'||ex.id==='goblet'){
-    var bot=S[2];
+    var bot=S[T];
     ck(ex.id,'bottom actually hits parallel (hip crease at/below knee)', bot.hip.y>=bot.kneeN.y-2,
       'hip '+r(bot.hip.y)+' vs knee '+r(bot.kneeN.y));
     // Real coaching cue: at the bottom the torso and shin are roughly parallel.
@@ -45,7 +55,7 @@ EX.forEach(function(ex){
       S[1].handN.y<S[0].handN.y && S[1].hip.y<S[0].hip.y,'bar/hip did not both rise');
   }
   if(ex.id==='bench'){
-    var lock=S[0], chest=S[2];
+    var lock=S[0], chest=S[T];
     ck(ex.id,'bar stays over the torso, not out past the hips', chest.handN.x<lock.sh.x+35,
       'bar '+r(chest.handN.x)+' shoulder '+r(lock.sh.x));
     ck(ex.id,'bar stays above the chest surface (does not clip through)', chest.handN.y<chest.sh.y-6,
@@ -54,14 +64,14 @@ EX.forEach(function(ex){
       'hip-ankle '+r(d(chest.hip,chest.ankN)));
   }
   if(ex.id==='ohp'){
-    ck(ex.id,'lockout stacks over midfoot', Math.abs(S[2].handN.x-S[2].ankN.x)<12,
-      'bar '+r(S[2].handN.x)+' foot '+r(S[2].ankN.x));
+    ck(ex.id,'lockout stacks over midfoot', Math.abs(S[T].handN.x-S[T].ankN.x)<12,
+      'bar '+r(S[T].handN.x)+' foot '+r(S[T].ankN.x));
     ck(ex.id,'bar passes the face, not through the head', S[1].handN.x>S[1].head.x-2,
       'bar '+r(S[1].handN.x)+' head '+r(S[1].head.x));
   }
   if(ex.id==='row'){
-    ck(ex.id,'bar does not swing through the legs', S[2].handN.y<S[2].kneeN.y-8,
-      'bar '+r(S[2].handN.y)+' knee '+r(S[2].kneeN.y));
+    ck(ex.id,'bar does not swing through the legs', S[T].handN.y<S[T].kneeN.y-8,
+      'bar '+r(S[T].handN.y)+' knee '+r(S[T].kneeN.y));
     ck(ex.id,'hinged torso is well past upright', ex.frames[0].torso>45,'torso '+ex.frames[0].torso);
   }
   if(ex.id==='pullup'){
@@ -69,8 +79,8 @@ EX.forEach(function(ex){
       ck(ex.id+' f'+i,'arm is not overstretched beyond reach', d(s.sh,s.handN)<=L.UPPER+L.FORE+0.5,
         'reach '+r(d(s.sh,s.handN))+' max '+(L.UPPER+L.FORE));
     });
-    ck(ex.id,'arms are clearly flexed at the top', d(S[2].sh,S[2].handN)<30,
-      'reach at top '+r(d(S[2].sh,S[2].handN)));
+    ck(ex.id,'arms are clearly flexed at the top', d(S[T].sh,S[T].handN)<30,
+      'reach at top '+r(d(S[T].sh,S[T].handN)));
   }
   if(ex.id==='kbswing'){
     var hike=S[0];
@@ -78,11 +88,11 @@ EX.forEach(function(ex){
       'bell '+r(hike.handN.y)+' hip '+r(hike.hip.y));
     ck(ex.id,'arms stay straight on the backswing', d(hike.sh,hike.handN)>34,
       'reach '+r(d(hike.sh,hike.handN)));
-    ck(ex.id,'top is not an overhead swing', S[2].handN.y>S[2].head.y,
-      'bell '+r(S[2].handN.y)+' head '+r(S[2].head.y));
+    ck(ex.id,'top is not an overhead swing', S[T].handN.y>S[T].head.y,
+      'bell '+r(S[T].handN.y)+' head '+r(S[T].head.y));
   }
   if(ex.id==='splitsq_bulg'){
-    var top=S[0], bot=S[2];
+    var top=S[0], bot=S[T];
     ck(ex.id,'rear foot is elevated behind the front foot', S[0].ankF.y<S[0].ankN.y-12 && S[0].ankF.x<S[0].ankN.x-20,
       'rear '+r(S[0].ankF.x)+','+r(S[0].ankF.y)+' front '+r(S[0].ankN.x)+','+r(S[0].ankN.y));
     ck(ex.id,'front thigh reaches about parallel at the bottom', bot.hip.y>=bot.kneeN.y-6,
@@ -91,10 +101,10 @@ EX.forEach(function(ex){
       'top '+r(top.kneeF.y)+' bottom '+r(bot.kneeF.y));
     ck(ex.id,'front shin stays near vertical, knee not thrown past the toes',
       bot.kneeN.x-bot.ankN.x<14,'knee '+r(bot.kneeN.x)+' ankle '+r(bot.ankN.x));
-    ck(ex.id,'torso stays more upright than a hinge', ex.frames[2].torso<25,'torso '+ex.frames[2].torso);
+    ck(ex.id,'torso stays more upright than a hinge', ex.frames[T].torso<25,'torso '+ex.frames[T].torso);
   }
   if(ex.id==='hipthrust'){
-    var lo=S[0], hi=S[2];
+    var lo=S[0], hi=S[T];
     ck(ex.id,'shoulders stay put on the bench while the hips travel',
       Math.abs(hi.sh.y-lo.sh.y)<6 && hi.hip.y<lo.hip.y-12,
       'shoulder '+r(lo.sh.y)+'->'+r(hi.sh.y)+' hip '+r(lo.hip.y)+'->'+r(hi.hip.y));
@@ -109,21 +119,21 @@ EX.forEach(function(ex){
       'hip '+r(hi.hip.y)+' shoulder '+r(hi.sh.y));
   }
   if(ex.id==='calfraise'){
-    var down=S[0], up=S[2];
+    var down=S[0], up=S[T];
     ck(ex.id,'the whole body rises', up.hip.y<down.hip.y-6,'hip '+r(down.hip.y)+'->'+r(up.hip.y));
     // Positive rotation lifts the heel over the ball of the foot, so the top of
     // the raise must rotate FURTHER positive than the stretched-heel start.
-    ck(ex.id,'the heel actually lifts (the foot pivots)', (ex.frames[2].footRot||0)>(ex.frames[0].footRot||0)+20,
-      'rot '+ex.frames[0].footRot+' -> '+ex.frames[2].footRot);
+    ck(ex.id,'the heel actually lifts (the foot pivots)', (ex.frames[T].footRot||0)>(ex.frames[0].footRot||0)+20,
+      'rot '+ex.frames[0].footRot+' -> '+ex.frames[T].footRot);
     ck(ex.id,'knees stay straight throughout', S.every(function(x){return d(x.hip,x.ankN)>L.THIGH+L.SHIN-6;}),
       'shortest hip-ankle '+r(Math.min.apply(null,S.map(function(x){return d(x.hip,x.ankN);}))));
     ck(ex.id,'the heel starts BELOW the step, not level with it',
-      ex.frames[0].ankN[1]>ex.frames[2].ankN[1]+6,'start '+ex.frames[0].ankN[1]+' top '+ex.frames[2].ankN[1]);
+      ex.frames[0].ankN[1]>ex.frames[T].ankN[1]+6,'start '+ex.frames[0].ankN[1]+' top '+ex.frames[T].ankN[1]);
     ck(ex.id,'the ball of the foot stays on the step, it does not slide',
       ex.frames.every(function(f){return f.ankN[0]===ex.frames[0].ankN[0];}),'ankle x moved');
   }
   if(ex.id==='wallsit'){
-    var hold=S[2];
+    var hold=S[T];
     ck(ex.id,'thigh is parallel to the floor at the hold', Math.abs(hold.hip.y-hold.kneeN.y)<5,
       'hip '+r(hold.hip.y)+' knee '+r(hold.kneeN.y));
     ck(ex.id,'shin is vertical at the hold', Math.abs(hold.kneeN.x-hold.ankN.x)<5,

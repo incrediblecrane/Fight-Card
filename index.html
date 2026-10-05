@@ -4232,17 +4232,20 @@ function rFrame(A,B,t){
     var e=rAdd(sh,rDir(arm[0],RL.UPPER*a)), hh=rAdd(e,rDir(arm[1],RL.FORE*a));
     return [hh.x,hh.y];
   }
-  function pick(key,angKey,far){
+  // Each keyframe resolves its far arm by its own key (armF, else armN), as
+  // rSolve draws it; reading B through A's key ended on a pose neither has.
+  function pick(key,ak,bk,far){
     var x=A[key], y=B[key];
-    if(!x && A[angKey]) x=h(A,A[angKey],far);
-    if(!y && B[angKey]) y=h(B,B[angKey],far);
+    if(!x && A[ak]) x=h(A,A[ak],far);
+    if(!y && B[bk]) y=h(B,B[bk],far);
     return (x&&y)?rLerpPt(x,y,t):null;
   }
-  if(A.handN||B.handN) f.handN=pick('handN','armN',false);
-  if(A.handF||B.handF) f.handF=pick('handF', A.armF?'armF':'armN', true);
+  if(A.handN||B.handN) f.handN=pick('handN','armN','armN',false);
+  if(A.handF||B.handF) f.handF=pick('handF', A.armF?'armF':'armN', B.armF?'armF':'armN', true);
   if(!f.handN && A.armN && B.armN) f.armN=[rLerpAng(A.armN[0],B.armN[0],t),rLerpAng(A.armN[1],B.armN[1],t)];
   if(!f.handF){
-    if(A.armF&&B.armF) f.armF=[rLerpAng(A.armF[0],B.armF[0],t),rLerpAng(A.armF[1],B.armF[1],t)];
+    var fa=A.armF||A.armN, fb=B.armF||B.armN;
+    if((A.armF||B.armF)&&fa&&fb) f.armF=[rLerpAng(fa[0],fb[0],t),rLerpAng(fa[1],fb[1],t)];
     else if(f.armN) f.armF=f.armN;
   }
   return f;
@@ -4313,7 +4316,7 @@ function rEquip(ex,s){
 // grip width, elbow flare and knee tracking. Explicit joints win over IK,
 // because a limb that bends front-to-back has no lateral bend to solve for.
 function rSolveFront(f){
-  var cx=f.cx===undefined?70:f.cx, hipHW=9, shHW=16, lean=f.lean||0;
+  var cx=f.cx===undefined?70:f.cx, hipHW=f.hipHW===undefined?9:f.hipHW, shHW=f.shHW===undefined?16:f.shHW, lean=f.lean||0;
   var tS=f.torsoScale===undefined?1:f.torsoScale;
   var hipC=rP(cx,f.hipY), shB=rP(cx+lean, f.hipY-RL.TORSO*tS);
   var head=rP(shB.x+lean*0.5, shB.y-RL.HEAD_OFF*(0.35+0.65*tS));
@@ -4357,7 +4360,8 @@ function rFrontFrame(A,B,t){
     return rLerpPt(A[k]||[sA[k].x,sA[k].y], B[k]||[sB[k].x,sB[k].y], t); }
   function sg(k){ return rLerp(sA.sign[k],sB.sign[k],t); }
   return {cx:rLerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
-    hipY:rLerp(A.hipY,B.hipY,t), lean:rLerp(A.lean||0,B.lean||0,t),
+    hipY:rLerp(A.hipY,B.hipY,t), hipHW:rLerp(A.hipHW||9,B.hipHW||9,t),
+    shHW:rLerp(A.shHW||16,B.shHW||16,t), lean:rLerp(A.lean||0,B.lean||0,t),
     shrug:rLerp(A.shrug||0,B.shrug||0,t),
     fistL:rLerp(A.fistL===undefined?1:A.fistL,B.fistL===undefined?1:B.fistL,t),
     fistR:rLerp(A.fistR===undefined?1:A.fistR,B.fistR===undefined?1:B.fistR,t),

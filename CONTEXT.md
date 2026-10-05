@@ -908,6 +908,16 @@ given in only one keyframe blends with the solved joint of the other. The
 continuous-motion suite fails any joint moving more than 3 units between
 samples 1/2000 of a rep apart, in both views and in the rig the app ships.
 
+**Turnaround**:
+The keyframe a rep turns around at: the bottom of a squat, the top of a pull.
+`rig.turn(ex)` gives it (`stops[1]` once a rig authors stops, otherwise frame
+2), and every check reads it from there, never as a hard-coded frame 2.
+
+**Bend range**:
+A knee or elbow bends from -10 to 160 degrees of flexion, never backwards.
+Rigs that break it today are listed in `BENDS` in `continuous.js` and print as
+warnings while they are re-authored; any other rig breaking it fails.
+
 **Axis**:
 Which way a dumbbell's handle runs: `lateral`, `sagittal`, `vertical`.
 Decides whether the side view shows a bell face or the whole dumbbell.
@@ -931,6 +941,10 @@ movement, and a tap on it plays one rep.
 `RIGFRAMES` in the app is generated from `pose/exercises.js` by
 `pose/emit-rig.js`, never edited by hand: change `pose/` and regenerate.
 `emit-rig.js --check` (part of `npm test`) fails when the app is behind.
+The app also carries its own copy of the solver (`rSolve`, `rFrame`,
+`rPoseAt` and the front ones); `continuous.js` fails unless it draws the same
+figure as `pose/rig.js`, to 0.01, at 400 moments of every rig and of edge
+cases no shipped rig uses yet. Change both copies together.
 `pose/probe.js` reports a frame set's margins against the rig's limits while it
 is being authored.
 

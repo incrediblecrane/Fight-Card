@@ -1016,20 +1016,6 @@ var FRONTS = {
     {hipY:150,footL:[50,168],footR:[90,168],kneeL:[46,158],kneeR:[94,158],
      handL:[44,116],handR:[96,116],elbL:[43,123],elbR:[97,123]}],
 
-  // Dead bug seen from ABOVE (frontPlan). A limb pointing at the ceiling
-  // projects to almost nothing, so the tabletop side collapses toward the joint
-  // it hangs from while the reaching side extends long up or down the screen.
-  // Which diagonal is working is the whole point and the side view cannot say.
-  deadbug:[
-    {hipY:130,footL:[61,152],footR:[79,152],kneeL:[61,138],kneeR:[79,138],
-     handL:[56,92],handR:[84,92],elbL:[56,99],elbR:[84,99]},
-    {hipY:130,footL:[61,178],footR:[79,152],kneeL:[61,154],kneeR:[79,138],
-     handL:[56,60],handR:[84,92],elbL:[56,78],elbR:[84,99]},
-    {hipY:130,footL:[61,152],footR:[79,152],kneeL:[61,138],kneeR:[79,138],
-     handL:[56,92],handR:[84,92],elbL:[56,99],elbR:[84,99]},
-    {hipY:130,footL:[61,152],footR:[79,178],kneeL:[61,138],kneeR:[79,154],
-     handL:[56,92],handR:[84,60],elbL:[56,99],elbR:[84,78]}],
-
   // Kettlebell clean from the front. Two hands on one bell in the backswing,
   // then it racks on ONE side at the chest while the free arm stays out of the
   // way. Where the bell finishes is the whole difference from a swing.
@@ -1525,6 +1511,11 @@ function placeJoint(aLat,aY,bLat,bY,l1,l2,wantY,wantLat){
   var midY=(aY+bY)/2;
   for(var k=0;k<=10;k++){
     var jY=wantY+(midY-wantY)*(k/10);
+    // A height one of the segments cannot reach is no answer: the clamps would
+    // pin the joint over its root and return it anyway, a segment drawn longer
+    // than the limb. Half a unit of slack, because the derived fronts sit at
+    // near-full reach on purpose and a strict test moved 27 of them.
+    if(Math.abs(jY-aY)>l1+0.5 || Math.abs(jY-bY)>l2+0.5) continue;
     // A hair short of full reach: keyframes are exact, but the frames between them
     // are linear blends of these joints and can bulge slightly past them.
     var s1=l1*0.99, s2=l2*0.99;
@@ -1533,7 +1524,11 @@ function placeJoint(aLat,aY,bLat,bY,l1,l2,wantY,wantLat){
     var lo=Math.max(aLat-r1,bLat-r2), hi=Math.min(aLat+r1,bLat+r2);
     if(lo<=hi) return [Math.max(lo,Math.min(hi,wantLat)), jY];
   }
-  return [(aLat+bLat)/2, midY];
+  // Nothing on the way was reachable (an end at near-full reach): split the
+  // root-to-end line by segment length, which both segments always reach. The
+  // plain midpoint left the longer segment short and the shorter one long.
+  var q=l1/(l1+l2);
+  return [aLat+(bLat-aLat)*q, aY+(bY-aY)*q];
 }
 
 function frontFromSide(ex,opt){
@@ -1667,4 +1662,6 @@ EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 // of bent legs and arms, which reads as someone squatting. [x,y,w,h,rx]
 EXERCISES.forEach(function(e){ if(e.id==='bench') e.planProps=[[56,88,28,70,4]]; });
 
+// For the checks, without becoming one of the exercises.
+Object.defineProperty(EXERCISES,'placeJoint',{value:placeJoint});
 if(typeof module!=='undefined') module.exports=EXERCISES;

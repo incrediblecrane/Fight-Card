@@ -99,18 +99,23 @@ function lerpFrame(A,B,t){
           armScaleN:lerp(A.armScaleN===undefined?1:A.armScaleN,B.armScaleN===undefined?1:B.armScaleN,t),
           armScaleF:lerp(A.armScaleF===undefined?1:A.armScaleF,B.armScaleF===undefined?1:B.armScaleF,t),
           footRot:lerp(A.footRot||0,B.footRot||0,t) };
-  function arm(key,angKey,far){
+  // Each keyframe resolves its far arm by its OWN key: armF when it has one,
+  // else armN, which is what solve() draws. Reading B through A's key took a
+  // far hand going from handF to armF from B's armN, and one going from armF
+  // to handF from A's armN, so the segment ended on a pose neither keyframe has.
+  function arm(key,ak,bk,far){
     var a=A[key], b=B[key];
-    if(!a && A[angKey]) a=handFromAngles(A,A[angKey],far);
-    if(!b && B[angKey]) b=handFromAngles(B,B[angKey],far);
+    if(!a && A[ak]) a=handFromAngles(A,A[ak],far);
+    if(!b && B[bk]) b=handFromAngles(B,B[bk],far);
     return (a&&b)?lerpPt(a,b,t):null;
   }
-  if((A.handN||B.handN) && (A.handN||A.armN) && (B.handN||B.armN)) f.handN=arm('handN','armN',false);
+  if((A.handN||B.handN) && (A.handN||A.armN) && (B.handN||B.armN)) f.handN=arm('handN','armN','armN',false);
   if((A.handF||B.handF) && (A.handF||A.armF||A.armN) && (B.handF||B.armF||B.armN))
-    f.handF=arm('handF', A.armF?'armF':'armN', true) || arm('handF','armN',true);
+    f.handF=arm('handF', A.armF?'armF':'armN', B.armF?'armF':'armN', true);
   if(!f.handN && A.armN && B.armN) f.armN=[lerpAng(A.armN[0],B.armN[0],t), lerpAng(A.armN[1],B.armN[1],t)];
   if(!f.handF){
-    if(A.armF&&B.armF) f.armF=[lerpAng(A.armF[0],B.armF[0],t), lerpAng(A.armF[1],B.armF[1],t)];
+    var fa=A.armF||A.armN, fb=B.armF||B.armN;
+    if((A.armF||B.armF) && fa && fb) f.armF=[lerpAng(fa[0],fb[0],t), lerpAng(fa[1],fb[1],t)];
     else if(f.armN) f.armF=f.armN;
   }
   return f;
@@ -128,7 +133,12 @@ function poseAt(ex,u){
   var local=(target-acc)/tempo[i];
   return lerpFrame(ex.frames[i], ex.frames[(i+1)%n], easeInOutSine(local));
 }
-if(typeof module!=='undefined') module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.easeInOutSine=easeInOutSine;
+// The keyframe a rep turns around at (the bottom of a squat, the top of a
+// pull): stops[1] once a rig authors its stops, otherwise frame 2 of the usual
+// four. Checks read it through here rather than hard-coding frame 2, which
+// stops meaning the bottom the moment a rig gains a frame.
+function turn(ex,front){ var s=(front&&ex.frontStops)||ex.stops; return s?s[1]:2; }
+if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.easeInOutSine=easeInOutSine;
 
 // ---- frontal-plane rig ---------------------------------------------------
 // Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
