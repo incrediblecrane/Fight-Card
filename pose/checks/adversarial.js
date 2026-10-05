@@ -121,16 +121,22 @@ EX.forEach(function(ex){
   if(ex.id==='calfraise'){
     var down=S[0], up=S[T];
     ck(ex.id,'the whole body rises', up.hip.y<down.hip.y-6,'hip '+r(down.hip.y)+'->'+r(up.hip.y));
-    // Positive rotation lifts the heel over the ball of the foot, so the top of
-    // the raise must rotate FURTHER positive than the stretched-heel start.
-    ck(ex.id,'the heel actually lifts (the foot pivots)', (ex.frames[T].footRot||0)>(ex.frames[0].footRot||0)+20,
-      'rot '+ex.frames[0].footRot+' -> '+ex.frames[T].footRot);
+    // Positive pitch lifts the heel, so the top of the raise must pitch
+    // FURTHER positive than the stretched-heel start.
+    ck(ex.id,'the heel actually lifts (the foot pivots)', up.footN>down.footN+20,
+      'pitch '+down.footN+' -> '+up.footN);
     ck(ex.id,'knees stay straight throughout', S.every(function(x){return d(x.hip,x.ankN)>L.THIGH+L.SHIN-6;}),
       'shortest hip-ankle '+r(Math.min.apply(null,S.map(function(x){return d(x.hip,x.ankN);}))));
     ck(ex.id,'the heel starts BELOW the step, not level with it',
       ex.frames[0].ankN[1]>ex.frames[T].ankN[1]+6,'start '+ex.frames[0].ankN[1]+' top '+ex.frames[T].ankN[1]);
-    ck(ex.id,'the ball of the foot stays on the step, it does not slide',
-      ex.frames.every(function(f){return f.ankN[0]===ex.frames[0].ankN[0];}),'ankle x moved');
+    // The ball of the foot (the sole under the toe, rig.footAt) is what stays
+    // put, on the step's top edge, while the ankle rises round it. A fixed
+    // ankle x passed a foot that pivoted about a point level with the ankle and
+    // floated 14 above the step at the top.
+    var step=ex.props[0], ball=function(s){ return rig.footAt(s.ankN,s.footN)[1]; }, b0=ball(S[0]), slide=0;
+    for(var q=0;q<=96;q++){ var bq=ball(solve(rig.poseAt(ex,q/96))); slide=Math.max(slide,d(bq,b0)); }
+    ck(ex.id,'the ball of the foot stays on the step, it does not slide or lift',
+      slide<1 && Math.abs(b0.y-step[1])<=1.5 && b0.x>step[0],'ball at '+r(b0.x)+','+r(b0.y)+' moves '+r(slide)+', step top '+step[1]);
   }
   if(ex.id==='wallsit'){
     var hold=S[T];
@@ -167,6 +173,43 @@ EX.forEach(function(ex){
       'hand '+r(jab.handN.x)+' head '+r(jab.head.x));
   }
 });
+
+// FOOTING. A foot is a block hinged at the ankle (rig.footAt), so where it
+// meets the floor or a prop depends on its pitch as well as the ankle. One
+// meant to be standing on something lies on it: a foot whose lowest point
+// is 1.5 to 4 above the floor or a prop is one that should be on it and
+// floats, and no foot sinks more than 1.5 into either at any moment of the
+// rep. (Further up it is in the air on purpose: a step, a jump, a hang.)
+// The floor line is 2 wide, so a sole 1 above its middle touches it. Props
+// turned at an angle are left out. The rigs listed below break it today and
+// are being re-authored (their toes and rear feet need footN and footF), so
+// they print as warnings; any other rig breaking it fails, and a listed rig
+// that comes right says so, so the list only shrinks.
+var FOOTING={splitsq_bulg:'sink',lunge_walk:'hover',invertedrow:'hover',sideplank:'hover',woodchopper:'hover',
+  boxjump:'sink',medballthrow:'hover',skipping:'hover',jumpingjack:'hover',highknees:'hover',briskwalkjog:'hover',
+  hipflexor:'hover',couchstretch:'sink',childspose:'hover',catcow:'hover',pigeon:'hover',thoracic:'hover',
+  ankle_mob:'hover',rowerg:'sink',pushup:'hover',plank:'hover',mtnclimb:'hover',burpee:'hover'};
+var footWarn=[], footDone=[];
+function surfaces(ex){ var t=[{x0:-1e9,x1:1e9,y:GROUND,h:1e9}];
+  (ex.props||[]).forEach(function(p){ if(!p[5]) t.push({x0:p[0],x1:p[0]+p[2],y:p[1],h:p[3]}); }); return t; }
+// How far the foot's lowest point is above whatever is under it: negative is
+// into it.
+function footGap(T,s,k){ var g=1e9;
+  rig.footAt(s['ank'+k],s['foot'+k]).forEach(function(p){ T.forEach(function(t){
+    if(p.x>=t.x0&&p.x<=t.x1&&p.y<=t.y+t.h) g=Math.min(g,t.y-p.y); }); });
+  return g; }
+EX.forEach(function(ex){
+  var T=surfaces(ex), bad={}, known=(FOOTING[ex.id]||'').split(' ');
+  ex.frames.forEach(function(f,i){ var s=solve(f); ['N','F'].forEach(function(k){ var g=footGap(T,s,k);
+    if(g>1.5&&g<=4&&!bad.hover) bad.hover='frame '+i+' ank'+k+' '+r(g)+' above'; }); });
+  for(var q=0;q<96;q++){ var s=solve(rig.poseAt(ex,q/96)); ['N','F'].forEach(function(k){ var g=footGap(T,s,k);
+    if(g<-1.5&&!bad.sink) bad.sink='ank'+k+' '+r(-g)+' in at u='+r(q/96*100)/100; }); }
+  ['hover','sink'].forEach(function(w){ var msg=w==='hover'?'a foot on the floor or a prop lies on it, not floating just above':'no foot sinks into the floor or a prop';
+    if(known.indexOf(w)>=0){ if(bad[w]) footWarn.push(ex.id+' '+w+': '+bad[w]); else footDone.push(ex.id+' '+w); }
+    else ck(ex.id,msg,!bad[w],bad[w]); });
+});
+if(footWarn.length) console.log('WARN: '+footWarn.length+' rigs float or sink a foot (listed in FOOTING, being re-authored):\n  ! '+footWarn.join('\n  ! '));
+if(footDone.length) console.log('NOTE: now standing on their feet, take off FOOTING: '+footDone.join(', '));
 
 console.log('=== ADVERSARIAL ANALYSIS ===');
 if(!fails.length) console.log('PASS: no violations across '+EX.length+' exercises.');

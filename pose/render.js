@@ -9,20 +9,9 @@ function segPts(A,B,w1,w2){
 }
 // The figure always faces +x, so the toe always points +x. This used to be
 // derived from whether the knee was forward of the ankle, which flipped the
-// foot backwards through most of every squat.
-function footPts(ank,rot){
-  if(rot){
-    // Pivot about the ball of the foot: the toe stays put and the heel lifts.
-    var r=rot*Math.PI/180, ball={x:ank.x+L.FOOT*0.72, y:ank.y};
-    function rp(x,y){ var dx=x-ball.x, dy=y-ball.y;
-      return (ball.x+dx*Math.cos(r)-dy*Math.sin(r)).toFixed(1)+','+(ball.y+dx*Math.sin(r)+dy*Math.cos(r)).toFixed(1); }
-    return [rp(ank.x+L.FOOT*0.72,ank.y+1), rp(ank.x+L.FOOT*0.72,ank.y+6),
-            rp(ank.x-L.FOOT*0.28,ank.y+6), rp(ank.x-L.FOOT*0.28,ank.y+1)].join(' ');
-  }
-  var toe=ank.x+L.FOOT*0.72, heel=ank.x-L.FOOT*0.28;
-  return heel.toFixed(1)+','+(ank.y-3.5)+' '+heel.toFixed(1)+','+(ank.y+4)+' '+
-         toe.toFixed(1)+','+(ank.y+4)+' '+toe.toFixed(1)+','+(ank.y+0.5);
-}
+// foot backwards through most of every squat. The foot is the app's: a block
+// hinged at the ankle, pitched by footN/footF (rig.js footAt).
+function footPts(ank,rot){ return footAt(ank,rot).map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' '); }
 // Precompute the bar path over a full rep so it can be shown as a trace.
 function barPath(ex){
   if(!ex.equip||ex.equip==='fixedbar') return null;
@@ -41,7 +30,7 @@ function boxOf(ex){
   var up=function(y,r){ if(y-r<top) top=y-r; };
   var eq=ex.equip==='barbell'?15:ex.equip==='dumbbell'?14:ex.equip?11:5;
   var ax=axisOf(ex), q=ex.equip;
-  var eqS=q==='barbell'?17:q==='dumbbell'?(ax==='vertical'?14:ax==='lateral'?7:9):q==='ball'?13:q==='plate'?13:q==='cable'?7:q==='kettlebell'?5:4;
+  var eqS=q==='barbell'?17:q==='dumbbell'?(ax==='vertical'?14:ax==='lateral'?7:9):q==='ball'?13:q==='plate'?13:q==='cable'?7:q==='kettlebell'?8:4;
   var eqF=q==='barbell'?15:q==='dumbbell'?(ax==='vertical'?14:ax==='lateral'?8:6):q==='ball'?13:q==='plate'?12:q==='cable'?7:q==='kettlebell'?6:8;
   for(var i=0;i<=N;i++){
     var s=solve(poseAt(ex,i/N));
@@ -49,7 +38,9 @@ function boxOf(ex){
     see(s.head.x,L.HEAD_R+1); up(s.head.y,L.HEAD_R+1);
     [s.ankN,s.ankF].forEach(function(p){ see(p.x+L.FOOT*0.72,1); see(p.x-L.FOOT*0.28,1); up(p.y,6); });
     [s.handN,s.handF].forEach(function(p){ see(p.x,eq); up(p.y,eqS); });
+    if(q==='kettlebell'){ var kb=bellAt(ex,s); see(kb.x,10); up(kb.y,10); }
     if(ex.front){ var f=solveFront(frontAt(ex,i/N));
+      if(q==='kettlebell') up(bellFront(ex,f).y,9);
       up(f.head.y,L.HEAD_R+1); up(f.shC.y,13);
       [f.shL,f.shR].forEach(function(p){ up(p.y,8); });
       [f.elbL,f.elbR,f.kneeL,f.kneeR].forEach(function(p){ up(p.y,6); });
@@ -155,9 +146,9 @@ function update(ex,ref,u){
     if(isLeg) R[n+'e'].setAttribute('points',footPts(c,rot));
     else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
   }
-  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true,s.footRot);
+  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true,s.footF);
   setLimb('farm',s.shF,s.elbF,s.handF,[7,5,4],false);
-  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true,s.footRot);
+  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true,s.footN);
   setLimb('ncut',s.sh,s.elbN,s.handN,[8,6,4.5],false);
   setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
   R.torso.setAttribute('points',segPts(s.hip,s.sh,13,17));
@@ -185,8 +176,10 @@ function update(ex,ref,u){
     R.d1.setAttribute('x',(p.x-14).toFixed(1)); R.d1.setAttribute('y',(p.y-8.5).toFixed(1));
     R.d2.setAttribute('x',(p.x+7).toFixed(1));  R.d2.setAttribute('y',(p.y-8.5).toFixed(1));
   }
-  if(R.kb){ R.kb.setAttribute('cx',p.x.toFixed(1)); R.kb.setAttribute('cy',(p.y+12).toFixed(1));
-            R.kh.setAttribute('d','M'+(p.x-6).toFixed(1)+' '+(p.y+4).toFixed(1)+' Q'+p.x.toFixed(1)+' '+(p.y-8).toFixed(1)+' '+(p.x+6).toFixed(1)+' '+(p.y+4).toFixed(1)); }
+  // A kettlebell lies where rig.js bellAt puts it; the handle loops round the
+  // fist on the side away from the bell.
+  if(R.kb){ var kb=bellAt(ex,s), kd=kb.d; R.kb.setAttribute('cx',kb.x.toFixed(1)); R.kb.setAttribute('cy',kb.y.toFixed(1));
+            R.kh.setAttribute('d','M'+(p.x+4*kd.x+6*kd.y).toFixed(1)+' '+(p.y+4*kd.y-6*kd.x).toFixed(1)+' Q'+(p.x-8*kd.x).toFixed(1)+' '+(p.y-8*kd.y).toFixed(1)+' '+(p.x+4*kd.x-6*kd.y).toFixed(1)+' '+(p.y+4*kd.y+6*kd.x).toFixed(1)); }
 }
 
 // ---- front-plane rendering ----
@@ -242,8 +235,8 @@ function buildFront(ex,host,bx){
   }
   svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
   if(ex.equip==='kettlebell'){
-    // Both hands share one handle, so the bell hangs as a single mass below
-    // them rather than one weight per hand.
+    // One bell: in the loaded hand of a one-handed lift (load), else both
+    // hands share its handle and it hangs as a single mass below them.
     R.fkbH=el('path',{fill:'none',stroke:soft,'stroke-width':3.4,'stroke-linecap':'round'});
     R.fkb=el('circle',{r:9,fill:soft});
     svg.appendChild(R.fkbH); svg.appendChild(R.fkb);
@@ -314,13 +307,16 @@ function updateFront(ex,R,u){
                R.fpR.setAttribute('cx',(x2+13).toFixed(1)); R.fpR.setAttribute('cy',y.toFixed(1)); }
   }
   if(R.fkb){
-    var kx=(s.handL.x+s.handR.x)/2, ky=(s.handL.y+s.handR.y)/2;
+    var kb=bellFront(ex,s), kx=kb.h.x, ky=kb.h.y;
     R.fkbH.setAttribute('d','M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+
-      ' Q'+kx.toFixed(1)+','+(ky-7).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
-    R.fkb.setAttribute('cx',kx.toFixed(1)); R.fkb.setAttribute('cy',(ky+9).toFixed(1));
+      ' Q'+kx.toFixed(1)+','+(ky-7*kb.u).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
+    R.fkb.setAttribute('cx',kb.x.toFixed(1)); R.fkb.setAttribute('cy',kb.y.toFixed(1));
   }
+  // A one-handed lift (load) has its one implement in that hand; the other
+  // hand's is drawn over it.
+  var hL=ex.load==='R'?s.handR:s.handL, hR=ex.load==='L'?s.handL:s.handR;
   if(R.fhL){
-    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+    [['L',hL],['R',hR]].forEach(function(pr){
       var h=pr[1];
       R['fh'+pr[0]].setAttribute('x',(h.x-10).toFixed(1)); R['fh'+pr[0]].setAttribute('y',(h.y-3).toFixed(1));
       R['fc'+pr[0]+'1'].setAttribute('x',(h.x-13).toFixed(1)); R['fc'+pr[0]+'1'].setAttribute('y',(h.y-8).toFixed(1));
@@ -336,8 +332,8 @@ function updateFront(ex,R,u){
     });
   }
   if(R.fbellL){
-    R.fbellL.setAttribute('cx',s.handL.x.toFixed(1)); R.fbellL.setAttribute('cy',s.handL.y.toFixed(1));
-    R.fbellR.setAttribute('cx',s.handR.x.toFixed(1)); R.fbellR.setAttribute('cy',s.handR.y.toFixed(1));
+    R.fbellL.setAttribute('cx',hL.x.toFixed(1)); R.fbellL.setAttribute('cy',hL.y.toFixed(1));
+    R.fbellR.setAttribute('cx',hR.x.toFixed(1)); R.fbellR.setAttribute('cy',hR.y.toFixed(1));
   }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;

@@ -65,7 +65,7 @@ var FINE=2000, JUMP=3;
 var app=(function(){
   var h=require('fs').readFileSync(require('path').join(__dirname,'..','..','index.html'),'utf8');
   var src=h.slice(h.indexOf('var RL='), h.indexOf('function rSeg('))+h.slice(h.indexOf('function rSolveFront('), h.indexOf('function rEquipFront('));
-  return new Function(src+';return {RIGFRAMES:RIGFRAMES,solve:rSolve,poseAt:rPoseAt,lerpFrame:rFrame,solveFront:rSolveFront,frontAt:rFrontAt};')();
+  return new Function(src+';return {RIGFRAMES:RIGFRAMES,solve:rSolve,poseAt:rPoseAt,lerpFrame:rFrame,solveFront:rSolveFront,frontAt:rFrontAt,bellAt:rBellAt,bellFront:rBellFront,footAt:rFootPts};')();
 })();
 function jumps(tag,at){
   var prev=null, worst=0, where='';
@@ -210,14 +210,64 @@ EX.forEach(function(ex){
     });
   });
 });
-// Elbows that should stay by the ribs: the row's working arm (the plan view
+// Elbows that should stay by the ribs: the row's working arm (L from above,
+// see views.js on which side is which; the plan view
 // exists to show it not flaring) and both arms of the running drills.
-[['row_single',['R'],4,99],['sprint',['L','R'],6,6],['highknees',['L','R'],6,6]].forEach(function(c){
+[['row_single',['L'],4,99],['sprint',['L','R'],6,6],['highknees',['L','R'],6,6]].forEach(function(c){
   var ex=EX.filter(function(e){return e.id===c[0];})[0], ax=app.RIGFRAMES[c[0]], worst=0, where='';
   for(var i=0;i<800;i++){ var s=i&1?app.solveFront(app.frontAt(ax,i/800)):rig.solveFront(rig.frontAt(ex,i/800));
     c[1].forEach(function(k){ var o=(s['elb'+k].x-s['sh'+k].x)*(k==='L'?-1:1);
       var bad=Math.max(o-c[2],-o-c[3]); if(bad>worst){ worst=bad; where='elb'+k+' '+r(o)+' outside the shoulder at u='+(i/800)+(i&1?' (app)':''); } }); }
   ck(c[0]+' front','elbows stay tucked, neither flared nor crossed',worst<=0,where);
+});
+// Where a kettlebell lies on the fist (rig.bellAt), in both copies. It used
+// to hang 12 below the fist whatever the arm did: on the crown of the head at
+// the top of a press, upright in a bottoms-up hold, dropped straight down at
+// the top of a swing. Within 30 degrees of what the hand is doing: upside down
+// above the fist held bottoms-up; under a hand below its elbow, straight down
+// from a bent arm and along a straight one; back down the forearm or behind
+// it, in a rack or a lockout.
+// Always on the fist (10 to 13 from it), the
+// same in the app, and never jumping as it turns round the wrist.
+function ang(a,b){ var c=(a.x*b.x+a.y*b.y)/((Math.hypot(a.x,a.y)*Math.hypot(b.x,b.y))||1); return Math.acos(Math.max(-1,Math.min(1,c)))*180/Math.PI; }
+EX.filter(function(e){ return e.equip==='kettlebell'; }).forEach(function(ex){
+  var ax=app.RIGFRAMES[ex.id], worst=0, where='', far=0, farAt='', par=0, parAt='', jump=0, jumpAt='', prev=null;
+  for(var i=0;i<=FINE;i++){ var u=i/FINE, s=rig.solve(rig.poseAt(ex,u)), b=rig.bellAt(ex,s), h=s.handN;
+    var off={x:b.x-h.x,y:b.y-h.y}, len=Math.hypot(off.x,off.y), want=null;
+    var fx=h.x-s.elbN.x, fy=(h.y-s.elbN.y)/Math.hypot(fx,h.y-s.elbN.y), reach=d(s.sh,h)/((L.UPPER+L.FORE)*s.armScaleN);
+    if(ex.bellUp) want={x:0,y:-1};
+    else if(fy>0.05&&reach>=0.97) want={x:h.x-s.sh.x,y:h.y-s.sh.y};
+    else if(fy>0.05&&reach<=0.88) want={x:0,y:1};
+    else if(fy<-0.3) want={x:s.elbN.x-h.x,y:s.elbN.y-h.y};
+    if(want){ var a=ang(off,want);
+      // Racked, anywhere on the back of the forearm will do (the side away
+      // from the face, -x as the figure faces +x).
+      if(fy<-0.3 && a<=90 && want.y*off.x-want.x*off.y<0) a=0;
+      if(a>worst){ worst=a; where='u='+u.toFixed(4); } }
+    var e=Math.max(10-len,len-13); if(e>far){ far=e; farAt=r(len)+' at u='+u.toFixed(4); }
+    if(prev){ var j=d(b,prev); if(j>jump){ jump=j; jumpAt='u='+u.toFixed(4); } }
+    prev=b;
+    if(i%5===0){ var bp=app.bellAt(ax,app.solve(app.poseAt(ax,u))), q=d(bp,b); if(q>par){ par=q; parAt='u='+u.toFixed(4); } }
+  }
+  ck(ex.id,'the kettlebell lies the way the hand holds it (within 30 degrees)',worst<=30,r(worst)+' degrees off at '+where);
+  ck(ex.id,'the kettlebell stays on the fist',far<=0,'centre '+farAt);
+  ck(ex.id,'the kettlebell turns round the wrist without jumping',jump<=JUMP,r(jump)+' at '+jumpAt);
+  ck(ex.id,'the app puts the kettlebell where pose/ does',par<=PTOL,'off by '+r(par*100)/100+' at '+parAt);
+  if(ex.front){ var fp=0, fj=0, fjAt='', pf=null;
+    for(var k=0;k<=FINE;k++){ var bf=rig.bellFront(ex,rig.solveFront(rig.frontAt(ex,k/FINE)));
+      if(pf&&d(bf,pf)>fj){ fj=d(bf,pf); fjAt='u='+(k/FINE).toFixed(4); } pf=bf;
+      if(k%5) continue;
+      var af=app.bellFront(ax,app.solveFront(app.frontAt(ax,k/FINE))); fp=Math.max(fp,d(bf,af),d(bf.h,af.h)); }
+    ck(ex.id+' front','the kettlebell moves onto the back of the forearm without jumping',fj<=JUMP,r(fj)+' at '+fjAt);
+    ck(ex.id+' front','the app puts the kettlebell where pose/ does',fp<=PTOL,'off by '+r(fp*100)/100); }
+});
+// The foot is the same block in both copies (rig.footAt), so a raised heel
+// is drawn where the checks put it.
+EX.forEach(function(ex){ var ax=app.RIGFRAMES[ex.id], w=0;
+  for(var i=0;i<PAR;i++){ var s=rig.solve(rig.poseAt(ex,i/PAR)), t=app.solve(app.poseAt(ax,i/PAR));
+    ['N','F'].forEach(function(k){ var a=rig.footAt(s['ank'+k],s['foot'+k]), b=app.footAt(t['ank'+k],t['foot'+k]);
+      a.forEach(function(p,j){ w=Math.max(w,d(p,b[j])); }); }); }
+  ck(ex.id,'the app draws the feet where pose/ does',w<=PTOL,'off by '+r(w*100)/100);
 });
 // Which way a knee or elbow bends. Flexion is the signed angle from the upper
 // segment to the lower: 0 straight, positive the way the joint folds, negative

@@ -10,7 +10,7 @@ var EX=require('./exercises.js');
 // `stops`, `frontStops`, `ease` and `still` are authoring keys: what the app
 // needs of them is worked out here by rig.ship (the rep's length, frames per
 // rep, the still's keyframe and the time warp), so the phone never does it.
-var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','planProps','front','behindHead'];
+var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','planProps','front','behindHead','load','bellUp'];
 var rig=require('./rig.js'), out={};
 EX.forEach(function(e){
   var o={}, s=rig.ship(e);

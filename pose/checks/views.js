@@ -204,6 +204,47 @@ EX.forEach(function(ex){
   ck('placeJoint','never returns a joint a segment cannot reach',worst<=0.5+1e-9,'+'+r(worst)+' at '+where);
 })();
 
+// --- which side is which: the second panel's L and R against the side view ---
+// The side view looks at the lifter's left, so its near limbs are R in a front
+// view and from above someone face up, and L from above someone face down
+// (rig.nearSide). The kettlebell fronts had the working arm on L while the
+// jab and the walking lunge had it on R, so a one-armed press showed one arm
+// in one panel and the other arm in the next. Where the two panels both show
+// a pair of limbs moving differently (one hand pressing, one foot stepping),
+// the near one must be the one the second panel moves that way: compared as
+// each hand's height above its shoulder and each foot's below its hip (along
+// the body, toward the head, from above), near minus far, over the rep.
+// The rigs listed below break it today and are being re-authored, so they
+// print as warnings; any other rig breaking it fails, and a listed rig that
+// comes right says so, so the list only shrinks.
+var HANDED={worldsgreatest:'hand',deadbug:'hand'};
+var handWarn=[], handDone=[];
+function sides(ex){
+  var nr=rig.nearSide(ex), fr=nr==='L'?'R':'L', plan=!!ex.frontPlan, out={};
+  [['hand','handN','handF','sh','shF','sh'],['foot','ankN','ankF','hip','hipF','hip']].forEach(function(q){
+    var ss=0, ff=0, sf=0;
+    for(var i=0;i<48;i++){ var s=rig.solve(rig.poseAt(ex,i/48)), f=rig.solveFront(rig.frontAt(ex,i/48));
+      var ux=s.sh.x-s.hip.x, uy=s.sh.y-s.hip.y, ul=Math.hypot(ux,uy);
+      var sc=function(p,o){ return plan?((p.x-o.x)*ux+(p.y-o.y)*uy)/ul:o.y-p.y; };
+      var a=sc(s[q[1]],s[q[3]])-sc(s[q[2]],s[q[4]]);
+      var b=(f[q[5]+nr].y-f[q[0]+nr].y)-(f[q[5]+fr].y-f[q[0]+fr].y);
+      ss+=a*a; ff+=b*b; sf+=a*b; }
+    out[q[0]]={s:Math.sqrt(ss/48), f:Math.sqrt(ff/48), c:sf/(Math.sqrt(ss*ff)||1)};
+  });
+  return out;
+}
+EX.filter(function(e){ return e.front&&e.frames; }).forEach(function(ex){
+  var o=sides(ex), known=(HANDED[ex.id]||'').split(' ');
+  ['hand','foot'].forEach(function(k){ var q=o[k], bad=q.s>6&&q.f>4&&q.c<-0.3, w=(k==='hand'?'hands':'feet')+': near against '+rig.nearSide(ex)+' '+r(q.c*100)/100;
+    if(known.indexOf(k)>=0){ if(bad) handWarn.push(ex.id+' '+w); else handDone.push(ex.id+' '+k); }
+    else ck(ex.id,'the second panel moves the side view\'s near '+k+' as '+rig.nearSide(ex)+', not the other one',!bad,w); });
+  // The implement is drawn in the near hand from the side, so a one-handed
+  // lift loads that hand in the second panel too.
+  if(ex.load) ck(ex.id,'the loaded hand is the near hand, '+rig.nearSide(ex),ex.load===rig.nearSide(ex),'load '+ex.load);
+});
+if(handWarn.length) console.log('WARN: '+handWarn.length+' second panels move the far limb as the near one (listed in HANDED, being re-authored):\n  ! '+handWarn.join('\n  ! '));
+if(handDone.length) console.log('NOTE: now the right way round, take off HANDED: '+handDone.join(', '));
+
 console.log('=== VIEW + FLAGGED-FIX CHECK ===');
 if(!fails.length) console.log('PASS: bench presses vertically, jab and cross differ, all front views valid.');
 else { console.log('FAILURES ('+fails.length+'):'); var seen={};

@@ -24,7 +24,8 @@ function ik(root,end,l1,l2,sign){
 // Build every joint for one frame.
 // frame: {hip:[x,y], torso:deg, ankN:[x,y], ankF:[x,y],
 //         armN:[upperDeg,foreDeg] | handN:[x,y], armF:[...] | handF:[x,y],
-//         kneeSign, elbowSign, shrug:px of shoulder elevation}
+//         kneeSign, elbowSign, shrug:px of shoulder elevation,
+//         footN, footF: each foot's pitch in degrees (footRot sets both)}
 function solve(f){
   var hip=P(f.hip[0],f.hip[1]);
   var shBase=add(hip,dir(f.torso,L.TORSO));
@@ -58,10 +59,68 @@ function solve(f){
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
     elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,
     armScaleN:aN,armScaleF:aF,
-    footRot:f.footRot||0};
+    footN:pitch(f,'N'),footF:pitch(f,'F')};
+}
+// A foot's pitch: its own footN/footF, else footRot, which sets both.
+function pitch(f,k){ var v=f['foot'+k]; return v===undefined?(f.footRot||0):v; }
+// The foot as drawn from the side: a block hinged at the ankle, toe toward +x
+// (the figure always faces +x), sole 6 below the ankle. Pitch turns it about
+// the ankle, positive lifting the heel (up on the toes, a calf raise's top),
+// negative the toes. It used to turn about a 'ball' level with the ankle and
+// shared by both feet, so a raised heel left the foot floating 14 above the
+// step, off the end of the shin. The author places the ankle so the part of
+// the foot bearing weight lands on the floor or the step (checks: footing).
+function footAt(ank,rot){
+  var r=(rot||0)*Math.PI/180, c=Math.cos(r), s=Math.sin(r), F=L.FOOT;
+  return [[F*0.72,1],[F*0.72,6],[-F*0.28,6],[-F*0.28,1]].map(function(p){ return P(ank.x+p[0]*c-p[1]*s, ank.y+p[0]*s+p[1]*c); });
 }
 
-if(typeof module!=='undefined') module.exports={L:L,GROUND:GROUND,ANKLE_Y:ANKLE_Y,STAND_HIP_Y:STAND_HIP_Y,solve:solve,ik:ik,dir:dir,add:add,P:P};
+// Where a kettlebell sits on the hand that holds it, side view: its centre
+// and the way it lies from the fist (d, a unit vector). It used to hang 12
+// below the fist whatever the arm did, so it sat on the crown of the head at
+// the top of a press, upright in a bottoms-up hold and dropped straight down
+// at the top of a swing. Now, by where the hand is:
+// - bellUp (a bottoms-up hold): upside down, 12 above the fist;
+// - hand below the elbow: it hangs, straight down from a bent arm and along
+//   the line of a straight one (a swing's arm and bell are one pendulum);
+// - hand above the elbow (a rack, a lockout): behind the wrist, lying on the
+//   back of the forearm. The offset assumes the figure faces +x, as every
+//   rig does.
+// Between the last two it turns around the wrist rather than jumping, as a
+// bell rolls over the hand in a snatch or a clean.
+function bellAt(ex,s){
+  var h=s.handN, D=12;
+  if(ex.bellUp) return {x:h.x, y:h.y-D, d:P(0,-1)};
+  var fx=h.x-s.elbN.x, fy=h.y-s.elbN.y, fl=Math.hypot(fx,fy)||1; fx/=fl; fy/=fl;
+  var ax=h.x-s.sh.x, ay=h.y-s.sh.y, al=Math.hypot(ax,ay)||1;
+  var k=ramp(0.88,0.97,al/((L.UPPER+L.FORE)*s.armScaleN));
+  var hx=k*ax/al, hy=(1-k)+k*ay/al, hl=Math.hypot(hx,hy)||1;
+  var bx=-6*fx-5, by=-6*fy+4, b=ramp(-0.3,0.05,fy);
+  var a0=Math.atan2(bx,by), a1=Math.atan2(hx,hy), da=((a1-a0)/Math.PI%2+3)%2-1;
+  var a=a0+da*Math.PI*b, len=lerp(11,D,b), d=P(Math.sin(a),Math.cos(a));
+  return {x:h.x+d.x*len, y:h.y+d.y*len, d:d};
+}
+function ramp(a,b,x){ var t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
+// The second panel: one bell, in the loaded hand when the rig names one
+// (load:'L'|'R', one-handed lifts), else between the two hands that share it;
+// 9 below the handle, or above it held bottoms-up. Racked or overhead (the
+// loaded hand above its elbow) it rests on the back of the forearm, so it
+// shows just outside the fist rather than hanging over the hand and the head.
+function bellFront(ex,f){
+  var L2=f.handL, R2=f.handR, h=ex.load?(ex.load==='L'?L2:R2):P((L2.x+R2.x)/2,(L2.y+R2.y)/2), u=ex.bellUp?-1:1, x=h.x, y=h.y+9*u;
+  if(ex.load&&!ex.bellUp){ var e=ex.load==='L'?f.elbL:f.elbR, k=ramp(-0.1,-0.5,(h.y-e.y)/(Math.hypot(h.x-e.x,h.y-e.y)||1));
+    x=lerp(x,h.x+(ex.load==='L'?-8:8),k); y=lerp(y,h.y+6,k); }
+  return {x:x, y:y, h:h, u:u};
+}
+// Which label, L or R, a second panel gives the side view's near limbs. The
+// side view looks at the lifter's left side, and L and R in a second panel
+// are sides of the screen, so the near limbs are R from the front (the lifter
+// faces you, their left on your right) and from above someone face up, and L
+// from above someone face down (you see their back, their left on your left).
+// A one-handed lift's load names this hand, since the side view draws the
+// implement in the near hand.
+function nearSide(ex){ return ex.frontPlan&&ex.frames&&Math.sin(ex.frames[0].torso*Math.PI/180)>0?'L':'R'; }
+if(typeof module!=='undefined') module.exports={L:L,GROUND:GROUND,ANKLE_Y:ANKLE_Y,STAND_HIP_Y:STAND_HIP_Y,solve:solve,ik:ik,dir:dir,add:add,P:P,footAt:footAt,bellAt:bellAt,bellFront:bellFront,nearSide:nearSide};
 
 // ---- continuous interpolation -------------------------------------------
 function lerp(a,b,t){ return a+(b-a)*t; }
@@ -97,7 +156,7 @@ function lerpFrame(A,B,t){
           shrug:lerp(A.shrug||0,B.shrug||0,t),
           armScaleN:lerp(A.armScaleN===undefined?1:A.armScaleN,B.armScaleN===undefined?1:B.armScaleN,t),
           armScaleF:lerp(A.armScaleF===undefined?1:A.armScaleF,B.armScaleF===undefined?1:B.armScaleF,t),
-          footRot:lerp(A.footRot||0,B.footRot||0,t) };
+          footN:lerp(pitch(A,'N'),pitch(B,'N'),t), footF:lerp(pitch(A,'F'),pitch(B,'F'),t) };
   // Each keyframe resolves its far arm by its OWN key: armF when it has one,
   // else armN, which is what solve() draws. Reading B through A's key took a
   // far hand going from handF to armF from B's armN, and one going from armF

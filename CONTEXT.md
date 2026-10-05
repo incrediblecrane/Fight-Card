@@ -953,6 +953,39 @@ A standing frame has the hip over the ankle (within 3) at `STAND_HIP_Y`
 was a quarter squat. `analyse.js` (`STANDING`) fails the re-authored rigs
 outside it and warns for the standing frames still to do.
 
+**Foot pitch** (`footN`, `footF`):
+How far each foot is turned about its ankle, in degrees, positive lifting the
+heel (up on the toes), negative the toes; `footRot` sets both. The foot is a
+block hinged at the ankle (`rig.footAt`), so the author places the ankle where
+the part bearing weight lands on the floor or the step: a calf raise's ankle
+rises round the ball of the foot, which stays on the step edge. It used to turn
+about a point level with the ankle, shared by both feet, and floated off the
+step. **Footing** (`adversarial.js`): a foot whose lowest point is 1.5 to 4
+above the floor or a prop is one meant to stand on it and floats, and no foot
+sinks more than 1.5 into either; rigs that break it today are listed in
+`FOOTING` and print as warnings while they are re-authored.
+
+**Near side**:
+The side view looks at the lifter's left. In a second panel L and R are sides
+of the screen, so the side view's near limbs are R in a front view and from
+above someone face up, and L from above someone face down (`rig.nearSide`).
+`views.js` fails a second panel that moves the far limb the way the side view
+moves the near one (rigs still to fix are listed in `HANDED`).
+
+**Load** (`load:'L'|'R'`):
+The hand a one-handed lift carries its one implement in, in the second panel:
+the kettlebell lifts, the suitcase carry, the single-arm row. It is the near
+side, since the side view draws the implement in the near hand. Without it the
+second panel draws one implement per hand, or a kettlebell between them.
+
+**Bell rule** (`rig.bellAt`, `bellFront`):
+Where a kettlebell lies on the fist. Held bottoms-up (`bellUp`) it is upside
+down above the fist; under a hand below its elbow it hangs, straight down from
+a bent arm and along the line of a straight one (a swing); with the hand above
+the elbow (a rack, a lockout) it lies behind the wrist on the back of the
+forearm, and it turns round the wrist between the two. In the second panel it
+is in the loaded hand, and racked or overhead just outside the fist.
+
 **Axis**:
 Which way a dumbbell's handle runs: `lateral`, `sagittal`, `vertical`.
 Decides whether the side view shows a bell face or the whole dumbbell.
@@ -1039,7 +1072,9 @@ checks once passed whatever the app did.
   no joint whipping more than 6 units in 1/144 of a rep, with the rigs that
   already do listed in `WHIPS`; the frame period; every view resting
   somewhere; the core lifts resting at the top and bottom only; the reviewed
-  stops table; a jump's still not in the air), views, and rendering.
+  stops table; a jump's still not in the air; the bell rule, in both copies,
+  and the feet drawn alike), views (including the near side and the load),
+  and rendering. `adversarial.js` holds the footing check.
 
 `test:app`, in the order it runs:
 
@@ -1071,7 +1106,7 @@ checks once passed whatever the app did.
   on a stop, and a tapped rep at full speed.
 - `test-rigdraw.js`: how the figure is drawn: what lies in front of what
   (the near arm over the head, with its cut line; the implement in the near
-  hand; the second panel's arms, raised knees and a stick behind the back),
+  hand, and in the second panel in the loaded hand of a one-handed lift; the second panel's arms, raised knees and a stick behind the back),
   every rig inside its panel at 96 moments of the rep, both panels at one
   top and height, the tablet cap, the floor across the panel, and `--ground`
   and `--prop` at 3:1 or more against the panel in both themes.

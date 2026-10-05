@@ -84,11 +84,10 @@ t('side view: the implement in the near hand is drawn over the body, under the h
     var bar=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'||p.a.stroke==='var(--text-soft)'; });
     assert.ok(bar>arm,id+': the bar (shape '+bar+') is under the hands ('+arm+')'); });
 });
-// A kettlebell is still drawn hanging below the fist (its rack and lockout
-// placement comes with the bell rule). Over the body that left a grey disc on
-// the belly in a rack or press, away from the hand, so while its hand is above
-// the hip it sits behind the body; hanging in a swing or the bottom of a clean
-// it stays in front of the body and the near leg.
+// A kettlebell lies where the bell rule puts it on the fist (rBellAt): over
+// the body a racked bell left a grey disc on the belly, away from the hand, so
+// while its hand is above the hip it sits behind the body; hanging in a swing
+// or the bottom of a clean it stays in front of the body and the near leg.
 t('side view: a kettlebell held above the hip is drawn behind the body, one hanging below it in front', function(){
   var seen={};
   ['kbswing','kb_clean','kb_snatch','kb_press','kb_bottomsup','kb_tgu'].forEach(function(id){ for(var i=0;i<24;i++){ var u=i/24, ex=rex(id), s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));
@@ -100,6 +99,20 @@ t('side view: a kettlebell held above the hip is drawn behind the body, one hang
     if(up) assert.ok(bell<torso,id+' u='+u.toFixed(2)+': the hand is above the hip but the bell (shape '+bell+') is over the body ('+torso+')');
     else assert.ok(bell>torso&&bell>leg&&bell<arm,id+' u='+u.toFixed(2)+': the bell hangs below the hip but is shape '+bell+' (body '+torso+', near leg '+leg+', arm '+arm+')'); } });
   assert.ok(seen['true']&&seen['false'],'no kettlebell rig is seen both above and below the hip');
+});
+// A one-handed lift (load) carries its one implement in that hand in the
+// second panel. The kettlebell used to be drawn half way between the two
+// hands, on the belly while the working hand was overhead, and a suitcase
+// carry showed a dumbbell in each hand, which is a farmer's carry.
+t('second panel: a one-handed lift carries its one implement in the loaded hand', function(){
+  var seen=0;
+  RIGS.forEach(function(id){ var ex=rex(id); if(!ex.load||!ex.front) return; seen++;
+    for(var i=0;i<24;i++){ var u=i/24, f=app.rSolveFront(app.rFrontAt(ex,u)), h=ex.load==='L'?f.handL:f.handR;
+      shapes(app.rigFrontSVG(EXOF[id],u)).forEach(function(p){
+        if(p.a.fill!=='var(--text-soft)'&&p.a.stroke!=='var(--text-soft)') return;
+        var e=extent(p), c={x:(e.x0+e.x1)/2, y:(e.y0+e.y1)/2}, dd=Math.hypot(c.x-h.x,c.y-h.y);
+        assert.ok(dd<=14,id+' u='+u.toFixed(2)+': a '+p.n+' of the implement is '+dd.toFixed(1)+' from the loaded hand ('+ex.load+')'); }); } });
+  assert.ok(seen>=7,'only '+seen+' rigs name a loaded hand');
 });
 t('front view: the arms are drawn over the head, unless the rig holds them behind it', function(){
   function order(id,u){ var ex=rex(id), f=app.rSolveFront(app.rFrontAt(ex,u)), sh=shapes(app.rigFrontSVG(EXOF[id],u));
