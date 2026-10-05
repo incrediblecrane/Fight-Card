@@ -1139,10 +1139,10 @@ var FRONTS = {
   // Sitting up lifts the chest toward the camera, so the torso foreshortens and
   // the hands close together as they drive away.
   situpwallthrow:[
-    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[63,126],handR:[77,126]},
-    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[64,134],handR:[76,134]},
-    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[66,152],handR:[74,152]},
-    {hipY:150,footL:[56,168],footR:[84,168],kneeL:[52,158],kneeR:[88,158],handL:[64,138],handR:[76,138]}],
+    {hipY:150,footL:[56,168],footR:[84,168],handL:[63,126],handR:[77,126]},
+    {hipY:150,footL:[56,168],footR:[84,168],handL:[64,134],handR:[76,134]},
+    {hipY:150,footL:[56,168],footR:[84,168],handL:[66,152],handR:[74,152]},
+    {hipY:150,footL:[56,168],footR:[84,168],handL:[64,138],handR:[76,138]}],
 
   /* Reverse cable fly from the FRONT, which is the only view that carries it.
      Each hand holds the opposite side's handle, so the cords cross in front at
@@ -1268,20 +1268,22 @@ var FRONTS = {
 
   // Half-kneeling hip flexor stretch from the front. The pelvis tucking under
   // rather than the lower back arching is the whole technique, and from here
-  // you can also see the front knee stacked over its own foot.
+  // you can also see the front knee stacked over its own foot. The rear shin
+  // runs straight back from the knee on the floor, so it hides behind it.
   hipflexor:[
-    {hipY:132,footL:[46,163],footR:[78,161],handL:[52,128],handR:[86,128]},
-    {hipY:133,footL:[46,163],footR:[78,161],handL:[52,129],handR:[86,129]},
-    {hipY:133,footL:[46,163],footR:[78,161],handL:[52,129],handR:[86,129]},
-    {hipY:132,footL:[46,163],footR:[78,161],handL:[52,128],handR:[86,128]}],
+    {hipY:132,footL:[59,163],footR:[78,161],handL:[52,128],handR:[86,128]},
+    {hipY:133,footL:[59,163],footR:[78,161],handL:[52,129],handR:[86,129]},
+    {hipY:133,footL:[59,163],footR:[78,161],handL:[52,129],handR:[86,129]},
+    {hipY:132,footL:[59,163],footR:[78,161],handL:[52,128],handR:[86,128]}],
 
   // Couch stretch from the front: same shape, but the rear shin is vertical up
-  // a wall behind, so the rear foot sits high on screen rather than on the floor.
+  // a wall behind, so the rear foot sits high on screen, right above its knee,
+  // rather than on the floor.
   couchstretch:[
-    {hipY:130,footL:[46,132],footR:[78,163],handL:[52,124],handR:[86,124]},
-    {hipY:130,footL:[46,132],footR:[78,163],handL:[52,124],handR:[86,124]},
-    {hipY:130,footL:[46,132],footR:[78,163],handL:[52,124],handR:[86,124]},
-    {hipY:130,footL:[46,132],footR:[78,163],handL:[52,124],handR:[86,124]}],
+    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]},
+    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]},
+    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]},
+    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]}],
 
   // Child's pose seen from ABOVE (frontPlan). Knees wide with the big toes
   // together and the arms stretched long and even is what the view carries.
@@ -1313,10 +1315,10 @@ var FRONTS = {
   // foot, the other reaching to the ceiling: the rotation is the whole reason
   // to do it and it happens almost entirely in this plane.
   worldsgreatest:[
-    {hipY:132,footL:[46,160],footR:[78,163],handL:[50,152],handR:[84,150]},
-    {hipY:131,footL:[46,160],footR:[78,163],handL:[50,152],handR:[92,120]},
-    {hipY:130,footL:[46,160],footR:[78,163],handL:[50,152],handR:[96,94]},
-    {hipY:131,footL:[46,160],footR:[78,163],handL:[50,152],handR:[92,120]}],
+    {hipY:132,footL:[59,160],footR:[78,163],handL:[50,152],handR:[84,150]},
+    {hipY:131,footL:[59,160],footR:[78,163],handL:[50,152],handR:[92,120]},
+    {hipY:130,footL:[59,160],footR:[78,163],handL:[50,152],handR:[96,94]},
+    {hipY:131,footL:[59,160],footR:[78,163],handL:[50,152],handR:[92,120]}],
 
   // Pigeon from the front. The hips staying square to the front rather than
   // rolling open onto one buttock is the thing that makes it work, and only
@@ -1420,7 +1422,7 @@ var FRONTS = {
   glutebridge:[
     {hipY:130,footL:[58,166],footR:[82,166],handL:[46,140],handR:[94,140]},
     {hipY:130,footL:[58,166],footR:[82,166],handL:[46,140],handR:[94,140]},
-    {hipY:130,footL:[59,166],footR:[81,166],handL:[46,140],handR:[94,140]},
+    {hipY:130,footL:[58,166],footR:[82,166],handL:[46,140],handR:[94,140]},
     {hipY:130,footL:[58,166],footR:[82,166],handL:[46,140],handR:[94,140]}],
 
   // Single-arm row seen from ABOVE (frontPlan): bent over a bench, so the
@@ -1696,6 +1698,37 @@ FRONTS.pullup[2].elbL=[38,50]; FRONTS.pullup[2].elbR=[102,50];
  'hollowhold','bearcrawl','russiantwist','situpwallthrow',
  'childspose','catcow','thoracic'].forEach(function(id){
   var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.frontPlan=true;
+});
+// A leg bending toward or away from the camera is foreshortened, not bent
+// sideways. The front solver can only reach a near foot by swinging the knee
+// out, so every second panel that left the knees to it was frog-legged: the
+// sprint, the walks and lunges, the stretches, and most of the views from
+// above. A knee not given by hand is placed where the side view puts it along
+// the leg (its height in a front view, its place along the body from above)
+// and on the line from hip to foot sideways. kneeOut keeps the sideways bend
+// for the legs that really splay: the pigeon's front shin, the 90/90 switch,
+// child's pose with the knees wide and the big toes together, and the squats,
+// presses and thrusts whose knees track out over turned-out toes.
+['pigeon','nine0','childspose','backsquat','frontsquat','goblet','sq_air','sq_jump',
+ 'boxjump','broadjump','burpee','bench','hipthrust'].forEach(function(id){
+  var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.kneeOut=true;
+});
+EXERCISES.forEach(function(ex){
+  var fr=FRONTS[ex.id]; if(!fr||ex.kneeOut||!ex.frames||fr.length!==ex.frames.length) return;
+  var near=ex.frontPlan&&Math.sin(ex.frames[0].torso*Math.PI/180)>0?'L':'R';
+  fr.forEach(function(f,i){ var s=RIG.solve(ex.frames[i]);
+    var ax=ex.frontPlan?[s.hip.x>s.sh.x?1:-1,0]:[0,1];
+    function pr(p,h){ return (p.x-h.x)*ax[0]+(p.y-h.y)*ax[1]; }
+    ['L','R'].forEach(function(k){ if(f['knee'+k]) return;
+      var n=k===near?'N':'F', h=n==='N'?s.hip:s.hipF, cx=f.cx===undefined?70:f.cx, hw=f.hipHW===undefined?9:f.hipHW;
+      var hx=cx+(k==='L'?-hw:hw), ft=f['foot'+k], a=pr(s['ank'+n],h), q=pr(s['knee'+n],h);
+      // From above, the floor plane is drawn at whatever scale the author chose,
+      // so the side view gives the knee's share of the way to the foot.
+      var y=ex.frontPlan&&Math.abs(a)>8?f.hipY+(ft[1]-f.hipY)*q/a:f.hipY+q;
+      var j=placeJoint(hx,f.hipY,ft[0],ft[1],RIG.L.THIGH,RIG.L.SHIN,y,hx+(ft[0]-hx)*0.5);
+      f['knee'+k]=[j[0],j[1]];
+    });
+  });
 });
 // How long one rep takes, in ms, where the tempo's own sum (kept inside 0.9 to
 // 3 s, see rig.cycleMs) is the wrong pace: the coaches' timings for the

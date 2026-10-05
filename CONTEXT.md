@@ -884,6 +884,18 @@ view. The side plank ships with none either: seen from above, someone lying on
 their side is a profile, which the front solver (its torso always square to
 the camera) drew as a seated butterfly stretch.
 
+**Foreshortened leg**:
+A leg pointing toward or away from the camera in a second panel. The front
+solver can only reach a near foot by swinging the knee out sideways, which
+drew about 20 second panels frog-legged (the sprint, the walks and lunges,
+the stretches, most plan views). So a front knee not given by hand is filled
+in from the side view (`exercises.js`): at the side knee's height in a front
+view, or its share of the way to the foot from above, and on the hip-to-foot
+line sideways. `kneeOut` keeps the sideways bend for legs that really splay
+(pigeon, 90/90, child's pose) and marks the squats and presses whose knees
+track out over the toes. `views.js` fails a second-panel knee more than 6
+off its hip-to-foot line in any other rig.
+
 **Plan view** (`frontPlan`):
 Looking down at someone on the floor. No gravity and no ground line; labelled
 "Above".

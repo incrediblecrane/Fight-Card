@@ -245,6 +245,22 @@ EX.filter(function(e){ return e.front&&e.frames; }).forEach(function(ex){
 if(handWarn.length) console.log('WARN: '+handWarn.length+' second panels move the far limb as the near one (listed in HANDED, being re-authored):\n  ! '+handWarn.join('\n  ! '));
 if(handDone.length) console.log('NOTE: now the right way round, take off HANDED: '+handDone.join(', '));
 
+// --- legs pointing at the camera foreshorten, they do not splay ---
+// The front solver reaches a near foot by swinging the knee out sideways, so
+// every second panel that left the knees to it was frog-legged: the sprint, the
+// walks and lunges, the stretches and most views from above (19 to 29 units).
+// Sideways is measured from the hip-to-foot line at the knee's height. A rig
+// that splays its knees on purpose says so (kneeOut).
+EX.filter(function(e){ return e.front&&!e.kneeOut; }).forEach(function(ex){
+  var worst=0, at='';
+  for(var i=0;i<96;i++){ var f=rig.solveFront(rig.frontAt(ex,i/96));
+    ['L','R'].forEach(function(k){ var h=f['hip'+k], n=f['knee'+k], p=f['foot'+k];
+      var lo=Math.min(h.y,p.y), hi=Math.max(h.y,p.y), y=Math.max(lo,Math.min(hi,n.y));
+      var o=Math.abs(n.x-(hi-lo<1e-6?(h.x+p.x)/2:h.x+(p.x-h.x)*(y-h.y)/(p.y-h.y)));
+      if(o>worst){ worst=o; at=k+' at u='+r(i/96); } }); }
+  ck(ex.id,'second-panel knees foreshorten instead of splaying sideways',worst<6,r(worst)+' '+at);
+});
+
 console.log('=== VIEW + FLAGGED-FIX CHECK ===');
 if(!fails.length) console.log('PASS: bench presses vertically, jab and cross differ, all front views valid.');
 else { console.log('FAILURES ('+fails.length+'):'); var seen={};
