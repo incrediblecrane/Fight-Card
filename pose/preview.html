@@ -110,11 +110,15 @@ function solve(f){
   if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER*aF,L.FORE*aF,es); }
   else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],L.UPPER*aF)); handF=add(elbF,dir(af[1],L.FORE*aF)); }
 
-  return {hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
+  var o={hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
     elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,
     armScaleN:aN,armScaleF:aF,
     footN:pitch(f,'N'),footF:pitch(f,'F')};
+  // A ball out of the hands (ballAt), and where a skipping rope has turned to.
+  if(f.ballAt) o.ball=P(f.ballAt[0],f.ballAt[1]);
+  if(f.rope!==undefined) o.rope=f.rope;
+  return o;
 }
 // A foot's pitch: its own footN/footF, else footRot, which sets both.
 function pitch(f,k){ var v=f['foot'+k]; return v===undefined?(f.footRot||0):v; }
@@ -195,17 +199,53 @@ function lerpPt(a,b,t){ return [lerp(a[0],b[0],t), lerp(a[1],b[1],t)]; }
 // later. Blending an angle frame with a target frame used to produce a frame
 // with neither, which crashed the solver, so resolve the angles to where that
 // hand actually is and interpolate positions.
-function handFromAngles(f,arm,far){
-  var hip=P(f.hip[0],f.hip[1]), sh=add(hip,dir(f.torso,L.TORSO));
+function shoulderOf(f,far){
+  var sh=add(P(f.hip[0],f.hip[1]),dir(f.torso,L.TORSO));
   if(f.shrug) sh=add(sh,{x:0,y:-f.shrug});
-  if(far) sh=add(sh,{x:-5,y:0});
-  var a=(far?f.armScaleF:f.armScaleN); if(a===undefined) a=1;
+  return far?add(sh,{x:-5,y:0}):sh;
+}
+function handFromAngles(f,arm,far){
+  var sh=shoulderOf(f,far), a=(far?f.armScaleF:f.armScaleN); if(a===undefined) a=1;
   var elb=add(sh,dir(arm[0],L.UPPER*a));
   var h=add(elb,dir(arm[1],L.FORE*a));
   return [h.x,h.y];
 }
-// Blend two keyframes into a valid in-between pose.
-function lerpFrame(A,B,t){
+// Where a keyframe's hand is, whichever way its arm is given (as solve reads it).
+function handOf(f,far){
+  if(far) return f.handF||handFromAngles(f,f.armF||f.armN||[178,178],true);
+  return f.handN||handFromAngles(f,f.armN||[178,178],false);
+}
+// A hand target blended in a straight line cuts the corner of an arm that
+// sweeps round its shoulder: half way through a raise or a jack it passes
+// close to the shoulder and the elbow folds to reach it. A rig with
+// handPolar blends each hand as an angle and a reach about its own shoulder
+// instead, so a straight arm sweeps an arc and stays straight.
+function polarHand(A,B,t,f,key,far){
+  if(!f[key]) return;
+  var a=handOf(A,far), b=handOf(B,far), sa=shoulderOf(A,far), sb=shoulderOf(B,far), so=shoulderOf(f,far);
+  f[key]=polarAt(a,b,sa,sb,so,t);
+}
+function polarAt(a,b,sa,sb,so,t){
+  var aa=Math.atan2(a[0]-sa.x,-(a[1]-sa.y))*180/Math.PI, ab=Math.atan2(b[0]-sb.x,-(b[1]-sb.y))*180/Math.PI;
+  var r=lerp(Math.hypot(a[0]-sa.x,a[1]-sa.y),Math.hypot(b[0]-sb.x,b[1]-sb.y),t), g=lerpAng(aa,ab,t)*Math.PI/180;
+  return [so.x+r*Math.sin(g), so.y-r*Math.cos(g)];
+}
+// An arm drawn short (armScale) keeps its bend between keyframes. Its hand
+// and its scale used to blend separately, so half way through a fly the hand
+// came closer to the shoulder than the shortened arm's straight length had
+// shrunk and the elbow folded to reach it: a hug in the middle of every rep.
+// The bend is the hand's reach over the arm's drawn length; it blends from
+// one keyframe's to the other's and the scale is set to keep it. Only where
+// a keyframe sets a scale.
+function keepBend(A,B,t,f,key,sk,far){
+  if(!f[key] || (A[sk]===undefined && B[sk]===undefined)) return;
+  function bend(F){ var h=handOf(F,far), s=shoulderOf(F,far); return Math.hypot(h[0]-s.x,h[1]-s.y)/((L.UPPER+L.FORE)*(F[sk]===undefined?1:F[sk])); }
+  var r=lerp(bend(A),bend(B),t), s=shoulderOf(f,far), d=Math.hypot(f[key][0]-s.x,f[key][1]-s.y);
+  if(r>0.05) f[sk]=Math.max(0.06,Math.min(1,d/((L.UPPER+L.FORE)*r)));
+}
+// Blend two keyframes into a valid in-between pose. ex, the rig, carries the
+// options that change how (handPolar).
+function lerpFrame(A,B,t,ex){
   var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
           // The bend sign blends too. Held from A for the whole segment, a sign
@@ -238,6 +278,12 @@ function lerpFrame(A,B,t){
     if((A.armF||B.armF) && fa && fb) f.armF=[lerpAng(fa[0],fb[0],t), lerpAng(fa[1],fb[1],t)];
     else if(f.armN) f.armF=f.armN;
   }
+  if(ex&&ex.handPolar){ polarHand(A,B,t,f,'handN',false); polarHand(A,B,t,f,'handF',true); }
+  keepBend(A,B,t,f,'handN','armScaleN',false); keepBend(A,B,t,f,'handF','armScaleF',true);
+  // A ball let go of (ballAt on a keyframe: on the floor after a slam, at the
+  // wall after a throw) travels from the hands to there and back; on a
+  // keyframe without one it is in the near hand.
+  if(A.ballAt||B.ballAt) f.ballAt=lerpPt(A.ballAt||handOf(A,false),B.ballAt||handOf(B,false),t);
   return f;
 }
 
@@ -245,15 +291,47 @@ function lerpFrame(A,B,t){
 // honouring per-segment tempo so eccentrics are slower than concentrics. Where
 // in its segment the pose is comes from warp() (see timing, below).
 function poseAt(ex,u){
-  var n=ex.frames.length, g=segAt(tempoOf(ex),u);
-  return lerpFrame(ex.frames[g.i], ex.frames[(g.i+1)%n], hermite(g.t,warp(ex)[g.i]));
+  var n=ex.frames.length, g=segAt(tempoOf(ex),u), c=cutAt(ex,g), f;
+  if(c>=0) f=lerpFrame(ex.frames[c],ex.frames[c],0,ex);
+  else f=lerpFrame(ex.frames[g.i], ex.frames[(g.i+1)%n], hermite(g.t,warp(ex)[g.i]), ex);
+  if(ex.equip==='rope') f.rope=ropeTurn(ex.frames,g);
+  // A ball in the hands is in the near one (ballAt otherwise).
+  if(ex.equip==='ball'&&!f.ballAt) f.ballAt=handOf(f,false);
+  return f;
+}
+// loop:'cut' ends the rep on its last keyframe and starts the next on its
+// first with no movement between them: the figure fades out, swaps while it
+// cannot be seen, and fades back in. A broad jump sticks its landing 60 units
+// in front of where it took off, and used to slide back there in a crouch.
+// cutAt is the keyframe shown in the last segment of such a rig, else -1;
+// alphaAt the figure's opacity, 0 for the middle fifth of that segment and
+// fading over the two fifths either side.
+function cutAt(ex,g){ var n=(ex.frames||ex.front).length; return ex.loop==='cut'&&g.i===n-1?(g.t<0.5?n-1:0):-1; }
+function alphaAt(ex,u){
+  var g=segAt(tempoOf(ex),u); if(cutAt(ex,g)<0) return 1;
+  return Math.max(0,Math.min(1,(Math.abs(1-2*g.t)-0.2)*2));
+}
+// A skipping rope's turn (equip:'rope'), in degrees: 0 overhead, 90 in front,
+// 180 under the feet, 270 behind. Each keyframe gives it (rope) and it turns
+// on forwards from one to the next at an even pace, not on the figure's time
+// warp: a rope turned by the wrists does not stop when the body does.
+function ropeTurn(fr,g){
+  var a=fr[g.i].rope||0, b=fr[(g.i+1)%fr.length].rope||0;
+  return (a+((b-a)%360+360)%360*g.t)%360;
+}
+// Where the rope is (rig.solve's rope): the far end of its loop, which runs
+// round the figure from above the head to just over the floor, under the
+// feet at 180. front: it is on the near side of the body in a front view.
+function ropeAt(s,c){
+  var top=s.head.y-L.HEAD_R-8, bot=GROUND-1, a=s.rope*Math.PI/180, x=c===undefined?s.hip.x+3:c;
+  return {x:x+28*Math.sin(a), y:(top+bot)/2-(bot-top)/2*Math.cos(a), front:Math.sin(a)>0};
 }
 // The keyframe a rep turns around at (the bottom of a squat, the top of a
 // pull): stops[1] once a rig authors its stops, otherwise frame 2 of the usual
 // four. Checks read it through here rather than hard-coding frame 2, which
 // stops meaning the bottom the moment a rig gains a frame.
 function turn(ex,front){ var s=(front&&ex.frontStops)||ex.stops; return s?s[1]:2; }
-if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt;
+if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.alphaAt=alphaAt, module.exports.ropeAt=ropeAt;
 
 // ---- frontal-plane rig ---------------------------------------------------
 // Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
@@ -317,18 +395,19 @@ function solveFront(f){
     footL:footL,footR:footR,handL:handL,handR:handR,
     kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,armScaleL:aL,armScaleR:aR,
     sign:{kneeL:kL.s,kneeR:kR.s,elbL:eL.s,elbR:eR.s}, hang:{elbL:eL.t,elbR:eR.t},
-    fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
+    fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR,
+    ball:f.ballFront?P(f.ballFront[0],f.ballFront[1]):undefined, rope:f.rope};
 }
 // An explicit joint in only one of the two keyframes is blended with the joint
 // the other keyframe solves to. Dropping it instead (it used to carry through
 // only when both had one) jumped from the given joint to a solved one at the
 // keyframe boundary.
-function lerpFront(A,B,t){
+function lerpFront(A,B,t,ex){
   var sA=solveFront(A), sB=solveFront(B);
   function jt(k){ if(!A[k]&&!B[k]) return undefined;
     return lerpPt(A[k]||[sA[k].x,sA[k].y], B[k]||[sB[k].x,sB[k].y], t); }
   function sg(k){ return lerp(sA.sign[k],sB.sign[k],t); }
-  return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
+  var o={cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
     shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
     shrug:lerp(A.shrug||0,B.shrug||0,t),
@@ -341,11 +420,32 @@ function lerpFront(A,B,t){
     handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t),
     kneeL:jt('kneeL'), kneeR:jt('kneeR'), elbL:jt('elbL'), elbR:jt('elbR'),
     kneeSignL:sg('kneeL'), kneeSignR:sg('kneeR'), elbSignL:sg('elbL'), elbSignR:sg('elbR')};
+  // As the side view: hands about their shoulders with handPolar, and a
+  // shortened arm keeping its bend, each only where no elbow is given.
+  ['L','R'].forEach(function(k){ var hk='hand'+k, sk='armScale'+k;
+    if(A['elb'+k]||B['elb'+k]) return;
+    if(ex&&ex.handPolar) o[hk]=polarAt(A[hk],B[hk],shFront(A,k),shFront(B,k),shFront(o,k),t);
+    if(A[sk]===undefined&&B[sk]===undefined) return;
+    function bend(F){ var s=shFront(F,k); return Math.hypot(F[hk][0]-s.x,F[hk][1]-s.y)/((L.UPPER+L.FORE)*(F[sk]===undefined?1:F[sk])); }
+    var r=lerp(bend(A),bend(B),t), s=shFront(o,k), d=Math.hypot(o[hk][0]-s.x,o[hk][1]-s.y);
+    if(r>0.05) o[sk]=Math.max(0.06,Math.min(1,d/((L.UPPER+L.FORE)*r)));
+  });
+  // A ball let go of (ballFront), else between the hands.
+  function mid(F){ return [(F.handL[0]+F.handR[0])/2,(F.handL[1]+F.handR[1])/2]; }
+  if(A.ballFront||B.ballFront) o.ballFront=lerpPt(A.ballFront||mid(A),B.ballFront||mid(B),t);
+  return o;
 }
+// A front frame's shoulder on side k, as solveFront places it.
+function shFront(F,k){ var tS=F.torsoScale===undefined?1:F.torsoScale, cx=F.cx===undefined?70:F.cx;
+  return P(cx+(F.lean||0)+(k==='L'?-1:1)*(F.shHW===undefined?16:F.shHW), F.hipY-L.TORSO*tS-(F.shrug||0)); }
 function frontAt(ex,u){
   var fr=ex.front; if(!fr) return null;
-  var n=fr.length, g=segAt(tempoOf(ex),u);
-  return lerpFront(frontKey(fr,g.i), frontKey(fr,(g.i+1)%n), hermite(g.t,warp(ex,true)[g.i]));
+  var n=fr.length, g=segAt(tempoOf(ex),u), c=cutAt(ex,g), f;
+  if(c>=0) f=lerpFront(frontKey(fr,c),frontKey(fr,c),0,ex);
+  else f=lerpFront(frontKey(fr,g.i), frontKey(fr,(g.i+1)%n), hermite(g.t,warp(ex,true)[g.i]), ex);
+  if(ex.equip==='rope'&&ex.frames) f.rope=ropeTurn(ex.frames,g);
+  if(ex.equip==='ball'&&!f.ballFront) f.ballFront=[(f.handL[0]+f.handR[0])/2,(f.handL[1]+f.handR[1])/2];
+  return f;
 }
 // A keyframe whose hand hangs straight below the shoulder (see solveFront)
 // bends that elbow the way its nearest decided neighbour does. Flaring it out
@@ -392,8 +492,8 @@ var TRACK=['hip','head','ankN','ankF','handN','handF'], TRACKF=['hipC','head','f
 // Every tracked joint of segment i at blend w, side then (if asked) front.
 function trackAt(ex,i,w,side,front,jf){
   var n=(ex.frames||ex.front).length, j=(i+1)%n, o=[];
-  if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w)); TRACK.forEach(function(k){ o.push(s[k]); }); }
-  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); (jf||TRACKF).forEach(function(k){ o.push(f[k]); }); }
+  if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w,ex)); TRACK.forEach(function(k){ o.push(s[k]); }); }
+  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w,ex)); (jf||TRACKF).forEach(function(k){ o.push(f[k]); }); }
   return o;
 }
 // A second panel whose hips, head, hands and feet keep still through a
@@ -416,6 +516,9 @@ function segPaths(ex,side,front){
   var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[], jf=front&&ex.front&&!side?frontJoints(ex):null;
   for(var i=0;i<n;i++){
     var pts=[], len=0, most=0, q;
+    // A cut (loop:'cut') holds still either side of it: both its ends rest.
+    if(ex.loop==='cut'&&i===n-1){ var z=trackAt(ex,i,0,side,front,jf).map(function(){ return {x:0,y:0}; });
+      out.push({len:0, held:true, d0:z, d1:z}); continue; }
     for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front,jf));
     for(q=0;q<K;q++) len+=vlen(pts[q+1],pts[q]);
     for(q=1;q<=K;q++) most=Math.max(most,vmax(pts[q],pts[0]));
@@ -520,11 +623,14 @@ function jumpsAt(ex,n){
     var s=ex.frames?solve(poseAt(ex,i/n)):null, f=ex.front?solveFront(frontAt(ex,i/n)):null, cur=[];
     if(s) TRACK.forEach(function(k){ cur.push(s[k]); });
     if(f) TRACKF.forEach(function(k){ cur.push(f[k]); });
-    if(prev) worst=Math.max(worst,vmax(cur,prev));
+    // The swap of a cut happens out of sight (alphaAt), so it is no jump.
+    if(prev&&!cutBetween(ex,(i-1)/n,i/n)) worst=Math.max(worst,vmax(cur,prev));
     prev=cur;
   }
   return worst;
 }
+// Whether the swap of a cut falls between two moments of a rep.
+function cutBetween(ex,u0,u1){ var t=tempoOf(ex), a=segAt(t,u0), b=segAt(t,u1), x=cutAt(ex,a), y=cutAt(ex,b); return x>=0&&y>=0&&x!==y; }
 function stepsOf(ex){ var at=Math.round(cycleMs(ex)/FRAME_MS); return jumpsAt(ex,at)>STROBE?Math.round(cycleMs(ex)/FAST_MS):at; }
 // The biggest jump between two of the frames the app draws.
 function strobes(ex){ return jumpsAt(ex,stepsOf(ex)); }
@@ -549,7 +655,7 @@ function ship(ex){
 }
 if(typeof module!=='undefined'){ module.exports.hermite=hermite; module.exports.warp=warp; module.exports.stopsOf=stopsOf;
   module.exports.autoStops=autoStops; module.exports.cycleMs=cycleMs; module.exports.stepsOf=stepsOf; module.exports.strobes=strobes; module.exports.stillOf=stillOf;
-  module.exports.ship=ship; module.exports.segAt=segAt; module.exports.tempoOf=tempoOf; }
+  module.exports.ship=ship; module.exports.segAt=segAt; module.exports.tempoOf=tempoOf; module.exports.cutBetween=cutBetween; }
 
 // ---- exercises.js ----
 // Exercise frames. Feet planted on GROUND=170 (ankle y=163) for standing lifts.
@@ -1038,7 +1144,9 @@ var EXERCISES = [
 { id:"woodchopper", tempo:[380,380,460,460], name:"Cable or band woodchopper",
   real:"Cable set high on one side. Pull it down and across the body to the opposite hip, letting the torso rotate and the back heel pivot, arms staying long. It is a rotation driven from the hips, not a lat pulldown done sideways.",
   changed:"The hands now travel on a long diagonal from high on one side to the opposite hip with the torso rotating behind them, rather than sharing the generic TWIST pose that only turned the shoulders.",
-  equip:"cable", active:"arms", anchorAt:[124,40], anchorFront:[16,44,124,44],
+  // One cable, high on one side, to one handle held in both hands: two from
+  // opposite sides drew it as a cable crossover.
+  equip:"cable", active:"arms", anchorAt:[124,40], anchorFront:[128,28],
   frames:[
     {hip:[55,110],torso:352,ankN:[64,163],ankF:[46,163], handN:[82,58],handF:[76,60], elbowSign:1},
     {hip:[55,110],torso:6,  ankN:[64,163],ankF:[46,163], handN:[72,88],handF:[66,90], elbowSign:1},
@@ -1060,7 +1168,11 @@ var EXERCISES = [
 { id:"palloffpress", tempo:[420,520,520,420], name:"Pallof press",
   real:"Stand side-on to a cable at chest height, hands together at the sternum. Press straight out and hold: the cable is trying to rotate you and you refuse. Nothing should turn. The further the hands travel from the chest, the harder the anti-rotation demand gets.",
   changed:"The hands now press straight out from the sternum with the torso locked square, so the exercise reads as anti-rotation. It used to share the overhead PRESS pose, which is the wrong plane entirely.",
-  equip:"cable", active:"arms", anchorAt:[6,88], anchorFront:[6,88,134,88],
+  // The cable pulls from one side, which is the whole exercise: two cables
+  // from opposite sides cancel out. From the side it runs toward the camera,
+  // so only the handle shows (no anchorAt); drawn running back to an anchor
+  // behind the lifter it read as a cable chest press.
+  equip:"cable", active:"arms", anchorFront:[134,86],
   frames:[
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[62,88],handF:[56,89], elbowSign:1},
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[76,86],handF:[70,87], elbowSign:1},
@@ -1114,7 +1226,9 @@ var EXERCISES = [
     {hip:[92,114],torso:26,ankN:[96,140],ankF:[86,140], armN:[170,160]}
   ]},
 
-{ id:"broadjump", tempo:[380,240,320,420], name:"Broad jump",
+// The landing is 60 in front of the take-off, so the rep cuts back to the
+// start (loop:'cut') rather than sliding there backwards in a crouch.
+{ id:"broadjump", tempo:[380,240,320,420], loop:"cut", name:"Broad jump",
   real:"Hips back, arms swung behind, then jump forward as far as you can and stick the landing with both feet and bent knees. It is a horizontal version of the same hip extension, and sticking the landing rather than stumbling out of it is the skill.",
   changed:"It now travels FORWARD across the frame and sticks a two-foot landing, which is the only thing separating it from a vertical jump. Both used to share one pose.",
   equip:null, active:"legs",
@@ -1143,7 +1257,8 @@ var EXERCISES = [
   frames:[
     {hip:[55,107],torso:2, ankN:[62,163],ankF:[53,163], handN:[59,34], handF:[53,36], elbowSign:1},
     {hip:[52,112],torso:20,ankN:[62,163],ankF:[53,163], handN:[68,76], handF:[62,78], elbowSign:1},
-    {hip:[42,124],torso:56,ankN:[62,163],ankF:[53,163], handN:[80,140],handF:[74,142], elbowSign:1},
+    // Let go of: the ball strikes the floor (ballAt) below the hands.
+    {hip:[42,124],torso:56,ankN:[62,163],ankF:[53,163], handN:[80,140],handF:[74,142], elbowSign:1, ballAt:[80,159]},
     {hip:[50,114],torso:26,ankN:[62,163],ankF:[53,163], handN:[70,84], handF:[64,86], elbowSign:1}
   ]},
 
@@ -1172,12 +1287,14 @@ var EXERCISES = [
 { id:"skipping", tempo:[200,180,200,180], name:"Skipping",
   real:"Small hops off the balls of the feet, an inch or two clear, with the rope turned by the wrists rather than the whole arm. Elbows stay in near the ribs. The knees stay soft and the heels never really touch down.",
   changed:"It now hops just clear of the floor with the elbows pinned and only the wrists turning, rather than sharing the big JUMP pose, which is the opposite of what skipping looks like.",
-  equip:null, active:"legs",
+  // The rope (rope: its turn at each keyframe, 0 overhead) comes over the
+  // head as the feet land and passes under them at the top of each hop.
+  equip:"rope", active:"legs",
   frames:[
-    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,84]},
-    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112]},
-    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,140]},
-    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112]}
+    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,84], rope:0},
+    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112], rope:180},
+    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,140], rope:0},
+    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112], rope:180}
   ]},
 
 { id:"jumpingjack", tempo:[240,240,240,240], name:"Jumping jacks",
@@ -2151,6 +2268,8 @@ function frontFromSide(ex,opt){
       handL:[cx-opt.grip,handY],   handR:[cx+opt.grip,handY],
       kneeL:[kL[0],kL[1]], kneeR:[kR[0],kR[1]], elbL:[eL[0],eL[1]], elbR:[eR[0],eR[1]]};
     if(f.shrug) out.shrug=f.shrug;
+    // A ball let go of is at the side view's height, on the midline.
+    if(f.ballAt) out.ballFront=[cx,f.ballAt[1]];
     return out;
   });
 }
@@ -2328,6 +2447,13 @@ function segPts(A,B,w1,w2){
 // foot backwards through most of every squat. The foot is the app's: a block
 // hinged at the ankle, pitched by footN/footF (rig.js footAt).
 function footPts(ank,rot){ return footAt(ank,rot).map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' '); }
+// A rope strand from a hand to the far end of its loop (rig.js ropeAt), bowed
+// back against the way it turns, as the app draws it.
+function ropePath(h,q,a){
+  var r=a*Math.PI/180, vx=28*Math.cos(r), vy=60*Math.sin(r), vl=Math.hypot(vx,vy)||1;
+  var cx=(h.x+q.x)/2-vx/vl*8, cy=(h.y+q.y)/2-vy/vl*8;
+  return 'M'+h.x.toFixed(1)+' '+h.y.toFixed(1)+' Q'+cx.toFixed(1)+' '+cy.toFixed(1)+' '+q.x.toFixed(1)+' '+q.y.toFixed(1);
+}
 // Precompute the bar path over a full rep so it can be shown as a trace.
 function barPath(ex){
   if(!ex.equip||ex.equip==='fixedbar') return null;
@@ -2355,8 +2481,12 @@ function boxOf(ex){
     [s.ankN,s.ankF].forEach(function(p){ see(p.x+L.FOOT*0.72,1); see(p.x-L.FOOT*0.28,1); up(p.y,6); });
     [s.handN,s.handF].forEach(function(p){ see(p.x,eq); up(p.y,eqS); });
     if(q==='kettlebell'){ var kb=bellAt(ex,s); see(kb.x,10); up(kb.y,10); }
+    if(s.ball){ see(s.ball.x,12); up(s.ball.y,12); }
+    if(q==='rope'){ see(s.hip.x-25,1); see(s.hip.x+31,1); up(s.head.y-L.HEAD_R-8,2); }
     if(ex.front){ var f=solveFront(frontAt(ex,i/N));
       if(q==='kettlebell') up(bellFront(ex,f).y,9);
+      if(f.ball) up(f.ball.y,12);
+      if(q==='rope') up(f.head.y-L.HEAD_R-8,2);
       up(f.head.y,L.HEAD_R+1); up(f.shC.y,13);
       [f.shL,f.shR].forEach(function(p){ up(p.y,8); });
       [f.elbL,f.elbR,f.kneeL,f.kneeR].forEach(function(p){ up(p.y,6); });
@@ -2368,7 +2498,7 @@ function boxOf(ex){
   (ex.planProps||[]).forEach(function(p){ up(p[1],1); });
   if(ex.barAt){ see(ex.barAt[0],4); up(ex.barAt[1],4); }
   if(ex.anchorAt){ see(ex.anchorAt[0],2); up(ex.anchorAt[1],2); }
-  if(ex.anchorFront){ up(ex.anchorFront[1],2); up(ex.anchorFront[3],2); }
+  if(ex.anchorFront) for(var a=1;a<ex.anchorFront.length;a+=2) up(ex.anchorFront[a],2);
   var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2));
   return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y};
 }
@@ -2428,8 +2558,12 @@ function buildFigure(ex,host,bx){
     // from the side you look down the handle and see one bell face.
     R.bell=el('circle',{r:6.5,fill:soft}); eq.appendChild(R.bell);
   } else if(ex.equip==='cable'){
-    R.cable=el('line',{stroke:soft,'stroke-width':1.8}); R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft});
-    eq.appendChild(R.cable); eq.appendChild(R.grip);
+    // With no anchorAt the cable runs toward the camera: only the handle shows.
+    if(ex.anchorAt){ R.cable=el('line',{stroke:soft,'stroke-width':1.8}); eq.appendChild(R.cable); }
+    R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft}); eq.appendChild(R.grip);
+  } else if(ex.equip==='ball'){
+    R.ball=el('circle',{r:11,fill:'none',stroke:soft,'stroke-width':3}); R.bhub=el('circle',{r:3,fill:soft});
+    eq.appendChild(R.ball); eq.appendChild(R.bhub);
   } else if(ex.equip==='dumbbell'){
     // Hanging in a neutral grip the handle runs front to back, so from the side
     // you see the whole dumbbell in profile, lying horizontal.
@@ -2442,8 +2576,11 @@ function buildFigure(ex,host,bx){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
     eq.appendChild(R.kb); eq.appendChild(R.kh);
   }
-  // Back to front, as the app: far leg and arm, the body, the near leg, the
-  // implement, the head, the near arm, then a bar or a pinched plate.
+  // Back to front, as the app: a rope's far strand, far leg and arm, the body,
+  // the near leg, the implement, the head, the near arm, then a bar or a
+  // pinched plate, and a rope's near strand.
+  var rope={fill:'none',stroke:soft,'stroke-width':1.6};
+  if(ex.equip==='rope'){ R.ropeF=el('path',rope); svg.appendChild(R.ropeF); }
   pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
   R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
   svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
@@ -2453,8 +2590,9 @@ function buildFigure(ex,host,bx){
   R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
   pair('ncut','var(--surface-raised)',[8,6,4.5],false,true); pair('narm',armCol,[8,6,4.5],false);
   if(top) svg.appendChild(eq);
+  if(ex.equip==='rope'){ R.ropeN=el('path',rope); svg.appendChild(R.ropeN); }
   host.appendChild(svg);
-  return {R:R,trace:trace};
+  return {R:R,trace:trace,svg:svg};
 }
 function update(ex,ref,u){
   var s=solve(poseAt(ex,u)), R=ref.R;
@@ -2482,11 +2620,15 @@ function update(ex,ref,u){
   if(R.pp){ R.pp.setAttribute('cx',p.x.toFixed(1)); R.pp.setAttribute('cy',(p.y+9).toFixed(1)); }
   if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
   if(R.bell){ R.bell.setAttribute('cx',p.x.toFixed(1)); R.bell.setAttribute('cy',p.y.toFixed(1)); }
-  if(R.cable && ex.anchorAt){
+  if(R.cable){
     R.cable.setAttribute('x1',ex.anchorAt[0]); R.cable.setAttribute('y1',ex.anchorAt[1]);
     R.cable.setAttribute('x2',p.x.toFixed(1)); R.cable.setAttribute('y2',p.y.toFixed(1));
-    R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1));
   }
+  if(R.grip){ R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1)); }
+  // A ball let go of (ballAt) is where the rig puts it, else in the near hand.
+  if(R.ball){ var b=s.ball||s.handN; [R.ball,R.bhub].forEach(function(n){ n.setAttribute('cx',b.x.toFixed(1)); n.setAttribute('cy',b.y.toFixed(1)); }); }
+  if(R.ropeN){ var q=ropeAt(s);
+    R.ropeF.setAttribute('d',ropePath(s.handF,{x:q.x-5,y:q.y},s.rope)); R.ropeN.setAttribute('d',ropePath(s.handN,q,s.rope)); }
   if(R.db && axis2==='vertical'){
     R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
     R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
@@ -2515,6 +2657,10 @@ function buildFront(ex,host,bx){
   if(!ex.frontPlan) svg.appendChild(groundEl(20,120));
   (ex.planProps||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
   var R={svg:svg};
+  // A rope's arch behind the body (on its way over), and in front (on its way
+  // down and under), as the app.
+  var rope={fill:'none',stroke:soft,'stroke-width':1.6};
+  if(ex.equip==='rope'){ R.ropeB=el('path',rope); svg.appendChild(R.ropeB); }
   // An arm foreshortened toward the camera lies on top of the torso in the same
   // ink, so it disappears into the silhouette. A surface-coloured outline is
   // what separates it; legs sit outside the body and do not need one.
@@ -2589,10 +2735,16 @@ function buildFront(ex,host,bx){
     R.fppL=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3}); R.fppR=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3});
     svg.appendChild(R.fppL); svg.appendChild(R.fppR);
   } else if(ex.equip==='cable'){
-    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fcabR=el('line',{stroke:soft,'stroke-width':1.8});
-    R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
-    svg.appendChild(R.fcabL); svg.appendChild(R.fcabR); svg.appendChild(R.fgripL); svg.appendChild(R.fgripR);
+    // One anchor ([x,y]) is one cable to one handle; two are one per hand.
+    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+    svg.appendChild(R.fcabL); svg.appendChild(R.fgripL);
+    if(!ex.anchorFront||ex.anchorFront.length>=4){ R.fcabR=el('line',{stroke:soft,'stroke-width':1.8}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+      svg.appendChild(R.fcabR); svg.appendChild(R.fgripR); }
+  } else if(ex.equip==='ball'){
+    R.fball=el('circle',{r:11,fill:'none',stroke:soft,'stroke-width':3}); R.fbhub=el('circle',{r:3,fill:soft});
+    svg.appendChild(R.fball); svg.appendChild(R.fbhub);
   }
+  if(ex.equip==='rope'){ R.ropeF=el('path',rope); svg.appendChild(R.ropeF); }
   host.appendChild(svg);
   return R;
 }
@@ -2649,8 +2801,8 @@ function updateFront(ex,R,u){
   }
   if(R.fppL){ R.fppL.setAttribute('cx',hL.x.toFixed(1)); R.fppL.setAttribute('cy',(hL.y+7).toFixed(1));
     R.fppR.setAttribute('cx',hR.x.toFixed(1)); R.fppR.setAttribute('cy',(hR.y+7).toFixed(1)); }
-  if(R.fcabL && ex.anchorFront){
-    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+  if(R.fcabL && ex.anchorFront){ var one=ex.anchorFront.length<4;
+    (one?[['L',ex.load?(ex.load==='L'?s.handL:s.handR):P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2)]]:[['L',s.handL],['R',s.handR]]).forEach(function(pr){
       var h=pr[1], ax=ex.anchorFront[pr[0]==='L'?0:2], ay=ex.anchorFront[pr[0]==='L'?1:3];
       R['fcab'+pr[0]].setAttribute('x1',ax); R['fcab'+pr[0]].setAttribute('y1',ay);
       R['fcab'+pr[0]].setAttribute('x2',h.x.toFixed(1)); R['fcab'+pr[0]].setAttribute('y2',h.y.toFixed(1));
@@ -2661,6 +2813,11 @@ function updateFront(ex,R,u){
     R.fbellL.setAttribute('cx',hL.x.toFixed(1)); R.fbellL.setAttribute('cy',hL.y.toFixed(1));
     R.fbellR.setAttribute('cx',hR.x.toFixed(1)); R.fbellR.setAttribute('cy',hR.y.toFixed(1));
   }
+  if(R.fball){ var fb=s.ball||P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2);
+    [R.fball,R.fbhub].forEach(function(n){ n.setAttribute('cx',fb.x.toFixed(1)); n.setAttribute('cy',fb.y.toFixed(1)); }); }
+  if(R.ropeF){ var rq=ropeAt(s,70), qy=rq.y.toFixed(1), mx=((s.handL.x+s.handR.x)/2).toFixed(1);
+    var arch='M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1)+' Q'+s.handL.x.toFixed(1)+' '+qy+' '+mx+' '+qy+' Q'+s.handR.x.toFixed(1)+' '+qy+' '+s.handR.x.toFixed(1)+' '+s.handR.y.toFixed(1), none='M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1);
+    R.ropeB.setAttribute('d',rq.front?none:arch); R.ropeF.setAttribute('d',rq.front?arch:none); }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;
     R.fdb.setAttribute('x',(mx-4.5).toFixed(1));  R.fdb.setAttribute('y',(my-10).toFixed(1));
@@ -2694,7 +2851,9 @@ var playing=true, speed=1, t0=performance.now(), elapsed=0, showPath=false, manu
 function frame(now){
   if(playing) elapsed=(now-t0)*speed;
   EXERCISES.forEach(function(ex,i){ var u=manual===null?(elapsed/cycleMs(ex))%1:manual;
-    update(ex,refs[i],u); if(refs[i].front) updateFront(ex,refs[i].front,u); });
+    update(ex,refs[i],u); if(refs[i].front) updateFront(ex,refs[i].front,u);
+    // A cut (loop:'cut') fades the figure out and in round its swap.
+    var a=String(alphaAt(ex,u)); [refs[i].svg,refs[i].front&&refs[i].front.svg].forEach(function(g){ if(g&&g.getAttribute('opacity')!==a) g.setAttribute('opacity',a); }); });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

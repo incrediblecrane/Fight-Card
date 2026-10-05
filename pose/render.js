@@ -12,6 +12,13 @@ function segPts(A,B,w1,w2){
 // foot backwards through most of every squat. The foot is the app's: a block
 // hinged at the ankle, pitched by footN/footF (rig.js footAt).
 function footPts(ank,rot){ return footAt(ank,rot).map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' '); }
+// A rope strand from a hand to the far end of its loop (rig.js ropeAt), bowed
+// back against the way it turns, as the app draws it.
+function ropePath(h,q,a){
+  var r=a*Math.PI/180, vx=28*Math.cos(r), vy=60*Math.sin(r), vl=Math.hypot(vx,vy)||1;
+  var cx=(h.x+q.x)/2-vx/vl*8, cy=(h.y+q.y)/2-vy/vl*8;
+  return 'M'+h.x.toFixed(1)+' '+h.y.toFixed(1)+' Q'+cx.toFixed(1)+' '+cy.toFixed(1)+' '+q.x.toFixed(1)+' '+q.y.toFixed(1);
+}
 // Precompute the bar path over a full rep so it can be shown as a trace.
 function barPath(ex){
   if(!ex.equip||ex.equip==='fixedbar') return null;
@@ -39,8 +46,12 @@ function boxOf(ex){
     [s.ankN,s.ankF].forEach(function(p){ see(p.x+L.FOOT*0.72,1); see(p.x-L.FOOT*0.28,1); up(p.y,6); });
     [s.handN,s.handF].forEach(function(p){ see(p.x,eq); up(p.y,eqS); });
     if(q==='kettlebell'){ var kb=bellAt(ex,s); see(kb.x,10); up(kb.y,10); }
+    if(s.ball){ see(s.ball.x,12); up(s.ball.y,12); }
+    if(q==='rope'){ see(s.hip.x-25,1); see(s.hip.x+31,1); up(s.head.y-L.HEAD_R-8,2); }
     if(ex.front){ var f=solveFront(frontAt(ex,i/N));
       if(q==='kettlebell') up(bellFront(ex,f).y,9);
+      if(f.ball) up(f.ball.y,12);
+      if(q==='rope') up(f.head.y-L.HEAD_R-8,2);
       up(f.head.y,L.HEAD_R+1); up(f.shC.y,13);
       [f.shL,f.shR].forEach(function(p){ up(p.y,8); });
       [f.elbL,f.elbR,f.kneeL,f.kneeR].forEach(function(p){ up(p.y,6); });
@@ -52,7 +63,7 @@ function boxOf(ex){
   (ex.planProps||[]).forEach(function(p){ up(p[1],1); });
   if(ex.barAt){ see(ex.barAt[0],4); up(ex.barAt[1],4); }
   if(ex.anchorAt){ see(ex.anchorAt[0],2); up(ex.anchorAt[1],2); }
-  if(ex.anchorFront){ up(ex.anchorFront[1],2); up(ex.anchorFront[3],2); }
+  if(ex.anchorFront) for(var a=1;a<ex.anchorFront.length;a+=2) up(ex.anchorFront[a],2);
   var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2));
   return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y};
 }
@@ -112,8 +123,12 @@ function buildFigure(ex,host,bx){
     // from the side you look down the handle and see one bell face.
     R.bell=el('circle',{r:6.5,fill:soft}); eq.appendChild(R.bell);
   } else if(ex.equip==='cable'){
-    R.cable=el('line',{stroke:soft,'stroke-width':1.8}); R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft});
-    eq.appendChild(R.cable); eq.appendChild(R.grip);
+    // With no anchorAt the cable runs toward the camera: only the handle shows.
+    if(ex.anchorAt){ R.cable=el('line',{stroke:soft,'stroke-width':1.8}); eq.appendChild(R.cable); }
+    R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft}); eq.appendChild(R.grip);
+  } else if(ex.equip==='ball'){
+    R.ball=el('circle',{r:11,fill:'none',stroke:soft,'stroke-width':3}); R.bhub=el('circle',{r:3,fill:soft});
+    eq.appendChild(R.ball); eq.appendChild(R.bhub);
   } else if(ex.equip==='dumbbell'){
     // Hanging in a neutral grip the handle runs front to back, so from the side
     // you see the whole dumbbell in profile, lying horizontal.
@@ -126,8 +141,11 @@ function buildFigure(ex,host,bx){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
     eq.appendChild(R.kb); eq.appendChild(R.kh);
   }
-  // Back to front, as the app: far leg and arm, the body, the near leg, the
-  // implement, the head, the near arm, then a bar or a pinched plate.
+  // Back to front, as the app: a rope's far strand, far leg and arm, the body,
+  // the near leg, the implement, the head, the near arm, then a bar or a
+  // pinched plate, and a rope's near strand.
+  var rope={fill:'none',stroke:soft,'stroke-width':1.6};
+  if(ex.equip==='rope'){ R.ropeF=el('path',rope); svg.appendChild(R.ropeF); }
   pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
   R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
   svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
@@ -137,8 +155,9 @@ function buildFigure(ex,host,bx){
   R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
   pair('ncut','var(--surface-raised)',[8,6,4.5],false,true); pair('narm',armCol,[8,6,4.5],false);
   if(top) svg.appendChild(eq);
+  if(ex.equip==='rope'){ R.ropeN=el('path',rope); svg.appendChild(R.ropeN); }
   host.appendChild(svg);
-  return {R:R,trace:trace};
+  return {R:R,trace:trace,svg:svg};
 }
 function update(ex,ref,u){
   var s=solve(poseAt(ex,u)), R=ref.R;
@@ -166,11 +185,15 @@ function update(ex,ref,u){
   if(R.pp){ R.pp.setAttribute('cx',p.x.toFixed(1)); R.pp.setAttribute('cy',(p.y+9).toFixed(1)); }
   if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
   if(R.bell){ R.bell.setAttribute('cx',p.x.toFixed(1)); R.bell.setAttribute('cy',p.y.toFixed(1)); }
-  if(R.cable && ex.anchorAt){
+  if(R.cable){
     R.cable.setAttribute('x1',ex.anchorAt[0]); R.cable.setAttribute('y1',ex.anchorAt[1]);
     R.cable.setAttribute('x2',p.x.toFixed(1)); R.cable.setAttribute('y2',p.y.toFixed(1));
-    R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1));
   }
+  if(R.grip){ R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1)); }
+  // A ball let go of (ballAt) is where the rig puts it, else in the near hand.
+  if(R.ball){ var b=s.ball||s.handN; [R.ball,R.bhub].forEach(function(n){ n.setAttribute('cx',b.x.toFixed(1)); n.setAttribute('cy',b.y.toFixed(1)); }); }
+  if(R.ropeN){ var q=ropeAt(s);
+    R.ropeF.setAttribute('d',ropePath(s.handF,{x:q.x-5,y:q.y},s.rope)); R.ropeN.setAttribute('d',ropePath(s.handN,q,s.rope)); }
   if(R.db && axis2==='vertical'){
     R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
     R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
@@ -199,6 +222,10 @@ function buildFront(ex,host,bx){
   if(!ex.frontPlan) svg.appendChild(groundEl(20,120));
   (ex.planProps||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
   var R={svg:svg};
+  // A rope's arch behind the body (on its way over), and in front (on its way
+  // down and under), as the app.
+  var rope={fill:'none',stroke:soft,'stroke-width':1.6};
+  if(ex.equip==='rope'){ R.ropeB=el('path',rope); svg.appendChild(R.ropeB); }
   // An arm foreshortened toward the camera lies on top of the torso in the same
   // ink, so it disappears into the silhouette. A surface-coloured outline is
   // what separates it; legs sit outside the body and do not need one.
@@ -273,10 +300,16 @@ function buildFront(ex,host,bx){
     R.fppL=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3}); R.fppR=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3});
     svg.appendChild(R.fppL); svg.appendChild(R.fppR);
   } else if(ex.equip==='cable'){
-    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fcabR=el('line',{stroke:soft,'stroke-width':1.8});
-    R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
-    svg.appendChild(R.fcabL); svg.appendChild(R.fcabR); svg.appendChild(R.fgripL); svg.appendChild(R.fgripR);
+    // One anchor ([x,y]) is one cable to one handle; two are one per hand.
+    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+    svg.appendChild(R.fcabL); svg.appendChild(R.fgripL);
+    if(!ex.anchorFront||ex.anchorFront.length>=4){ R.fcabR=el('line',{stroke:soft,'stroke-width':1.8}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
+      svg.appendChild(R.fcabR); svg.appendChild(R.fgripR); }
+  } else if(ex.equip==='ball'){
+    R.fball=el('circle',{r:11,fill:'none',stroke:soft,'stroke-width':3}); R.fbhub=el('circle',{r:3,fill:soft});
+    svg.appendChild(R.fball); svg.appendChild(R.fbhub);
   }
+  if(ex.equip==='rope'){ R.ropeF=el('path',rope); svg.appendChild(R.ropeF); }
   host.appendChild(svg);
   return R;
 }
@@ -333,8 +366,8 @@ function updateFront(ex,R,u){
   }
   if(R.fppL){ R.fppL.setAttribute('cx',hL.x.toFixed(1)); R.fppL.setAttribute('cy',(hL.y+7).toFixed(1));
     R.fppR.setAttribute('cx',hR.x.toFixed(1)); R.fppR.setAttribute('cy',(hR.y+7).toFixed(1)); }
-  if(R.fcabL && ex.anchorFront){
-    [['L',s.handL],['R',s.handR]].forEach(function(pr){
+  if(R.fcabL && ex.anchorFront){ var one=ex.anchorFront.length<4;
+    (one?[['L',ex.load?(ex.load==='L'?s.handL:s.handR):P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2)]]:[['L',s.handL],['R',s.handR]]).forEach(function(pr){
       var h=pr[1], ax=ex.anchorFront[pr[0]==='L'?0:2], ay=ex.anchorFront[pr[0]==='L'?1:3];
       R['fcab'+pr[0]].setAttribute('x1',ax); R['fcab'+pr[0]].setAttribute('y1',ay);
       R['fcab'+pr[0]].setAttribute('x2',h.x.toFixed(1)); R['fcab'+pr[0]].setAttribute('y2',h.y.toFixed(1));
@@ -345,6 +378,11 @@ function updateFront(ex,R,u){
     R.fbellL.setAttribute('cx',hL.x.toFixed(1)); R.fbellL.setAttribute('cy',hL.y.toFixed(1));
     R.fbellR.setAttribute('cx',hR.x.toFixed(1)); R.fbellR.setAttribute('cy',hR.y.toFixed(1));
   }
+  if(R.fball){ var fb=s.ball||P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2);
+    [R.fball,R.fbhub].forEach(function(n){ n.setAttribute('cx',fb.x.toFixed(1)); n.setAttribute('cy',fb.y.toFixed(1)); }); }
+  if(R.ropeF){ var rq=ropeAt(s,70), qy=rq.y.toFixed(1), mx=((s.handL.x+s.handR.x)/2).toFixed(1);
+    var arch='M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1)+' Q'+s.handL.x.toFixed(1)+' '+qy+' '+mx+' '+qy+' Q'+s.handR.x.toFixed(1)+' '+qy+' '+s.handR.x.toFixed(1)+' '+s.handR.y.toFixed(1), none='M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1);
+    R.ropeB.setAttribute('d',rq.front?none:arch); R.ropeF.setAttribute('d',rq.front?arch:none); }
   if(R.fdb){
     var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;
     R.fdb.setAttribute('x',(mx-4.5).toFixed(1));  R.fdb.setAttribute('y',(my-10).toFixed(1));
@@ -378,7 +416,9 @@ var playing=true, speed=1, t0=performance.now(), elapsed=0, showPath=false, manu
 function frame(now){
   if(playing) elapsed=(now-t0)*speed;
   EXERCISES.forEach(function(ex,i){ var u=manual===null?(elapsed/cycleMs(ex))%1:manual;
-    update(ex,refs[i],u); if(refs[i].front) updateFront(ex,refs[i].front,u); });
+    update(ex,refs[i],u); if(refs[i].front) updateFront(ex,refs[i].front,u);
+    // A cut (loop:'cut') fades the figure out and in round its swap.
+    var a=String(alphaAt(ex,u)); [refs[i].svg,refs[i].front&&refs[i].front.svg].forEach(function(g){ if(g&&g.getAttribute('opacity')!==a) g.setAttribute('opacity',a); }); });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

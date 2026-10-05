@@ -484,7 +484,9 @@ var EXERCISES = [
 { id:"woodchopper", tempo:[380,380,460,460], name:"Cable or band woodchopper",
   real:"Cable set high on one side. Pull it down and across the body to the opposite hip, letting the torso rotate and the back heel pivot, arms staying long. It is a rotation driven from the hips, not a lat pulldown done sideways.",
   changed:"The hands now travel on a long diagonal from high on one side to the opposite hip with the torso rotating behind them, rather than sharing the generic TWIST pose that only turned the shoulders.",
-  equip:"cable", active:"arms", anchorAt:[124,40], anchorFront:[16,44,124,44],
+  // One cable, high on one side, to one handle held in both hands: two from
+  // opposite sides drew it as a cable crossover.
+  equip:"cable", active:"arms", anchorAt:[124,40], anchorFront:[128,28],
   frames:[
     {hip:[55,110],torso:352,ankN:[64,163],ankF:[46,163], handN:[82,58],handF:[76,60], elbowSign:1},
     {hip:[55,110],torso:6,  ankN:[64,163],ankF:[46,163], handN:[72,88],handF:[66,90], elbowSign:1},
@@ -506,7 +508,11 @@ var EXERCISES = [
 { id:"palloffpress", tempo:[420,520,520,420], name:"Pallof press",
   real:"Stand side-on to a cable at chest height, hands together at the sternum. Press straight out and hold: the cable is trying to rotate you and you refuse. Nothing should turn. The further the hands travel from the chest, the harder the anti-rotation demand gets.",
   changed:"The hands now press straight out from the sternum with the torso locked square, so the exercise reads as anti-rotation. It used to share the overhead PRESS pose, which is the wrong plane entirely.",
-  equip:"cable", active:"arms", anchorAt:[6,88], anchorFront:[6,88,134,88],
+  // The cable pulls from one side, which is the whole exercise: two cables
+  // from opposite sides cancel out. From the side it runs toward the camera,
+  // so only the handle shows (no anchorAt); drawn running back to an anchor
+  // behind the lifter it read as a cable chest press.
+  equip:"cable", active:"arms", anchorFront:[134,86],
   frames:[
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[62,88],handF:[56,89], elbowSign:1},
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[76,86],handF:[70,87], elbowSign:1},
@@ -560,7 +566,9 @@ var EXERCISES = [
     {hip:[92,114],torso:26,ankN:[96,140],ankF:[86,140], armN:[170,160]}
   ]},
 
-{ id:"broadjump", tempo:[380,240,320,420], name:"Broad jump",
+// The landing is 60 in front of the take-off, so the rep cuts back to the
+// start (loop:'cut') rather than sliding there backwards in a crouch.
+{ id:"broadjump", tempo:[380,240,320,420], loop:"cut", name:"Broad jump",
   real:"Hips back, arms swung behind, then jump forward as far as you can and stick the landing with both feet and bent knees. It is a horizontal version of the same hip extension, and sticking the landing rather than stumbling out of it is the skill.",
   changed:"It now travels FORWARD across the frame and sticks a two-foot landing, which is the only thing separating it from a vertical jump. Both used to share one pose.",
   equip:null, active:"legs",
@@ -589,7 +597,8 @@ var EXERCISES = [
   frames:[
     {hip:[55,107],torso:2, ankN:[62,163],ankF:[53,163], handN:[59,34], handF:[53,36], elbowSign:1},
     {hip:[52,112],torso:20,ankN:[62,163],ankF:[53,163], handN:[68,76], handF:[62,78], elbowSign:1},
-    {hip:[42,124],torso:56,ankN:[62,163],ankF:[53,163], handN:[80,140],handF:[74,142], elbowSign:1},
+    // Let go of: the ball strikes the floor (ballAt) below the hands.
+    {hip:[42,124],torso:56,ankN:[62,163],ankF:[53,163], handN:[80,140],handF:[74,142], elbowSign:1, ballAt:[80,159]},
     {hip:[50,114],torso:26,ankN:[62,163],ankF:[53,163], handN:[70,84], handF:[64,86], elbowSign:1}
   ]},
 
@@ -618,12 +627,14 @@ var EXERCISES = [
 { id:"skipping", tempo:[200,180,200,180], name:"Skipping",
   real:"Small hops off the balls of the feet, an inch or two clear, with the rope turned by the wrists rather than the whole arm. Elbows stay in near the ribs. The knees stay soft and the heels never really touch down.",
   changed:"It now hops just clear of the floor with the elbows pinned and only the wrists turning, rather than sharing the big JUMP pose, which is the opposite of what skipping looks like.",
-  equip:null, active:"legs",
+  // The rope (rope: its turn at each keyframe, 0 overhead) comes over the
+  // head as the feet land and passes under them at the top of each hop.
+  equip:"rope", active:"legs",
   frames:[
-    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,84]},
-    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112]},
-    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,140]},
-    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112]}
+    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,84], rope:0},
+    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112], rope:180},
+    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,140], rope:0},
+    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112], rope:180}
   ]},
 
 { id:"jumpingjack", tempo:[240,240,240,240], name:"Jumping jacks",
@@ -1597,6 +1608,8 @@ function frontFromSide(ex,opt){
       handL:[cx-opt.grip,handY],   handR:[cx+opt.grip,handY],
       kneeL:[kL[0],kL[1]], kneeR:[kR[0],kR[1]], elbL:[eL[0],eL[1]], elbR:[eR[0],eR[1]]};
     if(f.shrug) out.shrug=f.shrug;
+    // A ball let go of is at the side view's height, on the midline.
+    if(f.ballAt) out.ballFront=[cx,f.ballAt[1]];
     return out;
   });
 }

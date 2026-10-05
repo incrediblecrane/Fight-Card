@@ -67,11 +67,13 @@ var app=(function(){
   var src=h.slice(h.indexOf('var RL='), h.indexOf('function rSeg('))+h.slice(h.indexOf('function rSolveFront('), h.indexOf('function rEquipFront('));
   return new Function(src+';return {RIGFRAMES:RIGFRAMES,solve:rSolve,poseAt:rPoseAt,lerpFrame:rFrame,solveFront:rSolveFront,frontAt:rFrontAt,bellAt:rBellAt,bellFront:rBellFront,footAt:rFootPts};')();
 })();
-function jumps(tag,at){
+// A cut (loop:'cut') swaps keyframes while the figure is faded out, so that
+// one step is no jump.
+function jumps(tag,at,ex){
   var prev=null, worst=0, where='';
   for(var i=0;i<=FINE;i++){
     var s=at(i/FINE);
-    if(prev) for(var k in s){ var a=s[k], b=prev[k];
+    if(prev&&!rig.cutBetween(ex,(i-1)/FINE,i/FINE)) for(var k in s){ var a=s[k], b=prev[k];
       if(a && typeof a.x==='number'){ var dd=d(a,b); if(dd>worst){ worst=dd; where=k+' at u='+(i/FINE).toFixed(4); } } }
     prev=s;
   }
@@ -79,11 +81,11 @@ function jumps(tag,at){
 }
 EX.forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id];
-  jumps(ex.id+' side',function(u){ return rig.solve(rig.poseAt(ex,u)); });
-  jumps(ex.id+' side (app)',function(u){ return app.solve(app.poseAt(ax,u)); });
+  jumps(ex.id+' side',function(u){ return rig.solve(rig.poseAt(ex,u)); },ex);
+  jumps(ex.id+' side (app)',function(u){ return app.solve(app.poseAt(ax,u)); },ex);
   if(!ex.front) return;
-  jumps(ex.id+' front',function(u){ return rig.solveFront(rig.frontAt(ex,u)); });
-  jumps(ex.id+' front (app)',function(u){ return app.solveFront(app.frontAt(ax,u)); });
+  jumps(ex.id+' front',function(u){ return rig.solveFront(rig.frontAt(ex,u)); },ex);
+  jumps(ex.id+' front (app)',function(u){ return app.solveFront(app.frontAt(ax,u)); },ex);
 });
 // The app ships its own copy of the solver (rSolve, rFrame, rPoseAt and the
 // front ones), so a fix made in rig.js alone leaves the app drawing the old
@@ -108,10 +110,20 @@ var EDGE=[
     {hip:[50,107],torso:4,ankN:[56,163],ankF:[46,163],armN:[180,175]},
     {hip:[50,122],torso:20,ankN:[56,163],ankF:[46,163],armN:[200,190]},
     {hip:[52,90],torso:2,ankN:[58,148],ankF:[48,148],armN:[10,10]},
-    {hip:[52,115],torso:12,ankN:[58,163],ankF:[48,163],armN:[170,170]}]}];
+    {hip:[52,115],torso:12,ankN:[58,163],ankF:[48,163],armN:[170,170]}]},
+  // A straight arm raised from forward-down to overhead (handPolar): blended
+  // in a line, the hand passes 14 from the shoulder and the elbow folds.
+  {id:'edge polar sweep',handPolar:true,frames:[
+    {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[76,104],handF:[71,104]},
+    {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[63,34],handF:[58,34]}]},
+  // A ball let go of on one keyframe (ballAt) and back in the hands.
+  {id:'edge ball',equip:'ball',frames:[
+    {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[59,34],handF:[53,36]},
+    {hip:[44,122],torso:50,ankN:[58,163],ankF:[53,163],handN:[80,138],handF:[74,140],ballAt:[80,159]},
+    {hip:[50,114],torso:26,ankN:[58,163],ankF:[53,163],handN:[70,84],handF:[64,86]}]}];
 // The authored eases are exactly the curves they name.
 (function(){
-  var ex=EDGE[EDGE.length-1], w=rig.warp(ex);
+  var ex=EDGE.filter(function(e){ return e.id==='edge authored stops and ease'; })[0], w=rig.warp(ex);
   ck(ex.id,'an authored ease is the curve it names',JSON.stringify(w[1])==='[2,0]'&&JSON.stringify(w[2])==='[0,2]'&&
     Math.abs(rig.hermite(0.3,w[1])-(1-0.7*0.7))<1e-12&&Math.abs(rig.hermite(0.3,w[2])-0.09)<1e-12,JSON.stringify(w));
   ck(ex.id,'authored stops are the stops',JSON.stringify(rig.stopsOf(ex))==='[0,2]',JSON.stringify(rig.stopsOf(ex)));
@@ -119,7 +131,14 @@ var EDGE=[
 var EDGEFRONT=[{id:'edge front widths',front:[
   {hipY:107,hipHW:11,shHW:18,cx:72,lean:2,footL:[56,163],footR:[86,163],handL:[50,140],handR:[94,140]},
   {hipY:118,torsoScale:0.9,shrug:2,footL:[56,163],footR:[86,163],handL:[46,96],handR:[98,96],
-   elbL:[44,100],armScaleR:0.8,fistL:1.5}]}];
+   elbL:[44,100],armScaleR:0.8,fistL:1.5}]},
+  // Arms straight from the sides to overhead, a jack seen from the front.
+  {id:'edge front polar',handPolar:true,front:[
+    {hipY:105.5,footL:[62,163],footR:[78,163],handL:[46,140],handR:[94,140]},
+    {hipY:105.5,footL:[62,163],footR:[78,163],handL:[46,40],handR:[94,40]}]},
+  {id:'edge front ball',equip:'ball',front:[
+    {hipY:105.5,footL:[62,163],footR:[78,163],handL:[62,40],handR:[78,40]},
+    {hipY:122,footL:[62,163],footR:[78,163],handL:[62,140],handR:[78,140],ballFront:[70,159]}]}];
 var PAR=400, PTOL=0.01;
 // What emit-rig.js would hand the app for a rig it has not shipped: the rig
 // plus rig.ship's timing.
@@ -177,7 +196,7 @@ EX.concat(EDGE).forEach(function(ex){
       // An arm blended between angles and a target is solved by IK, which
       // stops a hair short of a dead straight arm, so its elbow lands within
       // half a unit of the angles' elbow (kb_clean's straight hanging arm).
-      var bo=kfOff(rig.solve(B),v[2](v[1](A,B,1))), bo0=kfOff(rig.solve(A),v[2](v[1](A,B,0)));
+      var bo=kfOff(rig.solve(B),v[2](v[1](A,B,1,ex))), bo0=kfOff(rig.solve(A),v[2](v[1](A,B,0,ex)));
       ck(ex.id+v[0],'segment '+j+' to '+((j+1)%n)+' starts and ends on its keyframes',!bo&&!bo0,
         'end off by '+(bo?r(bo.w)+' '+bo.at:'0')+', start off by '+(bo0?r(bo0.w)+' '+bo0.at:'0'));
     });
@@ -381,7 +400,7 @@ EX.forEach(function(ex){
 // re-authored; any other rig breaking it fails, and a listed one that has come
 // back inside it says so.
 var WHIPS={woodchopper:'front',sq_jump:'side',medballslam:'side',jumpingjack:'front',
-  worldsgreatest:'side',bagspeed:'side',pulldown_straight:'front',burpee:'side'};
+  worldsgreatest:'side',bagspeed:'side',burpee:'side'};
 var whipWarn=[], whipDone=[];
 EX.forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id], known=(WHIPS[ex.id]||'').split(' ').filter(Boolean), N=1152, W=N/144;
@@ -390,6 +409,7 @@ EX.forEach(function(ex){
     var S=[], worst=0, where='';
     for(var i=0;i<N;i++) S.push(v[1](i/N));
     for(i=0;i<N;i++){ var a=S[i], b=S[(i+W)%N];
+      if(rig.cutBetween(ex,i/N,(i+W)/N)) continue;
       v[3].forEach(function(k){ var dd=d(a[k],b[k]); if(dd>worst){ worst=dd; where=k+' at u='+(i/N).toFixed(3); } }); }
     var listed=known.indexOf(v[0])>=0;
     if(worst>6){ if(listed) whipWarn.push(ex.id+' '+v[0]+' '+r(worst)+' '+where);
@@ -453,7 +473,105 @@ EX.forEach(function(ex){ ck(ex.id,'rests at the reviewed keyframes (pose/checks/
   var y=ex.frames.map(function(f){ var s=rig.solve(f); return Math.max(s.ankN.y,s.ankF.y); });
   ck(id,'the still is not in the air',!(y[k]<y[(k+n-1)%n]&&y[k]<y[(k+1)%n]),'still keyframe '+k+', feet at y '+r(y[k])+' between '+r(y[(k+n-1)%n])+' and '+r(y[(k+1)%n]));
 });
+// An arm keeps its bend between keyframes: no elbow, in either view, closes
+// more than 15 degrees tighter half way through a segment than it is at
+// either end. A hand blended in a straight line past its shoulder, or an arm
+// shortened (armScale) apart from its hand, folded the elbow into a hug half
+// way through every fly and a curl half way through every straight-arm
+// pulldown. keepBend (rig.js) holds a shortened arm's bend and handPolar
+// sweeps a straight arm round its shoulder. The rigs listed still fold and
+// print as warnings while they are re-authored; any other rig folding fails,
+// and a listed one that no longer does says so.
+var FOLDING={kb_snatch:'front',kb_press:'front',bearcrawl:'front',woodchopper:'front',kb_tgu:'side',
+  sq_jump:'side front',boxjump:'side front',broadjump:'front',medballslam:'front',sprint:'side',
+  jumpingjack:'front',highknees:'side',thoracic:'front',shadowbox:'front',bagspeed:'front',
+  skierg:'side front',pulldown_straight:'front',burpee:'side front',deadbug:'front'};
+var foldWarn=[], foldDone=[];
+function inner(a,b,c){ return ang({x:a.x-b.x,y:a.y-b.y},{x:c.x-b.x,y:c.y-b.y}); }
+EX.concat(EDGE,EDGEFRONT).filter(function(e){ return !/^edge/.test(e.id)||e.handPolar; }).forEach(function(ex){
+  var ku=keyAt(ex), n=ku.length, known=(FOLDING[ex.id]||'').split(' ').filter(Boolean);
+  [['side',ex.frames,function(u){ return rig.solve(rig.poseAt(ex,u)); },[['sh','elbN','handN'],['shF','elbF','handF']]],
+   ['front',ex.front,function(u){ return rig.solveFront(rig.frontAt(ex,u)); },[['shL','elbL','handL'],['shR','elbR','handR']]]].forEach(function(v){
+    if(!v[1]) return; var worst=0, where='';
+    for(var i=0;i<n;i++){ if(ex.loop==='cut'&&i===n-1) continue;
+      var u0=ku[i], u1=i+1<n?ku[i+1]:1, a=v[2](u0), b=v[2](u1-1e-9);
+      v[3].forEach(function(j){ var lo=Math.min(inner(a[j[0]],a[j[1]],a[j[2]]),inner(b[j[0]],b[j[1]],b[j[2]]));
+        for(var q=1;q<40;q++){ var m=v[2](u0+(u1-u0)*q/40), e=lo-15-inner(m[j[0]],m[j[1]],m[j[2]]);
+          if(e>worst){ worst=e; where=j[1]+' folds to '+r(inner(m[j[0]],m[j[1]],m[j[2]]))+' degrees between keyframes '+i+' and '+((i+1)%n)+', which are at '+r(lo); } } });
+    }
+    var listed=known.indexOf(v[0])>=0;
+    if(worst>0){ if(listed) foldWarn.push(ex.id+' '+v[0]+' '+where);
+      else ck(ex.id+' '+v[0],'an arm keeps its bend between keyframes (within 15 degrees)',false,where); }
+    else if(listed) foldDone.push(ex.id+' '+v[0]);
+  });
+});
+// A ball goes where the rig lets go of it (ballAt, ballFront: on the floor
+// after a slam) and is otherwise in the hands: in the near hand from the side
+// and between the hands from the front, within 6, in both copies. It used to
+// be drawn at the hands whatever the rig said, so a slam never reached the
+// floor.
+EX.concat(EDGE,EDGEFRONT).filter(function(e){ return e.equip==='ball'; }).forEach(function(ex){
+  var ku=keyAt(ex), n=ku.length, ax=app.RIGFRAMES[ex.id]||shipped(ex);
+  [['side',ex.frames,'ballAt',function(u){ return rig.solve(rig.poseAt(ex,u)); },function(u){ return app.solve(app.poseAt(ax,u)); },function(s){ return s.handN; }],
+   ['front',ex.front,'ballFront',function(u){ return rig.solveFront(rig.frontAt(ex,u)); },function(u){ return app.solveFront(app.frontAt(ax,u)); },function(s){ return rig.P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2); }]].forEach(function(v){
+    var fr=v[1]; if(!fr) return; var off=0, offAt='', miss=0, missAt='', par=0;
+    fr.forEach(function(f,k){ if(f[v[2]]){ var b=v[3](ku[k]).ball; var e=b?Math.hypot(b.x-f[v[2]][0],b.y-f[v[2]][1]):Infinity;
+      if(e>miss){ miss=e; missAt='keyframe '+k; } } });
+    for(var i=0;i<400;i++){ var u=i/400, g=rig.segAt(rig.tempoOf(ex),u), s=v[3](u), t=v[4](u);
+      if(!s.ball||!t.ball){ off=Infinity; offAt='no ball at u='+u; break; }
+      par=Math.max(par,d(s.ball,t.ball));
+      if(fr[g.i][v[2]]||fr[(g.i+1)%n][v[2]]) continue;
+      var e2=d(s.ball,v[5](s)); if(e2>off){ off=e2; offAt='u='+u; } }
+    ck(ex.id+' '+v[0],'the ball goes where the rig lets go of it ('+v[2]+')',miss<=0.5,'off by '+r(miss)+' at '+missAt);
+    ck(ex.id+' '+v[0],'the ball is otherwise in the hands (within 6)',off<=6,r(off)+' from the hands at '+offAt);
+    ck(ex.id+' '+v[0],'the app puts the ball where pose/ does',par<=PTOL,'off by '+r(par*100)/100);
+  });
+});
+// The slam drives the ball into the floor: at the bottom it touches down.
+(function(){ var ex=EX.filter(function(e){ return e.id==='medballslam'; })[0], b=rig.solve(rig.poseAt(ex,keyAt(ex)[rig.turn(ex)])).ball;
+  ck('medballslam','the ball hits the floor at the bottom of the slam',!!b&&Math.abs(b.y+11-GROUND)<=1.5,'ball bottom '+(b?r(b.y+11):'none')+', floor '+GROUND); })();
+// A skipping rope turns round the figure, over the head as the feet land and
+// under them at the top of each hop: it never passes through a foot on the
+// floor nor under the floor, and it is drawn the same in the app.
+EX.filter(function(e){ return e.equip==='rope'; }).forEach(function(ex){
+  var ax=app.RIGFRAMES[ex.id], through='', below=0, par=0, low=1e9;
+  for(var i=0;i<720;i++){ var u=i/720, s=rig.solve(rig.poseAt(ex,u)), q=rig.ropeAt(s), t=app.solve(app.poseAt(ax,u));
+    par=Math.max(par,Math.abs(s.rope-t.rope)%360);
+    below=Math.max(below,q.y-GROUND);
+    var sole=Math.max.apply(null,rig.footAt(s.ankN,s.footN).concat(rig.footAt(s.ankF,s.footF)).map(function(p){ return p.y; }));
+    if(Math.abs(s.rope-180)<=20 && sole>=q.y && !through) through='rope at y '+r(q.y)+' under a sole at '+r(sole)+', u='+u.toFixed(3);
+    if(Math.abs(s.rope-180)<=20) low=Math.min(low,q.y-sole); }
+  ck(ex.id,'the rope passes under the feet only while they are off the floor',!through,through);
+  // Timed to the hops: above the head when the feet are lowest, under them
+  // (within 30 degrees) when they are highest.
+  var ku=keyAt(ex), fy=ex.frames.map(function(f){ var q=rig.solve(f); return Math.max(q.ankN.y,q.ankF.y); });
+  var lo=Math.max.apply(null,fy), hi=Math.min.apply(null,fy), bad='';
+  ex.frames.forEach(function(f,k){ var a=rig.solve(rig.poseAt(ex,ku[k])).rope;
+    if(fy[k]===lo&&Math.cos(a*Math.PI/180)<0.5) bad+='keyframe '+k+' lands with the rope at '+r(a)+'; ';
+    if(fy[k]===hi&&Math.cos(a*Math.PI/180)>-Math.cos(Math.PI/6)) bad+='keyframe '+k+' is at the top of a hop with the rope at '+r(a)+'; '; });
+  ck(ex.id,'the rope is overhead as the feet land and under them at the top of each hop',!bad,bad);
+  ck(ex.id,'the rope never goes through the floor',below<=0,r(below)+' below');
+  ck(ex.id,'the app turns the rope where pose/ does',par<=PTOL,'off by '+r(par));
+});
+ck('skipping','skipping turns a rope',(EX.filter(function(e){ return e.id==='skipping'; })[0]||{}).equip==='rope','no rope');
+// A cut (loop:'cut') swaps keyframes only while the figure cannot be seen,
+// and a jump that travels never slides back to its start along the floor:
+// the broad jump used to drag its planted feet 62 back in a crouch.
+EX.filter(function(e){ return e.loop==='cut'||e.id==='broadjump'; }).forEach(function(ex){
+  var N=2000, seen=-1, prev=null, slide=0, where='';
+  for(var i=0;i<=N;i++){ var u=i/N;
+    if(i&&rig.cutBetween(ex,(i-1)/N,u)) seen=Math.max(seen,rig.alphaAt(ex,(i-1)/N),rig.alphaAt(ex,u));
+    var s=rig.solve(rig.poseAt(ex,u));
+    if(prev&&!rig.cutBetween(ex,(i-1)/N,u)) ['ankN','ankF'].forEach(function(k){
+      if(s[k].y>=rig.ANKLE_Y-2&&prev[k].y>=rig.ANKLE_Y-2&&prev[k].x>s[k].x){ slide+=prev[k].x-s[k].x; where=k+' by u='+u.toFixed(4); } });
+    prev=s; }
+  if(ex.loop==='cut') ck(ex.id,'the cut swaps keyframes while the figure is faded out',seen===0,'opacity '+r(seen)+' at the swap');
+  ck(ex.id,'a foot on the floor never slides back',slide<=1,'slid '+r(slide)+' '+where);
+});
+ck('broadjump','the broad jump cuts back to its start (loop:cut)',(EX.filter(function(e){ return e.id==='broadjump'; })[0]||{}).loop==='cut','it slides back');
 console.log('=== CONTINUOUS MOTION CHECK ('+SAMPLES+' samples/exercise) ===');
+if(foldWarn.length) console.log('WARN: '+foldWarn.length+' views fold an elbow between keyframes (listed in FOLDING, being re-authored):\n  ! '+foldWarn.join('\n  ! '));
+if(foldDone.length) console.log('NOTE: no longer folding, take off FOLDING: '+foldDone.join(', '));
 if(bendWarn.length) console.log('WARN: '+bendWarn.length+' joints bend outside -10..160 (listed in BENDS, being re-authored):\n  ! '+bendWarn.join('\n  ! '));
 if(bendDone.length) console.log('NOTE: now inside -10..160, take off BENDS: '+bendDone.join(', '));
 if(whipWarn.length) console.log('WARN: '+whipWarn.length+' views whip a joint (listed in WHIPS, being re-authored):\n  ! '+whipWarn.join('\n  ! '));

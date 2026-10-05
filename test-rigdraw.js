@@ -157,6 +157,52 @@ t('front view: the stick goes behind the body once the dislocate takes it behind
   assert.ok(seen['true']&&seen['false'],'the dislocate never takes the stick both in front and behind');
 });
 
+// A woodchopper and a Pallof press are one cable to one handle in both
+// hands (anchorFront [x,y]). The front view drew two cables from opposite
+// sides, a cable crossover, and a Pallof press's two cables cancelled the
+// rotation the exercise is about. From the side the Pallof cable runs toward
+// the camera, so only its handle shows.
+t('a single cable is one line from its anchor to one handle between the hands', function(){
+  ['woodchopper','palloffpress'].forEach(function(id){ var ex=rex(id);
+    assert.strictEqual(ex.anchorFront.length,2,id+' has '+ex.anchorFront.length/2+' anchors');
+    for(var i=0;i<12;i++){ var u=i/12, f=app.rSolveFront(app.rFrontAt(ex,u)), sh=shapes(app.rigFrontSVG(EXOF[id],u));
+      var lines=sh.filter(function(p){ return p.n==='line'&&p.a.stroke==='var(--text-soft)'; }), m={x:(f.handL.x+f.handR.x)/2,y:(f.handL.y+f.handR.y)/2};
+      assert.strictEqual(lines.length,1,id+' u='+u.toFixed(2)+': '+lines.length+' cables');
+      assert.ok(+lines[0].a.x1===ex.anchorFront[0]&&+lines[0].a.y1===ex.anchorFront[1],id+': the cable does not start at its anchor');
+      assert.ok(Math.hypot(lines[0].a.x2-m.x,lines[0].a.y2-m.y)<0.1,id+' u='+u.toFixed(2)+': the cable ends '+lines[0].a.x2+','+lines[0].a.y2+', not between the hands'); } });
+  assert.ok(!rex('palloffpress').anchorAt,'the Pallof press cable runs back to an anchor behind the lifter');
+  var ps=shapes(app.rigSVG(EXOF.palloffpress,0.4)), s=app.rSolve(app.rPoseAt(rex('palloffpress'),0.4));
+  assert.ok(!ps.some(function(p){ return p.n==='line'&&p.a.stroke==='var(--text-soft)'; }),'the Pallof press side view draws a cable');
+  assert.ok(ps.some(function(p){ return p.n==='rect'&&Math.abs(+p.a.x+2.5-s.handN.x)<0.06&&Math.abs(+p.a.y+6.5-s.handN.y)<0.06; }),'the Pallof press side view has no handle in the hand');
+});
+// A slam drives the ball into the floor: it leaves the hands at the bottom
+// (ballAt), where it used to stay in them.
+t('a ball let go of is drawn where the rig puts it, not in the hands', function(){
+  var ex=rex('medballslam'), k=ex.frames.map(function(f){ return !!f.ballAt; }).indexOf(true), tot=ex.tempo.reduce(function(a,b){ return a+b; },0), u=0;
+  assert.ok(k>=0,'the slam never lets go of the ball'); for(var i=0;i<k;i++) u+=ex.tempo[i]/tot;
+  var fb=ex.front[k].ballFront;
+  assert.ok(fb,'the slam\'s second panel keeps the ball in the hands');
+  [[app.rigSVG,ex.frames[k].ballAt],[app.rigFrontSVG,fb]].forEach(function(v,j){ var b=v[1], sh=shapes(v[0](EXOF.medballslam,u));
+    assert.ok(sh.some(function(p){ return p.n==='circle'&&+p.a.r===11&&Math.abs(+p.a.cx-b[0])<0.06&&Math.abs(+p.a.cy-b[1])<0.06; }),(j?'front':'side')+': no ball at '+b); });
+});
+// Skipping turns a rope: two strands from the hands from the side, an arch
+// between the hands from the front, over the head as the feet land.
+t('skipping draws its rope from the hands, overhead as it lands', function(){
+  var ex=rex('skipping'); assert.strictEqual(ex.equip,'rope','skipping has no rope');
+  for(var i=0;i<16;i++){ var u=i/16, s=app.rSolve(app.rPoseAt(ex,u)), f=app.rSolveFront(app.rFrontAt(ex,u));
+    var side=shapes(app.rigSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'; }), front=shapes(app.rigFrontSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'; });
+    assert.strictEqual(side.length,2,'u='+u+': '+side.length+' strands');
+    [s.handF,s.handN].forEach(function(h,j){ assert.ok(side[j].a.d.indexOf('M'+h.x.toFixed(1)+' '+h.y.toFixed(1))===0,'u='+u+': a strand does not start at a hand'); });
+    assert.strictEqual(front.length,2,'u='+u+': the front rope changes its shapes');
+    var arch=front.filter(function(p){ return / Q/.test(p.a.d); });
+    assert.strictEqual(arch.length,1,'u='+u+': '+arch.length+' arches');
+    var ys=(arch[0].a.d.match(/-?[\d.]+ -?[\d.]+/g)||[]).map(function(x){ return +x.split(' ')[1]; });
+    assert.ok(arch[0].a.d.indexOf('M'+f.handL.x.toFixed(1)+' '+f.handL.y.toFixed(1))===0&&/ -?[\d.]+ -?[\d.]+$/.test(arch[0].a.d)&&Math.abs(ys[ys.length-1]-f.handR.y)<0.06,'u='+u+': the arch does not run between the hands'); }
+  var s0=app.rSolveFront(app.rFrontAt(ex,0)), a0=shapes(app.rigFrontSVG(EXOF.skipping,0)).filter(function(p){ return p.n==='path'&&/ Q/.test(p.a.d); })[0];
+  var top=Math.min.apply(null,(a0.a.d.match(/-?[\d.]+ -?[\d.]+/g)||[]).map(function(x){ return +x.split(' ')[1]; }));
+  assert.ok(top<s0.head.y,'as the feet land the rope is at y '+top+', not over the head at '+s0.head.y.toFixed(1));
+});
+
 console.log('\nTHE FIGURE STAYS IN ITS PANEL');
 // Each panel's box, at 96 moments of every rep. The floor is drawn wider on
 // purpose (it runs the width of the panel) and is left out.

@@ -904,7 +904,18 @@ Looking down at someone on the floor. No gravity and no ground line; labelled
 How much of its true length an arm projects in a view, 1 being square to the
 camera (`armScaleL`/`armScaleR` on a front frame, `armScaleN`/`armScaleF` on a
 side one). The only way to draw an arm pointing at the viewer, because the
-solver bends limbs rather than shortening them.
+solver bends limbs rather than shortening them. Between keyframes a shortened
+arm keeps its bend (`keepBend`): the hand's reach over the arm's drawn length
+blends from one keyframe's to the next and the scale follows, where blending
+the hand and the scale apart folded a fly's elbow into a hug half way through.
+
+**Polar hands** (`handPolar:true`):
+A rig whose arms sweep round the shoulder (a jack, a straight-arm pulldown, a
+slam) blends each hand as an angle and a reach about its own shoulder, in both
+views, rather than in a straight line that cuts the corner past the shoulder
+and folds the elbow. Not given an elbow by hand. `continuous.js` fails an
+elbow that closes more than 15 degrees tighter between two keyframes than at
+either; rigs still to fix are listed in `FOLDING`.
 
 **Bend sign**:
 Which of the two mirror IK solutions a knee or elbow takes. Decided at
@@ -1028,6 +1039,36 @@ hand, never through the forearm, while the forearm is 30 to 98 degrees from
 straight up. In the second panel it is in the loaded hand, and racked or
 overhead just outside the fist, moving there with the hand's height over its
 elbow. continuous.js measures the turn per frame the app draws.
+
+**Ball let go** (`ballAt`, `ballFront`):
+A keyframe may put a med ball somewhere other than the hands (`ballAt` on a
+side frame, `ballFront` on a front one): on the floor at the bottom of a slam,
+at the wall at the top of a throw. It travels there from the hands and back;
+on every other keyframe it is in the near hand from the side and between the
+hands from the front. A front view derived from the side puts it at the side
+view's height on the midline.
+
+**Rope** (`equip:'rope'`):
+A skipping rope, turning round the figure: each keyframe gives its turn
+(`rope`, in degrees: 0 overhead, 180 under the feet) and it turns on forwards
+at an even pace between them, not on the time warp. From the side it is two
+strands from the hands to the far end of its loop, the far one behind the
+body; from the front an arch between the hands, behind the body on the way
+over and in front of it on the way down. It passes under the feet only while
+they are off the floor.
+
+**Single cable** (`anchorFront:[x,y]`):
+One anchor in the second panel is one cable to one handle, between the hands
+or in the loaded one (a woodchopper, a Pallof press); two (`[x1,y1,x2,y2]`)
+are a cable per hand. A side view with no `anchorAt` shows only the handle:
+the cable runs toward the camera.
+
+**Cut** (`loop:'cut'`):
+A rep whose end is not where it starts (a broad jump lands 60 in front of its
+take-off) holds its last keyframe through the last segment and swaps to the
+first half way, while the figure is faded out (`rig.alphaAt`, the app's
+`rigAlpha` on the figure's opacity), instead of sliding back along the floor.
+Both ends rest, and the swap is exempt from the continuity checks.
 
 **Axis**:
 Which way a dumbbell's handle runs: `lateral`, `sagittal`, `vertical`.

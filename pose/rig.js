@@ -55,11 +55,15 @@ function solve(f){
   if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER*aF,L.FORE*aF,es); }
   else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],L.UPPER*aF)); handF=add(elbF,dir(af[1],L.FORE*aF)); }
 
-  return {hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
+  var o={hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
     elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,
     armScaleN:aN,armScaleF:aF,
     footN:pitch(f,'N'),footF:pitch(f,'F')};
+  // A ball out of the hands (ballAt), and where a skipping rope has turned to.
+  if(f.ballAt) o.ball=P(f.ballAt[0],f.ballAt[1]);
+  if(f.rope!==undefined) o.rope=f.rope;
+  return o;
 }
 // A foot's pitch: its own footN/footF, else footRot, which sets both.
 function pitch(f,k){ var v=f['foot'+k]; return v===undefined?(f.footRot||0):v; }
@@ -140,17 +144,53 @@ function lerpPt(a,b,t){ return [lerp(a[0],b[0],t), lerp(a[1],b[1],t)]; }
 // later. Blending an angle frame with a target frame used to produce a frame
 // with neither, which crashed the solver, so resolve the angles to where that
 // hand actually is and interpolate positions.
-function handFromAngles(f,arm,far){
-  var hip=P(f.hip[0],f.hip[1]), sh=add(hip,dir(f.torso,L.TORSO));
+function shoulderOf(f,far){
+  var sh=add(P(f.hip[0],f.hip[1]),dir(f.torso,L.TORSO));
   if(f.shrug) sh=add(sh,{x:0,y:-f.shrug});
-  if(far) sh=add(sh,{x:-5,y:0});
-  var a=(far?f.armScaleF:f.armScaleN); if(a===undefined) a=1;
+  return far?add(sh,{x:-5,y:0}):sh;
+}
+function handFromAngles(f,arm,far){
+  var sh=shoulderOf(f,far), a=(far?f.armScaleF:f.armScaleN); if(a===undefined) a=1;
   var elb=add(sh,dir(arm[0],L.UPPER*a));
   var h=add(elb,dir(arm[1],L.FORE*a));
   return [h.x,h.y];
 }
-// Blend two keyframes into a valid in-between pose.
-function lerpFrame(A,B,t){
+// Where a keyframe's hand is, whichever way its arm is given (as solve reads it).
+function handOf(f,far){
+  if(far) return f.handF||handFromAngles(f,f.armF||f.armN||[178,178],true);
+  return f.handN||handFromAngles(f,f.armN||[178,178],false);
+}
+// A hand target blended in a straight line cuts the corner of an arm that
+// sweeps round its shoulder: half way through a raise or a jack it passes
+// close to the shoulder and the elbow folds to reach it. A rig with
+// handPolar blends each hand as an angle and a reach about its own shoulder
+// instead, so a straight arm sweeps an arc and stays straight.
+function polarHand(A,B,t,f,key,far){
+  if(!f[key]) return;
+  var a=handOf(A,far), b=handOf(B,far), sa=shoulderOf(A,far), sb=shoulderOf(B,far), so=shoulderOf(f,far);
+  f[key]=polarAt(a,b,sa,sb,so,t);
+}
+function polarAt(a,b,sa,sb,so,t){
+  var aa=Math.atan2(a[0]-sa.x,-(a[1]-sa.y))*180/Math.PI, ab=Math.atan2(b[0]-sb.x,-(b[1]-sb.y))*180/Math.PI;
+  var r=lerp(Math.hypot(a[0]-sa.x,a[1]-sa.y),Math.hypot(b[0]-sb.x,b[1]-sb.y),t), g=lerpAng(aa,ab,t)*Math.PI/180;
+  return [so.x+r*Math.sin(g), so.y-r*Math.cos(g)];
+}
+// An arm drawn short (armScale) keeps its bend between keyframes. Its hand
+// and its scale used to blend separately, so half way through a fly the hand
+// came closer to the shoulder than the shortened arm's straight length had
+// shrunk and the elbow folded to reach it: a hug in the middle of every rep.
+// The bend is the hand's reach over the arm's drawn length; it blends from
+// one keyframe's to the other's and the scale is set to keep it. Only where
+// a keyframe sets a scale.
+function keepBend(A,B,t,f,key,sk,far){
+  if(!f[key] || (A[sk]===undefined && B[sk]===undefined)) return;
+  function bend(F){ var h=handOf(F,far), s=shoulderOf(F,far); return Math.hypot(h[0]-s.x,h[1]-s.y)/((L.UPPER+L.FORE)*(F[sk]===undefined?1:F[sk])); }
+  var r=lerp(bend(A),bend(B),t), s=shoulderOf(f,far), d=Math.hypot(f[key][0]-s.x,f[key][1]-s.y);
+  if(r>0.05) f[sk]=Math.max(0.06,Math.min(1,d/((L.UPPER+L.FORE)*r)));
+}
+// Blend two keyframes into a valid in-between pose. ex, the rig, carries the
+// options that change how (handPolar).
+function lerpFrame(A,B,t,ex){
   var f={ hip:lerpPt(A.hip,B.hip,t), torso:lerpAng(A.torso,B.torso,t),
           ankN:lerpPt(A.ankN,B.ankN,t), ankF:lerpPt(A.ankF,B.ankF,t),
           // The bend sign blends too. Held from A for the whole segment, a sign
@@ -183,6 +223,12 @@ function lerpFrame(A,B,t){
     if((A.armF||B.armF) && fa && fb) f.armF=[lerpAng(fa[0],fb[0],t), lerpAng(fa[1],fb[1],t)];
     else if(f.armN) f.armF=f.armN;
   }
+  if(ex&&ex.handPolar){ polarHand(A,B,t,f,'handN',false); polarHand(A,B,t,f,'handF',true); }
+  keepBend(A,B,t,f,'handN','armScaleN',false); keepBend(A,B,t,f,'handF','armScaleF',true);
+  // A ball let go of (ballAt on a keyframe: on the floor after a slam, at the
+  // wall after a throw) travels from the hands to there and back; on a
+  // keyframe without one it is in the near hand.
+  if(A.ballAt||B.ballAt) f.ballAt=lerpPt(A.ballAt||handOf(A,false),B.ballAt||handOf(B,false),t);
   return f;
 }
 
@@ -190,15 +236,47 @@ function lerpFrame(A,B,t){
 // honouring per-segment tempo so eccentrics are slower than concentrics. Where
 // in its segment the pose is comes from warp() (see timing, below).
 function poseAt(ex,u){
-  var n=ex.frames.length, g=segAt(tempoOf(ex),u);
-  return lerpFrame(ex.frames[g.i], ex.frames[(g.i+1)%n], hermite(g.t,warp(ex)[g.i]));
+  var n=ex.frames.length, g=segAt(tempoOf(ex),u), c=cutAt(ex,g), f;
+  if(c>=0) f=lerpFrame(ex.frames[c],ex.frames[c],0,ex);
+  else f=lerpFrame(ex.frames[g.i], ex.frames[(g.i+1)%n], hermite(g.t,warp(ex)[g.i]), ex);
+  if(ex.equip==='rope') f.rope=ropeTurn(ex.frames,g);
+  // A ball in the hands is in the near one (ballAt otherwise).
+  if(ex.equip==='ball'&&!f.ballAt) f.ballAt=handOf(f,false);
+  return f;
+}
+// loop:'cut' ends the rep on its last keyframe and starts the next on its
+// first with no movement between them: the figure fades out, swaps while it
+// cannot be seen, and fades back in. A broad jump sticks its landing 60 units
+// in front of where it took off, and used to slide back there in a crouch.
+// cutAt is the keyframe shown in the last segment of such a rig, else -1;
+// alphaAt the figure's opacity, 0 for the middle fifth of that segment and
+// fading over the two fifths either side.
+function cutAt(ex,g){ var n=(ex.frames||ex.front).length; return ex.loop==='cut'&&g.i===n-1?(g.t<0.5?n-1:0):-1; }
+function alphaAt(ex,u){
+  var g=segAt(tempoOf(ex),u); if(cutAt(ex,g)<0) return 1;
+  return Math.max(0,Math.min(1,(Math.abs(1-2*g.t)-0.2)*2));
+}
+// A skipping rope's turn (equip:'rope'), in degrees: 0 overhead, 90 in front,
+// 180 under the feet, 270 behind. Each keyframe gives it (rope) and it turns
+// on forwards from one to the next at an even pace, not on the figure's time
+// warp: a rope turned by the wrists does not stop when the body does.
+function ropeTurn(fr,g){
+  var a=fr[g.i].rope||0, b=fr[(g.i+1)%fr.length].rope||0;
+  return (a+((b-a)%360+360)%360*g.t)%360;
+}
+// Where the rope is (rig.solve's rope): the far end of its loop, which runs
+// round the figure from above the head to just over the floor, under the
+// feet at 180. front: it is on the near side of the body in a front view.
+function ropeAt(s,c){
+  var top=s.head.y-L.HEAD_R-8, bot=GROUND-1, a=s.rope*Math.PI/180, x=c===undefined?s.hip.x+3:c;
+  return {x:x+28*Math.sin(a), y:(top+bot)/2-(bot-top)/2*Math.cos(a), front:Math.sin(a)>0};
 }
 // The keyframe a rep turns around at (the bottom of a squat, the top of a
 // pull): stops[1] once a rig authors its stops, otherwise frame 2 of the usual
 // four. Checks read it through here rather than hard-coding frame 2, which
 // stops meaning the bottom the moment a rig gains a frame.
 function turn(ex,front){ var s=(front&&ex.frontStops)||ex.stops; return s?s[1]:2; }
-if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt;
+if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.alphaAt=alphaAt, module.exports.ropeAt=ropeAt;
 
 // ---- frontal-plane rig ---------------------------------------------------
 // Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
@@ -262,18 +340,19 @@ function solveFront(f){
     footL:footL,footR:footR,handL:handL,handR:handR,
     kneeL:kneeL,kneeR:kneeR,elbL:elbL,elbR:elbR,armScaleL:aL,armScaleR:aR,
     sign:{kneeL:kL.s,kneeR:kR.s,elbL:eL.s,elbR:eR.s}, hang:{elbL:eL.t,elbR:eR.t},
-    fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR};
+    fistL:f.fistL===undefined?1:f.fistL, fistR:f.fistR===undefined?1:f.fistR,
+    ball:f.ballFront?P(f.ballFront[0],f.ballFront[1]):undefined, rope:f.rope};
 }
 // An explicit joint in only one of the two keyframes is blended with the joint
 // the other keyframe solves to. Dropping it instead (it used to carry through
 // only when both had one) jumped from the given joint to a solved one at the
 // keyframe boundary.
-function lerpFront(A,B,t){
+function lerpFront(A,B,t,ex){
   var sA=solveFront(A), sB=solveFront(B);
   function jt(k){ if(!A[k]&&!B[k]) return undefined;
     return lerpPt(A[k]||[sA[k].x,sA[k].y], B[k]||[sB[k].x,sB[k].y], t); }
   function sg(k){ return lerp(sA.sign[k],sB.sign[k],t); }
-  return {cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
+  var o={cx:lerp(A.cx===undefined?70:A.cx,B.cx===undefined?70:B.cx,t),
     hipY:lerp(A.hipY,B.hipY,t), hipHW:lerp(A.hipHW||9,B.hipHW||9,t),
     shHW:lerp(A.shHW||16,B.shHW||16,t), lean:lerp(A.lean||0,B.lean||0,t),
     shrug:lerp(A.shrug||0,B.shrug||0,t),
@@ -286,11 +365,32 @@ function lerpFront(A,B,t){
     handL:lerpPt(A.handL,B.handL,t), handR:lerpPt(A.handR,B.handR,t),
     kneeL:jt('kneeL'), kneeR:jt('kneeR'), elbL:jt('elbL'), elbR:jt('elbR'),
     kneeSignL:sg('kneeL'), kneeSignR:sg('kneeR'), elbSignL:sg('elbL'), elbSignR:sg('elbR')};
+  // As the side view: hands about their shoulders with handPolar, and a
+  // shortened arm keeping its bend, each only where no elbow is given.
+  ['L','R'].forEach(function(k){ var hk='hand'+k, sk='armScale'+k;
+    if(A['elb'+k]||B['elb'+k]) return;
+    if(ex&&ex.handPolar) o[hk]=polarAt(A[hk],B[hk],shFront(A,k),shFront(B,k),shFront(o,k),t);
+    if(A[sk]===undefined&&B[sk]===undefined) return;
+    function bend(F){ var s=shFront(F,k); return Math.hypot(F[hk][0]-s.x,F[hk][1]-s.y)/((L.UPPER+L.FORE)*(F[sk]===undefined?1:F[sk])); }
+    var r=lerp(bend(A),bend(B),t), s=shFront(o,k), d=Math.hypot(o[hk][0]-s.x,o[hk][1]-s.y);
+    if(r>0.05) o[sk]=Math.max(0.06,Math.min(1,d/((L.UPPER+L.FORE)*r)));
+  });
+  // A ball let go of (ballFront), else between the hands.
+  function mid(F){ return [(F.handL[0]+F.handR[0])/2,(F.handL[1]+F.handR[1])/2]; }
+  if(A.ballFront||B.ballFront) o.ballFront=lerpPt(A.ballFront||mid(A),B.ballFront||mid(B),t);
+  return o;
 }
+// A front frame's shoulder on side k, as solveFront places it.
+function shFront(F,k){ var tS=F.torsoScale===undefined?1:F.torsoScale, cx=F.cx===undefined?70:F.cx;
+  return P(cx+(F.lean||0)+(k==='L'?-1:1)*(F.shHW===undefined?16:F.shHW), F.hipY-L.TORSO*tS-(F.shrug||0)); }
 function frontAt(ex,u){
   var fr=ex.front; if(!fr) return null;
-  var n=fr.length, g=segAt(tempoOf(ex),u);
-  return lerpFront(frontKey(fr,g.i), frontKey(fr,(g.i+1)%n), hermite(g.t,warp(ex,true)[g.i]));
+  var n=fr.length, g=segAt(tempoOf(ex),u), c=cutAt(ex,g), f;
+  if(c>=0) f=lerpFront(frontKey(fr,c),frontKey(fr,c),0,ex);
+  else f=lerpFront(frontKey(fr,g.i), frontKey(fr,(g.i+1)%n), hermite(g.t,warp(ex,true)[g.i]), ex);
+  if(ex.equip==='rope'&&ex.frames) f.rope=ropeTurn(ex.frames,g);
+  if(ex.equip==='ball'&&!f.ballFront) f.ballFront=[(f.handL[0]+f.handR[0])/2,(f.handL[1]+f.handR[1])/2];
+  return f;
 }
 // A keyframe whose hand hangs straight below the shoulder (see solveFront)
 // bends that elbow the way its nearest decided neighbour does. Flaring it out
@@ -337,8 +437,8 @@ var TRACK=['hip','head','ankN','ankF','handN','handF'], TRACKF=['hipC','head','f
 // Every tracked joint of segment i at blend w, side then (if asked) front.
 function trackAt(ex,i,w,side,front,jf){
   var n=(ex.frames||ex.front).length, j=(i+1)%n, o=[];
-  if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w)); TRACK.forEach(function(k){ o.push(s[k]); }); }
-  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); (jf||TRACKF).forEach(function(k){ o.push(f[k]); }); }
+  if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w,ex)); TRACK.forEach(function(k){ o.push(s[k]); }); }
+  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w,ex)); (jf||TRACKF).forEach(function(k){ o.push(f[k]); }); }
   return o;
 }
 // A second panel whose hips, head, hands and feet keep still through a
@@ -361,6 +461,9 @@ function segPaths(ex,side,front){
   var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[], jf=front&&ex.front&&!side?frontJoints(ex):null;
   for(var i=0;i<n;i++){
     var pts=[], len=0, most=0, q;
+    // A cut (loop:'cut') holds still either side of it: both its ends rest.
+    if(ex.loop==='cut'&&i===n-1){ var z=trackAt(ex,i,0,side,front,jf).map(function(){ return {x:0,y:0}; });
+      out.push({len:0, held:true, d0:z, d1:z}); continue; }
     for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front,jf));
     for(q=0;q<K;q++) len+=vlen(pts[q+1],pts[q]);
     for(q=1;q<=K;q++) most=Math.max(most,vmax(pts[q],pts[0]));
@@ -465,11 +568,14 @@ function jumpsAt(ex,n){
     var s=ex.frames?solve(poseAt(ex,i/n)):null, f=ex.front?solveFront(frontAt(ex,i/n)):null, cur=[];
     if(s) TRACK.forEach(function(k){ cur.push(s[k]); });
     if(f) TRACKF.forEach(function(k){ cur.push(f[k]); });
-    if(prev) worst=Math.max(worst,vmax(cur,prev));
+    // The swap of a cut happens out of sight (alphaAt), so it is no jump.
+    if(prev&&!cutBetween(ex,(i-1)/n,i/n)) worst=Math.max(worst,vmax(cur,prev));
     prev=cur;
   }
   return worst;
 }
+// Whether the swap of a cut falls between two moments of a rep.
+function cutBetween(ex,u0,u1){ var t=tempoOf(ex), a=segAt(t,u0), b=segAt(t,u1), x=cutAt(ex,a), y=cutAt(ex,b); return x>=0&&y>=0&&x!==y; }
 function stepsOf(ex){ var at=Math.round(cycleMs(ex)/FRAME_MS); return jumpsAt(ex,at)>STROBE?Math.round(cycleMs(ex)/FAST_MS):at; }
 // The biggest jump between two of the frames the app draws.
 function strobes(ex){ return jumpsAt(ex,stepsOf(ex)); }
@@ -494,4 +600,4 @@ function ship(ex){
 }
 if(typeof module!=='undefined'){ module.exports.hermite=hermite; module.exports.warp=warp; module.exports.stopsOf=stopsOf;
   module.exports.autoStops=autoStops; module.exports.cycleMs=cycleMs; module.exports.stepsOf=stepsOf; module.exports.strobes=strobes; module.exports.stillOf=stillOf;
-  module.exports.ship=ship; module.exports.segAt=segAt; module.exports.tempoOf=tempoOf; }
+  module.exports.ship=ship; module.exports.segAt=segAt; module.exports.tempoOf=tempoOf; module.exports.cutBetween=cutBetween; }

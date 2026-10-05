@@ -8,7 +8,7 @@ var rig=require('./pose/rig.js'), EX=require('./pose/exercises.js');
 var h=fs.readFileSync(process.argv[2]||(__dirname+'/index.html'),'utf8');
 function cut(a,b){ var i=h.indexOf(a), j=h.indexOf(b,i); if(i<0||j<0) throw new Error('could not find '+a+' .. '+b+' in index.html'); return h.slice(i,j); }
 var src=h.split(/\r?\n/).filter(function(l){ return l.indexOf('var RIGFRAMES=')===0; })[0]+';\n'+
-  cut('var RIGMAP=','function rP(')+cut('var rigRaf=null','function bodyContent(');
+  cut('var RIGMAP=','function rP(')+cut('function rSegAt(','function rWarp(')+cut('function rCutAt(','function rRopeTurn(')+cut('var rigRaf=null','function bodyContent(');
 
 var fails=0;
 function t(name,fn){ try{ fn(); console.log('  PASS  '+name); }
@@ -23,9 +23,9 @@ function world(rig0,opt){
   var rigId=EXOF[rig0]; if(!rigId) throw new Error('no exercise draws the '+rig0+' rig');
   opt=opt||{};
   var now=0, timers={}, frames={}, next=1, us=[], wakes=0, io=null;
-  var el={id:'fig-live', attrs:{'data-rig':rigId}, innerHTML:'', firstElementChild:null,
+  var el={id:'fig-live', attrs:{'data-rig':rigId}, innerHTML:'', firstElementChild:null, style:{opacity:''},
     getAttribute:function(k){ return k in this.attrs?this.attrs[k]:null; },
-    setAttribute:function(k,v){ this.attrs[k]=String(v); if(k==='data-u') us.push({t:now,u:+v}); },
+    setAttribute:function(k,v){ this.attrs[k]=String(v); if(k==='data-u') us.push({t:now,u:+v,a:el.style.opacity}); },
     closest:function(){ return box; }, parentNode:null};
   var box={el:el};
   var rest=null;
@@ -92,6 +92,20 @@ t('every frame of the rep is drawn, in order', function(){
   var d=drawsIn(w,1500);
   d.slice(1).forEach(function(x,i){ var step=Math.round(((x.u-d[i].u+1)%1)*n);
     assert.strictEqual(step,1,'a frame was skipped or repeated between u='+d[i].u+' and u='+x.u); });
+});
+
+// A broad jump lands 60 in front of its take-off and cuts back to the start
+// (loop:'cut'): the figure fades out, swaps while it cannot be seen, and
+// fades back in. Every other rig stays fully drawn.
+t('a cut fades the figure out round its swap, and nothing else ever fades', function(){
+  var w=world('broadjump'); w.api.start(); w.run(200);
+  // The opacity is set as each frame is drawn, after its data-u, so each
+  // entry carries the frame before's.
+  var d=drawsIn(w,ship.broadjump.cycleMs*2), vals=d.slice(1).map(function(x){ return x.a; });
+  assert.ok(vals.indexOf('0')>=0,'the broad jump never fades out: '+vals.join(','));
+  assert.ok(vals.filter(function(v){ return v==='1'; }).length>vals.length/2,'the broad jump is faded most of the rep: '+vals.join(','));
+  var w2=world('sq_jump'); w2.api.start(); w2.run(200); var e=drawsIn(w2,ship.sq_jump.cycleMs);
+  assert.ok(e.slice(1).every(function(x){ return x.a==='1'; }),'the jump squat fades: '+e.map(function(x){ return x.a; }).join(','));
 });
 
 console.log('\nTHE REST CLOCK');
