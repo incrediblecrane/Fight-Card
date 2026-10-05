@@ -297,8 +297,7 @@ EX.forEach(function(ex){ var ax=app.RIGFRAMES[ex.id], w=0;
 // for now they print as warnings. Any other rig breaking it fails, and a
 // listed rig that has come back inside it says so, so the list only shrinks.
 var BENDS={backsquat:'elbF elbN',hipthrust:'elbF elbN',facepull:'elbF elbN',
-  press_push:'elbF',glutebridge:'elbF elbN',row_single:'elbF elbN',invertedrow:'elbF elbN',
-  kb_press:'elbN',sideplank:'elbF elbN kneeF kneeN',hollowhold:'elbF elbN',
+  press_push:'elbF',glutebridge:'elbF elbN',hollowhold:'elbF elbN',
   bearcrawl:'elbF elbN kneeF kneeN',kb_tgu:'elbF elbN',sq_jump:'elbF elbN',boxjump:'elbF elbN',
   medballslam:'elbF elbN',sprint:'elbF elbN',highknees:'elbF elbN',briskwalkjog:'elbF elbN',
   childspose:'elbF elbN kneeF kneeN',catcow:'elbF elbN kneeF kneeN',worldsgreatest:'elbF',
@@ -377,7 +376,7 @@ EX.forEach(function(ex){
 // ballistic hand that already does, and print as warnings while they are
 // re-authored; any other rig breaking it fails, and a listed one that has come
 // back inside it says so.
-var WHIPS={kb_snatch:'front',woodchopper:'front',sq_jump:'side',medballslam:'side',jumpingjack:'front',
+var WHIPS={woodchopper:'front',sq_jump:'side',medballslam:'side',jumpingjack:'front',
   worldsgreatest:'side',bagspeed:'side',pulldown_straight:'front',burpee:'side'};
 var whipWarn=[], whipDone=[];
 EX.forEach(function(ex){

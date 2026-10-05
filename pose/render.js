@@ -119,16 +119,19 @@ function buildFigure(ex,host,bx){
     // you see the whole dumbbell in profile, lying horizontal.
     R.db=el('rect',{width:22,height:7,rx:3,fill:soft}); R.d1=el('rect',{width:7,height:17,rx:2,fill:soft}); R.d2=el('rect',{width:7,height:17,rx:2,fill:soft});
     eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
+  } else if(ex.equip==='plate'){
+    // A plate seen edge on, pinched by its rim: it hangs below the fist.
+    R.pp=el('ellipse',{rx:4.5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3}); eq.appendChild(R.pp);
   } else if(ex.equip==='kettlebell'){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
     eq.appendChild(R.kb); eq.appendChild(R.kh);
   }
   // Back to front, as the app: far leg and arm, the body, the near leg, the
-  // implement, the head, the near arm, then a bar.
+  // implement, the head, the near arm, then a bar or a pinched plate.
   pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
   R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
   svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
-  var top=ex.equip==='barbell'||ex.equip==='fixedbar';
+  var top=ex.equip==='barbell'||ex.equip==='fixedbar'||ex.equip==='plate';
   pair('nleg',legCol,[11,8,5.5],true);
   if(!top) svg.appendChild(eq);
   R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
@@ -160,6 +163,7 @@ function update(ex,ref,u){
   var p = (ex.equip==='fixedbar'&&ex.barAt) ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
   var axis2 = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
   if(R.plate){ R.plate.setAttribute('cx',p.x.toFixed(1)); R.plate.setAttribute('cy',p.y.toFixed(1)); }
+  if(R.pp){ R.pp.setAttribute('cx',p.x.toFixed(1)); R.pp.setAttribute('cy',(p.y+9).toFixed(1)); }
   if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
   if(R.bell){ R.bell.setAttribute('cx',p.x.toFixed(1)); R.bell.setAttribute('cy',p.y.toFixed(1)); }
   if(R.cable && ex.anchorAt){
@@ -264,6 +268,10 @@ function buildFront(ex,host,bx){
     // bell face per hand, not a dumbbell lying sideways across the body.
     R.fbellL=el('circle',{r:6,fill:soft}); R.fbellR=el('circle',{r:6,fill:soft});
     svg.appendChild(R.fbellL); svg.appendChild(R.fbellR);
+  } else if(ex.equip==='plate'){
+    // Face on from the front, one per hand, hanging from the pinch at the rim.
+    R.fppL=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3}); R.fppR=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3});
+    svg.appendChild(R.fppL); svg.appendChild(R.fppR);
   } else if(ex.equip==='cable'){
     R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fcabR=el('line',{stroke:soft,'stroke-width':1.8});
     R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
@@ -323,6 +331,8 @@ function updateFront(ex,R,u){
       R['fc'+pr[0]+'2'].setAttribute('x',(h.x+7).toFixed(1));  R['fc'+pr[0]+'2'].setAttribute('y',(h.y-8).toFixed(1));
     });
   }
+  if(R.fppL){ R.fppL.setAttribute('cx',hL.x.toFixed(1)); R.fppL.setAttribute('cy',(hL.y+7).toFixed(1));
+    R.fppR.setAttribute('cx',hR.x.toFixed(1)); R.fppR.setAttribute('cy',(hR.y+7).toFixed(1)); }
   if(R.fcabL && ex.anchorFront){
     [['L',s.handL],['R',s.handR]].forEach(function(pr){
       var h=pr[1], ax=ex.anchorFront[pr[0]==='L'?0:2], ay=ex.anchorFront[pr[0]==='L'?1:3];

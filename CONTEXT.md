@@ -880,7 +880,9 @@ Either derived from the side by `frontFromSide` (symmetric sagittal
 movements) or hand-authored (unilateral ones, and anything whose arms point at
 the camera). The front dumbbell raise ships with none: the frontal projection
 collapses onto the shoulders, so its second panel is the finish of the side
-view.
+view. The side plank ships with none either: seen from above, someone lying on
+their side is a profile, which the front solver (its torso always square to
+the camera) drew as a seated butterfly stretch.
 
 **Plan view** (`frontPlan`):
 Looking down at someone on the floor. No gravity and no ground line; labelled
@@ -951,7 +953,20 @@ A standing frame has the hip over the ankle (within 3) at `STAND_HIP_Y`
 (105.5), which leaves the knee at 160 to 172 degrees: soft, never locked at
 180, where the leg's IK is singular. The old hip at y 107, 5 behind the ankle,
 was a quarter squat. `analyse.js` (`STANDING`) fails the re-authored rigs
-outside it and warns for the standing frames still to do.
+outside it and warns for the standing frames still to do. A split stance or a
+walk is not standing on both feet (`'none'` there).
+
+**Walk**:
+The figure walks on the spot: the hip stays put and the feet pass under it.
+So a foot on the floor only ever travels back (the body passes over it) and a
+walk's lifted foot only forward (it swings through to the next step); the
+carries used to moonwalk, the planted foot sliding forward 20 a step. Half
+way through a stride the far foot is the one swinging, so the second panel
+lifts L there and R half way back. A walk rests only where each foot lands
+(`stops:[0,2]`); its second panel, where a foot just rises and sets down,
+also at the top of each lift (`frontStops`). `analyse.js` (`GAIT`) fails a
+rig that slides or swings a foot the wrong way; rigs listed there print as
+warnings while they are re-authored.
 
 **Foot pitch** (`footN`, `footF`):
 How far each foot is turned about its ankle, in degrees, positive lifting the
@@ -1017,7 +1032,8 @@ What is drawn over what. Side view, back to front: far leg and arm, body,
 near leg, the implement in the near hand (in front of the body, behind the
 head it hangs past at the top of a press), head, near arm (with a cut line of
 panel colour round it, so it shows where it crosses the body or passes the
-head), then a bar: the barbell's near plate or a fixed bar. Second panel: legs
+head), then a bar: the barbell's near plate or a fixed bar, or a pinched plate,
+which hangs from the fist by its rim. Second panel: legs
 behind the body unless a knee is raised above its hip, the arms in front of
 the head unless the rig sets `behindHead` (the overhead triceps extension),
 and a stick held behind the back (side-view hands behind the hip) behind the
@@ -1077,7 +1093,7 @@ checks once passed whatever the app did.
   somewhere; the core lifts resting at the top and bottom only; the reviewed
   stops table; a jump's still not in the air; the bell rule, in both copies,
   and the feet drawn alike), views (including the near side and the load),
-  and rendering. `adversarial.js` holds the footing check.
+  and rendering. `adversarial.js` holds the footing check, `analyse.js` the walking one.
 
 `test:app`, in the order it runs:
 
@@ -1109,7 +1125,7 @@ checks once passed whatever the app did.
   on a stop, and a tapped rep at full speed.
 - `test-rigdraw.js`: how the figure is drawn: what lies in front of what
   (the near arm over the head, with its cut line; the implement in the near
-  hand, and in the second panel in the loaded hand of a one-handed lift; the second panel's arms, raised knees and a stick behind the back),
+  hand, and in the second panel in the loaded hand of a one-handed lift; the second panel's arms, raised knees and a stick behind the back; a pinched plate hanging from the fist by its rim, over the arm),
   every rig inside its panel at 96 moments of the rep, both panels at one
   top and height, the tablet cap, the floor across the panel, and `--ground`
   and `--prop` at 3:1 or more against the panel in both themes.

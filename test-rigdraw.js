@@ -88,6 +88,22 @@ t('side view: the implement in the near hand is drawn over the body, under the h
 // the body a racked bell left a grey disc on the belly, away from the hand, so
 // while its hand is above the hip it sits behind the body; hanging in a swing
 // or the bottom of a clean it stays in front of the body and the near leg.
+// A pinched plate hung behind the near arm and leg, so the side view was a
+// figure standing empty handed, and both views hung it from its hub as if
+// held by a handle. It hangs from the fist by its rim, over the arm.
+t('a pinched plate hangs from the fist by its rim, drawn over the near arm', function(){
+  var ex=rex('platepinch'), s=app.rSolve(app.rPoseAt(ex,0.3)), sh=shapes(app.rigSVG(EXOF.platepinch,0.3));
+  var hand=idx(sh,function(p){ return isHand(p,s.handN); });
+  var plate=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'||p.a.stroke==='var(--text-soft)'; });
+  assert.ok(plate>hand,'the plate (shape '+plate+') is under the near arm ('+hand+')');
+  var e=extent(sh[plate]), top=e.y0+1.5, bot=e.y1-1.5;
+  assert.ok(top<s.handN.y && s.handN.y-top<=5 && bot>s.handN.y+18,'plate runs '+top+' to '+bot+', fist at y '+s.handN.y.toFixed(1));
+  var f=app.rSolveFront(app.rFrontAt(ex,0.3)), fs=shapes(app.rigFrontSVG(EXOF.platepinch,0.3));
+  var disc=fs.filter(function(p){ return p.n==='circle'&&p.a.stroke==='var(--text-soft)'; });
+  assert.equal(disc.length,2,'one plate per hand');
+  disc.forEach(function(d,i){ var h=i?f.handR:f.handL;
+    assert.ok(Math.abs(+d.a.cx-h.x)<0.06 && +d.a.cy-h.y>=5,'plate centre '+d.a.cy+' against the fist at '+h.y.toFixed(1)); });
+});
 t('side view: a kettlebell held above the hip is drawn behind the body, one hanging below it in front', function(){
   var seen={};
   ['kbswing','kb_clean','kb_snatch','kb_press','kb_bottomsup','kb_tgu'].forEach(function(id){ for(var i=0;i<24;i++){ var u=i/24, ex=rex(id), s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));

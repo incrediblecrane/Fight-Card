@@ -185,7 +185,7 @@ EX.forEach(function(ex){
 // are being re-authored (their toes and rear feet need footN and footF), so
 // they print as warnings; any other rig breaking it fails, and a listed rig
 // that comes right says so, so the list only shrinks.
-var FOOTING={splitsq_bulg:'sink',lunge_walk:'hover',invertedrow:'hover',sideplank:'hover',woodchopper:'hover',
+var FOOTING={lunge_walk:'hover',woodchopper:'hover',
   boxjump:'sink',medballthrow:'hover',skipping:'hover',jumpingjack:'hover',highknees:'hover',briskwalkjog:'hover',
   hipflexor:'hover',couchstretch:'sink',childspose:'hover',catcow:'hover',pigeon:'hover',thoracic:'hover',
   ankle_mob:'hover',rowerg:'sink',pushup:'hover',plank:'hover',mtnclimb:'hover',burpee:'hover'};

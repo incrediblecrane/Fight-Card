@@ -218,6 +218,17 @@ EX.forEach(function(ex){
       'travel '+r(S[0].handN.y-S[T].handN.y));
     check(ex.id,'the supporting hand does not move', S.every(function(x){return x.handF.y===S[0].handF.y;}),'support hand moved');
     check(ex.id,'the torso does not rotate up to help', S.every(function(x){return x.sh.y===S[0].sh.y;}),'the torso moved');
+    // The arm hangs straight under the shoulder, then the elbow drives up
+    // past the back with the forearm hanging under it, the hand coming to
+    // the hip. It used to bend backwards all rep and finish at the armpit.
+    check(ex.id,'the working arm starts hanging straight under the shoulder',
+      Math.abs(S[0].handN.x-S[0].sh.x)<3 && angAt(S[0].sh,S[0].elbN,S[0].handN)>=165,'hand x '+r(S[0].handN.x)+' shoulder x '+r(S[0].sh.x)+' elbow '+r(angAt(S[0].sh,S[0].elbN,S[0].handN)));
+    check(ex.id,'it rows to the hip: the hand ends between hip and shoulder under a raised elbow',
+      S[T].handN.x>S[T].hip.x && S[T].handN.x<S[T].sh.x-8 && S[T].elbN.y<S[T].handN.y-10,'hand '+r(S[T].handN.x)+','+r(S[T].handN.y)+' elbow '+r(S[T].elbN.x)+','+r(S[T].elbN.y));
+    var bench=ex.props[0];
+    check(ex.id,'the far knee and hand rest on the bench',
+      S.every(function(x){ return x.kneeF.y>=bench[1]-7 && x.kneeF.y<=bench[1] && x.handF.y>=bench[1]-4 && x.handF.y<=bench[1]; }),
+      'knee y '+r(S[0].kneeF.y)+' hand y '+r(S[0].handF.y)+' bench top '+bench[1]);
   }
   if(ex.id==='chinup'||ex.id==='hangingkneeraise'){
     check(ex.id,'the bar is fixed in space', S.every(function(x){return x.handN.x===S[0].handN.x && x.handN.y===S[0].handN.y;}),'the bar moved');
@@ -227,6 +238,12 @@ EX.forEach(function(ex){
   }
   if(ex.id==='chinup'){
     check(ex.id,'the body rises to the bar', S[0].hip.y-S[T].hip.y>18,'rise '+r(S[0].hip.y-S[T].hip.y));
+    // The head used to rise into the bar and the chin never cleared it.
+    var bar=ex.barAt, chin=S[T].head.y+L.HEAD_R*0.75, clear=1e9;
+    for(var q=0;q<=96;q++){ var sq=solve(rig.poseAt(ex,q/96)); clear=Math.min(clear,Math.hypot(sq.head.x-bar[0],sq.head.y-bar[1])-L.HEAD_R); }
+    check(ex.id,'the chin clears the bar at the top',chin<bar[1],'chin '+r(chin)+' bar '+bar[1]);
+    check(ex.id,'the head passes beside the bar, never through it',clear>=2,'closest '+r(clear));
+    check(ex.id,'the arms hang straight at the bottom',angAt(S[0].sh,S[0].elbN,S[0].handN)>=165,'elbow '+r(angAt(S[0].sh,S[0].elbN,S[0].handN)));
     check(ex.id,'the grip is narrower than a pull-up',
       ex.front && ex.front[0].handR[0]-ex.front[0].handL[0] < 42,'grip width '+r(ex.front[0].handR[0]-ex.front[0].handL[0]));
   }
@@ -239,26 +256,47 @@ EX.forEach(function(ex){
     check(ex.id,'the bar is fixed in space', S.every(function(x){return x.handN.y===S[0].handN.y;}),'the bar moved');
     check(ex.id,'the heels stay on the floor', S.every(function(x){return x.ankN.y<=GROUND;}),'a heel sank');
     check(ex.id,'the chest travels up to the bar', S[0].sh.y-S[T].sh.y>8,'rise '+r(S[0].sh.y-S[T].sh.y));
-    check(ex.id,'the body stays one line, hips do not sag behind the shoulders',
-      S.every(function(x){return Math.abs((x.hip.y-x.sh.y)-(S[0].hip.y-S[0].sh.y))<3;}),'the body folded');
+    // Face up, heels down, one straight line from heel to head pivoting
+    // about the heels. It used to check that the hip stayed a fixed height
+    // below the shoulder, which passed a face-down body folded at the hips
+    // with the knees bent under it and would fail a correct pivot.
+    check(ex.id,'the body stays one straight line, heel to shoulder, knees straight',
+      S.every(function(x){ return angAt(x.ankN,x.hip,x.sh)>168 && angAt(x.hip,x.kneeN,x.ankN)>165; }),
+      S.map(function(x){ return r(angAt(x.ankN,x.hip,x.sh))+'/'+r(angAt(x.hip,x.kneeN,x.ankN)); }).join(' '));
+    check(ex.id,'it lies face up under the bar, head past the hips from the heels',
+      S.every(function(x){ return x.head.x<x.hip.x && x.hip.x<x.ankN.x && x.head.y<x.hip.y; }),'head '+r(S[0].head.x)+' hip '+r(S[0].hip.x)+' heel '+r(S[0].ankN.x));
+    check(ex.id,'the heels stay put: the body pivots on them',
+      ex.frames.every(function(f){ return f.ankN[0]===ex.frames[0].ankN[0] && f.ankN[1]===ex.frames[0].ankN[1]; }),'a heel moved');
   }
+  // The top of a clean or a snatch is its highest hand: the rack or the
+  // lockout, wherever the rig's stops put its turnaround.
+  var TOP=S.reduce(function(b,x,i){ return x.handN.y<S[b].handN.y?i:b; },0);
   if(ex.id==='kb_clean'||ex.id==='kb_snatch'){
     check(ex.id,'it starts from a hinge with the bell behind the knees',
       ex.frames[0].torso>60 && S[0].handN.x<S[0].kneeN.x,'torso '+ex.frames[0].torso+' hand '+r(S[0].handN.x)+' knee '+r(S[0].kneeN.x));
-    check(ex.id,'it finishes standing tall', ex.frames[T].torso<10,'finish torso '+ex.frames[T].torso);
+    check(ex.id,'it finishes standing tall', ex.frames[TOP].torso<10,'finish torso '+ex.frames[TOP].torso);
     check(ex.id,'the feet stay planted throughout', S.every(function(x){return x.ankN.y===GROUND-7;}),'a foot moved');
   }
   if(ex.id==='kb_snatch'){
     var cl=EX.filter(function(e){return e.id==='kb_clean';})[0];
-    var clTop=solve(cl.frames[rig.turn(cl)]);
+    var clTop=cl.frames.map(solve).reduce(function(b,x){ return x.handN.y<b.handN.y?x:b; });
     check(ex.id,'it finishes overhead, higher than a clean racks',
-      S[T].handN.y < clTop.handN.y-30,'snatch '+r(S[T].handN.y)+' clean '+r(clTop.handN.y));
+      S[TOP].handN.y < clTop.handN.y-30,'snatch '+r(S[TOP].handN.y)+' clean '+r(clTop.handN.y));
     check(ex.id,'the lockout arm is straight',
-      Math.hypot(S[T].handN.x-S[T].sh.x,S[T].handN.y-S[T].sh.y)>37,'reach '+r(Math.hypot(S[T].handN.x-S[T].sh.x,S[T].handN.y-S[T].sh.y)));
+      Math.hypot(S[TOP].handN.x-S[TOP].sh.x,S[TOP].handN.y-S[TOP].sh.y)>37,'reach '+r(Math.hypot(S[TOP].handN.x-S[TOP].sh.x,S[TOP].handN.y-S[TOP].sh.y)));
+    check(ex.id,'the lockout is held a moment, not swung through',
+      ex.frames.some(function(f,i){ return i>0 && JSON.stringify(f)===JSON.stringify(ex.frames[i-1]) && solve(f).handN.y===S[TOP].handN.y; }),'no repeated lockout keyframe');
   }
   if(ex.id==='kb_clean'){
-    check(ex.id,'the rack is at chest height, not overhead', S[T].handN.y>S[T].sh.y+6 && S[T].handN.y<S[T].hip.y,
-      'rack '+r(S[T].handN.y)+' shoulder '+r(S[T].sh.y));
+    // The rack: the fist in front of the chest at about collarbone height,
+    // the elbow down by the ribs. It used to park the fist behind the
+    // shoulder with the elbow out behind the back at shoulder height.
+    var rk=S[TOP];
+    check(ex.id,'the rack is in front of the chest at collarbone height, not overhead',rk.handN.y>rk.sh.y && rk.handN.y<rk.sh.y+16 && rk.handN.x>rk.sh.x+5,
+      'fist '+r(rk.handN.x)+','+r(rk.handN.y)+' shoulder '+r(rk.sh.x)+','+r(rk.sh.y));
+    check(ex.id,'the racked elbow is down by the ribs, not winged out behind',rk.elbN.y>rk.sh.y+12 && rk.elbN.x>rk.sh.x-6,
+      'elbow '+r(rk.elbN.x)+','+r(rk.elbN.y)+' shoulder '+r(rk.sh.x)+','+r(rk.sh.y));
+    check(ex.id,'the rack is held a moment',ex.frames.some(function(f,i){ return i>0 && JSON.stringify(f)===JSON.stringify(ex.frames[i-1]) && solve(f).handN.y===rk.handN.y; }),'no repeated rack keyframe');
   }
   if(ex.id==='kb_press'){
     check(ex.id,'only one arm presses; the other hangs still',
@@ -268,6 +306,13 @@ EX.forEach(function(ex){
       'rack '+r(S[0].handN.y)+' top '+r(S[T].handN.y));
     check(ex.id,'the torso stays upright rather than leaning away from the load',
       S.every(function(x){return Math.abs(x.sh.x-x.hip.x)<4;}),'the torso leaned');
+    check(ex.id,'it racks with the fist in front of the chest and the elbow down by the ribs',
+      S[0].handN.x>S[0].sh.x+5 && S[0].elbN.y>S[0].sh.y+12,'fist '+r(S[0].handN.x)+' elbow y '+r(S[0].elbN.y)+' shoulder '+r(S[0].sh.x)+','+r(S[0].sh.y));
+    check(ex.id,'it locks out straight overhead',angAt(S[T].sh,S[T].elbN,S[T].handN)>=170,'elbow '+r(angAt(S[T].sh,S[T].elbN,S[T].handN)));
+    var near=1e9; for(var q=0;q<=96;q++){ var sq=solve(rig.poseAt(ex,q/96)); near=Math.min(near,Math.hypot(sq.handN.x-sq.head.x,sq.handN.y-sq.head.y)); }
+    check(ex.id,'the fist goes past the face, never through the head',near>=L.HEAD_R+5,'closest '+r(near));
+    var tp=rig.tempoOf(ex), upT=0, dnT=0; tp.forEach(function(t,i){ if(i<T) upT+=t; else dnT+=t; });
+    check(ex.id,'it lowers no faster than it presses',dnT>=upT,'press '+upT+' ms, lower '+dnT+' ms');
   }
   if(ex.id==='suitcasecarry'||ex.id==='kb_bottomsup'||ex.id==='briskwalkjog'){
     var strides={};
@@ -279,6 +324,12 @@ EX.forEach(function(ex){
   if(ex.id==='kb_bottomsup'){
     check(ex.id,'the bell is racked at shoulder height, not hanging at the side',
       S.every(function(x){return x.handN.y<x.sh.y+22;}),'hand '+r(S[0].handN.y)+' shoulder '+r(S[0].sh.y));
+    // Bottoms up the forearm stands straight under the bell, the fist just
+    // above the shoulder and in front of it. It used to be the clean's
+    // chicken-winged rack, the elbow out behind the back.
+    check(ex.id,'the forearm stands vertical under the bell, the fist in front of the shoulder',
+      S.every(function(x){ return Math.abs(x.handN.x-x.elbN.x)<4 && x.handN.y<x.elbN.y && x.handN.x>x.sh.x+5; }),
+      'fist '+r(S[0].handN.x)+','+r(S[0].handN.y)+' elbow '+r(S[0].elbN.x)+','+r(S[0].elbN.y));
   }
   if(ex.id==='suitcasecarry'){
     check(ex.id,'only one arm is loaded, so the two hands hang differently',
@@ -295,8 +346,20 @@ EX.forEach(function(ex){
       Math.max.apply(null,S.map(function(x){return Math.abs(x.hip.y-S[0].hip.y);}))<4,'the hips travelled');
   }
   if(ex.id==='sideplank'){
-    check(ex.id,'the hips are lifted clear of the floor', S.every(function(x){return x.hip.y<GROUND-25;}),
+    // One straight line from ankle to shoulder, the elbow under the
+    // shoulder. It used to ask for the hips 25 above the floor, which only a
+    // pike could give: the hips were the highest point, the knees bent
+    // backwards to get there.
+    check(ex.id,'the body is one straight line from ankle to shoulder', S.every(function(x){
+      var dx=x.sh.x-x.ankN.x, dy=x.sh.y-x.ankN.y; return Math.abs((x.hip.x-x.ankN.x)*dy-(x.hip.y-x.ankN.y)*dx)/Math.hypot(dx,dy)<3; }),'hip off the line');
+    check(ex.id,'the hips are lifted clear of the floor', S.every(function(x){return x.hip.y<GROUND-12;}),
       'hip '+r(S[0].hip.y)+' ground '+GROUND);
+    check(ex.id,'the elbow is planted under the shoulder', S.every(function(x){return Math.abs(x.elbN.x-x.sh.x)<3 && x.elbN.y>GROUND-8;}),
+      'elbow '+r(S[0].elbN.x)+','+r(S[0].elbN.y)+' shoulder x '+r(S[0].sh.x));
+    // Seen from above, someone lying on their side is a profile the front
+    // solver cannot draw (its torso is always square to the camera): it drew
+    // a seated butterfly stretch.
+    check(ex.id,'it has no second panel rather than a wrong one',!ex.front,'a second panel was added back');
     check(ex.id,'one forearm is planted on the floor', S.every(function(x){return x.handN.y>GROUND-22;}),'the supporting hand floated');
   }
   if(ex.id==='hollowhold'){
@@ -828,14 +891,18 @@ EX.forEach(function(ex){
    and the knee shoots forward as the descent starts. The rigs listed here
    have been re-authored and fail outside it; any other frame that looks like
    standing (feet down, torso upright) and is not prints as a warning until its
-   batch is re-authored. */
+   batch is re-authored. A list names the standing keyframes; 'none' marks a rig whose upright frames are not
+   standing on both feet (a split stance, a walk), which the warning would
+   otherwise ask to stand tall. */
 function angAt(a,b,c){ var d=Math.abs(Math.atan2(a.y-b.y,a.x-b.x)-Math.atan2(c.y-b.y,c.x-b.x))*180/Math.PI; return d>180?360-d:d; }
-var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadlift:'turn', ohp:'all', kbswing:'after'};
+var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadlift:'turn', ohp:'all', kbswing:'after',
+  facepull:'all', triceps_ext:'all', kb_press:'all', platepinch:'top', kb_clean:[1,2,3,4,5,6], kb_snatch:[1,2,3,4,5],
+  splitsq_bulg:'none', farmerscarry:'none', suitcasecarry:'none', kb_bottomsup:'none'};
 (function standingTall(){
   EX.forEach(function(ex){
     var how=STANDING[ex.id], T=rig.turn(ex), bad=[];
     ex.frames.forEach(function(f,i){
-      var want=how==='all'||(how==='top'&&i===0)||(how==='turn'&&i===T)||(how==='after'&&i>0);
+      var want=how==='all'||(Array.isArray(how)&&how.indexOf(i)>=0)||(how==='top'&&i===0)||(how==='turn'&&i===T)||(how==='after'&&i>0);
       var s=solve(f), knee=angAt(s.hip,s.kneeN,s.ankN), dx=s.hip.x-s.ankN.x;
       var tall=knee>=160 && knee<=172 && Math.abs(dx)<=3 && Math.abs(s.hip.y-rig.STAND_HIP_Y)<=0.5;
       var why='knee '+r(knee)+' deg, hip '+r(dx)+' from the ankle at y '+r(s.hip.y);
@@ -917,6 +984,84 @@ var PLATE_EDGE=15+1.75, PLATE_EDGE_F=13+1.5;
   check('kbswing','the bell clears the floor at the hike',GROUND-(kb[0].handN.y+22)>=8,'bell bottom '+r(kb[0].handN.y+22));
   check('kbswing','the hips have locked by the time the bell is at the belly (the arms do not raise it from a hinge)',
     get('kbswing').frames[1].torso<=5 && kb[1].handN.y>kb[1].sh.y,'torso '+get('kbswing').frames[1].torso+' bell y '+r(kb[1].handN.y));
+})();
+
+/* Walking. The three carries moonwalked: the figure faced forward on a
+   still hip while the planted foot slid FORWARD 20 units a step and the
+   lifted one swung back. Seen against a still hip, a foot on the floor can
+   only travel back (the body passes over it), and a walk's lifted foot only
+   forward (it swings through to the next step). A walk here is an upright
+   rig with a foot on the floor at every moment and one lifted at some. The
+   rigs listed slide or swing a foot the wrong way today and are being
+   re-authored, so they print as warnings; any other rig doing it fails, and
+   a listed one that comes right says so. */
+var GAIT={lunge_walk:'slide', burpee:'slide', shadowbox:'swing'};
+(function walking(){
+  var done=[];
+  EX.forEach(function(ex){
+    var N=480, S=[], Y=rig.ANKLE_Y, known=(GAIT[ex.id]||'').split(' ');
+    for(var i=0;i<=N;i++) S.push(solve(rig.poseAt(ex,i/N)));
+    function down(p){ return p.y>=Y-0.3; }
+    var walk=ex.frames.every(function(f){ return Math.abs(((f.torso+180)%360)-180)<15; }) &&
+      S.every(function(x){ return down(x.ankN)||down(x.ankF); }) && S.some(function(x){ return !down(x.ankN)||!down(x.ankF); });
+    var fw=0, fwAt='', bw=0, bwAt='';
+    ['ankN','ankF'].forEach(function(k){ var run=0, back=0;
+      for(var i=1;i<=N;i++){ var a=S[i-1][k], b=S[i][k], dx=b.x-a.x;
+        if(down(a)&&down(b)){ run=Math.max(0,run+dx); if(run>fw){ fw=run; fwAt=k+' at u='+r(i/N*100)/100; } } else run=0;
+        if(!down(a)&&!down(b)){ back=Math.min(0,back+dx); if(back<bw){ bw=back; bwAt=k+' at u='+r(i/N*100)/100; } } else back=0; } });
+    [['slide','a foot on the floor never slides forward under a still hip',fw<=1,'slides forward '+r(fw)+', '+fwAt],
+     ['swing','a walk\'s lifted foot swings forward, never back (no moonwalk)',!walk||bw>=-1,'swings back '+r(-bw)+', '+bwAt]].forEach(function(c){
+      if(known.indexOf(c[0])>=0){ if(c[2]) done.push(ex.id+' '+c[0]); else soft(ex.id,c[1]+' (listed in GAIT, being re-authored)',false,c[3]); }
+      else check(ex.id,c[1],c[2],c[3]); });
+  });
+  if(done.length) soft('GAIT','now walking the right way, take off GAIT',false,done.join(', '));
+})();
+
+/* The machines and isolation lifts, as the coaches' review (batch B) found
+   them: a dip that squatted behind a rail with the shoulder never reaching the
+   elbow, a dead hang drawn as a small pull-up, a pulldown that stopped at the
+   chin, a split squat that showed only the bottom half, a triceps extension
+   whose elbows drifted, an incline press that pushed out along the bench, a
+   face pull that finished as a high pull, and a wall sit that squatted. */
+(function machines(){
+  function get(id){ return EX.filter(function(e){return e.id===id;})[0]; }
+  function at(ex,n){ var o=[]; for(var i=0;i<=n;i++) o.push(solve(rig.poseAt(ex,i/n))); return o; }
+  function elb(s){ return angAt(s.sh,s.elbN,s.handN); }
+  var dp=get('dip'), D=dp.frames.map(solve), Td=rig.turn(dp);
+  check('dip','starts on straight arms',elb(D[0])>=165,'elbow '+r(elb(D[0])));
+  check('dip','the shoulder comes down level with the elbow at the bottom',D[Td].sh.y>=D[Td].elbN.y-2,'shoulder y '+r(D[Td].sh.y)+' elbow y '+r(D[Td].elbN.y));
+  check('dip','the hands rest on a bar',D.every(function(s){ return (dp.props||[]).some(function(p){ return Math.abs(s.handN.y-p[1])<=2 && s.handN.x>=p[0] && s.handN.x<=p[0]+p[2]; }); }),'hand y '+r(D[0].handN.y));
+  var dh=at(get('deadhang'),48), worst=Math.min.apply(null,dh.map(elb));
+  check('deadhang','the arms stay dead straight: only the shoulders pack',worst>=170,'most bent elbow '+r(worst));
+  var pd=get('pulldown'), PD=pd.frames.map(solve), Tp=rig.turn(pd);
+  check('pulldown','starts with the arms fully extended overhead',elb(PD[0])>=165,'elbow '+r(elb(PD[0])));
+  check('pulldown','the bar comes down to the upper chest, below the shoulder',PD[Tp].handN.y>=PD[Tp].sh.y && PD[Tp].elbN.y>PD[Tp].sh.y+8,
+    'hand y '+r(PD[Tp].handN.y)+' elbow y '+r(PD[Tp].elbN.y)+' shoulder y '+r(PD[Tp].sh.y));
+  var pf=rig.solveFront(pd.front[rig.turn(pd,true)]);
+  check('pulldown front','the hands come down below the chin',pf.handL.y>pf.head.y+8,'hand y '+r(pf.handL.y)+' head y '+r(pf.head.y));
+  var ht=get('hipthrust'), H=ht.frames.map(solve), Th=rig.turn(ht);
+  check('hipthrust','the bench is knee height (about 40 cm), not a table under the back',ht.props[0][1]>=GROUND-30,'bench top '+ht.props[0][1]);
+  check('hipthrust','the knee is over the ankle at the top',Math.abs(H[Th].kneeN.x-H[Th].ankN.x)<=2,'knee x '+r(H[Th].kneeN.x)+' ankle x '+r(H[Th].ankN.x));
+  var sq=get('splitsq_bulg'), Q=sq.frames.map(solve), Tq=rig.turn(sq);
+  check('splitsq_bulg','the rep starts from the top, front leg near straight',angAt(Q[0].hip,Q[0].kneeN,Q[0].ankN)>=150,'front knee '+r(angAt(Q[0].hip,Q[0].kneeN,Q[0].ankN)));
+  var qf=rig.solveFront(sq.front[rig.turn(sq,true)]);
+  check('splitsq_bulg front','the rear knee is the low one, as from the side',qf.kneeL.y>qf.kneeR.y+10 && Math.abs(qf.kneeL.y-Q[Tq].kneeF.y)<4,
+    'rear knee y '+r(qf.kneeL.y)+' front knee y '+r(qf.kneeR.y)+' side rear knee y '+r(Q[Tq].kneeF.y));
+  var te=get('triceps_ext'), TE=at(te,48), ex0=TE.map(function(s){ return s.elbN.x; }), ey0=TE.map(function(s){ return s.elbN.y; });
+  var drift=Math.max(Math.max.apply(null,ex0)-Math.min.apply(null,ex0),Math.max.apply(null,ey0)-Math.min.apply(null,ey0));
+  check('triceps_ext','the upper arm stays put: only the forearm moves',drift<1.5,'elbow travels '+r(drift));
+  var TS=te.frames.map(solve);
+  check('triceps_ext','locks out straight and lowers deep behind the head',elb(TS[0])>=170 && elb(TS[rig.turn(te)])<=60,'elbow '+r(elb(TS[0]))+' to '+r(elb(TS[rig.turn(te)])));
+  var pi=get('press_incline'), PI=pi.frames.map(solve), Ti=rig.turn(pi);
+  check('press_incline','presses straight up over the shoulder, not out along the bench',Math.abs(PI[0].handN.x-PI[0].sh.x)<=8 && PI[0].handN.y<PI[0].sh.y-30,
+    'hand '+r(PI[0].handN.x)+','+r(PI[0].handN.y)+' shoulder '+r(PI[0].sh.x)+','+r(PI[0].sh.y));
+  check('press_incline','the forearm is vertical under the bell at the bottom',Math.abs(PI[Ti].handN.x-PI[Ti].elbN.x)<=4,'hand x '+r(PI[Ti].handN.x)+' elbow x '+r(PI[Ti].elbN.x));
+  var fp=get('facepull'), FP=fp.frames.map(solve), Tf=rig.turn(fp);
+  check('facepull','starts with the arms extended toward the cable',elb(FP[0])>=160,'elbow '+r(elb(FP[0])));
+  check('facepull','the elbow finishes below the middle of the head, not up by the crown',FP[Tf].elbN.y>FP[Tf].head.y,'elbow y '+r(FP[Tf].elbN.y)+' head y '+r(FP[Tf].head.y));
+  var ws=get('wallsit'), WS=at(ws,48), hy=WS.map(function(s){ return s.hip.y; });
+  check('wallsit','it is a hold: the hips barely move',Math.max.apply(null,hy)-Math.min.apply(null,hy)<=4.5,'hip travels '+r(Math.max.apply(null,hy)-Math.min.apply(null,hy)));
+  check('wallsit front','the hands stay off the thighs',ws.front.every(function(f){ return f.handL[1]<f.hipY-12 && f.handR[1]<f.hipY-12; }),'hand y '+ws.front[0].handL[1]+' hip y '+ws.front[0].hipY);
 })();
 
 // Frame 2 is the bottom of the usual four-frame rep and nothing more: a rig
