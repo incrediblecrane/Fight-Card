@@ -4280,26 +4280,28 @@ function rFootPts(ank,rot){
 // A kettlebell on the hand that holds it (pose/rig.js bellAt): upside down
 // above the fist held bottoms-up; hanging below a hand that is below its
 // elbow, along the arm when the arm is straight; behind the wrist on the back
-// of the forearm in a rack or a lockout; turning round the wrist between.
+// of the forearm in a rack or a lockout; turning round the wrist between, over
+// the back of the hand and never through the forearm, while the forearm is 30
+// to 98 degrees from straight up.
 function rRamp(a,b,x){ var t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
 function rBellAt(ex,s){
-  var h=s.handN, D=12;
+  var h=s.handN, D=12, T=2*Math.PI;
   if(ex.bellUp) return {x:h.x, y:h.y-D, d:rP(0,-1)};
   var fx=h.x-s.elbN.x, fy=h.y-s.elbN.y, fl=Math.hypot(fx,fy)||1; fx/=fl; fy/=fl;
   var ax=h.x-s.sh.x, ay=h.y-s.sh.y, al=Math.hypot(ax,ay)||1;
   var k=rRamp(0.88,0.97,al/((RL.UPPER+RL.FORE)*s.armScaleN));
-  var hx=k*ax/al, hy=(1-k)+k*ay/al;
-  var bx=-6*fx-5, by=-6*fy+4, b=rRamp(-0.3,0.05,fy);
-  var a0=Math.atan2(bx,by), a1=Math.atan2(hx,hy), da=((a1-a0)/Math.PI%2+3)%2-1;
-  var a=a0+da*Math.PI*b, len=rLerp(11,D,b), d=rP(Math.sin(a),Math.cos(a));
+  var e=Math.atan2(-fx,-fy), r1=((Math.atan2(k*ax/al,(1-k)+k*ay/al)-e)%T+T)%T, r0=T-0.4636;
+  var b=Math.max(0,Math.min(1,(Math.acos(Math.max(-1,Math.min(1,-fy)))*180/Math.PI-30)/68));
+  var a=e+r0+(r1-r0)*b, len=rLerp(11,D,b), d=rP(Math.sin(a),Math.cos(a));
   return {x:h.x+d.x*len, y:h.y+d.y*len, d:d};
 }
 // The second panel's one bell: in the loaded hand (load:'L'|'R') of a
 // one-handed lift, else between the hands sharing it.
 function rBellFront(ex,f){
   var h=ex.load?(ex.load==='L'?f.handL:f.handR):rP((f.handL.x+f.handR.x)/2,(f.handL.y+f.handR.y)/2), u=ex.bellUp?-1:1, x=h.x, y=h.y+9*u;
-  // Racked or overhead it rests on the back of the forearm, just outside the fist.
-  if(ex.load&&!ex.bellUp){ var e=ex.load==='L'?f.elbL:f.elbR, k=rRamp(-0.1,-0.5,(h.y-e.y)/(Math.hypot(h.x-e.x,h.y-e.y)||1));
+  // Racked or overhead it rests on the back of the forearm, just outside the
+  // fist, moving there as the hand rises from 8 below its elbow to 14 above.
+  if(ex.load&&!ex.bellUp){ var e=ex.load==='L'?f.elbL:f.elbR, k=Math.max(0,Math.min(1,(8-h.y+e.y)/22));
     x=rLerp(x,h.x+(ex.load==='L'?-8:8),k); y=rLerp(y,h.y+6,k); }
   return {x:x, y:y, h:h, u:u};
 }

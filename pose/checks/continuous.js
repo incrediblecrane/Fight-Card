@@ -227,38 +227,56 @@ EX.forEach(function(ex){
 // above the fist held bottoms-up; under a hand below its elbow, straight down
 // from a bent arm and along a straight one; back down the forearm or behind
 // it, in a rack or a lockout.
-// Always on the fist (10 to 13 from it), the
-// same in the app, and never jumping as it turns round the wrist.
+// Always on the fist (10 to 13 from it) and the same in the app.
+// Turning round the wrist it goes over the back of the hand: it never passes
+// through the forearm, which is the bell flipping over and banging the
+// forearm that the clean and the snatch warn against. And it does not jump
+// round the fist between two frames the app draws (RIGFRAMES steps): at most
+// 6 a frame, or as far as the fist itself moves that frame when the arm is
+// whipping faster. Measured per sample, a flip across the forearm in one
+// 33 ms frame passed, as it moved under a unit between samples 1/2000 of a rep
+// apart. The same in the second panel, 6 a frame as it moves outside the fist.
+function crossesForearm(prev,s,b){ var h=s.handN, e={x:s.elbN.x-h.x,y:s.elbN.y-h.y}, o={x:b.x-h.x,y:b.y-h.y};
+  var side=e.x*o.y-e.y*o.x, toward=e.x*o.x+e.y*o.y; return {side:side, cross:prev&&prev.toward>0&&toward>0&&(prev.side<0)!==(side<0), toward:toward}; }
 function ang(a,b){ var c=(a.x*b.x+a.y*b.y)/((Math.hypot(a.x,a.y)*Math.hypot(b.x,b.y))||1); return Math.acos(Math.max(-1,Math.min(1,c)))*180/Math.PI; }
 EX.filter(function(e){ return e.equip==='kettlebell'; }).forEach(function(ex){
-  var ax=app.RIGFRAMES[ex.id], worst=0, where='', far=0, farAt='', par=0, parAt='', jump=0, jumpAt='', prev=null;
+  var ax=app.RIGFRAMES[ex.id], worst=0, where='', far=0, farAt='', par=0, parAt='', cross='', fc=null;
   for(var i=0;i<=FINE;i++){ var u=i/FINE, s=rig.solve(rig.poseAt(ex,u)), b=rig.bellAt(ex,s), h=s.handN;
     var off={x:b.x-h.x,y:b.y-h.y}, len=Math.hypot(off.x,off.y), want=null;
     var fx=h.x-s.elbN.x, fy=(h.y-s.elbN.y)/Math.hypot(fx,h.y-s.elbN.y), reach=d(s.sh,h)/((L.UPPER+L.FORE)*s.armScaleN);
+    // Racked once the forearm is within 30 degrees of straight up, hanging
+    // or in line once it is past 98 (it used to switch over between -0.3 and
+    // 0.05 of the forearm's unit y, about 20 degrees, which a snatch swept in
+    // one frame); between, it is turning round the wrist (checked below).
+    var up=Math.acos(Math.max(-1,Math.min(1,-fy)))*180/Math.PI;
     if(ex.bellUp) want={x:0,y:-1};
-    else if(fy>0.05&&reach>=0.97) want={x:h.x-s.sh.x,y:h.y-s.sh.y};
-    else if(fy>0.05&&reach<=0.88) want={x:0,y:1};
-    else if(fy<-0.3) want={x:s.elbN.x-h.x,y:s.elbN.y-h.y};
+    else if(up>=98&&reach>=0.97) want={x:h.x-s.sh.x,y:h.y-s.sh.y};
+    else if(up>=98&&reach<=0.88) want={x:0,y:1};
+    else if(up<=30) want={x:s.elbN.x-h.x,y:s.elbN.y-h.y};
     if(want){ var a=ang(off,want);
       // Racked, anywhere on the back of the forearm will do (the side away
       // from the face, -x as the figure faces +x).
-      if(fy<-0.3 && a<=90 && want.y*off.x-want.x*off.y<0) a=0;
+      if(up<=30 && a<=90 && want.y*off.x-want.x*off.y<0) a=0;
       if(a>worst){ worst=a; where='u='+u.toFixed(4); } }
     var e=Math.max(10-len,len-13); if(e>far){ far=e; farAt=r(len)+' at u='+u.toFixed(4); }
-    if(prev){ var j=d(b,prev); if(j>jump){ jump=j; jumpAt='u='+u.toFixed(4); } }
-    prev=b;
+    fc=crossesForearm(fc,s,b); if(fc.cross&&!cross) cross='u='+u.toFixed(4);
     if(i%5===0){ var bp=app.bellAt(ax,app.solve(app.poseAt(ax,u))), q=d(bp,b); if(q>par){ par=q; parAt='u='+u.toFixed(4); } }
   }
   ck(ex.id,'the kettlebell lies the way the hand holds it (within 30 degrees)',worst<=30,r(worst)+' degrees off at '+where);
   ck(ex.id,'the kettlebell stays on the fist',far<=0,'centre '+farAt);
-  ck(ex.id,'the kettlebell turns round the wrist without jumping',jump<=JUMP,r(jump)+' at '+jumpAt);
+  ck(ex.id,'the kettlebell turns over the back of the hand, never through the forearm',!cross,'crosses at '+cross);
+  var n=ax.steps, pr=null, ph=null, step=0, stepAt='';
+  for(var i=0;i<=n;i++){ var s=app.solve(app.poseAt(ax,i/n)), b=app.bellAt(ax,s), h=s.handN, rel={x:b.x-h.x,y:b.y-h.y};
+    if(pr){ var over=d(rel,pr)-Math.max(6,d(h,ph)); if(over>step){ step=over; stepAt='step '+i+'/'+n+': '+r(d(rel,pr))+' round the fist, the fist moved '+r(d(h,ph)); } }
+    pr=rel; ph=h; }
+  ck(ex.id,'the kettlebell turns round the wrist without jumping between frames',step<=0,stepAt);
   ck(ex.id,'the app puts the kettlebell where pose/ does',par<=PTOL,'off by '+r(par*100)/100+' at '+parAt);
   if(ex.front){ var fp=0, fj=0, fjAt='', pf=null;
-    for(var k=0;k<=FINE;k++){ var bf=rig.bellFront(ex,rig.solveFront(rig.frontAt(ex,k/FINE)));
-      if(pf&&d(bf,pf)>fj){ fj=d(bf,pf); fjAt='u='+(k/FINE).toFixed(4); } pf=bf;
-      if(k%5) continue;
+    for(var k=0;k<=FINE;k+=5){ var bf=rig.bellFront(ex,rig.solveFront(rig.frontAt(ex,k/FINE)));
       var af=app.bellFront(ax,app.solveFront(app.frontAt(ax,k/FINE))); fp=Math.max(fp,d(bf,af),d(bf.h,af.h)); }
-    ck(ex.id+' front','the kettlebell moves onto the back of the forearm without jumping',fj<=JUMP,r(fj)+' at '+fjAt);
+    for(var i=0;i<=n;i++){ var bf=app.bellFront(ax,app.solveFront(app.frontAt(ax,i/n))), rel={x:bf.x-bf.h.x,y:bf.y-bf.h.y};
+      if(pf&&d(rel,pf)>fj){ fj=d(rel,pf); fjAt='step '+i+'/'+n; } pf=rel; }
+    ck(ex.id+' front','the kettlebell moves onto the back of the forearm without jumping between frames',fj<=6,r(fj)+' round the fist at '+fjAt);
     ck(ex.id+' front','the app puts the kettlebell where pose/ does',fp<=PTOL,'off by '+r(fp*100)/100); }
 });
 // The foot is the same block in both copies (rig.footAt), so a raised heel

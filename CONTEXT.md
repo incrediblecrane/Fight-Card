@@ -983,8 +983,11 @@ Where a kettlebell lies on the fist. Held bottoms-up (`bellUp`) it is upside
 down above the fist; under a hand below its elbow it hangs, straight down from
 a bent arm and along the line of a straight one (a swing); with the hand above
 the elbow (a rack, a lockout) it lies behind the wrist on the back of the
-forearm, and it turns round the wrist between the two. In the second panel it
-is in the loaded hand, and racked or overhead just outside the fist.
+forearm, and it turns round the wrist between the two: over the back of the
+hand, never through the forearm, while the forearm is 30 to 98 degrees from
+straight up. In the second panel it is in the loaded hand, and racked or
+overhead just outside the fist, moving there with the hand's height over its
+elbow. continuous.js measures the turn per frame the app draws.
 
 **Axis**:
 Which way a dumbbell's handle runs: `lateral`, `sagittal`, `vertical`.

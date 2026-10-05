@@ -141,18 +141,22 @@ function footAt(ank,rot){
 // - hand above the elbow (a rack, a lockout): behind the wrist, lying on the
 //   back of the forearm. The offset assumes the figure faces +x, as every
 //   rig does.
-// Between the last two it turns around the wrist rather than jumping, as a
-// bell rolls over the hand in a snatch or a clean.
+// Between the last two it turns around the wrist, over the back of the hand
+// as a bell rolls over it in a snatch or a clean, and never through the
+// forearm. The turn is measured from the forearm (r, the angle from the line
+// back to the elbow, kept between 0 and 360 so the bell cannot cross it) and
+// runs while the forearm is between 30 and 98 degrees from straight up: below
+// 30 a get-up's tilted lockout stays racked, past 98 a swing's float stays in
+// line with the arm, and the snatch gets the widest arc its rig allows.
 function bellAt(ex,s){
-  var h=s.handN, D=12;
+  var h=s.handN, D=12, T=2*Math.PI;
   if(ex.bellUp) return {x:h.x, y:h.y-D, d:P(0,-1)};
   var fx=h.x-s.elbN.x, fy=h.y-s.elbN.y, fl=Math.hypot(fx,fy)||1; fx/=fl; fy/=fl;
   var ax=h.x-s.sh.x, ay=h.y-s.sh.y, al=Math.hypot(ax,ay)||1;
   var k=ramp(0.88,0.97,al/((L.UPPER+L.FORE)*s.armScaleN));
-  var hx=k*ax/al, hy=(1-k)+k*ay/al, hl=Math.hypot(hx,hy)||1;
-  var bx=-6*fx-5, by=-6*fy+4, b=ramp(-0.3,0.05,fy);
-  var a0=Math.atan2(bx,by), a1=Math.atan2(hx,hy), da=((a1-a0)/Math.PI%2+3)%2-1;
-  var a=a0+da*Math.PI*b, len=lerp(11,D,b), d=P(Math.sin(a),Math.cos(a));
+  var e=Math.atan2(-fx,-fy), r1=((Math.atan2(k*ax/al,(1-k)+k*ay/al)-e)%T+T)%T, r0=T-0.4636;
+  var b=Math.max(0,Math.min(1,(Math.acos(Math.max(-1,Math.min(1,-fy)))*180/Math.PI-30)/68));
+  var a=e+r0+(r1-r0)*b, len=lerp(11,D,b), d=P(Math.sin(a),Math.cos(a));
   return {x:h.x+d.x*len, y:h.y+d.y*len, d:d};
 }
 function ramp(a,b,x){ var t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
@@ -161,9 +165,12 @@ function ramp(a,b,x){ var t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2
 // 9 below the handle, or above it held bottoms-up. Racked or overhead (the
 // loaded hand above its elbow) it rests on the back of the forearm, so it
 // shows just outside the fist rather than hanging over the hand and the head.
+// It moves there as the hand rises from 8 below its elbow to 14 above it, by
+// height rather than the forearm's direction, which swings round in one frame
+// when a foreshortened forearm passes the elbow.
 function bellFront(ex,f){
   var L2=f.handL, R2=f.handR, h=ex.load?(ex.load==='L'?L2:R2):P((L2.x+R2.x)/2,(L2.y+R2.y)/2), u=ex.bellUp?-1:1, x=h.x, y=h.y+9*u;
-  if(ex.load&&!ex.bellUp){ var e=ex.load==='L'?f.elbL:f.elbR, k=ramp(-0.1,-0.5,(h.y-e.y)/(Math.hypot(h.x-e.x,h.y-e.y)||1));
+  if(ex.load&&!ex.bellUp){ var e=ex.load==='L'?f.elbL:f.elbR, k=Math.max(0,Math.min(1,(8-h.y+e.y)/22));
     x=lerp(x,h.x+(ex.load==='L'?-8:8),k); y=lerp(y,h.y+6,k); }
   return {x:x, y:y, h:h, u:u};
 }
