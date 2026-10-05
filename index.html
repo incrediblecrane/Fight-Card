@@ -172,7 +172,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .story-title{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:0.95rem;color:var(--text-faint);margin:0;}\
 .slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y pinch-zoom;}\
 #fig-live svg,#fig-live-front svg{pointer-events:none;}\
-.fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;overflow:hidden;--fig-cap:clamp(155px,34vw,260px);}\
+.fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;overflow:hidden;--fig-cap:clamp(155px,min(34vw,calc((100vh - 120px) * 0.54)),260px);}\
 .fig-wrap svg{width:var(--fig-cap);height:auto;aspect-ratio:155/172;overflow:visible;}\
 @media (prefers-reduced-motion:reduce){#fig-live,#fig-live-front{cursor:pointer;}}\
 .slide h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1.15rem;margin:0 0 2px;text-align:center;}\
@@ -4557,7 +4557,9 @@ function figPairStyle(exId){
 }
 // Side view, back to front: far leg and arm, the body, the near leg, the
 // implement in the near hand (in front of the body, behind the head it hangs
-// past overhead and under the fist that holds it), the head, the near arm
+// past overhead and under the fist that holds it; a kettlebell, drawn hanging
+// below the fist, goes behind the body while that fist is above the hip, so a
+// rack is not a disc on the belly), the head, the near arm
 // with a cut line of panel colour round it so it shows where it crosses the
 // body or passes the head, then a bar: the barbell's near plate, or a fixed
 // bar the hands hang from.
@@ -4570,7 +4572,7 @@ function rigSVG(exId,u){
   var o='<svg viewBox="'+bx.x+' '+bx.y+' '+bx.w+' '+bx.h+'" preserveAspectRatio="xMidYMax meet" role="img" aria-label="exercise animation">';
   o+=rGround(bx.x,bx.x+bx.w);
   (ex.props||[]).forEach(function(p){ o+=rProp(p); });
-  var top=ex.equip==='barbell'||ex.equip==='fixedbar';
+  var top=ex.equip==='barbell'||ex.equip==='fixedbar', back=ex.equip==='kettlebell'&&s.handN.y<s.hip.y;
   function limb(a,b,c,col,w,isLeg,edge){
     var st=edge?' stroke="'+col+'" stroke-width="2.6" stroke-linejoin="round"':'';
     return '<polygon points="'+rSeg(a,b,w[0],w[1])+'" fill="'+col+'"'+st+'/>'+
@@ -4581,11 +4583,12 @@ function rigSVG(exId,u){
   }
   o+=limb(s.hipF,s.kneeF,s.ankF,far,[10,7,5],true);
   o+=limb(s.shF,s.elbF,s.handF,far,[7,5,4],false);
+  if(back) o+=rEquip(ex,s);
   o+='<polygon points="'+rSeg(s.hip,s.sh,13,17)+'" fill="'+ink+'"/>';
   o+='<circle cx="'+s.hip.x.toFixed(1)+'" cy="'+s.hip.y.toFixed(1)+'" r="6.5" fill="'+ink+'"/>';
   o+='<circle cx="'+s.sh.x.toFixed(1)+'" cy="'+s.sh.y.toFixed(1)+'" r="8.5" fill="'+ink+'"/>';
   o+=limb(s.hip,s.kneeN,s.ankN,legCol,[11,8,5.5],true);
-  if(!top) o+=rEquip(ex,s);
+  if(!top&&!back) o+=rEquip(ex,s);
   o+='<circle cx="'+s.head.x.toFixed(1)+'" cy="'+s.head.y.toFixed(1)+'" r="'+RL.HEAD_R+'" fill="'+ink+'"/>';
   o+=limb(s.sh,s.elbN,s.handN,cut,[8,6,4.5],false,true);
   o+=limb(s.sh,s.elbN,s.handN,armCol,[8,6,4.5],false);

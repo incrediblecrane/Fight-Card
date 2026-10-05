@@ -208,6 +208,26 @@ srv.listen(0,async function(){
     await S.ctx.close();
   }
 
+  // The figure's size follows the screen's width up to a cap, but never so
+  // tall that head and feet cannot be on screen together with the cue: on a
+  // phone held sideways (844x390, panels stacked) it was drawn 437 px tall.
+  // The tallest crop a rig has is 186 units over the front view's 100.
+  console.log('\nTHE FIGURE FITS THE SCREEN');
+  for(var vp of [{width:844,height:390,big:false},{width:390,height:844,big:false},{width:820,height:1180,big:true}]){
+    var S=await fresh({viewport:{width:vp.width,height:vp.height}}), p=S.p, at=vp.width+'x'+vp.height;
+    try{
+      await onFigSlide(S);
+      var m=await p.evaluate(function(){ var f=document.getElementById('fig-live-front').getBoundingClientRect(), pair=document.getElementById('fig-live-front').closest('.fig-pair')||document.getElementById('fig-live-front').closest('.fig-wrap');
+        return {fw:f.width, ph:pair.getBoundingClientRect().height, vh:innerHeight}; });
+      console.log('        '+at+': front panel '+m.fw.toFixed(0)+' px wide, figure '+m.ph.toFixed(0)+' px tall');
+      assert.ok(m.ph<=m.vh-80,at+': the figure is '+m.ph.toFixed(0)+' px tall on a '+m.vh+' px screen');
+      assert.ok(m.fw*186/100<=Math.max(m.vh-80,155*1.86)+0.5,at+': the tallest rig would be drawn '+(m.fw*1.86).toFixed(0)+' px tall on a '+m.vh+' px screen');
+      if(vp.big) assert.ok(m.fw>=240,at+': a tablet\'s figure shrank to '+m.fw.toFixed(0)+' px wide');
+      ok(at+': the whole figure fits on the screen'+(vp.big?' and still fills a tablet\'s panel':''));
+    }catch(e){ bad(at+': the figure fits the screen',e); }
+    await S.ctx.close();
+  }
+
   if(errs.length){ fails++; console.log('  FAIL  page errors: '+errs.join(' | ')); }
   await b.close(); srv.close();
   console.log(fails?fails+' slide view check(s) failed':'slide view checks passed');

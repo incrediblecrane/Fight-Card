@@ -66,12 +66,12 @@ t('side view: the near arm has a cut line of panel colour under it, so it shows 
     if(!(cutAt>torso&&cutAt<hand)) bad.push(id); });
   assert.ok(!bad.length,'no cut line between the body and the near arm in '+bad.join(', '));
 });
-// An implement in the near hand hid behind the body (a bottoms-up bell held
-// at the chest, a lateral raise's dumbbell) when it was drawn before it. It
-// goes in front of the body and the near leg, but behind the head it hangs
-// past at the top of a press and under the arm whose hand holds it.
+// An implement in the near hand hid behind the body (a lateral raise's
+// dumbbell) when it was drawn before it. It goes in front of the body and the
+// near leg, but behind the head it hangs past at the top of a press and under
+// the arm whose hand holds it.
 t('side view: the implement in the near hand is drawn over the body, under the head and the near arm', function(){
-  ['kb_clean','kb_bottomsup','kb_press','goblet','raise_lateral','suitcasecarry','triceps_ext'].forEach(function(id){ var ex=rex(id), s=app.rSolve(app.rPoseAt(ex,0.4)), sh=shapes(app.rigSVG(EXOF[id],0.4));
+  ['goblet','raise_lateral','suitcasecarry','triceps_ext'].forEach(function(id){ var ex=rex(id), s=app.rSolve(app.rPoseAt(ex,0.4)), sh=shapes(app.rigSVG(EXOF[id],0.4));
     var arm=idx(sh,function(p){ return isHand(p,s.handN); });
     var head=idx(sh,function(p){ return p.n==='circle'&&+p.a.r===app.RL.HEAD_R&&near(p,s.head); });
     var torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.fill==='var(--text)'; });
@@ -83,6 +83,23 @@ t('side view: the implement in the near hand is drawn over the body, under the h
     var arm=idx(sh,function(p){ return isHand(p,s.handN); });
     var bar=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'||p.a.stroke==='var(--text-soft)'; });
     assert.ok(bar>arm,id+': the bar (shape '+bar+') is under the hands ('+arm+')'); });
+});
+// A kettlebell is still drawn hanging below the fist (its rack and lockout
+// placement comes with the bell rule). Over the body that left a grey disc on
+// the belly in a rack or press, away from the hand, so while its hand is above
+// the hip it sits behind the body; hanging in a swing or the bottom of a clean
+// it stays in front of the body and the near leg.
+t('side view: a kettlebell held above the hip is drawn behind the body, one hanging below it in front', function(){
+  var seen={};
+  ['kbswing','kb_clean','kb_snatch','kb_press','kb_bottomsup','kb_tgu'].forEach(function(id){ for(var i=0;i<24;i++){ var u=i/24, ex=rex(id), s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));
+    var torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.fill==='var(--text)'; });
+    var leg=idx(sh,function(p){ return p.n==='circle'&&near(p,s.kneeN)&&p.a.fill!=='var(--text-faint)'; });
+    var arm=idx(sh,function(p){ return isHand(p,s.handN); });
+    var bell=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'; });
+    var up=s.handN.y<s.hip.y; seen[up]=1;
+    if(up) assert.ok(bell<torso,id+' u='+u.toFixed(2)+': the hand is above the hip but the bell (shape '+bell+') is over the body ('+torso+')');
+    else assert.ok(bell>torso&&bell>leg&&bell<arm,id+' u='+u.toFixed(2)+': the bell hangs below the hip but is shape '+bell+' (body '+torso+', near leg '+leg+', arm '+arm+')'); } });
+  assert.ok(seen['true']&&seen['false'],'no kettlebell rig is seen both above and below the hip');
 });
 t('front view: the arms are drawn over the head, unless the rig holds them behind it', function(){
   function order(id,u){ var ex=rex(id), f=app.rSolveFront(app.rFrontAt(ex,u)), sh=shapes(app.rigFrontSVG(EXOF[id],u));
@@ -149,7 +166,7 @@ t('both panels share one top and one height, so they are drawn at one scale', fu
 console.log('\nSIZE AND CONTRAST');
 var css=h.slice(h.indexOf(':root{'),h.indexOf('</style>')).replace(/\\\n/g,'\n');
 t('the figure grows with a tablet\'s screen, and the side panel keeps the front\'s scale', function(){
-  assert.ok(/\.fig-wrap\{[^}]*--fig-cap:clamp\(155px,\s*34vw,\s*260px\)/.test(css),'no growing cap on .fig-wrap');
+  assert.ok(/\.fig-wrap\{[^}]*--fig-cap:clamp\(155px,\s*min\(34vw,\s*calc\(\(100vh - \d+px\) \* 0\.5\d\)\),\s*260px\)/.test(css),'no cap on .fig-wrap that grows with the width and is bounded by the height (test-slideview measures it)');
   assert.ok(/\.fig-pair \.fig-wrap>div\{[^}]*max-width:var\(--fig-cap\)/.test(css),'the front panel is not capped by --fig-cap');
   assert.ok(/\.fig-pair \.fig-wrap:first-child>div\{max-width:calc\(var\(--fig-cap\) \* var\(--fig-w,1\)\)/.test(css),'the side panel is not capped in proportion');
   assert.ok(/--fig-w:1\.\d{3}/.test(app.figPairStyle(EXOF.bench)),'the bench\'s wide crop has no --fig-w: '+app.figPairStyle(EXOF.bench));
