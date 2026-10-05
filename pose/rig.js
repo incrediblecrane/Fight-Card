@@ -67,7 +67,6 @@ if(typeof module!=='undefined') module.exports={L:L,GROUND:GROUND,ANKLE_Y:ANKLE_
 function lerp(a,b,t){ return a+(b-a)*t; }
 function lerpAng(a,b,t){ var d=((b-a+540)%360)-180; return a+d*t; }
 function lerpPt(a,b,t){ return [lerp(a[0],b[0],t), lerp(a[1],b[1],t)]; }
-function easeInOutSine(t){ return -(Math.cos(Math.PI*t)-1)/2; }
 
 // An arm is given either as joint angles (armN) or as a target the hand must
 // reach (handN). A movement can legitimately switch between the two mid-rep: a
@@ -122,23 +121,18 @@ function lerpFrame(A,B,t){
 }
 
 // Pose at normalised progress u (0..1) around the whole rep cycle,
-// honouring per-segment tempo so eccentrics are slower than concentrics.
+// honouring per-segment tempo so eccentrics are slower than concentrics. Where
+// in its segment the pose is comes from warp() (see timing, below).
 function poseAt(ex,u){
-  var n=ex.frames.length;
-  var tempo=ex.tempo||ex.frames.map(function(){return 1;});
-  var total=tempo.reduce(function(a,b){return a+b;},0);
-  var target=((u%1)+1)%1*total, acc=0, i=0;
-  for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
-  if(i>=n) i=n-1;
-  var local=(target-acc)/tempo[i];
-  return lerpFrame(ex.frames[i], ex.frames[(i+1)%n], easeInOutSine(local));
+  var n=ex.frames.length, g=segAt(tempoOf(ex),u);
+  return lerpFrame(ex.frames[g.i], ex.frames[(g.i+1)%n], hermite(g.t,warp(ex)[g.i]));
 }
 // The keyframe a rep turns around at (the bottom of a squat, the top of a
 // pull): stops[1] once a rig authors its stops, otherwise frame 2 of the usual
 // four. Checks read it through here rather than hard-coding frame 2, which
 // stops meaning the bottom the moment a rig gains a frame.
 function turn(ex,front){ var s=(front&&ex.frontStops)||ex.stops; return s?s[1]:2; }
-if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt, module.exports.easeInOutSine=easeInOutSine;
+if(typeof module!=='undefined') module.exports.turn=turn, module.exports.lerpFrame=lerpFrame, module.exports.poseAt=poseAt;
 
 // ---- frontal-plane rig ---------------------------------------------------
 // Viewer faces the lifter. x is lateral, y vertical. Depth is invisible, so
@@ -229,12 +223,8 @@ function lerpFront(A,B,t){
 }
 function frontAt(ex,u){
   var fr=ex.front; if(!fr) return null;
-  var n=fr.length, tempo=ex.tempo||fr.map(function(){return 1;});
-  var total=tempo.reduce(function(a,b){return a+b;},0);
-  var target=((u%1)+1)%1*total, acc=0, i=0;
-  for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
-  if(i>=n) i=n-1;
-  return lerpFront(frontKey(fr,i), frontKey(fr,(i+1)%n), easeInOutSine((target-acc)/tempo[i]));
+  var n=fr.length, g=segAt(tempoOf(ex),u);
+  return lerpFront(frontKey(fr,g.i), frontKey(fr,(g.i+1)%n), hermite(g.t,warp(ex,true)[g.i]));
 }
 // A keyframe whose hand hangs straight below the shoulder (see solveFront)
 // bends that elbow the way its nearest decided neighbour does. Flaring it out
@@ -253,3 +243,171 @@ function frontKey(fr,j){
   return o||fr[j];
 }
 if(typeof module!=='undefined'){ module.exports.solveFront=solveFront; module.exports.frontAt=frontAt; module.exports.lerpFront=lerpFront; }
+
+// ---- timing: when the figure is where -----------------------------------
+// Every segment used to be eased in and out on its own, so the figure stopped
+// dead at every keyframe, including the half-way keyframes that only shape the
+// path: a squat stalled half way down and half way up, and a swing's bell at
+// the hip snap, its fastest moment. The poses are unchanged; only the time
+// spent along each segment is warped, by a cubic Hermite w(t) whose end slopes
+// m0, m1 are the segment-fraction speeds at its keyframes. A stop keyframe has
+// slope 0 and eases to rest as before; any other is passed through at the
+// speed its two segments share. Slopes stay within 0..3, so w is monotone and
+// never overshoots a pose.
+var STOP_TURN=0.5, M_CAP=3, DEAD=0.12;
+function tempoOf(ex){ return ex.tempo||(ex.frames||ex.front).map(function(){ return 1; }); }
+function segAt(tempo,u){
+  var n=tempo.length, total=tempo.reduce(function(a,b){ return a+b; },0);
+  var target=((u%1)+1)%1*total, acc=0, i=0;
+  for(i=0;i<n;i++){ if(target<acc+tempo[i]) break; acc+=tempo[i]; }
+  if(i>=n) i=n-1;
+  return {i:i, t:(target-acc)/tempo[i]};
+}
+function hermite(t,m){ var t2=t*t, t3=t2*t; return (t3-2*t2+t)*m[0]+(-2*t3+3*t2)+(t3-t2)*m[1]; }
+// The joints that carry a movement, in each view. Elbows and knees follow
+// from them by IK, so their paths turn wherever a limb folds and an elbow
+// swinging through its IK branch would set the pace of the whole rep.
+var TRACK=['hip','head','ankN','ankF','handN','handF'], TRACKF=['hipC','head','footL','footR','handL','handR'];
+// Every tracked joint of segment i at blend w, side then (if asked) front.
+function trackAt(ex,i,w,side,front){
+  var n=(ex.frames||ex.front).length, j=(i+1)%n, o=[];
+  if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w)); TRACK.forEach(function(k){ o.push(s[k]); }); }
+  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); TRACKF.forEach(function(k){ o.push(f[k]); }); }
+  return o;
+}
+// Per segment: path length, and per joint the direction and rate (units per
+// unit of w) it leaves its first keyframe at and reaches its second at.
+function segPaths(ex,side,front){
+  var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[];
+  for(var i=0;i<n;i++){
+    var pts=[], len=0, most=0, q;
+    for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front));
+    for(q=0;q<K;q++) len+=vlen(pts[q+1],pts[q]);
+    for(q=1;q<=K;q++) most=Math.max(most,vmax(pts[q],pts[0]));
+    out.push({len:len, held:most<0.5, d0:vdiff(trackAt(ex,i,E,side,front),pts[0],E), d1:vdiff(pts[K],trackAt(ex,i,1-E,side,front),E)});
+  }
+  return out;
+}
+function vdiff(a,b,e){ return a.map(function(p,k){ return {x:(p.x-b[k].x)/e, y:(p.y-b[k].y)/e}; }); }
+function vlen(a,b){ var t=0; a.forEach(function(p,k){ var dx=p.x-(b?b[k].x:0), dy=p.y-(b?b[k].y:0); t+=dx*dx+dy*dy; }); return Math.sqrt(t); }
+function vmax(a,b){ var m=0; a.forEach(function(p,k){ m=Math.max(m,Math.hypot(p.x-b[k].x,p.y-b[k].y)); }); return m; }
+function vcos(a,b){ var t=0; a.forEach(function(p,k){ t+=p.x*b[k].x+p.y*b[k].y; }); return t/((vlen(a)*vlen(b))||1); }
+// The keyframes a rep comes to rest at, in each view. Authored as `stops`
+// (and `frontStops` for a second panel that turns around elsewhere),
+// otherwise found from that view's paths: a keyframe borders a hold (both ends
+// of a held segment are stops), the path of a hip, hand or foot that is really
+// moving on both sides of it (a fifth of the fastest of them) turns through
+// more than 60 degrees there, or the view's joints taken together do (a crawl
+// hands over from one limb to the next, each turning only a little). The two
+// views can differ, as a 3D path can reverse across the body while it carries
+// on front to back.
+var TURNS=[0,2,3,4,5];
+function autoStops(ex,front){
+  var P=segPaths(ex,!front,!!front), n=P.length, tempo=tempoOf(ex), st=[];
+  for(var k=0;k<n;k++){
+    var p=(k-1+n)%n, a=P[p].d1, b=P[k].d0, stop=P[p].held||P[k].held, top=0;
+    var sa=a.map(function(v){ return Math.hypot(v.x,v.y)/tempo[p]; }), sb=b.map(function(v){ return Math.hypot(v.x,v.y)/tempo[k]; });
+    TURNS.forEach(function(j){ top=Math.max(top,sa[j],sb[j]); });
+    TURNS.forEach(function(j){
+      if(Math.min(sa[j],sb[j])<0.2*top) return;
+      if((a[j].x*b[j].x+a[j].y*b[j].y)/(Math.hypot(a[j].x,a[j].y)*Math.hypot(b[j].x,b[j].y))<STOP_TURN) stop=true;
+    });
+    if(vcos(a,b)<STOP_TURN) stop=true;
+    if(stop) st.push(k);
+  }
+  return st;
+}
+function authored(ex,front){ return (front&&(ex.frontStops||ex.stops))||(!front&&ex.stops)||null; }
+// The keyframes a view rests at: authored, or found (autoStops) along with
+// any it would pass through so slowly that they are made stops (warpTable).
+function stopsOf(ex,front){ return authored(ex,front)||timed(ex,front).stops; }
+// The slope table [[m0,m1],...] for one view, from that view's own paths, so
+// each panel keeps its own speed through a keyframe; both reach every keyframe
+// at the same moment. An authored segment `ease` wins: 'out' (1-(1-t)^2)
+// leaves at speed and arrives at rest, a take-off to the apex of a jump, 'in'
+// (t^2) the fall to the landing, and 'inout' rests at both ends.
+var EASE={inout:[0,0], out:[2,0], 'in':[0,2]};
+function warpTable(ex,front){
+  var P=segPaths(ex,!front,!!front), n=P.length, tempo=tempoOf(ex), ease=ex.ease||[];
+  var stops=(authored(ex,front)||autoStops(ex,front)).slice(), m, v, top, slow;
+  for(var pass=0;pass<4;pass++){
+    m=P.map(function(){ return [0,0]; }); v=[]; top=0; slow=[];
+    for(var k=0;k<n;k++){
+      var p=(k-1+n)%n; v[k]=0;
+      if(stops.indexOf(k)>=0 || P[p].held || P[k].held) continue;
+      // Fritsch-Butland: the two segments' average speeds, weighted harmonic
+      // mean, less where the path bends.
+      var s1=P[p].len/tempo[p], s2=P[k].len/tempo[k], w1=2*tempo[k]+tempo[p], w2=tempo[k]+2*tempo[p];
+      var g1=vlen(P[p].d1), g0=vlen(P[k].d0), c=Math.max(0,vcos(P[p].d1,P[k].d0));
+      // A slope capped on one side only would leave the two speeds unequal.
+      v[k]=Math.min(c*(w1+w2)/(w1/s1+w2/s2), M_CAP*g1/tempo[p], M_CAP*g0/tempo[k]);
+      if(!(v[k]>0)){ v[k]=0; continue; }
+      m[p][1]=Math.round(v[k]*tempo[p]/g1*1000)/1000; m[k][0]=Math.round(v[k]*tempo[k]/g0*1000)/1000;
+    }
+    ease.forEach(function(e,i){ if(EASE[e]) m[i]=EASE[e].slice(); });
+    // A keyframe passed at a tenth of the rep's top speed or less is a stop
+    // that stutters: make it a real one.
+    m.forEach(function(q,i){ for(var j=0;j<=20;j++){ var t=j/20;
+      top=Math.max(top,((3*t*t-4*t+1)*q[0]+6*t*(1-t)+(3*t*t-2*t)*q[1])*P[i].len/tempo[i]); } });
+    v.forEach(function(x,k){ if(x>0 && x<DEAD*top && !ease[k] && !ease[(k-1+n)%n]) slow.push(k); });
+    if(!slow.length) break;
+    stops=stops.concat(slow);
+  }
+  return {m:m, stops:stops.sort(function(a,b){ return a-b; })};
+}
+function timed(ex,front){
+  var key=front?'_timedF':'_timed';
+  if(!ex[key]) Object.defineProperty(ex,key,{value:warpTable(ex,front),configurable:true});
+  return ex[key];
+}
+function warp(ex,front){ return timed(ex,front).m; }
+// How long one rep takes, in ms: authored, or the tempo's own sum kept inside
+// 0.9 to 3 seconds. Every rep used to take 2.4 s, so sprints and boxing drills
+// played at a third to a half of their speed and a held plank looked like reps.
+function cycleMs(ex){
+  if(ex.cycleMs) return ex.cycleMs;
+  return Math.max(900,Math.min(3000,tempoOf(ex).reduce(function(a,b){ return a+b; },0)));
+}
+// Frames per rep the app draws: one every 50 ms (three screen refreshes),
+// whatever the rep's length, so a 6 s stretch is not drawn at 8 frames a
+// second nor a 1 s sprint stride at 48. A frame every 33 ms would steady the
+// fastest rigs (strobes() is the biggest jump of a hip, hand, foot or head
+// between two frames; over 6 units, about 9 CSS px, it reads as a jump, and
+// `emit-rig.js --stops` lists them), but on a phone at 4x CPU throttle it kept
+// the main thread 38 to 45% busy against 25% at 50 ms, over the 30% budget,
+// so it waits for a cheaper way to draw a frame.
+var FRAME_MS=50;
+function stepsOf(ex){ return Math.round(cycleMs(ex)/FRAME_MS); }
+function strobes(ex){
+  var n=stepsOf(ex), worst=0, prev=null;
+  for(var i=0;i<=n;i++){
+    var s=ex.frames?solve(poseAt(ex,i/n)):null, f=ex.front?solveFront(frontAt(ex,i/n)):null, cur=[];
+    if(s) TRACK.forEach(function(k){ cur.push(s[k]); });
+    if(f) TRACKF.forEach(function(k){ cur.push(f[k]); });
+    if(prev) worst=Math.max(worst,vmax(cur,prev));
+    prev=cur;
+  }
+  return worst;
+}
+// The keyframe a still shows (reduced motion, or the end of a tapped rep): an
+// authored `still`, else the turnaround (the bottom of a squat, the top of a
+// press) when the rep rests there, else the last keyframe it rests at (a
+// jump's landing). The end of the first segment it used to be is half way
+// down.
+function stillOf(ex){
+  if(ex.still!==undefined) return ex.still;
+  var t=Math.min(turn(ex),(ex.frames||ex.front).length-1), st=ex.frames?stopsOf(ex):[];
+  if(!st.length || st.indexOf(t)>=0) return t;
+  return st[st.length-1];
+}
+// What the app is handed beyond the rig itself, so it never has to work any
+// of this out on a phone.
+function ship(ex){
+  var o={cycleMs:cycleMs(ex), steps:stepsOf(ex), still:stillOf(ex)};
+  if(ex.frames) o.warp=warp(ex);
+  if(ex.front) o.warpF=warp(ex,true);
+  return o;
+}
+if(typeof module!=='undefined'){ module.exports.hermite=hermite; module.exports.warp=warp; module.exports.stopsOf=stopsOf;
+  module.exports.autoStops=autoStops; module.exports.cycleMs=cycleMs; module.exports.stepsOf=stepsOf; module.exports.strobes=strobes; module.exports.stillOf=stillOf;
+  module.exports.ship=ship; module.exports.segAt=segAt; module.exports.tempoOf=tempoOf; }

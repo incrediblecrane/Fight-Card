@@ -913,6 +913,30 @@ The keyframe a rep turns around at: the bottom of a squat, the top of a pull.
 `rig.turn(ex)` gives it (`stops[1]` once a rig authors stops, otherwise frame
 2), and every check reads it from there, never as a hard-coded frame 2.
 
+**Stop**:
+A keyframe the figure comes to rest at, in one view (`rig.stopsOf`). Found
+from the paths (a hold either side of it, or a hip, hand or foot turning more
+than 60 degrees through it, or one passed at under a tenth of top speed),
+or authored as `stops` (and `frontStops` for the second panel).
+`node pose/emit-rig.js --stops` prints the table for review.
+_Avoid_: pause (a pause is the app's, not the rep's)
+
+**Time warp**:
+Where in its segment the pose is at a moment of the rep (`rig.warp`): a cubic
+whose end slopes are 0 at a stop and the shared speed of the two segments at
+any other keyframe, so the figure passes through a half-way keyframe instead of
+stopping dead there. Slopes stay within 0 to 3, so no pose is overshot. Each
+view has its own, and both reach every keyframe at the same moment. A segment
+may author `ease` ('out' from take-off to apex, 'in' from apex to landing,
+'inout'). Only the timing changes: the keyframes and the path between them do
+not.
+
+**Rep length** (`cycleMs`):
+How long one rep plays: authored (the `CYCLES` table in `exercises.js`: the
+coaches' lift timings, running cadences, 4 to 6 s for holds and stretches),
+otherwise the tempo's sum kept within 0.9 to 3 s. `RIG_PACE` in the app slows
+every rig alike.
+
 **Bend range**:
 A knee or elbow bends from -10 to 160 degrees of flexion, never backwards.
 Rigs that break it today are listed in `BENDS` in `continuous.js` and print as
@@ -931,16 +955,23 @@ rounds blocks and the three gym-machine slots are containers rather than
 movements, and the four swim entries have no ground to stand on.
 
 **Live figure**:
-The slide's figure plays the rep on a loop at about 20 frames a second. Each
-frame moves the shapes already drawn (`drawInPlace`) rather than drawing the
-figure again, and a rep's frames are solved once and kept for the next rep.
-While the rest clock runs it moves at a third of that rate. Under
-`prefers-reduced-motion: reduce` it is a still at the end of the first
-movement, and a tap on it plays one rep.
+The slide's figure plays the rep at the rig's own length, a frame every 50 ms
+(`steps` frames a rep), each frame drawn when it is due and the page asleep
+in between. Each frame moves the shapes already drawn (`drawInPlace`) rather
+than drawing the figure again, and a rep's frames are solved once and kept for
+the next rep. While the rest clock runs it plays in slow motion, at a third of
+the speed with every frame drawn, on a clock of its own (`rigVT`) so the rep
+carries on where it was when the rest starts and ends. Scrolled out of sight it
+stops, and picks up where it left off. Under `prefers-reduced-motion: reduce`
+it is a still at the rig's `still` keyframe (the turnaround when the rep rests
+there, else its last stop), and a tap on it plays one rep at full speed.
 
 `RIGFRAMES` in the app is generated from `pose/exercises.js` by
 `pose/emit-rig.js`, never edited by hand: change `pose/` and regenerate.
 `emit-rig.js --check` (part of `npm test`) fails when the app is behind.
+It also hands the app what is worked out from the rig (`rig.ship`): the rep
+length, frames a rep, the still and both views' time warps (`warp`, `warpF`),
+so the phone never computes them.
 The app also carries its own copy of the solver (`rSolve`, `rFrame`,
 `rPoseAt` and the front ones); `continuous.js` fails unless it draws the same
 figure as `pose/rig.js`, to 0.01, at 400 moments of every rig and of edge
@@ -968,7 +999,10 @@ checks once passed whatever the app did.
 
 - `pose/build.js`, then `emit-rig.js --check`: the app's rig matches `pose/`.
 - `pose/checks/`: movement criteria (`analyse.js`), adversarial geometry,
-  continuous motion, views, and rendering.
+  continuous motion (including the time warp: every keyframe that is not a
+  stop passed at speed, no lurch through one, equal keyframes held still, and
+  no joint whipping more than 6 units in 1/144 of a rep, with the rigs that
+  already do listed in `WHIPS`), views, and rendering.
 
 `test:app`, in the order it runs:
 
@@ -993,6 +1027,11 @@ checks once passed whatever the app did.
   equipment, warm-up sets, the rest clock, session length, streaks (per
   substance, past 400 days), the estimated 1RM and rep PB, recent workouts and
   the week target, water XP for old days, form cues.
+- `test-rigloop.js`: the live figure's loop on a fake clock: frames at the
+  rig's own pace, asleep between them, every frame drawn in order, slow motion
+  while resting with no jump at either end of the rest, one loop after a
+  render and nothing left behind when stopped, the pause off screen, the still
+  on a stop, and a tapped rep at full speed.
 - `test-roundtrip.js`: state survives `dbDocs`/`dbApply` with every key.
 - `test-app.js`: the real save cycle, backfill dates (a tap moves only that
   day), session dating, a new day opening on Today, and Today's in-progress

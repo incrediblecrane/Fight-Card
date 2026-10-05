@@ -297,23 +297,26 @@ EXERCISES.forEach(function(ex,i){
   ref.front = ex.front ? buildFront(ex,wraps[1]) : null;
   refs.push(ref);
 });
-var playing=true, speed=1, t0=performance.now(), CYCLE=2400, showPath=false, manual=0;
+// Each rig plays at its own rep length (cycleMs in rig.js), as in the app. The
+// scrubber sets every figure to the same point of its own rep.
+var playing=true, speed=1, t0=performance.now(), elapsed=0, showPath=false, manual=null;
 function frame(now){
-  if(playing){ manual=((now-t0)/CYCLE*speed)%1; }
-  EXERCISES.forEach(function(ex,i){ update(ex,refs[i],manual); if(refs[i].front) updateFront(ex,refs[i].front,manual); });
+  if(playing) elapsed=(now-t0)*speed;
+  EXERCISES.forEach(function(ex,i){ var u=manual===null?(elapsed/cycleMs(ex))%1:manual;
+    update(ex,refs[i],u); if(refs[i].front) updateFront(ex,refs[i].front,u); });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 var playBtn=document.getElementById('playBtn'), scrub=document.getElementById('scrub');
 playBtn.addEventListener('click',function(){
   playing=!playing; this.textContent=playing?'Pause':'Play'; this.classList.toggle('on',playing);
-  if(playing) t0=performance.now()-manual*CYCLE/speed;
+  if(playing){ manual=null; t0=performance.now()-elapsed/speed; }
   scrub.disabled=playing;
 });
 scrub.addEventListener('input',function(){ if(!playing) manual=+this.value/100; });
 document.getElementById('slowBtn').addEventListener('click',function(){
   speed = speed===1?0.35:1; this.textContent = speed===1?'Slow motion':'Normal speed';
-  this.classList.toggle('on',speed!==1); t0=performance.now()-manual*CYCLE/speed;
+  this.classList.toggle('on',speed!==1); t0=performance.now()-elapsed/speed;
 });
 document.getElementById('pathBtn').addEventListener('click',function(){
   showPath=!showPath; this.classList.toggle('on',showPath);

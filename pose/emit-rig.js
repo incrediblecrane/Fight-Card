@@ -1,17 +1,21 @@
 // Regenerates the RIGFRAMES literal inside index.html from pose/exercises.js.
 // The app used to carry a hand-pasted copy, which is how a rig could be fixed
 // in pose/ and stay broken in the app. This is the one way it gets across.
-// Usage: node pose/emit-rig.js [--check]
+// Usage: node pose/emit-rig.js [--check | --stops]
 var fs=require('fs'), path=require('path');
 var EX=require('./exercises.js');
 // Fixed order so a regeneration is a no-op diff when nothing changed. `floor`
 // is a check-suite hint and `name`/`real`/`changed`/`flag` are authoring notes,
 // so none of them ship.
+// `stops`, `frontStops`, `ease` and `still` are authoring keys: what the app
+// needs of them is worked out here by rig.ship (the rep's length, frames per
+// rep, the still's keyframe and the time warp), so the phone never does it.
 var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','planProps','front'];
-var out={};
+var rig=require('./rig.js'), out={};
 EX.forEach(function(e){
-  var o={};
+  var o={}, s=rig.ship(e);
   KEYS.forEach(function(k){ if(e[k]!==undefined && e[k]!==null) o[k]=e[k]; });
+  Object.keys(s).forEach(function(k){ o[k]=s[k]; });
   out[e.id]=o;
 });
 /* A rig nothing can reach is a rig that ships and never draws. RIGMAP is the
@@ -42,6 +46,14 @@ if(orphans.length){
   process.exit(1);
 }
 var same=lines[i]===line;
+// The keyframes each rig comes to rest at, for review: authored stops are
+// marked, the rest were found from the paths (see rig.autoStops).
+if(process.argv.indexOf('--stops')>-1){
+  EX.forEach(function(e){ console.log((e.id+'                  ').slice(0,18)+' '+(e.stops?'authored ':'found    ')+JSON.stringify(rig.stopsOf(e))+
+    (e.front?'  front '+JSON.stringify(rig.stopsOf(e,true)):'')+'  '+out[e.id].cycleMs+' ms, '+out[e.id].steps+' frames'+
+    (rig.strobes(e)>6?', strobes ('+rig.strobes(e).toFixed(1)+' units a frame)':'')); });
+  process.exit(0);
+}
 if(process.argv.indexOf('--check')>-1){
   console.log(same?'RIGFRAMES in sync ('+EX.length+' rigs)':'RIGFRAMES DIFFERS from pose/exercises.js');
   process.exit(same?0:1);

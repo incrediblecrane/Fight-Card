@@ -937,24 +937,35 @@ srv.listen(0,async function(){
     await p.click('[data-action="water"][data-d="-1"]'); await settle();
   });
 
-  await t('the rig keeps its place in the rep across a render, at about 20fps', async function(){
+  await t('the rig keeps its place in the rep across a render, at its own frame rate', async function(){
     await go(); var ex=await toLift();
     assert.ok(ex,'no rigged lift slide');
     await p.waitForTimeout(1300);
     var r=await p.evaluate(function(ex){
-      var u0=parseFloat(document.getElementById('fig-live').getAttribute('data-u'));
-      document.querySelector('[data-action="logset"][data-ex="'+ex+'"]').click();   // empty: renders, logs nothing
-      return new Promise(function(res){ setTimeout(function(){
-        var u1=parseFloat(document.getElementById('fig-live').getAttribute('data-u'));
-        // A frame moves the drawing in place and marks its phase.
-        var n=0, ob=new MutationObserver(function(){ n++; });
-        ob.observe(document.getElementById('fig-live'),{attributes:true,attributeFilter:['data-u']});
-        setTimeout(function(){ ob.disconnect(); res({u0:u0,u1:u1,paints:n}); },1000);
-      },80); });
+      var f=document.getElementById('fig-live'), ms=+f.getAttribute('data-ms'), steps=+f.getAttribute('data-steps'), t0=performance.now();
+      // Caught mid-rep, so a render that sent it back to the start, or a rep
+      // that wrapped round, cannot pass for one that kept its place.
+      return new Promise(function(res){ var iv=setInterval(function(){
+        var u0=parseFloat(f.getAttribute('data-u'));
+        if(performance.now()-t0>2*ms+500){ clearInterval(iv); res({u0:null,ms:ms,steps:steps}); return; }
+        if(!(u0>=0.3 && u0<=0.7)) return;
+        clearInterval(iv);
+        document.querySelector('[data-action="logset"][data-ex="'+ex+'"]').click();   // empty: renders, logs nothing
+        setTimeout(function(){
+          var u1=parseFloat(document.getElementById('fig-live').getAttribute('data-u'));
+          // A frame moves the drawing in place and marks its phase.
+          var n=0, ob=new MutationObserver(function(){ n++; });
+          ob.observe(document.getElementById('fig-live'),{attributes:true,attributeFilter:['data-u']});
+          setTimeout(function(){ ob.disconnect(); res({u0:u0,u1:u1,paints:n,ms:ms,steps:steps}); },1000);
+        },80);
+      },4); });
     },ex);
-    assert.ok(r.u0>0.3,'the phase never advanced: '+r.u0);
+    // Each rig has its own rep length and frames per rep, read off the figure.
+    assert.ok(r.ms>=900 && r.steps>=18,'the figure does not say its rep length and frames: '+r.ms+' ms, '+r.steps);
+    var fps=1000*r.steps/r.ms;
+    assert.ok(r.u0!==null,'the phase never reached mid-rep in '+(2*r.ms+500)+' ms');
     assert.ok(r.u1>=r.u0 && r.u1-r.u0<0.15,'a render moved the rep from '+r.u0+' to '+r.u1);
-    assert.ok(r.paints>=12 && r.paints<=26,r.paints+' redraws in a second');
+    assert.ok(r.paints>=0.6*fps && r.paints<=fps+2,r.paints+' redraws in a second, at '+fps.toFixed(1)+' frames a second');
     await leave();
   });
 

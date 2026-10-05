@@ -1656,6 +1656,18 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
  'childspose','catcow','thoracic'].forEach(function(id){
   var ex=EXERCISES.filter(function(e){return e.id===id;})[0]; if(ex) ex.frontPlan=true;
 });
+// How long one rep takes, in ms, where the tempo's own sum (kept inside 0.9 to
+// 3 s, see rig.cycleMs) is the wrong pace: the coaches' timings for the
+// loaded lifts, cadences for the running and skipping drills, and 4 to 6 s for
+// the holds and stretches, which looked like reps at 2.4 s.
+var CYCLES={backsquat:2800,frontsquat:2800,goblet:2800,rdl:2800,deadlift:3200,pullup:3000,
+  kbswing:1500,boxjump:3000,kb_tgu:9600,medballslam:2000,medballthrow:2200,situpwallthrow:2400,
+  sprint:1000,highknees:1000,skipping:900,jumpingjack:1100,briskwalkjog:1200,mtnclimb:1100,
+  farmerscarry:1150,burpee:2600,deadbug:7000,curl_reverse:3200,
+  plank:4000,wallsit:4000,sideplank:4000,hollowhold:4000,deadhang:4000,platepinch:4000,
+  childspose:6000,pigeon:6000,hamstring:6000,hipflexor:6000,couchstretch:6000,
+  catcow:4800,nine0:4800,worldsgreatest:4800,thoracic:4000,shoulderdisloc:4000,ankle_mob:3200};
+EXERCISES.forEach(function(e){ if(CYCLES[e.id]) e.cycleMs=CYCLES[e.id]; });
 EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 // What a plan view rests on, in the front view's own coordinates, drawn under
 // the body like props. Without the bench the bench press from above is a pair

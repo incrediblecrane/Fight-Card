@@ -101,12 +101,29 @@ var EDGE=[
     {hip:[50,110],torso:6,ankN:[56,163],ankF:[46,163],armN:[200,190]}]},
   {id:'edge near hand<->angles, shrug',frames:[
     {hip:[50,107],torso:0,ankN:[56,163],ankF:[46,163],handN:[70,120],handF:[64,122],shrug:3,armScaleN:0.7},
-    {hip:[52,118],torso:20,ankN:[56,163],ankF:[46,163],armN:[150,60],kneeSign:-1}]}];
+    {hip:[52,118],torso:20,ankN:[56,163],ankF:[46,163],armN:[150,60],kneeSign:-1}]},
+  // Authored stops and a jump's ballistic eases: take-off to apex 'out',
+  // apex to landing 'in', the rest of the rep found.
+  {id:'edge authored stops and ease',stops:[0,2],ease:[null,'out','in',null],tempo:[300,200,200,300],frames:[
+    {hip:[50,107],torso:4,ankN:[56,163],ankF:[46,163],armN:[180,175]},
+    {hip:[50,122],torso:20,ankN:[56,163],ankF:[46,163],armN:[200,190]},
+    {hip:[52,90],torso:2,ankN:[58,148],ankF:[48,148],armN:[10,10]},
+    {hip:[52,115],torso:12,ankN:[58,163],ankF:[48,163],armN:[170,170]}]}];
+// The authored eases are exactly the curves they name.
+(function(){
+  var ex=EDGE[EDGE.length-1], w=rig.warp(ex);
+  ck(ex.id,'an authored ease is the curve it names',JSON.stringify(w[1])==='[2,0]'&&JSON.stringify(w[2])==='[0,2]'&&
+    Math.abs(rig.hermite(0.3,w[1])-(1-0.7*0.7))<1e-12&&Math.abs(rig.hermite(0.3,w[2])-0.09)<1e-12,JSON.stringify(w));
+  ck(ex.id,'authored stops are the stops',JSON.stringify(rig.stopsOf(ex))==='[0,2]',JSON.stringify(rig.stopsOf(ex)));
+})();
 var EDGEFRONT=[{id:'edge front widths',front:[
   {hipY:107,hipHW:11,shHW:18,cx:72,lean:2,footL:[56,163],footR:[86,163],handL:[50,140],handR:[94,140]},
   {hipY:118,torsoScale:0.9,shrug:2,footL:[56,163],footR:[86,163],handL:[46,96],handR:[98,96],
    elbL:[44,100],armScaleR:0.8,fistL:1.5}]}];
 var PAR=400, PTOL=0.01;
+// What emit-rig.js would hand the app for a rig it has not shipped: the rig
+// plus rig.ship's timing.
+function shipped(ex){ var o={}, s=rig.ship(ex), k; for(k in ex) o[k]=ex[k]; for(k in s) o[k]=s[k]; return o; }
 function diff(a,b,path,out,keep){
   for(var k in a){ var x=a[k], y=b?b[k]:undefined;
     if(x===undefined||x===null) continue;
@@ -128,12 +145,12 @@ function parity(tag,ours,theirs){
   ck(tag,'the app draws the same figure as pose/',out.w<=PTOL,'off by '+r(out.w*100)/100+' '+out.at);
 }
 EX.concat(EDGE).forEach(function(ex){
-  var ax=app.RIGFRAMES[ex.id]||ex;
+  var ax=app.RIGFRAMES[ex.id]||shipped(ex);
   parity(ex.id+' side',function(u){ return rig.solve(rig.poseAt(ex,u)); },function(u){ return app.solve(app.poseAt(ax,u)); });
 });
 EX.concat(EDGEFRONT).forEach(function(ex){
   if(!ex.front) return;
-  var ax=app.RIGFRAMES[ex.id]||ex;
+  var ax=app.RIGFRAMES[ex.id]||shipped(ex);
   parity(ex.id+' front',function(u){ return rig.solveFront(rig.frontAt(ex,u)); },function(u){ return app.solveFront(app.frontAt(ax,u)); });
 });
 // A segment starts on its first keyframe and ends on its second, exactly, in
@@ -238,9 +255,82 @@ EX.forEach(function(ex){
     else ck(ex.id,'knees and elbows bend only the way they can (-10 to 160)',false,w); });
   known.forEach(function(k){ if(!out[k]) bendDone.push(ex.id+' '+k); });
 });
+// When the figure is where (rig.warp). Every segment used to ease in and out
+// on its own, so the figure stopped dead at every keyframe: half way down
+// every squat, and the swing's bell at the hip snap, its fastest moment. A
+// keyframe the rep does not rest at (rig.stopsOf) is passed through at speed,
+// in both views and in the copy the app ships.
+// Speed is read off the hips, head, hands and feet: an elbow swinging through
+// its IK branch (listed in WHIPS below) would otherwise set the top speed.
+var SIDEJ=['hip','head','ankN','ankF','handN','handF'], FRONTJ=['hipC','head','footL','footR','handL','handR'],
+    SIDEALL=SIDEJ.concat(['kneeN','kneeF','elbN','elbF']), FRONTALL=FRONTJ.concat(['kneeL','kneeR','elbL','elbR']);
+function views(ex,ax){
+  var o=[['side',function(u){ return rig.solve(rig.poseAt(ex,u)); },SIDEJ,SIDEALL],
+         ['side (app)',function(u){ return app.solve(app.poseAt(ax,u)); },SIDEJ,SIDEALL]];
+  if(ex.front) o.push(['front',function(u){ return rig.solveFront(rig.frontAt(ex,u)); },FRONTJ,FRONTALL],
+                      ['front (app)',function(u){ return app.solveFront(app.frontAt(ax,u)); },FRONTJ,FRONTALL]);
+  return o;
+}
+function speed(at,J,u,dt){ var a=at(u), b=at(u+dt), t=0;
+  J.forEach(function(k){ var dx=b[k].x-a[k].x, dy=b[k].y-a[k].y; t+=dx*dx+dy*dy; }); return Math.sqrt(t)/Math.abs(dt); }
+function keyAt(ex){ var t=rig.tempoOf(ex), tot=t.reduce(function(a,b){ return a+b; },0), acc=0;
+  return t.map(function(x){ var u=acc/tot; acc+=x; return u; }); }
+var DT=1e-4;
+EX.forEach(function(ex){
+  var ax=app.RIGFRAMES[ex.id], ku=keyAt(ex), n=ku.length, ease=ex.ease||[];
+  views(ex,ax).forEach(function(v){
+    var front=/front/.test(v[0]), stops=rig.stopsOf(ex,front), top=0;
+    for(var i=0;i<400;i++) top=Math.max(top,speed(v[1],v[2],i/400,DT));
+    ku.forEach(function(u,k){
+      if(stops.indexOf(k)>=0 || ease[k] || ease[(k-1+n)%n]) return;
+      var a=speed(v[1],v[2],u,-DT), b=speed(v[1],v[2],u,DT);
+      ck(ex.id+' '+v[0],'passes through keyframe '+k+' at speed rather than stopping dead',
+        Math.min(a,b)>=0.1*top,'speed '+r(Math.min(a,b))+' of a top speed of '+r(top));
+      ck(ex.id+' '+v[0],'keeps its speed through keyframe '+k+' (no lurch)',
+        Math.max(a,b)<=2*Math.min(a,b)+0.01*top,'speed '+r(a)+' in, '+r(b)+' out');
+    });
+  });
+});
+// Between two equal keyframes the figure holds still. Nothing interpolated
+// across a hold may wander off it (a spline through the keyframes would).
+EX.forEach(function(ex){
+  var n=ex.frames.length, ku=keyAt(ex), ax=app.RIGFRAMES[ex.id];
+  views(ex,ax).forEach(function(v){
+    var fr=/front/.test(v[0])?ex.front:ex.frames;
+    fr.forEach(function(f,k){ if(JSON.stringify(f)!==JSON.stringify(fr[(k+1)%n])) return;
+      var u0=ku[k], u1=k+1<n?ku[k+1]:1, a=v[1](u0), worst=0;
+      for(var q=1;q<20;q++){ var b=v[1](u0+(u1-u0)*q/20); v[3].forEach(function(j){ worst=Math.max(worst,d(a[j],b[j])); }); }
+      ck(ex.id+' '+v[0],'holds still between equal keyframes '+k+' and '+((k+1)%n),worst<=0.1,'moved '+r(worst));
+    });
+  });
+});
+// No joint whips: none moves more than 6 units (9 px on a phone) in 1/144 of
+// a rep. The rigs listed have an elbow that swings through its IK branch or a
+// ballistic hand that already does, and print as warnings while they are
+// re-authored; any other rig breaking it fails, and a listed one that has come
+// back inside it says so.
+var WHIPS={kb_snatch:'front',woodchopper:'front',sq_jump:'side',medballslam:'side',jumpingjack:'front',
+  worldsgreatest:'side',bagspeed:'side',pulldown_straight:'front',burpee:'side'};
+var whipWarn=[], whipDone=[];
+EX.forEach(function(ex){
+  var ax=app.RIGFRAMES[ex.id], known=(WHIPS[ex.id]||'').split(' ').filter(Boolean), N=1152, W=N/144;
+  views(ex,ax).forEach(function(v){
+    if(/app/.test(v[0])) return;
+    var S=[], worst=0, where='';
+    for(var i=0;i<N;i++) S.push(v[1](i/N));
+    for(i=0;i<N;i++){ var a=S[i], b=S[(i+W)%N];
+      v[3].forEach(function(k){ var dd=d(a[k],b[k]); if(dd>worst){ worst=dd; where=k+' at u='+(i/N).toFixed(3); } }); }
+    var listed=known.indexOf(v[0])>=0;
+    if(worst>6){ if(listed) whipWarn.push(ex.id+' '+v[0]+' '+r(worst)+' '+where);
+      else ck(ex.id+' '+v[0],'no joint moves more than 6 units in 1/144 of a rep',false,r(worst)+' '+where); }
+    else if(listed) whipDone.push(ex.id+' '+v[0]);
+  });
+});
 console.log('=== CONTINUOUS MOTION CHECK ('+SAMPLES+' samples/exercise) ===');
 if(bendWarn.length) console.log('WARN: '+bendWarn.length+' joints bend outside -10..160 (listed in BENDS, being re-authored):\n  ! '+bendWarn.join('\n  ! '));
 if(bendDone.length) console.log('NOTE: now inside -10..160, take off BENDS: '+bendDone.join(', '));
+if(whipWarn.length) console.log('WARN: '+whipWarn.length+' views whip a joint (listed in WHIPS, being re-authored):\n  ! '+whipWarn.join('\n  ! '));
+if(whipDone.length) console.log('NOTE: no longer whipping, take off WHIPS: '+whipDone.join(', '));
 if(!fails.length) console.log('PASS: motion is valid at every point, not just the keyframes.');
 else { console.log('FAILURES ('+fails.length+'):');
   var seen={}; fails.forEach(function(f){ var k=f.split('(sample')[0]; if(seen[k])return; seen[k]=1; console.log('  x '+f); }); }

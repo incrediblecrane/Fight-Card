@@ -193,11 +193,13 @@ srv.listen(0,async function(){
       assert.strictEqual(h1,h0,'the figure was redrawn under reduced motion');
       assert.ok(/<svg/.test(h0),'no figure drawn');
       ok('under reduced motion the figure is drawn once and holds still');
-      // Tapping the figure plays one rep and stops again.
+      // Tapping the figure plays one rep, as long as the rig's own, and stops again.
+      var ms=+(await p.getAttribute('#fig-live','data-ms'));
+      assert.ok(ms>=900,'the figure does not say how long its rep is: '+ms);
       await p.click('#fig-live'); await p.waitForTimeout(400);
       var u2=await p.getAttribute('#fig-live','data-u');
       assert.notStrictEqual(u2,u0,'a tap on the still figure did not play it');
-      await p.waitForTimeout(3000);
+      await p.waitForTimeout(ms+600);
       var u3=await p.getAttribute('#fig-live','data-u');
       await p.waitForTimeout(400);
       assert.strictEqual(await p.getAttribute('#fig-live','data-u'),u3,'the figure kept playing after one rep');

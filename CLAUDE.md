@@ -55,7 +55,7 @@ Follow this on every change:
    `test:pose` is the rig suite (`pose/build.js`, `emit-rig.js --check`, then
    `pose/checks/`: analyse, adversarial, continuous, views, render) and
    `test:app` builds the document and runs every suite over it: build,
-   tooling, shopping, planmodel, catalog, volume, coaching, roundtrip, app,
+   tooling, shopping, planmodel, catalog, volume, coaching, rigloop, roundtrip, app,
    removal, undo, session, meals, publish, db, store, plan, addplan, ticks,
    design, dates, touch, slideview, a11y (`test-<name>.js`). A new suite goes
    into `test:app` in `package.json` and into CONTEXT.md's list. Use
