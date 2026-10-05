@@ -228,7 +228,7 @@ EX.forEach(function(ex){
 // The rigs listed below already break the range and are being re-authored, so
 // for now they print as warnings. Any other rig breaking it fails, and a
 // listed rig that has come back inside it says so, so the list only shrinks.
-var BENDS={backsquat:'elbF elbN',row:'elbF elbN',hipthrust:'elbF elbN',facepull:'elbF elbN',
+var BENDS={backsquat:'elbF elbN',hipthrust:'elbF elbN',facepull:'elbF elbN',
   press_push:'elbF',glutebridge:'elbF elbN',row_single:'elbF elbN',invertedrow:'elbF elbN',
   kb_press:'elbN',sideplank:'elbF elbN kneeF kneeN',hollowhold:'elbF elbN',
   bearcrawl:'elbF elbN kneeF kneeN',kb_tgu:'elbF elbN',sq_jump:'elbF elbN',boxjump:'elbF elbN',
@@ -354,12 +354,14 @@ EX.forEach(function(ex){
 // The core lifts rest at the top and the bottom only. The check above that a
 // keyframe is passed at speed skips the stops, so a keyframe edit that made
 // half way down a squat a stop again would pass it. A bench press seen from
-// the feet moves only its elbows, and used to rest at every keyframe.
-var FLOW={backsquat:'side front',frontsquat:'side front',goblet:'side front',deadlift:'side front',rdl:'side front',
-  pullup:'side front',ohp:'side front',kbswing:'side front',sq_air:'side front',bench:'side front',dip:'side front'};
+// the feet moves only its elbows, and used to rest at every keyframe. The
+// deadlift also rests once more, with the bar set down on the floor between
+// reps (its fifth keyframe is its first), rather than bouncing it.
+var FLOW={backsquat:'[0,2]',frontsquat:'[0,2]',goblet:'[0,2]',deadlift:'[0,2,4]',rdl:'[0,2]',
+  pullup:'[0,2]',ohp:'[0,2]',kbswing:'[0,2]',sq_air:'[0,2]',bench:'[0,2]',dip:'[0,2]'};
 Object.keys(FLOW).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
-  FLOW[id].split(' ').forEach(function(v){ var st=rig.stopsOf(ex,v==='front');
-    ck(id+' '+v,'rests at the top and bottom only, passing through half way',JSON.stringify(st)==='[0,2]',JSON.stringify(st)); }); });
+  ['side','front'].forEach(function(v){ var st=rig.stopsOf(ex,v==='front');
+    ck(id+' '+v,'rests at the top and bottom only, passing through half way',JSON.stringify(st)===FLOW[id],JSON.stringify(st)+' not '+FLOW[id]); }); });
 // Every rig's stops, as reviewed. A change in which keyframes the figure rests
 // at changes how every rep of it looks, so it is a deliberate edit: look at the
 // rigs named, then rewrite the table with --write-stops.

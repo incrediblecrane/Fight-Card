@@ -2,7 +2,7 @@
 // Screen space: y grows downward. Angle 0 = up, 90 = +x, 180 = down.
 // Proportions from the 7.5-head canon: head dia 16 => figure height 120.
 var L = { THIGH:29, SHIN:29, TORSO:34, UPPER:21, FORE:19, HEAD_R:8, HEAD_OFF:16, FOOT:14 };
-var GROUND = 170, ANKLE_Y = 163, STAND_HIP_Y = 107; // 163-29-29 = 105
+var GROUND = 170, ANKLE_Y = 163, STAND_HIP_Y = 105.5; // 163-29-29 = 105, the knee left soft (see analyse.js standingTall)
 
 function P(x,y){ return {x:x,y:y}; }
 function dir(deg,len){ var r=deg*Math.PI/180; return {x:len*Math.sin(r), y:-len*Math.cos(r)}; }

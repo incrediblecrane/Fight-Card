@@ -946,6 +946,13 @@ A knee or elbow bends from -10 to 160 degrees of flexion, never backwards.
 Rigs that break it today are listed in `BENDS` in `continuous.js` and print as
 warnings while they are re-authored; any other rig breaking it fails.
 
+**Standing**:
+A standing frame has the hip over the ankle (within 3) at `STAND_HIP_Y`
+(105.5), which leaves the knee at 160 to 172 degrees: soft, never locked at
+180, where the leg's IK is singular. The old hip at y 107, 5 behind the ankle,
+was a quarter squat. `analyse.js` (`STANDING`) fails the re-authored rigs
+outside it and warns for the standing frames still to do.
+
 **Axis**:
 Which way a dumbbell's handle runs: `lateral`, `sagittal`, `vertical`.
 Decides whether the side view shows a bell face or the whole dumbbell.

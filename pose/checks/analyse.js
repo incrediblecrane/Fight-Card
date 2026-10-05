@@ -820,6 +820,105 @@ EX.forEach(function(ex){
     Math.abs(drop('fly_cable'))<15, 'it drops '+r(drop('fly_cable')));
 })();
 
+/* Standing tall. A standing frame used to put the hip at y 107, 5 behind the
+   ankle, which leaves the knee at 150 degrees: every "standing" frame of the
+   strength lifts was a quarter squat, and the strict press read as a push
+   press. Standing is the hip over the ankle (within 3) at STAND_HIP_Y, the
+   knee at 160 to 172 degrees: soft, never 180, where the leg's IK is singular
+   and the knee shoots forward as the descent starts. The rigs listed here
+   have been re-authored and fail outside it; any other frame that looks like
+   standing (feet down, torso upright) and is not prints as a warning until its
+   batch is re-authored. */
+function angAt(a,b,c){ var d=Math.abs(Math.atan2(a.y-b.y,a.x-b.x)-Math.atan2(c.y-b.y,c.x-b.x))*180/Math.PI; return d>180?360-d:d; }
+var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadlift:'turn', ohp:'all', kbswing:'after'};
+(function standingTall(){
+  EX.forEach(function(ex){
+    var how=STANDING[ex.id], T=rig.turn(ex), bad=[];
+    ex.frames.forEach(function(f,i){
+      var want=how==='all'||(how==='top'&&i===0)||(how==='turn'&&i===T)||(how==='after'&&i>0);
+      var s=solve(f), knee=angAt(s.hip,s.kneeN,s.ankN), dx=s.hip.x-s.ankN.x;
+      var tall=knee>=160 && knee<=172 && Math.abs(dx)<=3 && Math.abs(s.hip.y-rig.STAND_HIP_Y)<=0.5;
+      var why='knee '+r(knee)+' deg, hip '+r(dx)+' from the ankle at y '+r(s.hip.y);
+      if(want) check(ex.id,'frame'+i+' stands tall (knee 160-172, hip over the ankle)',tall,why);
+      else if(!how && !tall && f.ankN && Math.abs(f.ankN[1]-rig.ANKLE_Y)<0.1 && Math.abs(f.torso)<=10 && s.hip.y<110) bad.push(i+' knee '+Math.round(knee));
+    });
+    if(bad.length) soft(ex.id,'standing frames still to re-author',false,'frame '+bad.join(', '));
+  });
+})();
+
+/* A plate is a 45 cm disc round the bar: from the side a ring of radius 15
+   (and a 3.5 stroke), from the front edge-on, 13 tall (and a 3 stroke). Its
+   drawn edge must never go below the floor line (2 thick at GROUND). The
+   deadlift started with the bar at y 159 and the plate 4 units into the
+   floor, in both panels. It now starts, and resets between reps, with the
+   plate resting on the floor. */
+var PLATE_EDGE=15+1.75, PLATE_EDGE_F=13+1.5;
+(function platesOnTheFloor(){
+  EX.forEach(function(ex){
+    if(ex.equip!=='barbell') return;
+    var low=0, lowF=0;
+    for(var i=0;i<=400;i++){ var s=solve(rig.poseAt(ex,i/400)); low=Math.max(low,s.handN.y+PLATE_EDGE);
+      if(ex.front && !ex.frontPlan){ var f=rig.solveFront(rig.frontAt(ex,i/400)); lowF=Math.max(lowF,f.handL.y+PLATE_EDGE_F,f.handR.y+PLATE_EDGE_F); } }
+    check(ex.id,'the plate never sinks into the floor',low<=GROUND+2,'plate edge '+r(low)+' ground '+GROUND);
+    check(ex.id+' front','the plates never sink into the floor',lowF<=GROUND+2,'plate edge '+r(lowF)+' ground '+GROUND);
+  });
+  var dl=EX.filter(function(e){ return e.id==='deadlift'; })[0], n=dl.frames.length;
+  var s0=solve(dl.frames[0]), f0=rig.solveFront(dl.front[0]);
+  check('deadlift','starts with the plate resting on the floor',Math.abs(s0.handN.y+PLATE_EDGE-GROUND)<=2,'plate edge '+r(s0.handN.y+PLATE_EDGE));
+  check('deadlift front','starts with the plates resting on the floor',Math.abs(f0.handL.y+PLATE_EDGE_F-GROUND)<=2,'plate edge '+r(f0.handL.y+PLATE_EDGE_F));
+  // Each rep sets the bar down and pauses (a dead stop), rather than
+  // bouncing it off the floor.
+  check('deadlift','the bar settles on the floor between reps',
+    JSON.stringify(dl.frames[n-1])===JSON.stringify(dl.frames[0]) && rig.tempoOf(dl)[n-1]>=250 && rig.stopsOf(dl).indexOf(0)>=0,
+    n+' frames, last segment '+rig.tempoOf(dl)[n-1]+' ms');
+})();
+
+/* The core strength lifts, as the coaches' review (batch A) found them wrong. */
+(function strength(){
+  function get(id){ return EX.filter(function(e){return e.id===id;})[0]; }
+  function S(id){ return get(id).frames.map(solve); }
+  function spread(a){ return Math.max.apply(null,a)-Math.min.apply(null,a); }
+  function midfoot(s){ return s.ankN.x+L.FOOT*0.22; }
+  var dl=S('deadlift');
+  check('deadlift','hips start above the knees, not in a squat',dl[0].hip.y<dl[0].kneeN.y-2,'hip y '+r(dl[0].hip.y)+' knee y '+r(dl[0].kneeN.y));
+  check('deadlift','the bar passes in front of the knees, not through them',dl[1].handN.x>dl[1].kneeN.x,'bar x '+r(dl[1].handN.x)+' knee x '+r(dl[1].kneeN.x));
+  var bs=S('backsquat');
+  check('backsquat','the bar travels straight up and down',spread(bs.map(function(s){ return s.handN.x; }))<3,'bar x spread '+r(spread(bs.map(function(s){ return s.handN.x; }))));
+  ['backsquat','frontsquat','goblet'].forEach(function(id){
+    var f=rig.solveFront(get(id).front[0]), w=f.footR.x-f.footL.x, sw=f.shR.x-f.shL.x;
+    check(id+' front','a squat stance, about shoulder width',w>=sw*7/8,'feet '+r(w)+' apart, shoulders '+r(sw));
+  });
+  var fs=rig.solveFront(get('frontsquat').front[0]);
+  check('frontsquat front','elbows sit under the bar, not flared out past the hands',
+    Math.abs(fs.elbL.x-fs.handL.x)<=3 && Math.abs(fs.elbR.x-fs.handR.x)<=3,'elbow x '+r(fs.elbL.x)+' hand x '+r(fs.handL.x));
+  var rd=S('rdl'), knees=rd.map(function(s){ return angAt(s.hip,s.kneeN,s.ankN); });
+  check('rdl','the knee sets once and holds its soft bend',spread(knees)<=8,'knee '+knees.map(r).join(', '));
+  var bn=S('bench'), bp=get('bench').front.map(rig.solveFront);
+  check('bench','locks out with the elbow all but straight (170 degrees or more)',angAt(bn[0].sh,bn[0].elbN,bn[0].handN)>=170,
+    'elbow '+r(angAt(bn[0].sh,bn[0].elbN,bn[0].handN))+' deg');
+  bp.forEach(function(p,i){
+    var plan=p.handL.y-p.shL.y, side=bn[i].handN.x-bn[i].sh.x;
+    check('bench above','frame'+i+' hands sit as far toward the feet as the side view puts the bar',Math.abs(plan-side)<3,
+      'from above '+r(plan)+', from the side '+r(side));
+  });
+  var op=S('ohp');
+  check('ohp','racks on the front of the shoulder',Math.abs(op[0].handN.x-op[0].sh.x)<9,'bar x '+r(op[0].handN.x)+' shoulder x '+r(op[0].sh.x));
+  check('ohp','the bar goes up in a line, not looping out in front of the face',spread(op.map(function(s){ return s.handN.x; }))<7,
+    'bar x '+op.map(function(s){ return r(s.handN.x); }).join(', '));
+  var rw=S('row'), Tr=rig.turn(get('row')), fa=rw[Tr];
+  check('row','the bar hangs over the middle of the foot',Math.abs(rw[0].handN.x-midfoot(rw[0]))<5,'bar x '+r(rw[0].handN.x)+' midfoot '+r(midfoot(rw[0])));
+  check('row','at the top the forearm hangs down from the elbow, not out behind it',
+    Math.abs(fa.handN.x-fa.elbN.x)<fa.handN.y-fa.elbN.y,'elbow '+r(fa.elbN.x)+','+r(fa.elbN.y)+' hand '+r(fa.handN.x)+','+r(fa.handN.y));
+  var pu=S('pullup'), pf=get('pullup').front.map(rig.solveFront), Tp=rig.turn(get('pullup'));
+  check('pullup','feet hang clear of the floor, not on tiptoe',pu[0].ankN.y+7<=GROUND-4,'sole '+r(pu[0].ankN.y+7)+' ground '+GROUND);
+  check('pullup front','at the top the elbows drive down below the shoulders, not a W at shoulder height',
+    pf[Tp].elbL.y>pf[Tp].shL.y+4 && pf[Tp].elbR.y>pf[Tp].shR.y+4,'elbow y '+r(pf[Tp].elbL.y)+' shoulder y '+r(pf[Tp].shL.y));
+  var kb=S('kbswing');
+  check('kbswing','the bell clears the floor at the hike',GROUND-(kb[0].handN.y+22)>=8,'bell bottom '+r(kb[0].handN.y+22));
+  check('kbswing','the hips have locked by the time the bell is at the belly (the arms do not raise it from a hinge)',
+    get('kbswing').frames[1].torso<=5 && kb[1].handN.y>kb[1].sh.y,'torso '+get('kbswing').frames[1].torso+' bell y '+r(kb[1].handN.y));
+})();
+
 // Frame 2 is the bottom of the usual four-frame rep and nothing more: a rig
 // that gains a frame, or authors its stops, moves its turnaround, and a check
 // still reading frame 2 then judges the wrong pose and can pass on it. Every
