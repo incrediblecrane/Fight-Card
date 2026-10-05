@@ -1191,8 +1191,12 @@ srv.listen(0,async function(){
       // The generic fallback also draws two figures, which is how a sit-up once
       // shipped as a squat. A solved view has a viewBox of its own, and the two
       // views have different ones.
-      // The side view is cropped to the figure, so it is a box 168 high from 18.
-      assert.ok(E.front?got.boxes[1]==='20 18 100 168':/^-?[\d.]+ 18 [\d.]+ 168$/.test(got.boxes[1]||''),
+      // The side view is cropped to the figure, and both panels share its top
+      // and height (18 and 168, or taller for a rig that reaches above 18).
+      // The generic fallback's box is -20 -20 180 200, so a box that ends at 186
+      // is the rig's own.
+      var vb=(got.boxes[0]||'').split(' ').map(Number), fits=vb.length===4&&vb[1]+vb[3]===186;
+      assert.ok(fits&&(E.front?got.boxes[1]==='20 '+vb[1]+' 100 '+vb[3]:got.boxes[1]===got.boxes[0]),
         'the second panel is not the view it should be, its viewBox is '+got.boxes[1]);
       assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
       assert.strictEqual(got.arrow, E.front?'':'\u2192',

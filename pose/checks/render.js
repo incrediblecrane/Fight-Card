@@ -37,6 +37,32 @@ setTimeout(function(){
       if(c.getAttribute('cx')===null) fails.push(label+': circle '+j+' never positioned');
     });
   });
+  // Side view, back to front: the head sits on the body's midline, so the near
+  // arm is drawn over it. Drawn the other way round, an arm overhead (a
+  // triceps extension, a pull-up) vanished behind the head.
+  var cards=d.querySelectorAll('.card');
+  EX.forEach(function(ex,i){ var svg=cards[i]&&cards[i].querySelector('.figwrap svg'); if(!svg) return;
+    var kids=[].slice.call(svg.children), head=-1, hand=-1, cut=-1;
+    kids.forEach(function(k,j){ if(k.tagName!=='circle') return; var r=+k.getAttribute('r'), f=k.getAttribute('fill');
+      if(r===8&&head<0) head=j;
+      if(Math.abs(r-3.05)<0.01&&f==='var(--surface-raised)') cut=j;
+      if(Math.abs(r-3.05)<0.01&&f!=='var(--surface-raised)'&&f!=='var(--text-faint)'&&hand<0) hand=j; });
+    if(head<0||hand<0||head>hand) fails.push(ex.id+': the head is drawn over the near arm (head '+head+', near hand '+hand+')');
+    if(!(cut>=0&&cut<hand)) fails.push(ex.id+': the near arm has no cut line under it');
+  });
+  // The preview is cropped as the app crops it (rigBox), so a figure judged in
+  // the preview is the size it is in the app: both panels' boxes match.
+  var h=fs.readFileSync(path.join(__dirname,'..','..','index.html'),'utf8');
+  function cut2(a,b){ var i=h.indexOf(a), j=h.indexOf(b,i); return h.slice(i,j); }
+  var app=new Function('hasOwn',cut2('var RL=','function figureSVG(')+';return {RIGMAP:RIGMAP,rigBox:rigBox};')(function(o,k){ return Object.prototype.hasOwnProperty.call(o,k); });
+  var exOf={}; Object.keys(app.RIGMAP).forEach(function(k){ if(!exOf[app.RIGMAP[k]]) exOf[app.RIGMAP[k]]=k; });
+  EX.forEach(function(ex,i){ if(!exOf[ex.id]||!cards[i]) return; var b=app.rigBox(exOf[ex.id]), v=cards[i].querySelectorAll('.figwrap svg');
+    var want=[b.x+' '+b.y+' '+b.w+' '+b.h,'20 '+b.y+' 100 '+b.h];
+    [].forEach.call(v,function(svg,k){ var got=svg.getAttribute('viewBox');
+      if(got!==want[k]) fails.push(ex.id+': the preview\'s '+(k?'second':'side')+' panel is '+got+', the app draws '+want[k]); });
+    var fw=cards[i].querySelector('.figwrap').style.flexGrow;
+    if(ex.front&&+fw!==b.w) fails.push(ex.id+': the preview\'s side panel takes '+fw+' of the row, the app '+b.w);
+  });
   // And it has to be still running, not merely to have run once.
   var beat=w.document.querySelector('.figwrap svg polygon');
   var before=beat&&beat.getAttribute('points');

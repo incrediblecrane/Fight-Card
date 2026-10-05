@@ -1,9 +1,9 @@
 <title>Exercise Motion Rebuild</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-:root{--bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;--text:#18181C;--text-soft:#55555F;--text-faint:#8A8A93;--accent:#E8500F;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}}
-:root[data-theme="dark"]{--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#6E6E78;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;}
+:root{--bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;--text:#18181C;--text-soft:#55555F;--text-faint:#64646D;--accent:#C2410C;--accent-ink:#FFFFFF;--good:#2E8B57;--warn:#B8790A;--line:#DAD4C6;--ground:#8F887A;--prop:#8F887A;--prop-fill:#E2DCCF;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#9696A0;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;--ground:#74747F;--prop:#74747F;--prop-fill:#3A3A46;}}
+:root[data-theme="dark"]{--bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;--text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#9696A0;--accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--warn:#F2B134;--line:#303038;--ground:#74747F;--prop:#74747F;--prop-fill:#3A3A46;}
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
 .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px;}
@@ -22,9 +22,9 @@ h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-
 .card h3{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1rem;margin:0 0 8px;display:flex;align-items:center;gap:7px;}
 .card h3 .flag{font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--accent);color:var(--accent-ink);padding:2px 6px;border-radius:5px;}
 .views{display:flex;gap:8px;}
-.figwrap{background:var(--surface-raised);border-radius:10px;padding:6px 0 2px;flex:1;min-width:0;position:relative;}
+.figwrap{background:var(--surface-raised);border-radius:10px;padding:6px 0 2px;flex:1;min-width:0;position:relative;overflow:hidden;}
 .vlbl{position:absolute;top:6px;left:8px;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-faint);}
-.figwrap svg{width:100%;max-width:210px;height:auto;display:block;margin:0 auto;}
+.figwrap svg{width:100%;max-width:calc(210px * var(--fig-w,1));height:auto;display:block;margin:0 auto;overflow:visible;}
 .lbl{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-faint);margin:8px 0 4px;}
 .body-copy{font-size:0.82rem;color:var(--text-soft);line-height:1.5;margin:0 0 8px;}
 .changed{font-size:0.78rem;color:var(--text-soft);line-height:1.5;margin:0;border-left:2px solid var(--accent);padding-left:9px;}
@@ -703,7 +703,9 @@ var EXERCISES = [
 { id:"triceps_ext", tempo:[480,480,420,420], name:"Triceps extension",
   real:"One weight held overhead in both hands. Only the elbows bend: the upper arms stay pointing at the ceiling while the weight lowers behind the head, then press back to straight. If the elbows drift forward and down it becomes a press.",
   changed:"The upper arm now stays vertical and only the forearm moves, which is the entire point of the exercise. It used to share the overhead press pose, where the whole arm travels.",
-  equip:"dumbbell", axis:"vertical", active:"arms",
+  // Seen from the front the weight and forearms go down behind the head, so
+  // the head is drawn over them (the second panel draws arms in front of it).
+  equip:"dumbbell", axis:"vertical", active:"arms", behindHead:true,
   frames:[
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[58,36],handF:[52,38], elbowSign:1},
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[50,46],handF:[44,48], elbowSign:1},
@@ -2204,29 +2206,73 @@ function barPath(ex){
   for(var i=0;i<=90;i++){ var s=solve(poseAt(ex,i/90)); pts.push(s.handN.x.toFixed(1)+','+s.handN.y.toFixed(1)); }
   return pts.join(' ');
 }
-function buildFigure(ex,host){
-  var svg=el('svg',{viewBox:'-20 18 175 168',role:'img','aria-label':ex.name+' animation'});
+// The app's rigBox, so the preview is cropped and scaled as the app draws it:
+// both panels share a top (18, or higher for a rig that reaches above it) and
+// the side view is cropped to the ground the figure covers, at the front
+// view's scale.
+function axisOf(ex){ return ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral'); }
+function boxOf(ex){
+  var x0=1e9, x1=-1e9, top=1e9, N=48;
+  var see=function(x,r){ if(x-r<x0) x0=x-r; if(x+r>x1) x1=x+r; };
+  var up=function(y,r){ if(y-r<top) top=y-r; };
+  var eq=ex.equip==='barbell'?15:ex.equip==='dumbbell'?14:ex.equip?11:5;
+  var ax=axisOf(ex), q=ex.equip;
+  var eqS=q==='barbell'?17:q==='dumbbell'?(ax==='vertical'?14:ax==='lateral'?7:9):q==='ball'?13:q==='plate'?13:q==='cable'?7:q==='kettlebell'?5:4;
+  var eqF=q==='barbell'?15:q==='dumbbell'?(ax==='vertical'?14:ax==='lateral'?8:6):q==='ball'?13:q==='plate'?12:q==='cable'?7:q==='kettlebell'?6:8;
+  for(var i=0;i<=N;i++){
+    var s=solve(poseAt(ex,i/N));
+    [s.hip,s.sh,s.hipF,s.shF,s.kneeN,s.kneeF,s.elbN,s.elbF].forEach(function(p){ see(p.x,9); up(p.y,9); });
+    see(s.head.x,L.HEAD_R+1); up(s.head.y,L.HEAD_R+1);
+    [s.ankN,s.ankF].forEach(function(p){ see(p.x+L.FOOT*0.72,1); see(p.x-L.FOOT*0.28,1); up(p.y,6); });
+    [s.handN,s.handF].forEach(function(p){ see(p.x,eq); up(p.y,eqS); });
+    if(ex.front){ var f=solveFront(frontAt(ex,i/N));
+      up(f.head.y,L.HEAD_R+1); up(f.shC.y,13);
+      [f.shL,f.shR].forEach(function(p){ up(p.y,8); });
+      [f.elbL,f.elbR,f.kneeL,f.kneeR].forEach(function(p){ up(p.y,6); });
+      [f.handL,f.handR].forEach(function(p){ up(p.y,eqF); }); }
+  }
+  (ex.props||[]).forEach(function(p){ var a=(p[5]||0)*Math.PI/180, cx=p[0]+p[2]/2, cy=p[1]+p[3]/2;
+    [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(function(k){ var dx=k[0]*p[2]/2, dy=k[1]*p[3]/2;
+      see(cx+dx*Math.cos(a)-dy*Math.sin(a),1); up(cy+dx*Math.sin(a)+dy*Math.cos(a),1); }); });
+  (ex.planProps||[]).forEach(function(p){ up(p[1],1); });
+  if(ex.barAt){ see(ex.barAt[0],4); up(ex.barAt[1],4); }
+  if(ex.anchorAt){ see(ex.anchorAt[0],2); up(ex.anchorAt[1],2); }
+  if(ex.anchorFront){ up(ex.anchorFront[1],2); up(ex.anchorFront[3],2); }
+  var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2));
+  return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y};
+}
+// A prop has an edge of its own (--prop, 3:1 against the panel).
+function propEl(p){
+  var a={x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--prop-fill)',stroke:'var(--prop)','stroke-width':1.5};
+  if(p[5]) a.transform='rotate('+p[5]+' '+(p[0]+p[2]/2)+' '+(p[1]+p[3]/2)+')';
+  return el('rect',a);
+}
+// The floor runs the whole width of the panel; the panel clips it.
+function groundEl(x0,x1){ return el('line',{x1:x0-200,y1:GROUND,x2:x1+200,y2:GROUND,stroke:'var(--ground)','stroke-width':2}); }
+function buildFigure(ex,host,bx){
+  bx=bx||boxOf(ex);
+  var svg=el('svg',{viewBox:bx.x+' '+bx.y+' '+bx.w+' '+bx.h,preserveAspectRatio:'xMidYMax meet',role:'img','aria-label':ex.name+' animation'});
   var ink='var(--text)', far='var(--text-faint)', hi='var(--accent)', soft='var(--text-soft)';
   var legCol = ex.active==='legs'?hi:ink;
   var armCol = (ex.active==='arms'||ex.active==='armN')?hi:ink;
-  svg.appendChild(el('line',{x1:-15,y1:GROUND,x2:150,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
+  svg.appendChild(groundEl(bx.x,bx.x+bx.w));
   // Props are part of the movement, not decoration: a split squat without the
   // bench behind it is a lunge, and a wall sit without the wall is a squat.
-  (ex.props||[]).forEach(function(p){
-    var a={x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'};
-    if(p[5]) a.transform='rotate('+p[5]+' '+(p[0]+p[2]/2)+' '+(p[1]+p[3]/2)+')';
-    svg.appendChild(el('rect',a));
-  });
+  (ex.props||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
   var bp=barPath(ex), trace=null;
   if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
   var R={};
-  function pair(name,col,w,isLeg){
-    R[name+'1']=el('polygon',{fill:col}); R[name+'j']=el('circle',{r:w[1]/2,fill:col});
-    R[name+'2']=el('polygon',{fill:col});
-    R[name+'e']= isLeg ? el('polygon',{fill:col}) : el('circle',{r:w[2]/2+0.8,fill:col});
+  // edge: drawn in panel colour with a stroke, under the near arm, as the cut
+  // line that keeps it visible where it crosses the body or passes the head.
+  function pair(name,col,w,isLeg,edge){
+    var st=edge?{stroke:col,'stroke-width':2.6,'stroke-linejoin':'round'}:{};
+    function mk(t,a){ for(var k in st) a[k]=st[k]; return el(t,a); }
+    R[name+'1']=mk('polygon',{fill:col}); R[name+'j']=mk('circle',{r:w[1]/2,fill:col});
+    R[name+'2']=mk('polygon',{fill:col});
+    R[name+'e']= isLeg ? el('polygon',{fill:col}) : mk('circle',{r:w[2]/2+0.8,fill:col});
     [R[name+'1'],R[name+'j'],R[name+'2'],R[name+'e']].forEach(function(n){svg.appendChild(n);});
   }
-  // equipment sits behind the near-side limbs
+  // The implement is in the near hand: in front of the body, under the arm.
   var eq=el('g',{});
   // An implement is drawn as it PROJECTS in this view, not as a generic icon.
   // A barbell runs across the body, so from the side its axis points at the
@@ -2237,7 +2283,7 @@ function buildFigure(ex,host){
   // back (a dumbbell hanging in a neutral grip), 'vertical' upright (a goblet).
   var axis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
   if(ex.equip==='barbell'){
-    R.plate=el('circle',{r:15,fill:'var(--surface)',stroke:soft,'stroke-width':3});
+    R.plate=el('circle',{r:15,fill:'none',stroke:soft,'stroke-width':3.5});
     R.hub=el('circle',{r:3.5,fill:soft});
     eq.appendChild(R.plate); eq.appendChild(R.hub);
   } else if(ex.equip==='fixedbar'){
@@ -2262,12 +2308,17 @@ function buildFigure(ex,host){
     R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
     eq.appendChild(R.kb); eq.appendChild(R.kh);
   }
+  // Back to front, as the app: far leg and arm, the body, the near leg, the
+  // implement, the head, the near arm, then a bar.
   pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
-  svg.appendChild(eq);
   R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
   svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
-  pair('nleg',legCol,[11,8,5.5],true); pair('narm',armCol,[8,6,4.5],false);
+  var top=ex.equip==='barbell'||ex.equip==='fixedbar';
+  pair('nleg',legCol,[11,8,5.5],true);
+  if(!top) svg.appendChild(eq);
   R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
+  pair('ncut','var(--surface-raised)',[8,6,4.5],false,true); pair('narm',armCol,[8,6,4.5],false);
+  if(top) svg.appendChild(eq);
   host.appendChild(svg);
   return {R:R,trace:trace};
 }
@@ -2283,6 +2334,7 @@ function update(ex,ref,u){
   setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true,s.footRot);
   setLimb('farm',s.shF,s.elbF,s.handF,[7,5,4],false);
   setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true,s.footRot);
+  setLimb('ncut',s.sh,s.elbN,s.handN,[8,6,4.5],false);
   setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
   R.torso.setAttribute('points',segPts(s.hip,s.sh,13,17));
   R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
@@ -2314,15 +2366,18 @@ function update(ex,ref,u){
 }
 
 // ---- front-plane rendering ----
-function buildFront(ex,host){
-  var svg=el('svg',{viewBox:'20 18 100 168',role:'img','aria-label':ex.name+' front view'});
+// Layered as the app draws it: legs behind the body unless a knee comes up
+// above its hip, the head behind the arms unless the rig holds them behind it
+// (behindHead), and a stick behind the back (its side-view hands behind the
+// hip) behind the body.
+function buildFront(ex,host,bx){
+  bx=bx||boxOf(ex);
+  var svg=el('svg',{viewBox:'20 '+bx.y+' 100 '+bx.h,role:'img','aria-label':ex.name+' front view'});
   var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
-  if(!ex.frontPlan) svg.appendChild(el('line',{x1:20,y1:GROUND,x2:120,y2:GROUND,stroke:'var(--line)','stroke-width':3}));
-  (ex.planProps||[]).forEach(function(p){
-    svg.appendChild(el('rect',{x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--line)'}));
-  });
-  var R={};
+  if(!ex.frontPlan) svg.appendChild(groundEl(20,120));
+  (ex.planProps||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
+  var R={svg:svg};
   // An arm foreshortened toward the camera lies on top of the torso in the same
   // ink, so it disappears into the silhouette. A surface-coloured outline is
   // what separates it; legs sit outside the body and do not need one.
@@ -2331,19 +2386,25 @@ function buildFront(ex,host){
     function mk(t,a){ for(var k in o) a[k]=o[k]; return el(t,a); }
     R[n+'1']=mk('polygon',{fill:col}); R[n+'j']=mk('circle',{r:w[1]/2,fill:col});
     R[n+'2']=mk('polygon',{fill:col});
-    [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){svg.appendChild(x);});
+    var g=el('g',{}); [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){g.appendChild(x);}); svg.appendChild(g); return g;
   }
-  limb('flegL',legCol,[11,8,5.5]); limb('flegR',legCol,[11,8,5.5]);
+  // The stick's place behind the body, and each leg's two places.
+  R.backAt=el('g',{}); svg.appendChild(R.backAt);
+  R.gLegL=limb('flegL',legCol,[11,8,5.5]); R.gLegR=limb('flegR',legCol,[11,8,5.5]);
   R.ffootL=el('ellipse',{rx:7,ry:4,fill:legCol}); R.ffootR=el('ellipse',{rx:7,ry:4,fill:legCol});
-  svg.appendChild(R.ffootL); svg.appendChild(R.ffootR);
+  R.gLegL.appendChild(R.ffootL); R.gLegR.appendChild(R.ffootR);
+  R.legsBack=el('g',{}); svg.appendChild(R.legsBack);
   R.fneck=el('rect',{width:7,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
   R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
   R.fhipL=el('circle',{r:5.5,fill:ink}); R.fhipR=el('circle',{r:5.5,fill:ink});
   svg.appendChild(R.fhipL); svg.appendChild(R.fhipR);
+  R.legsUp=el('g',{}); svg.appendChild(R.legsUp);
+  R.fhead=el('circle',{r:L.HEAD_R,fill:ink});
+  if(!ex.behindHead) svg.appendChild(R.fhead);
   limb('farmL',armCol,[8,6,4.5],true); limb('farmR',armCol,[8,6,4.5],true);
   R.fshL=el('circle',{r:6.5,fill:ink}); R.fshR=el('circle',{r:6.5,fill:ink});
   svg.appendChild(R.fshL); svg.appendChild(R.fshR);
-  R.fhead=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.fhead);
+  if(ex.behindHead) svg.appendChild(R.fhead);
   R.fhandL=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
   R.fhandR=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
   // A bar is gripped, so the hands go on top of it; a bell hangs from the
@@ -2352,7 +2413,7 @@ function buildFront(ex,host){
     R.fbar=el('rect',{height:5,rx:2.5,fill:soft});
     R.fpL=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
     R.fpR=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
-    svg.appendChild(R.fbar);
+    svg.appendChild(R.fbar); R.barAt=R.fbar.previousSibling;
     if(ex.equip==='barbell'){ svg.appendChild(R.fpL); svg.appendChild(R.fpR); }
   }
   svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
@@ -2397,6 +2458,12 @@ function buildFront(ex,host){
 function updateFront(ex,R,u){
   var f=frontAt(ex,u); if(!f) return;
   var s=solveFront(f);
+  // Which layer each leg and the stick are in at this moment.
+  [['gLegL',s.kneeL,s.hipL],['gLegR',s.kneeR,s.hipR]].forEach(function(k){
+    var up=!ex.frontPlan&&k[1].y<k[2].y-1;
+    if(R[k[0]+'up']!==up){ R[k[0]+'up']=up; R.svg.insertBefore(R[k[0]],up?R.legsUp:R.legsBack); } });
+  if(R.fbar&&ex.equip==='fixedbar'&&!ex.barAt&&ex.frames){ var sd=solve(poseAt(ex,u)), back=sd.handN.x<sd.hip.x;
+    if(R.back!==back){ R.back=back; R.svg.insertBefore(R.fbar,back?R.backAt:R.barAt.nextSibling); } }
   function setL(n,a,b,c,w){
     R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
     R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
@@ -2466,9 +2533,13 @@ EXERCISES.forEach(function(ex,i){
     '<div class="lbl">The real movement</div><p class="body-copy">'+ex.real+'</p>'+
     '<div class="lbl">What changed</div><p class="changed">'+ex.changed+'</p>';
   grid.appendChild(c);
-  var wraps=c.querySelectorAll('.figwrap');
-  var ref=buildFigure(ex,wraps[0]);
-  ref.front = ex.front ? buildFront(ex,wraps[1]) : null;
+  // Sized as the app's figPairStyle does: the side panel's share of the row
+  // and its cap in proportion to its crop, the front 100 wide.
+  var wraps=c.querySelectorAll('.figwrap'), bx=boxOf(ex);
+  wraps[0].style.flexGrow=bx.w; wraps[0].style.flexBasis='0px'; wraps[0].style.setProperty('--fig-w',(bx.w/100).toFixed(3));
+  if(wraps[1]){ wraps[1].style.flexGrow=100; wraps[1].style.flexBasis='0px'; }
+  var ref=buildFigure(ex,wraps[0],bx);
+  ref.front = ex.front ? buildFront(ex,wraps[1],bx) : null;
   refs.push(ref);
 });
 // Each rig plays at its own rep length (cycleMs in rig.js), as in the app. The

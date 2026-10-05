@@ -958,6 +958,28 @@ Eleven exercises have no rig deliberately: warm-up, cool-down, technique and
 rounds blocks and the three gym-machine slots are containers rather than
 movements, and the four swim entries have no ground to stand on.
 
+**Panel** (`rigBox`):
+The box a rig is drawn in, worked out once from the whole rep: the side view
+is cropped to the ground the figure covers, and both panels share a top (18,
+or higher for a rig that reaches above it, such as the top of a pull-up or a
+jump squat's hands) and so one scale. The side panel's share of the row and
+its width cap follow its crop (`figPairStyle`); the cap (`--fig-cap`) grows
+from 155 px on a phone to 260 px on a tablet. The floor (`--ground`) runs the
+full width of the panel, and props have an edge of their own (`--prop`), both
+at 3:1 or more against the panel. `pose/render.js` crops the preview the same
+way (`boxOf`), and `pose/checks/render.js` fails if the two differ.
+
+**Layering**:
+What is drawn over what. Side view, back to front: far leg and arm, body,
+near leg, the implement in the near hand (in front of the body, behind the
+head it hangs past at the top of a press), head, near arm (with a cut line of
+panel colour round it, so it shows where it crosses the body or passes the
+head), then a bar: the barbell's near plate or a fixed bar. Second panel: legs
+behind the body unless a knee is raised above its hip, the arms in front of
+the head unless the rig sets `behindHead` (the overhead triceps extension),
+and a stick held behind the back (side-view hands behind the hip) behind the
+body.
+
 **Live figure**:
 The slide's figure plays the rep at the rig's own length, a frame every 50 ms
 (`steps` frames a rep), or every 33 ms for a rig whose hips, head, hands or feet
@@ -1040,6 +1062,12 @@ checks once passed whatever the app did.
   while resting with no jump at either end of the rest, one loop after a
   render and nothing left behind when stopped, the pause off screen, the still
   on a stop, and a tapped rep at full speed.
+- `test-rigdraw.js`: how the figure is drawn: what lies in front of what
+  (the near arm over the head, with its cut line; the implement in the near
+  hand; the second panel's arms, raised knees and a stick behind the back),
+  every rig inside its panel at 96 moments of the rep, both panels at one
+  top and height, the tablet cap, the floor across the panel, and `--ground`
+  and `--prop` at 3:1 or more against the panel in both themes.
 - `test-roundtrip.js`: state survives `dbDocs`/`dbApply` with every key.
 - `test-app.js`: the real save cycle, backfill dates (a tap moves only that
   day), session dating, a new day opening on Today, and Today's in-progress

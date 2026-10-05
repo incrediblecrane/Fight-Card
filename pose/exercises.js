@@ -215,7 +215,9 @@ var EXERCISES = [
 { id:"triceps_ext", tempo:[480,480,420,420], name:"Triceps extension",
   real:"One weight held overhead in both hands. Only the elbows bend: the upper arms stay pointing at the ceiling while the weight lowers behind the head, then press back to straight. If the elbows drift forward and down it becomes a press.",
   changed:"The upper arm now stays vertical and only the forearm moves, which is the entire point of the exercise. It used to share the overhead press pose, where the whole arm travels.",
-  equip:"dumbbell", axis:"vertical", active:"arms",
+  // Seen from the front the weight and forearms go down behind the head, so
+  // the head is drawn over them (the second panel draws arms in front of it).
+  equip:"dumbbell", axis:"vertical", active:"arms", behindHead:true,
   frames:[
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[58,36],handF:[52,38], elbowSign:1},
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[50,46],handF:[44,48], elbowSign:1},
