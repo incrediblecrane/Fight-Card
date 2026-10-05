@@ -269,22 +269,36 @@ function hermite(t,m){ var t2=t*t, t3=t2*t; return (t3-2*t2+t)*m[0]+(-2*t3+3*t2)
 // swinging through its IK branch would set the pace of the whole rep.
 var TRACK=['hip','head','ankN','ankF','handN','handF'], TRACKF=['hipC','head','footL','footR','handL','handR'];
 // Every tracked joint of segment i at blend w, side then (if asked) front.
-function trackAt(ex,i,w,side,front){
+function trackAt(ex,i,w,side,front,jf){
   var n=(ex.frames||ex.front).length, j=(i+1)%n, o=[];
   if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w)); TRACK.forEach(function(k){ o.push(s[k]); }); }
-  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); TRACKF.forEach(function(k){ o.push(f[k]); }); }
+  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); (jf||TRACKF).forEach(function(k){ o.push(f[k]); }); }
   return o;
+}
+// A second panel whose hips, head, hands and feet keep still through a
+// segment while its elbows or knees move (a bench press seen from above,
+// where only the elbows open and close) is read off those as well, or every
+// keyframe of it would look held and be a stop while the side panel flows
+// through.
+var LIMBF=TRACKF.concat(['elbL','elbR','kneeL','kneeR']);
+function frontJoints(ex){
+  var n=ex.front.length;
+  for(var i=0;i<n;i++){ var a=trackAt(ex,i,0,false,true,LIMBF), most=0, all=0;
+    for(var q=1;q<=12;q++){ var b=trackAt(ex,i,q/12,false,true,LIMBF);
+      most=Math.max(most,vmax(b.slice(0,TRACKF.length),a.slice(0,TRACKF.length))); all=Math.max(all,vmax(b,a)); }
+    if(most<0.5 && all>=0.5) return LIMBF; }
+  return TRACKF;
 }
 // Per segment: path length, and per joint the direction and rate (units per
 // unit of w) it leaves its first keyframe at and reaches its second at.
 function segPaths(ex,side,front){
-  var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[];
+  var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[], jf=front&&ex.front&&!side?frontJoints(ex):null;
   for(var i=0;i<n;i++){
     var pts=[], len=0, most=0, q;
-    for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front));
+    for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front,jf));
     for(q=0;q<K;q++) len+=vlen(pts[q+1],pts[q]);
     for(q=1;q<=K;q++) most=Math.max(most,vmax(pts[q],pts[0]));
-    out.push({len:len, held:most<0.5, d0:vdiff(trackAt(ex,i,E,side,front),pts[0],E), d1:vdiff(pts[K],trackAt(ex,i,1-E,side,front),E)});
+    out.push({len:len, held:most<0.5, d0:vdiff(trackAt(ex,i,E,side,front,jf),pts[0],E), d1:vdiff(pts[K],trackAt(ex,i,1-E,side,front,jf),E)});
   }
   return out;
 }
@@ -370,16 +384,17 @@ function cycleMs(ex){
 }
 // Frames per rep the app draws: one every 50 ms (three screen refreshes),
 // whatever the rep's length, so a 6 s stretch is not drawn at 8 frames a
-// second nor a 1 s sprint stride at 48. A frame every 33 ms would steady the
-// fastest rigs (strobes() is the biggest jump of a hip, hand, foot or head
-// between two frames; over 6 units, about 9 CSS px, it reads as a jump, and
-// `emit-rig.js --stops` lists them), but on a phone at 4x CPU throttle it kept
-// the main thread 38 to 45% busy against 25% at 50 ms, over the 30% budget,
-// so it waits for a cheaper way to draw a frame.
-var FRAME_MS=50;
-function stepsOf(ex){ return Math.round(cycleMs(ex)/FRAME_MS); }
-function strobes(ex){
-  var n=stepsOf(ex), worst=0, prev=null;
+// second nor a 1 s sprint stride at 48. A rig whose hips, head, hands or feet
+// would jump more than 6 units (about 9 CSS px) between two such frames reads
+// as a jump rather than a movement, and is drawn every 33 ms (two refreshes)
+// instead: the boxing drills, sprints, jumps and swings. Only one rig plays at
+// a time, so the cost is that rig's: on a phone at 4x CPU throttle the push
+// press kept the main thread 15 to 25% busy at 33 ms against 12 to 16% at 50,
+// inside the 30% budget.
+// `emit-rig.js --stops` lists what each rig jumps a frame.
+var FRAME_MS=50, FAST_MS=100/3, STROBE=6;
+function jumpsAt(ex,n){
+  var worst=0, prev=null;
   for(var i=0;i<=n;i++){
     var s=ex.frames?solve(poseAt(ex,i/n)):null, f=ex.front?solveFront(frontAt(ex,i/n)):null, cur=[];
     if(s) TRACK.forEach(function(k){ cur.push(s[k]); });
@@ -389,6 +404,9 @@ function strobes(ex){
   }
   return worst;
 }
+function stepsOf(ex){ var at=Math.round(cycleMs(ex)/FRAME_MS); return jumpsAt(ex,at)>STROBE?Math.round(cycleMs(ex)/FAST_MS):at; }
+// The biggest jump between two of the frames the app draws.
+function strobes(ex){ return jumpsAt(ex,stepsOf(ex)); }
 // The keyframe a still shows (reduced motion, or the end of a tapped rep): an
 // authored `still`, else the turnaround (the bottom of a squat, the top of a
 // press) when the rep rests there, else the last keyframe it rests at (a

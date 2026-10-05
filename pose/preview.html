@@ -324,22 +324,36 @@ function hermite(t,m){ var t2=t*t, t3=t2*t; return (t3-2*t2+t)*m[0]+(-2*t3+3*t2)
 // swinging through its IK branch would set the pace of the whole rep.
 var TRACK=['hip','head','ankN','ankF','handN','handF'], TRACKF=['hipC','head','footL','footR','handL','handR'];
 // Every tracked joint of segment i at blend w, side then (if asked) front.
-function trackAt(ex,i,w,side,front){
+function trackAt(ex,i,w,side,front,jf){
   var n=(ex.frames||ex.front).length, j=(i+1)%n, o=[];
   if(side&&ex.frames){ var s=solve(lerpFrame(ex.frames[i],ex.frames[j],w)); TRACK.forEach(function(k){ o.push(s[k]); }); }
-  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); TRACKF.forEach(function(k){ o.push(f[k]); }); }
+  if(front&&ex.front){ var f=solveFront(lerpFront(frontKey(ex.front,i),frontKey(ex.front,j),w)); (jf||TRACKF).forEach(function(k){ o.push(f[k]); }); }
   return o;
+}
+// A second panel whose hips, head, hands and feet keep still through a
+// segment while its elbows or knees move (a bench press seen from above,
+// where only the elbows open and close) is read off those as well, or every
+// keyframe of it would look held and be a stop while the side panel flows
+// through.
+var LIMBF=TRACKF.concat(['elbL','elbR','kneeL','kneeR']);
+function frontJoints(ex){
+  var n=ex.front.length;
+  for(var i=0;i<n;i++){ var a=trackAt(ex,i,0,false,true,LIMBF), most=0, all=0;
+    for(var q=1;q<=12;q++){ var b=trackAt(ex,i,q/12,false,true,LIMBF);
+      most=Math.max(most,vmax(b.slice(0,TRACKF.length),a.slice(0,TRACKF.length))); all=Math.max(all,vmax(b,a)); }
+    if(most<0.5 && all>=0.5) return LIMBF; }
+  return TRACKF;
 }
 // Per segment: path length, and per joint the direction and rate (units per
 // unit of w) it leaves its first keyframe at and reaches its second at.
 function segPaths(ex,side,front){
-  var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[];
+  var n=(ex.frames||ex.front).length, E=0.002, K=24, out=[], jf=front&&ex.front&&!side?frontJoints(ex):null;
   for(var i=0;i<n;i++){
     var pts=[], len=0, most=0, q;
-    for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front));
+    for(q=0;q<=K;q++) pts.push(trackAt(ex,i,q/K,side,front,jf));
     for(q=0;q<K;q++) len+=vlen(pts[q+1],pts[q]);
     for(q=1;q<=K;q++) most=Math.max(most,vmax(pts[q],pts[0]));
-    out.push({len:len, held:most<0.5, d0:vdiff(trackAt(ex,i,E,side,front),pts[0],E), d1:vdiff(pts[K],trackAt(ex,i,1-E,side,front),E)});
+    out.push({len:len, held:most<0.5, d0:vdiff(trackAt(ex,i,E,side,front,jf),pts[0],E), d1:vdiff(pts[K],trackAt(ex,i,1-E,side,front,jf),E)});
   }
   return out;
 }
@@ -425,16 +439,17 @@ function cycleMs(ex){
 }
 // Frames per rep the app draws: one every 50 ms (three screen refreshes),
 // whatever the rep's length, so a 6 s stretch is not drawn at 8 frames a
-// second nor a 1 s sprint stride at 48. A frame every 33 ms would steady the
-// fastest rigs (strobes() is the biggest jump of a hip, hand, foot or head
-// between two frames; over 6 units, about 9 CSS px, it reads as a jump, and
-// `emit-rig.js --stops` lists them), but on a phone at 4x CPU throttle it kept
-// the main thread 38 to 45% busy against 25% at 50 ms, over the 30% budget,
-// so it waits for a cheaper way to draw a frame.
-var FRAME_MS=50;
-function stepsOf(ex){ return Math.round(cycleMs(ex)/FRAME_MS); }
-function strobes(ex){
-  var n=stepsOf(ex), worst=0, prev=null;
+// second nor a 1 s sprint stride at 48. A rig whose hips, head, hands or feet
+// would jump more than 6 units (about 9 CSS px) between two such frames reads
+// as a jump rather than a movement, and is drawn every 33 ms (two refreshes)
+// instead: the boxing drills, sprints, jumps and swings. Only one rig plays at
+// a time, so the cost is that rig's: on a phone at 4x CPU throttle the push
+// press kept the main thread 15 to 25% busy at 33 ms against 12 to 16% at 50,
+// inside the 30% budget.
+// `emit-rig.js --stops` lists what each rig jumps a frame.
+var FRAME_MS=50, FAST_MS=100/3, STROBE=6;
+function jumpsAt(ex,n){
+  var worst=0, prev=null;
   for(var i=0;i<=n;i++){
     var s=ex.frames?solve(poseAt(ex,i/n)):null, f=ex.front?solveFront(frontAt(ex,i/n)):null, cur=[];
     if(s) TRACK.forEach(function(k){ cur.push(s[k]); });
@@ -444,6 +459,9 @@ function strobes(ex){
   }
   return worst;
 }
+function stepsOf(ex){ var at=Math.round(cycleMs(ex)/FRAME_MS); return jumpsAt(ex,at)>STROBE?Math.round(cycleMs(ex)/FAST_MS):at; }
+// The biggest jump between two of the frames the app draws.
+function strobes(ex){ return jumpsAt(ex,stepsOf(ex)); }
 // The keyframe a still shows (reduced motion, or the end of a tapped rep): an
 // authored `still`, else the turnaround (the bottom of a squat, the top of a
 // press) when the rep rests there, else the last keyframe it rests at (a
@@ -992,7 +1010,9 @@ var EXERCISES = [
     {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:-1}
   ]},
 
-{ id:"sq_jump", tempo:[380,220,300,420], name:"Jump squat",
+// The still is the loaded bottom (keyframe 0), not the apex, where it hung in
+// the air with the arms up.
+{ id:"sq_jump", tempo:[380,220,300,420], still:0, name:"Jump squat",
   real:"Quarter to half squat, then jump as high as you can and land soft on the same spot, absorbing through the hips and knees. The landing is the part that matters: quiet feet, knees tracking out, straight back into the next one only when you have control.",
   changed:"The feet now actually leave the floor and it lands back into a bent-knee absorb, rather than sharing a generic JUMP pose that stayed planted.",
   equip:null, active:"legs",
@@ -1201,7 +1221,10 @@ var EXERCISES = [
     {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[78,120], kneeSign:1, elbowSign:-1}
   ]},
 
-{ id:"shoulderdisloc", tempo:[560,560,620,620], name:"Shoulder dislocate",
+// The arm keys turn the same way all round, so found from the paths the side
+// view would never rest; it rests where the second panel does, in front, overhead
+// and behind, until the path itself is re-authored to come back over the top.
+{ id:"shoulderdisloc", tempo:[560,560,620,620], stops:[0,2,3], name:"Shoulder dislocate",
   real:"Wide grip on a band or broomstick, arms straight, take it from in front of your thighs up over your head and behind you, then back. Go as wide as you need to keep the elbows locked. If they bend, the grip is too narrow.",
   changed:"The stick now travels on a full arc from the thighs to behind the head with the arms staying straight, which is the whole movement. The old REACH pose just lifted the arms in front.",
   equip:"fixedbar", active:"arms",

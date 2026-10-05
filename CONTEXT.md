@@ -917,8 +917,12 @@ The keyframe a rep turns around at: the bottom of a squat, the top of a pull.
 A keyframe the figure comes to rest at, in one view (`rig.stopsOf`). Found
 from the paths (a hold either side of it, or a hip, hand or foot turning more
 than 60 degrees through it, or one passed at under a tenth of top speed),
-or authored as `stops` (and `frontStops` for the second panel).
-`node pose/emit-rig.js --stops` prints the table for review.
+or authored as `stops` (and `frontStops` for the second panel). A second
+panel in which only the elbows or knees move through a segment is read off
+those too. `node pose/emit-rig.js --stops` prints the table for review, and
+`pose/checks/stops.json` holds the reviewed table: `continuous.js` fails when
+any rig's stops change, until the change is looked at and accepted with
+`node pose/checks/continuous.js --write-stops`.
 _Avoid_: pause (a pause is the app's, not the rep's)
 
 **Time warp**:
@@ -956,7 +960,9 @@ movements, and the four swim entries have no ground to stand on.
 
 **Live figure**:
 The slide's figure plays the rep at the rig's own length, a frame every 50 ms
-(`steps` frames a rep), each frame drawn when it is due and the page asleep
+(`steps` frames a rep), or every 33 ms for a rig whose hips, head, hands or feet
+would jump more than 6 units between frames at 50 (the boxing drills, sprints,
+jumps and swings), each frame drawn when it is due and the page asleep
 in between. Each frame moves the shapes already drawn (`drawInPlace`) rather
 than drawing the figure again, and a rep's frames are solved once and kept for
 the next rep. While the rest clock runs it plays in slow motion, at a third of
@@ -1002,7 +1008,9 @@ checks once passed whatever the app did.
   continuous motion (including the time warp: every keyframe that is not a
   stop passed at speed, no lurch through one, equal keyframes held still, and
   no joint whipping more than 6 units in 1/144 of a rep, with the rigs that
-  already do listed in `WHIPS`), views, and rendering.
+  already do listed in `WHIPS`; the frame period; every view resting
+  somewhere; the core lifts resting at the top and bottom only; the reviewed
+  stops table; a jump's still not in the air), views, and rendering.
 
 `test:app`, in the order it runs:
 

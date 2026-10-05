@@ -522,7 +522,9 @@ var EXERCISES = [
     {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:-1}
   ]},
 
-{ id:"sq_jump", tempo:[380,220,300,420], name:"Jump squat",
+// The still is the loaded bottom (keyframe 0), not the apex, where it hung in
+// the air with the arms up.
+{ id:"sq_jump", tempo:[380,220,300,420], still:0, name:"Jump squat",
   real:"Quarter to half squat, then jump as high as you can and land soft on the same spot, absorbing through the hips and knees. The landing is the part that matters: quiet feet, knees tracking out, straight back into the next one only when you have control.",
   changed:"The feet now actually leave the floor and it lands back into a bent-knee absorb, rather than sharing a generic JUMP pose that stayed planted.",
   equip:null, active:"legs",
@@ -731,7 +733,10 @@ var EXERCISES = [
     {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[78,120], kneeSign:1, elbowSign:-1}
   ]},
 
-{ id:"shoulderdisloc", tempo:[560,560,620,620], name:"Shoulder dislocate",
+// The arm keys turn the same way all round, so found from the paths the side
+// view would never rest; it rests where the second panel does, in front, overhead
+// and behind, until the path itself is re-authored to come back over the top.
+{ id:"shoulderdisloc", tempo:[560,560,620,620], stops:[0,2,3], name:"Shoulder dislocate",
   real:"Wide grip on a band or broomstick, arms straight, take it from in front of your thighs up over your head and behind you, then back. Go as wide as you need to keep the elbows locked. If they bend, the grip is too narrow.",
   changed:"The stick now travels on a full arc from the thighs to behind the head with the arms staying straight, which is the whole movement. The old REACH pose just lifted the arms in front.",
   equip:"fixedbar", active:"arms",

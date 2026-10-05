@@ -326,6 +326,60 @@ EX.forEach(function(ex){
     else if(listed) whipDone.push(ex.id+' '+v[0]);
   });
 });
+// How often the app draws a frame. A frame every 50 ms is three screen
+// refreshes; a rig whose hips, head, hands or feet would jump more than 6
+// units (about 9 CSS px) between two such frames is drawn every 33 ms (two
+// refreshes) instead. Measured here, not with rig.strobes, which picks it.
+function jumpAt(ex,n){
+  var worst=0, prev=null;
+  for(var i=0;i<=n;i++){ var cur=[];
+    if(ex.frames){ var s=rig.solve(rig.poseAt(ex,i/n)); SIDEJ.forEach(function(k){ cur.push(s[k]); }); }
+    if(ex.front){ var f=rig.solveFront(rig.frontAt(ex,i/n)); FRONTJ.forEach(function(k){ cur.push(f[k]); }); }
+    if(prev) cur.forEach(function(p,k){ worst=Math.max(worst,d(p,prev[k])); });
+    prev=cur; }
+  return worst;
+}
+EX.forEach(function(ex){
+  var ax=app.RIGFRAMES[ex.id], cyc=ax.cycleMs, at50=Math.round(cyc/50), at33=Math.round(cyc*3/100);
+  ck(ex.id,'is drawn a frame every 50 or 33 ms',ax.steps===at50||ax.steps===at33,ax.steps+' frames in '+cyc+' ms');
+  var j=jumpAt(ex,at50);
+  if(j>6) ck(ex.id,'jumps '+r(j)+' units a frame at 50 ms, so is drawn every 33 ms',ax.steps===at33,ax.steps+' frames in '+cyc+' ms');
+});
+// Every view comes to rest somewhere in a rep. One that never does turns the
+// same way all round (the dislocate's arm windmilling through the hips).
+EX.forEach(function(ex){
+  ck(ex.id+' side','rests at some keyframe',rig.stopsOf(ex).length>0,JSON.stringify(rig.stopsOf(ex)));
+  if(ex.front) ck(ex.id+' front','rests at some keyframe',rig.stopsOf(ex,true).length>0,JSON.stringify(rig.stopsOf(ex,true)));
+});
+// The core lifts rest at the top and the bottom only. The check above that a
+// keyframe is passed at speed skips the stops, so a keyframe edit that made
+// half way down a squat a stop again would pass it. A bench press seen from
+// the feet moves only its elbows, and used to rest at every keyframe.
+var FLOW={backsquat:'side front',frontsquat:'side front',goblet:'side front',deadlift:'side front',rdl:'side front',
+  pullup:'side front',ohp:'side front',kbswing:'side front',sq_air:'side front',bench:'side front',dip:'side front'};
+Object.keys(FLOW).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
+  FLOW[id].split(' ').forEach(function(v){ var st=rig.stopsOf(ex,v==='front');
+    ck(id+' '+v,'rests at the top and bottom only, passing through half way',JSON.stringify(st)==='[0,2]',JSON.stringify(st)); }); });
+// Every rig's stops, as reviewed. A change in which keyframes the figure rests
+// at changes how every rep of it looks, so it is a deliberate edit: look at the
+// rigs named, then rewrite the table with --write-stops.
+var STOPSFILE=require('path').join(__dirname,'stops.json'), now={};
+EX.forEach(function(ex){ now[ex.id]=ex.front?[rig.stopsOf(ex),rig.stopsOf(ex,true)]:[rig.stopsOf(ex)]; });
+if(process.argv.indexOf('--write-stops')>-1){
+  require('fs').writeFileSync(STOPSFILE,'{\n'+EX.map(function(ex){ return JSON.stringify(ex.id)+':'+JSON.stringify(now[ex.id]); }).join(',\n')+'\n}\n');
+  console.log('wrote '+STOPSFILE);
+}
+var was={}; try{ was=JSON.parse(require('fs').readFileSync(STOPSFILE,'utf8')); }catch(e){}
+EX.forEach(function(ex){ ck(ex.id,'rests at the reviewed keyframes (pose/checks/stops.json; --write-stops to accept)',
+  JSON.stringify(was[ex.id])===JSON.stringify(now[ex.id]),'was '+JSON.stringify(was[ex.id])+', now '+JSON.stringify(now[ex.id])); });
+// The still (reduced motion, the end of a tapped rep) of a jump shows it
+// loading or landing, not hanging in the air at the apex with the arms up:
+// the feet are no higher there than at the keyframes either side.
+['sq_jump','boxjump','broadjump'].forEach(function(id){
+  var ex=EX.filter(function(e){ return e.id===id; })[0], n=ex.frames.length, k=app.RIGFRAMES[id].still;
+  var y=ex.frames.map(function(f){ var s=rig.solve(f); return Math.max(s.ankN.y,s.ankF.y); });
+  ck(id,'the still is not in the air',!(y[k]<y[(k+n-1)%n]&&y[k]<y[(k+1)%n]),'still keyframe '+k+', feet at y '+r(y[k])+' between '+r(y[(k+n-1)%n])+' and '+r(y[(k+1)%n]));
+});
 console.log('=== CONTINUOUS MOTION CHECK ('+SAMPLES+' samples/exercise) ===');
 if(bendWarn.length) console.log('WARN: '+bendWarn.length+' joints bend outside -10..160 (listed in BENDS, being re-authored):\n  ! '+bendWarn.join('\n  ! '));
 if(bendDone.length) console.log('NOTE: now inside -10..160, take off BENDS: '+bendDone.join(', '));
