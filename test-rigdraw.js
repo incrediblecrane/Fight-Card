@@ -224,5 +224,26 @@ t('the floor and the props stand out from the panel at 3:1 or more, light and da
   assert.strictEqual(pl.a.stroke,'var(--prop)','the bench from above is edged in '+pl.a.stroke);
 });
 
+console.log('\nDRAWN IN PLACE');
+// The live loop updates the figure's shapes in place rather than rebuilding
+// the panel. A leg pointing at the camera moves in front of or behind the body
+// as it swings, so a shape of one kind takes the place of another of the same
+// count: that shape is swapped on its own, not the whole panel redrawn (a
+// high knee did that four times a rep, the get-up and pistol too).
+t('a rep redraws the figure in place, swapping only a shape whose kind changes, in every rig', function(){
+  var JSDOM; try{ JSDOM=require('jsdom').JSDOM; }catch(e){ console.log('        (skipped: jsdom not installed)'); return; }
+  var win=new JSDOM('<div id="a"></div>').window, doc=win.document;
+  var lib=new Function('document',cut('function svgShapes(','var rigDrawn=')+';return {shapes:svgShapes,draw:drawInPlace};')(doc);
+  var el=doc.getElementById('a'), ref=doc.createElement('div'), set=Object.getOwnPropertyDescriptor(win.Element.prototype,'innerHTML').set, rebuilt=0, bad=[];
+  Object.defineProperty(el,'innerHTML',{set:function(v){ rebuilt++; set.call(this,v); }, get:function(){ return win.Element.prototype.__lookupGetter__('innerHTML').call(this); }});
+  RIGS.forEach(function(id){ [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){
+    var n0=null, ok=true; if(!f(EXOF[id],0)) return; for(var i=0;i<=120;i++){ var html=f(EXOF[id],i/120), d=lib.shapes(html);
+      if(n0!==null && d.s.length!==n0) ok=false; n0=d.s.length;
+      rebuilt=0; lib.draw(el,d);
+      if(i && ok && rebuilt) { bad.push(id+(v?' front':' side')+' at u='+(i/120).toFixed(3)); break; }
+      ref.innerHTML=html; if(el.innerHTML!==ref.innerHTML){ bad.push(id+(v?' front':' side')+' draws something else at u='+(i/120).toFixed(3)); break; } } }); });
+  assert.ok(!bad.length,bad.length+' panels rebuilt or drew wrong: '+bad.slice(0,6).join(', '));
+});
+
 console.log(fails?('\n'+fails+' FAILING'):'\nALL PASS');
 process.exit(fails?1:0);

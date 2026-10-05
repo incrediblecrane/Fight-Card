@@ -866,7 +866,7 @@ EX.forEach(function(ex){
   // the knees and hips straight. These planks used to bend the knees backwards
   // (57 to 133 degrees), pike the hips and prop the elbows in front of the
   // shoulders with the forearm running back.
-  var PRONE={pushup:[0,1,2,3], plank:[0,1,2,3], mtnclimb:[0,2], burpee:[2,3]};
+  var PRONE={pushup:[0,1,2,3], plank:[0,1,2,3], mtnclimb:[0,4], burpee:[3,4]};
   if(PRONE[ex.id]) PRONE[ex.id].forEach(function(i){ var s=S[i];
     var knee=angAt(s.hip,s.kneeN,s.ankN), kneeF=angAt(s.hipF,s.kneeF,s.ankF), hip=angAt(s.sh,s.hip,s.kneeN);
     check(ex.id,'frame '+i+' holds one straight line, knees and hips at 165 or more',
@@ -882,10 +882,22 @@ EX.forEach(function(ex){
     check(ex.id,'frame '+i+' rests on the forearm: elbow under the shoulder, forearm flat',
       Math.abs(s.elbN.x-s.sh.x)<3 && Math.abs(s.handN.y-s.elbN.y)<2,'elbow '+r(s.elbN.x-s.sh.x)+' from the shoulder, forearm drop '+r(s.handN.y-s.elbN.y));
   });
-  if(ex.id==='mtnclimb') [[1,'N'],[3,'F']].forEach(function(q){ var s=S[q[0]];
+  if(ex.id==='mtnclimb') [[2,'N'],[6,'F']].forEach(function(q){ var s=S[q[0]];
     check(ex.id,'frame '+q[0]+' drives the knee forward under the chest, off the floor',
       s['knee'+q[1]].x > s.hip.x+15 && s['ank'+q[1]].y < GROUND-14,'knee '+r(s['knee'+q[1]].x-s.hip.x)+' ahead of the hip');
   });
+  // Between those keyframes too. A drive ankle sent straight from the plank to
+  // the chest dropped the knee to 4 units off the floor as the thigh passed
+  // under the hip, the shin lying flat on it: a crawl forward on the knee. The
+  // burpee's kick-back scraped the floor the same way. The knee passes close
+  // under a low hip, but the hips lift a little and the foot comes up behind it.
+  if(ex.id==='mtnclimb'||ex.id==='burpee'){ var lo=1e9, loAt=0, drag=[];
+    for(var qi=0;qi<400;qi++){ var sq=solve(rig.poseAt(ex,qi/400));
+      ['N','F'].forEach(function(k){ var c=GROUND-sq['knee'+k].y; if(c<lo){ lo=c; loAt=qi/400; }
+        if(sq.hip.y>125 && Math.abs(sq['knee'+k].x-sq.hip.x)<8 && sq['ank'+k].y>GROUND-15) drag.push(k+'@'+qi/400); }); }
+    check(ex.id,'the knees swing through clear of the floor all through the rep',lo>=5,'knee '+r(lo)+' off the floor at u='+loAt);
+    check(ex.id,'the foot is off the floor as its knee passes under the hip',!drag.length,'shin on the floor at '+drag.slice(0,4).join(' '));
+  }
   // The reverse curl starts from straight arms (it stopped at 157, a partial
   // rep) and the upper arm stays by the side (hand targets drifted it 7 to 11).
   if(ex.id==='curl_reverse'){
@@ -1050,7 +1062,7 @@ var PLATE_EDGE=15+1.75, PLATE_EDGE_F=13+1.5;
    rigs listed slide or swing a foot the wrong way today and are being
    re-authored, so they print as warnings; any other rig doing it fails, and
    a listed one that comes right says so. */
-var GAIT={burpee:'slide', shadowbox:'swing'};
+var GAIT={shadowbox:'swing'};
 (function walking(){
   var done=[];
   EX.forEach(function(ex){

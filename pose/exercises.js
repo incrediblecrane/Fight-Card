@@ -958,26 +958,37 @@ var EXERCISES = [
     {hip:[60.5,150.4],torso:77.4,ankN:[4,163],ankF:[-1,163], handN:[113,164],handF:[107,164], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"mtnclimb", tempo:[240,240,240,240], name:"Mountain climbers",
+{ id:"mtnclimb", tempo:[120,120,120,120,120,120,120,120], name:"Mountain climbers",
   real:"Hold a push-up top position and drive the knees to the chest one at a time. The hips stay low and level: as soon as they pike up toward the ceiling it becomes a hip flexor exercise and the core stops working.",
   changed:"The knees drive alternately toward the chest from a straight-armed plank, the foot leaving the floor. It used to bend the knee backwards and down behind the hip, so it read as kneeling.",
   equip:null, active:"legs", floor:true,
   frames:[
     {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    // On the way in and out the hips lift a little and the foot comes up
+    // behind the knee as it passes under them, so the knee swings clear of
+    // the floor instead of the shin dragging along it.
+    {hip:[59.4,134.4],torso:71.5,ankN:[38,146],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
     {hip:[60.9,137.4],torso:65.9,ankN:[56,153],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    {hip:[59.4,134.4],torso:71.5,ankN:[38,146],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
     {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
-    {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[51,153], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1}
+    {hip:[59.4,134.4],torso:71.5,ankN:[8,161],ankF:[33,146], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[51,153], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    {hip:[59.4,134.4],torso:71.5,ankN:[8,161],ankF:[33,146], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"burpee", tempo:[300,260,240,300,220,280,300,340], name:"Burpee",
+{ id:"burpee", tempo:[300,130,130,240,150,150,220,280,300,340], name:"Burpee",
   real:"Stand, drop the hands to the floor, kick the feet back to a plank, snap them in again, then jump and land soft. The plank is the bit people skip: the hips should reach a straight line before the feet come back, or it turns into a squat thrust with extra steps.",
   changed:"All five positions are there in order, and the plank is a real one, straight from heel to head on locked arms and held for a moment before the feet come back. The jump reaches full extension. The old pose was a two-frame crouch that showed neither, and then bent the elbows the wrong way and flashed a crawl for the plank.",
   equip:null, active:null, floor:true,
   frames:[
     {hip:[58,105.5],torso:4, ankN:[60,163],ankF:[50,163], handN:[62,110],handF:[56,110], kneeSign:-1, elbowSign:1},
     {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:1},
+    // The feet jump back and in with the hips up a little and the feet off the
+    // floor, so the knees swing over it rather than scraping along it.
+    {hip:[47,134],torso:72,ankN:[24,148],ankF:[18,148], footRot:15, handN:[80,163],handF:[73,163], kneeSign:-1, elbowSign:1},
     {hip:[47.9,137.4],torso:65.9,ankN:[-5,161],ankF:[-10,161], footRot:20, handN:[80,163],handF:[74,163], kneeSign:-1, elbowSign:1},
     {hip:[47.9,137.4],torso:65.9,ankN:[-5,161],ankF:[-10,161], footRot:20, handN:[80,163],handF:[74,163], kneeSign:-1, elbowSign:1},
+    {hip:[47,134],torso:72,ankN:[24,148],ankF:[18,148], footRot:15, handN:[80,163],handF:[73,163], kneeSign:-1, elbowSign:1},
     {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:1},
     {hip:[55,112],torso:8, ankN:[60,163],ankF:[50,163], handN:[78,100],handF:[72,102], kneeSign:-1, elbowSign:1},
     {hip:[55,95], torso:2, ankN:[56,152.8],ankF:[50,152.8], handN:[60,24],handF:[54,24], kneeSign:-1, elbowSign:1},
@@ -1500,7 +1511,8 @@ var FRONTS = {
   FRONTS.plank=[pl,ext(pl,{hipY:124.6}),ext(pl,{hipY:124.6}),pl];
   // Which knee is driving is only visible from here: it travels up toward the
   // chest, as far as the side view's.
-  FRONTS.mtnclimb=[top,ext(top,{footL:[63,133],kneeL:[62,104.5]}),top,ext(top,{footR:[77,133],kneeR:[78,104.5]})];
+  var pL=ext(top,{footL:[62.5,152],kneeL:[62,129]}), pR=ext(top,{footR:[77.5,152],kneeR:[78,129]});
+  FRONTS.mtnclimb=[top,pL,ext(top,{footL:[63,133],kneeL:[62,104.5]}),pL,top,pR,ext(top,{footR:[77,133],kneeR:[78,104.5]}),pR];
   var db={hipY:104,footL:[61,133],footR:[79,133],kneeL:[61,106],kneeR:[79,106],handL:[54,72],handR:[86,72],armScaleL:0.15,armScaleR:0.15};
   FRONTS.deadbug=[db,ext(db,{footR:[78,161],kneeR:[78.5,133],handL:[54,31],elbL:[54,49.5],armScaleL:1}),
     db,ext(db,{footL:[62,161],kneeL:[61.5,133],handR:[86,31],elbR:[86,49.5],armScaleR:1})];
