@@ -174,12 +174,14 @@ EX.forEach(function(ex){
       'knee y='+r(ext.kneeF.y)+' hip y='+r(ext.hipF.y));
     check(ex.id,'extended leg is long and low', ext.ankN.x > ext.hip.x+45 && ext.ankN.y > ext.kneeF.y,
       'ankle='+r(ext.ankN.x)+','+r(ext.ankN.y));
-    check(ex.id,'extended arm reaches back past the head', ext.handN.x < ext.head.x,
-      'hand='+r(ext.handN.x)+' head='+r(ext.head.x));
+    // Contralateral: the near leg reaches with the FAR arm. These checks used
+    // to ask for the near arm, so they held the same-side reach in place.
+    check(ex.id,'extended arm reaches back past the head', ext.handF.x < ext.head.x,
+      'hand='+r(ext.handF.x)+' head='+r(ext.head.x));
     check(ex.id,'opposite pairs: extended arm and extended leg are on different sides',
-      (ext.handN.x<ext.head.x) && (ext.ankN.x>ext.ankF.x),'not contralateral');
+      (ext.handF.x<ext.head.x) && (ext.ankN.x>ext.ankF.x) && ext.handN.x>ext.head.x,'not contralateral');
     var alt=S[3];
-    check(ex.id,'alternates to the other diagonal', alt.handF.x < alt.head.x && alt.ankF.x > alt.ankN.x,
+    check(ex.id,'alternates to the other diagonal', alt.handN.x < alt.head.x && alt.handF.x > alt.head.x && alt.ankF.x > alt.ankN.x,
       'second diagonal not mirrored');
   }
   /* ---- the 45 rigs added in one pass. Each of these is the claim its own
@@ -194,14 +196,18 @@ EX.forEach(function(ex){
       Math.hypot(S[T].hipF.x-S[T].ankF.x,S[T].hipF.y-S[T].ankF.y) > Math.hypot(S[T].hip.x-S[T].ankN.x,S[T].hip.y-S[T].ankN.y),'free leg not extended');
   }
   if(ex.id==='lunge_walk'){
-    check(ex.id,'the trailing leg swings through past the lead one, so it walks',
-      ex.frames[3].ankF[0]-ex.frames[0].ankF[0]>30 &&
-      ex.frames[3].ankF[0]>=ex.frames[0].ankN[0]-2,
-      'trailing foot '+r(ex.frames[0].ankF[0])+' -> '+r(ex.frames[3].ankF[0])+', lead was at '+r(ex.frames[0].ankN[0]));
+    // A lunge drops both knees with the feet apart, then the back leg swings
+    // through to lead. It used to keep the near foot in front throughout,
+    // kick the back foot up at the bottom and slide it back along the floor.
+    var f=ex.frames;
+    check(ex.id,'the legs swap: the back foot of one lunge leads the next',
+      f[0].ankN[0]>f[0].ankF[0]+40 && f[T].ankF[0]>f[T].ankN[0]+40,
+      'lunge 1 lead '+f[0].ankN[0]+' back '+f[0].ankF[0]+', lunge 2 lead '+f[T].ankF[0]+' back '+f[T].ankN[0]);
     check(ex.id,'the swinging foot lifts off the floor to get there',
-      ex.frames[1].ankF[1]<GROUND-14,'swing foot '+r(ex.frames[1].ankF[1]));
-    check(ex.id,'the back knee drops toward the floor', S[1].kneeF.y>S[0].kneeF.y+6,
-      'rear knee '+r(S[0].kneeF.y)+' -> '+r(S[1].kneeF.y));
+      f[1].ankF[1]<GROUND-14 && f[3].ankN[1]<GROUND-14,'swing feet '+f[1].ankF[1]+', '+f[3].ankN[1]);
+    check(ex.id,'the back knee drops toward the floor with both feet down',
+      S[0].kneeF.y>GROUND-12 && S[T].kneeN.y>GROUND-12 && f[0].ankF[1]===f[0].ankN[1] && f[T].ankF[1]===f[T].ankN[1],
+      'back knees '+r(S[0].kneeF.y)+', '+r(S[T].kneeN.y));
   }
   if(ex.id==='glutebridge'){
     check(ex.id,'the shoulders stay on the floor, which is what makes it a bridge not a hip thrust',
@@ -680,6 +686,9 @@ EX.forEach(function(ex){
     check(ex.id,'it sits back onto the heels with the arms stretched long forward',
       S[0].handN.x>S[0].hip.x+50,'hand '+r(S[0].handN.x)+' hip '+r(S[0].hip.x));
     check(ex.id,'the head is down near the floor', S[0].head.y>GROUND-40,'head '+r(S[0].head.y));
+    // It used to kneel up with the knees bent backwards (-147) behind the hips.
+    S.forEach(function(x,i){ check(ex.id,'frame '+i+' rests the knees and forehead on the floor',
+      x.kneeN.y>GROUND-8 && x.head.y+L.HEAD_R>GROUND-6,'knee '+r(x.kneeN.y)+' head '+r(x.head.y)); });
   }
   if(ex.id==='worldsgreatest'){
     check(ex.id,'the inside hand stays planted by the front foot',
@@ -714,6 +723,10 @@ EX.forEach(function(ex){
       'rear leg '+r(Math.hypot(S[0].hipF.x-S[0].ankF.x,S[0].hipF.y-S[0].ankF.y)));
     check(ex.id,'it folds forward over the front leg', ex.frames[T].torso>ex.frames[0].torso+10,
       'torso '+ex.frames[0].torso+' -> '+ex.frames[T].torso);
+    // Its knees bent backwards, the front one 115 the wrong way.
+    S.forEach(function(x,i){ check(ex.id,'frame '+i+' has the front knee forward on the floor and the rear leg long behind',
+      x.ankF.x<x.hip.x-40 && x.kneeN.x>x.hip.x+20 && x.kneeN.y>GROUND-8 && x.kneeF.y<GROUND-3,
+      'front knee '+r(x.kneeN.x-x.hip.x)+' ahead at y '+r(x.kneeN.y)+', rear foot '+r(x.hip.x-x.ankF.x)+' behind'); });
   }
   if(ex.id==='nine0'){
     check(ex.id,'it is seated on the floor', S.every(function(x){return x.hip.y>GROUND-26;}),'hip '+r(S[0].hip.y));
@@ -839,6 +852,47 @@ EX.forEach(function(ex){
       'rear='+r(cross.handF.x)+' lead='+r(cross.handN.x));
     check(ex.id,'punches land near shoulder height', Math.abs(jab.handN.y-jab.sh.y)<18,
       'hand='+r(jab.handN.y)+' shoulder='+r(jab.sh.y));
+    // The guard is at the chin (about 8 under the head's centre); it sat at
+    // the chest, 10 low.
+    check(ex.id,'guard fists at the chin, not the chest', g.handN.y < g.head.y+16 && g.handF.y < g.head.y+16,
+      'fists '+r(g.handN.y)+', '+r(g.handF.y)+' head '+r(g.head.y));
+    // A punch snaps back at least as fast as it went out, and the combo
+    // resets in guard before the next one.
+    var tp=ex.tempo;
+    check(ex.id,'each punch comes back no slower than it went out, then rests in guard',
+      tp.length===5 && tp[1]<=tp[0] && tp[3]<=tp[2] && tp[4]>=tp[0]+tp[1]+tp[2]+tp[3]-200,'tempo '+tp.join(','));
+  }
+  // Face down on straight arms or forearms: one line from heel to shoulder,
+  // the knees and hips straight. These planks used to bend the knees backwards
+  // (57 to 133 degrees), pike the hips and prop the elbows in front of the
+  // shoulders with the forearm running back.
+  var PRONE={pushup:[0,1,2,3], plank:[0,1,2,3], mtnclimb:[0,2], burpee:[2,3]};
+  if(PRONE[ex.id]) PRONE[ex.id].forEach(function(i){ var s=S[i];
+    var knee=angAt(s.hip,s.kneeN,s.ankN), kneeF=angAt(s.hipF,s.kneeF,s.ankF), hip=angAt(s.sh,s.hip,s.kneeN);
+    check(ex.id,'frame '+i+' holds one straight line, knees and hips at 165 or more',
+      knee>=165 && kneeF>=165 && hip>=165,'knees '+r(knee)+', '+r(kneeF)+' hip '+r(hip));
+  });
+  if(ex.id==='pushup'){
+    check(ex.id,'the top locks the arms out over the hands', angAt(S[0].sh,S[0].elbN,S[0].handN)>=155 && Math.abs(S[0].handN.x-S[0].sh.x)<4,
+      'elbow '+r(angAt(S[0].sh,S[0].elbN,S[0].handN))+' hand '+r(S[0].handN.x-S[0].sh.x)+' ahead of the shoulder');
+    check(ex.id,'at the bottom the elbows are back beside the ribs, behind the shoulder', S[T].elbN.x < S[T].sh.x,
+      'elbow x '+r(S[T].elbN.x)+' shoulder x '+r(S[T].sh.x));
+  }
+  if(ex.id==='plank') S.forEach(function(s,i){
+    check(ex.id,'frame '+i+' rests on the forearm: elbow under the shoulder, forearm flat',
+      Math.abs(s.elbN.x-s.sh.x)<3 && Math.abs(s.handN.y-s.elbN.y)<2,'elbow '+r(s.elbN.x-s.sh.x)+' from the shoulder, forearm drop '+r(s.handN.y-s.elbN.y));
+  });
+  if(ex.id==='mtnclimb') [[1,'N'],[3,'F']].forEach(function(q){ var s=S[q[0]];
+    check(ex.id,'frame '+q[0]+' drives the knee forward under the chest, off the floor',
+      s['knee'+q[1]].x > s.hip.x+15 && s['ank'+q[1]].y < GROUND-14,'knee '+r(s['knee'+q[1]].x-s.hip.x)+' ahead of the hip');
+  });
+  // The reverse curl starts from straight arms (it stopped at 157, a partial
+  // rep) and the upper arm stays by the side (hand targets drifted it 7 to 11).
+  if(ex.id==='curl_reverse'){
+    check(ex.id,'starts from straight arms', angAt(S[0].sh,S[0].elbN,S[0].handN)>=170,'elbow '+r(angAt(S[0].sh,S[0].elbN,S[0].handN)));
+    var ua=S.map(function(s){ return Math.atan2(s.elbN.x-s.sh.x,s.elbN.y-s.sh.y)*180/Math.PI; });
+    check(ex.id,'the upper arm stays pinned to the side', Math.max.apply(null,ua)-Math.min.apply(null,ua)<=10,
+      'upper arm swings '+r(Math.max.apply(null,ua)-Math.min.apply(null,ua))+' degrees');
   }
 });
 
@@ -897,7 +951,8 @@ EX.forEach(function(ex){
 function angAt(a,b,c){ var d=Math.abs(Math.atan2(a.y-b.y,a.x-b.x)-Math.atan2(c.y-b.y,c.x-b.x))*180/Math.PI; return d>180?360-d:d; }
 var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadlift:'turn', ohp:'all', kbswing:'after',
   facepull:'all', triceps_ext:'all', kb_press:'all', platepinch:'top', kb_clean:[1,2,3,4,5,6], kb_snatch:[1,2,3,4,5],
-  splitsq_bulg:'none', farmerscarry:'none', suitcasecarry:'none', kb_bottomsup:'none'};
+  splitsq_bulg:'none', farmerscarry:'none', suitcasecarry:'none', kb_bottomsup:'none',
+  curl_reverse:'all', burpee:[0], jabcross:'none', lunge_walk:'none'};
 (function standingTall(){
   EX.forEach(function(ex){
     var how=STANDING[ex.id], T=rig.turn(ex), bad=[];
@@ -995,7 +1050,7 @@ var PLATE_EDGE=15+1.75, PLATE_EDGE_F=13+1.5;
    rigs listed slide or swing a foot the wrong way today and are being
    re-authored, so they print as warnings; any other rig doing it fails, and
    a listed one that comes right says so. */
-var GAIT={lunge_walk:'slide', burpee:'slide', shadowbox:'swing'};
+var GAIT={burpee:'slide', shadowbox:'swing'};
 (function walking(){
   var done=[];
   EX.forEach(function(ex){

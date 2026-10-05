@@ -296,14 +296,18 @@ EX.forEach(function(ex){ var ax=app.RIGFRAMES[ex.id], w=0;
 // The rigs listed below already break the range and are being re-authored, so
 // for now they print as warnings. Any other rig breaking it fails, and a
 // listed rig that has come back inside it says so, so the list only shrinks.
-var BENDS={backsquat:'elbF elbN',hipthrust:'elbF elbN',facepull:'elbF elbN',
-  press_push:'elbF',glutebridge:'elbF elbN',hollowhold:'elbF elbN',
-  bearcrawl:'elbF elbN kneeF kneeN',kb_tgu:'elbF elbN',sq_jump:'elbF elbN',boxjump:'elbF elbN',
-  medballslam:'elbF elbN',sprint:'elbF elbN',highknees:'elbF elbN',briskwalkjog:'elbF elbN',
-  childspose:'elbF elbN kneeF kneeN',catcow:'elbF elbN kneeF kneeN',worldsgreatest:'elbF',
-  pigeon:'kneeF kneeN',thoracic:'elbF elbN kneeF kneeN',shadowbox:'elbF elbN',
-  bagspeed:'elbF elbN',skierg:'elbN',pushup:'elbF elbN kneeF kneeN',plank:'elbF elbN kneeF kneeN',
-  mtnclimb:'elbF elbN kneeF kneeN',burpee:'elbF elbN'};
+var BENDS={backsquat:'elbF elbN',facepull:'elbF elbN',press_push:'elbF',
+  sq_jump:'elbF elbN',boxjump:'elbF elbN',medballslam:'elbF elbN',sprint:'elbF elbN',
+  highknees:'elbF elbN',briskwalkjog:'elbF elbN',worldsgreatest:'elbF',shadowbox:'elbF elbN',
+  bagspeed:'elbF elbN',skierg:'elbN'};
+// Floor and prone rigs are done: a face-down plank whose knees bent the wrong
+// way is what this check was written for, so none of them may be listed.
+Object.keys(BENDS).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
+  ck(id,'a floor rig is never excused from the bend range (BENDS)',!(ex&&ex.floor),'listed in BENDS'); });
+// A shin that runs across the body, into the picture, is drawn folded flat
+// under its thigh from the side: the pigeon's front leg bends about 90 degrees
+// but shows 160 to 166. Such a joint may fold to 170.
+var FOLDS={pigeon:'kneeN'};
 var bendWarn=[], bendDone=[];
 function head(p,q){ return Math.atan2(q.x-p.x,-(q.y-p.y))*180/Math.PI; }
 function flex(a,b,c){ return ((head(a,b)-head(b,c))%360+540)%360-180; }
@@ -312,7 +316,7 @@ EX.forEach(function(ex){
   for(var i=0;i<240;i++){ var s=rig.solve(rig.poseAt(ex,i/240)), u=i/240;
     [['elbN',flex(s.sh,s.elbN,s.handN)],['elbF',flex(s.shF,s.elbF,s.handF)],
      ['kneeN',-flex(s.hip,s.kneeN,s.ankN)],['kneeF',-flex(s.hipF,s.kneeF,s.ankF)]].forEach(function(q){
-      var over=q[1]<-10?-10-q[1]:q[1]>160?q[1]-160:0;
+      var top=(FOLDS[ex.id]||'').split(' ').indexOf(q[0])>=0?170:160, over=q[1]<-10?-10-q[1]:q[1]>top?q[1]-top:0;
       if(over>0 && (!out[q[0]]||over>out[q[0]].o)) out[q[0]]={o:over,v:q[1],u:u};
     });
   }

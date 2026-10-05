@@ -151,8 +151,8 @@ EX.forEach(function(ex){
   }
   if(ex.id==='deadbug'){
     var ext=S[1];
-    ck(ex.id,'extended limbs hover, not driven into the floor', ext.ankN.y<GROUND-8 && ext.handN.y<GROUND-8,
-      'ankle '+r(ext.ankN.y)+' hand '+r(ext.handN.y));
+    ck(ex.id,'extended limbs hover, not driven into the floor', ext.ankN.y<GROUND-8 && ext.handF.y<GROUND-8,
+      'ankle '+r(ext.ankN.y)+' hand '+r(ext.handF.y));
     ck(ex.id,'tabletop shin is roughly horizontal', Math.abs(ext.ankF.y-ext.kneeF.y)<12,
       'ankle y '+r(ext.ankF.y)+' knee y '+r(ext.kneeF.y));
     ck(ex.id,'extended leg is straighter than the tabletop leg',
@@ -185,10 +185,10 @@ EX.forEach(function(ex){
 // are being re-authored (their toes and rear feet need footN and footF), so
 // they print as warnings; any other rig breaking it fails, and a listed rig
 // that comes right says so, so the list only shrinks.
-var FOOTING={lunge_walk:'hover',woodchopper:'hover',
+var FOOTING={woodchopper:'hover',
   boxjump:'sink',medballthrow:'hover',skipping:'hover',jumpingjack:'hover',highknees:'hover',briskwalkjog:'hover',
-  hipflexor:'hover',couchstretch:'sink',childspose:'hover',catcow:'hover',pigeon:'hover',thoracic:'hover',
-  ankle_mob:'hover',rowerg:'sink',pushup:'hover',plank:'hover',mtnclimb:'hover',burpee:'hover'};
+  hipflexor:'hover',couchstretch:'sink',catcow:'hover',thoracic:'hover',
+  ankle_mob:'hover',rowerg:'sink'};
 var footWarn=[], footDone=[];
 function surfaces(ex){ var t=[{x0:-1e9,x1:1e9,y:GROUND,h:1e9}];
   (ex.props||[]).forEach(function(p){ if(!p[5]) t.push({x0:p[0],x1:p[0]+p[2],y:p[1],h:p[3]}); }); return t; }

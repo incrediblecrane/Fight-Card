@@ -958,7 +958,20 @@ every rig alike.
 **Bend range**:
 A knee or elbow bends from -10 to 160 degrees of flexion, never backwards.
 Rigs that break it today are listed in `BENDS` in `continuous.js` and print as
-warnings while they are re-authored; any other rig breaking it fails.
+warnings while they are re-authored; any other rig breaking it fails, and a
+floor rig (`floor:true`) may never be listed: face down or up, the right bend
+is `kneeSign:-1` and `elbowSign:1` far more often than not, and the push-up,
+plank and mountain climber once shipped with knees bent 57 to 133 degrees the
+wrong way. A shin running across the body into the picture is drawn folded
+flat under its thigh (the pigeon's front leg), so `FOLDS` lets that joint
+reach 170.
+
+**Prone**:
+Face down on hands or forearms (push-up, plank, mountain climber, the
+burpee's plank): one straight line from heel to shoulder pivoting on the
+toes, the knees and hips at 165 or more, the arms locked under the
+shoulders at the top or the forearms flat with the elbows under them.
+`analyse.js` (`PRONE`) checks it.
 
 **Standing**:
 A standing frame has the hip over the ankle (within 3) at `STAND_HIP_Y`

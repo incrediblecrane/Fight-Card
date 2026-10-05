@@ -217,7 +217,7 @@ EX.forEach(function(ex){
 // The rigs listed below break it today and are being re-authored, so they
 // print as warnings; any other rig breaking it fails, and a listed rig that
 // comes right says so, so the list only shrinks.
-var HANDED={worldsgreatest:'hand',deadbug:'hand'};
+var HANDED={worldsgreatest:'hand'};
 var handWarn=[], handDone=[];
 function sides(ex){
   var nr=rig.nearSide(ex), fr=nr==='L'?'R':'L', plan=!!ex.frontPlan, out={};

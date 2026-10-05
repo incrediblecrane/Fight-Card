@@ -128,11 +128,11 @@ var EXERCISES = [
   changed:"There is now a bench under the shoulders and the bar sits across the hips, so the top is a horizontal torso with vertical shins instead of a generic floor bridge.",
   equip:"barbell", active:"legs", props:[[-8,141,32,8],[-4,149,6,21,0],[16,149,6,21,0]],
   frames:[
-    {hip:[50.3,155],torso:309,handN:[52.3,154],handF:[44.3,154], ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:-1},
-    {hip:[56,145],  torso:290,handN:[58,144],  handF:[50,144],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:-1},
-    {hip:[58,133],  torso:270,handN:[60,132],  handF:[52,132],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:-1},
-    {hip:[58,133],  torso:270,handN:[60,132],  handF:[52,132],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:-1},
-    {hip:[56,145],  torso:290,handN:[58,144],  handF:[50,144],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:-1}
+    {hip:[50.3,155],torso:309,handN:[52.3,154],handF:[44.3,154], ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:1},
+    {hip:[56,145],  torso:290,handN:[58,144],  handF:[50,144],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:1},
+    {hip:[58,133],  torso:270,handN:[60,132],  handF:[52,132],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:1},
+    {hip:[58,133],  torso:270,handN:[60,132],  handF:[52,132],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:1},
+    {hip:[56,145],  torso:290,handN:[58,144],  handF:[50,144],   ankN:[87,163],ankF:[79,163], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"calfraise", tempo:[340,340,260,460,460,300], name:"Calf raise",
@@ -308,15 +308,15 @@ var EXERCISES = [
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], armN:[178,178], shrug:2.5}
   ]},
 
-{ id:"lunge_walk", tempo:[400,400,400,400], name:"Walking lunge",
+{ id:"lunge_walk", tempo:[600,600,600,600], name:"Walking lunge",
   real:"Step out, drop the back knee toward the floor until both knees are near ninety degrees, then drive through the front heel to stand and step through with the other leg. The torso stays tall; leaning forward turns it into a good morning. The front shin stays close to vertical and the front knee tracks over the foot.",
-  changed:"It walks: the trailing leg swings through to become the leading one, which is the only thing separating a walking lunge from a static one. It used to share a fixed LUNGE pose that never travelled.",
+  changed:"It walks: both knees drop to about ninety degrees with the front shin upright and the back knee just off the floor, then the back leg swings through to become the front one. It used to share a fixed LUNGE pose that never travelled, and then hopped on one leg with the back foot kicked up and slid it along the floor.",
   equip:null, active:"legs",
   frames:[
-    {hip:[55,116],torso:6, ankN:[74,163],ankF:[34,158], armN:[172,176]},
-    {hip:[55,128],torso:8, ankN:[74,163],ankF:[30,150], armN:[172,176]},
-    {hip:[57,116],torso:6, ankN:[74,163],ankF:[52,161], armN:[172,176]},
-    {hip:[59,128],torso:8, ankN:[76,150],ankF:[74,163], armN:[172,176]}
+    {hip:[56,131],torso:5,ankN:[85,163],ankF:[22,163], armN:[176,178]},
+    {hip:[56,107],torso:3,ankN:[58,163],ankF:[52,148], armN:[176,178]},
+    {hip:[56,131],torso:5,ankN:[27,163],ankF:[80,163], armN:[176,178]},
+    {hip:[56,107],torso:3,ankN:[57,148],ankF:[53,163], armN:[176,178]}
   ]},
 
 { id:"pistol", tempo:[600,600,520,520], name:"Pistol squat",
@@ -335,10 +335,10 @@ var EXERCISES = [
   changed:"The shoulders are now pinned to the FLOOR and only the hips travel, so it is clearly the floor version rather than the bench-supported hip thrust it used to share a pose with. The torso here is one rigid segment pivoting about the shoulder, and the head extends past that pivot, so lifting the hips any further would swing the head down through the floor. That caps the travel at about eight units, which is roughly the twelve centimetres a real bridge covers anyway.",
   equip:null, active:"legs", floor:true,
   frames:[
-    {hip:[46,156],torso:270,  ankN:[80,163],ankF:[71,163], handN:[34,163],handF:[28,162], kneeSign:-1, elbowSign:-1},
-    {hip:[46,152],torso:263.3,ankN:[80,163],ankF:[71,163], handN:[34,163],handF:[28,162], kneeSign:-1, elbowSign:-1},
-    {hip:[45,148],torso:256.4,ankN:[80,163],ankF:[71,163], handN:[34,163],handF:[28,162], kneeSign:-1, elbowSign:-1},
-    {hip:[46,152],torso:263.3,ankN:[80,163],ankF:[71,163], handN:[34,163],handF:[28,162], kneeSign:-1, elbowSign:-1}
+    {hip:[46,156],torso:270,  ankN:[80,163],ankF:[71,163], handN:[49,164],handF:[43,164], kneeSign:-1, elbowSign:1},
+    {hip:[46,152],torso:263.3,ankN:[80,163],ankF:[71,163], handN:[49,164],handF:[43,164], kneeSign:-1, elbowSign:1},
+    {hip:[45,148],torso:256.4,ankN:[80,163],ankF:[71,163], handN:[49,164],handF:[43,164], kneeSign:-1, elbowSign:1},
+    {hip:[46,152],torso:263.3,ankN:[80,163],ankF:[71,163], handN:[49,164],handF:[43,164], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"row_single", tempo:[460,460,520,520], name:"Single-arm row",
@@ -464,10 +464,10 @@ var EXERCISES = [
   changed:"The shoulders and legs now hover off the floor with the lumbar spine pinned down, instead of a generic supine pose. It is a hold, so almost nothing travels.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[50,160],torso:288,ankN:[96,140],ankF:[90,143], handN:[-6,133],handF:[-2,136], kneeSign:-1, elbowSign:-1},
-    {hip:[50,160],torso:288,ankN:[96,137],ankF:[90,140], handN:[-6,131],handF:[-2,134], kneeSign:-1, elbowSign:-1},
-    {hip:[50,160],torso:288,ankN:[96,137],ankF:[90,140], handN:[-6,131],handF:[-2,134], kneeSign:-1, elbowSign:-1},
-    {hip:[50,160],torso:288,ankN:[96,140],ankF:[90,143], handN:[-6,133],handF:[-2,136], kneeSign:-1, elbowSign:-1}
+    {hip:[50,160],torso:288,ankN:[96,140],ankF:[90,143], handN:[-6,133],handF:[-2,136], kneeSign:-1, elbowSign:1},
+    {hip:[50,160],torso:288,ankN:[96,137],ankF:[90,140], handN:[-6,131],handF:[-2,134], kneeSign:-1, elbowSign:1},
+    {hip:[50,160],torso:288,ankN:[96,137],ankF:[90,140], handN:[-6,131],handF:[-2,134], kneeSign:-1, elbowSign:1},
+    {hip:[50,160],torso:288,ankN:[96,140],ankF:[90,143], handN:[-6,133],handF:[-2,136], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"bearcrawl", tempo:[260,260,260,260], name:"Bear crawl",
@@ -475,10 +475,10 @@ var EXERCISES = [
   changed:"The knees now hover just clear of the floor and opposite limbs travel together, which is the movement. It used to share the static plank pose and never moved at all.",
   equip:null, active:"legs", floor:true,
   frames:[
-    {hip:[48,132],torso:88,ankN:[16,156],ankF:[10,158], handN:[92,160],handF:[84,162], kneeSign:1, elbowSign:-1},
-    {hip:[48,132],torso:88,ankN:[32,150],ankF:[10,158], handN:[92,160],handF:[76,156], kneeSign:1, elbowSign:-1},
-    {hip:[48,132],torso:88,ankN:[16,156],ankF:[10,158], handN:[92,160],handF:[84,162], kneeSign:1, elbowSign:-1},
-    {hip:[48,132],torso:88,ankN:[16,156],ankF:[26,151], handN:[84,156],handF:[84,162], kneeSign:1, elbowSign:-1}
+    {hip:[48,132],torso:88,ankN:[16,156],ankF:[10,158], handN:[92,160],handF:[84,162], kneeSign:-1, elbowSign:1},
+    {hip:[48,132],torso:88,ankN:[32,150],ankF:[10,158], handN:[92,160],handF:[76,156], kneeSign:-1, elbowSign:1},
+    {hip:[48,132],torso:88,ankN:[16,156],ankF:[10,158], handN:[92,160],handF:[84,162], kneeSign:-1, elbowSign:1},
+    {hip:[48,132],torso:88,ankN:[16,156],ankF:[26,151], handN:[84,156],handF:[84,162], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"woodchopper", tempo:[380,380,460,460], name:"Cable or band woodchopper",
@@ -530,10 +530,10 @@ var EXERCISES = [
   changed:"It now shows the actual sequence, from lying with the arm locked out to the half-kneeling position, with the loaded arm vertical the whole way. It used to share the generic REACH pose and looked like a standing stretch.",
   equip:"kettlebell", load:"R", active:"arms", floor:true,
   frames:[
-    {hip:[46,156],torso:268,ankN:[86,150],ankF:[78,158], handN:[14,120],handF:[24,152], kneeSign:-1, elbowSign:-1},
-    {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:-1},
-    {hip:[56,138],torso:344,ankN:[82,163],ankF:[32,159], handN:[50,67], handF:[38,142], kneeSign:-1, elbowSign:-1},
-    {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:-1}
+    {hip:[46,156],torso:268,ankN:[86,150],ankF:[78,158], handN:[14,120],handF:[24,152], kneeSign:-1, elbowSign:1},
+    {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:1},
+    {hip:[56,138],torso:344,ankN:[82,163],ankF:[32,159], handN:[50,67], handF:[38,142], kneeSign:-1, elbowSign:1},
+    {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:1}
   ]},
 
 // The still is the loaded bottom (keyframe 0), not the apex, where it hung in
@@ -681,15 +681,15 @@ var EXERCISES = [
     {hip:[55,142],torso:11,ankN:[80,163],ankF:[26,131], handN:[65,134],handF:[57,136], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"childspose", tempo:[600,900,900,600], name:"Child\'s pose",
+{ id:"childspose", tempo:[900,700,900,700], name:"Child\'s pose",
   real:"Knees wide, big toes together, sit back onto the heels and walk the hands forward until the forehead rests down. Breathe into the back of the ribs. It is a rest position, so let the shoulders and neck go completely.",
-  changed:"It now sits back onto the heels with the arms stretched forward and the head down, rather than sharing an upright KNEEL pose which is nearly the opposite shape.",
+  changed:"It sits back onto the heels with the knees on the floor in front, the arms stretched long and the forehead down. It used to share an upright KNEEL pose, and then folded the knees backwards behind the hips.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[30,150],torso:78,ankN:[16,163],ankF:[12,162], handN:[96,157],handF:[90,159], kneeSign:1, elbowSign:-1},
-    {hip:[28,152],torso:80,ankN:[16,163],ankF:[12,162], handN:[96,158],handF:[90,160], kneeSign:1, elbowSign:-1},
-    {hip:[28,152],torso:80,ankN:[16,163],ankF:[12,162], handN:[96,158],handF:[90,160], kneeSign:1, elbowSign:-1},
-    {hip:[30,150],torso:78,ankN:[16,163],ankF:[12,162], handN:[96,157],handF:[90,159], kneeSign:1, elbowSign:-1}
+    {hip:[15,151],torso:98,ankN:[11,165],ankF:[7,165], handN:[86,165],handF:[81,165], kneeSign:-1, elbowSign:1},
+    {hip:[15,152],torso:101,ankN:[11,165],ankF:[7,165], handN:[86,165],handF:[81,165], kneeSign:-1, elbowSign:1},
+    {hip:[15,152],torso:101,ankN:[11,165],ankF:[7,165], handN:[86,165],handF:[81,165], kneeSign:-1, elbowSign:1},
+    {hip:[15,151],torso:98,ankN:[11,165],ankF:[7,165], handN:[86,165],handF:[81,165], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"catcow", tempo:[520,520,520,520], name:"Cat-cow",
@@ -697,10 +697,10 @@ var EXERCISES = [
   changed:"The pelvis now rocks between an arched and a tucked position under planted hands, which is what the movement looks like from the side. The torso here is one rigid segment, so it cannot round a spine; tilting the pelvis under a fixed shoulder is the honest version of the same motion. It used to share the HINGE pose and looked like a standing bend.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[38,140],torso:70, ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:1, elbowSign:-1},
-    {hip:[36,132],torso:87, ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:1, elbowSign:-1},
-    {hip:[37,124],torso:100,ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:1, elbowSign:-1},
-    {hip:[36,132],torso:87, ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:1, elbowSign:-1}
+    {hip:[38,140],torso:70, ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:-1, elbowSign:1},
+    {hip:[36,132],torso:87, ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:-1, elbowSign:1},
+    {hip:[37,124],torso:100,ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:-1, elbowSign:1},
+    {hip:[36,132],torso:87, ankN:[16,161],ankF:[10,162], handN:[94,156],handF:[86,158], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"worldsgreatest", tempo:[500,500,500,500], name:"World\'s greatest stretch",
@@ -714,15 +714,15 @@ var EXERCISES = [
     {hip:[48,131],torso:70,ankN:[80,163],ankF:[16,158], handN:[74,152],handF:[74,116], elbowSign:1}
   ]},
 
-{ id:"pigeon", tempo:[600,900,900,600], name:"Pigeon / figure-4",
+{ id:"pigeon", tempo:[700,700,600,400], name:"Pigeon / figure-4",
   real:"Front shin across the body, back leg long behind, hips square to the front. Sink the hips toward the floor and fold forward only as far as the glute lets you. If the front knee complains, bring the shin closer to parallel with your hips.",
-  changed:"The front shin now sits across the body with the rear leg long behind and the torso folding over it, rather than sharing the seated SITROT pose with the 90/90.",
+  changed:"The front shin sits across the body with its knee forward on the floor, the rear leg long behind, and the torso folds down over it. It used to share the seated SITROT pose with the 90/90, and then bent both knees the wrong way.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[54,146],torso:44,ankN:[24,158],ankF:[96,160], handN:[80,156],handF:[74,158], kneeSign:1, elbowSign:1},
-    {hip:[54,148],torso:54,ankN:[24,158],ankF:[96,160], handN:[84,158],handF:[78,160], kneeSign:1, elbowSign:1},
-    {hip:[54,150],torso:62,ankN:[24,158],ankF:[96,160], handN:[88,160],handF:[82,162], kneeSign:1, elbowSign:1},
-    {hip:[54,148],torso:54,ankN:[24,158],ankF:[96,160], handN:[84,158],handF:[78,160], kneeSign:1, elbowSign:1}
+    {hip:[56,156],torso:25,ankN:[55,165],ankF:[-6,164], handN:[82,163],handF:[77,163], kneeSign:-1, elbowSign:1},
+    {hip:[56,157],torso:62,ankN:[55,165],ankF:[-6,164], handN:[116,165],handF:[111,165], kneeSign:-1, elbowSign:1},
+    {hip:[56,158],torso:66,ankN:[55,165],ankF:[-6,164], handN:[118,165],handF:[113,165], kneeSign:-1, elbowSign:1},
+    {hip:[56,157],torso:62,ankN:[55,165],ankF:[-6,164], handN:[116,165],handF:[111,165], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"nine0", tempo:[560,560,560,560], name:"90/90 hip mobility",
@@ -741,10 +741,10 @@ var EXERCISES = [
   changed:"It now rotates from a quadruped base with one hand behind the head and the hips locked, so the rotation reads as thoracic. It used to share the standing TWIST pose where the hips turned too.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[72,140], kneeSign:1, elbowSign:-1},
-    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[78,120], kneeSign:1, elbowSign:-1},
-    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[80,100], kneeSign:1, elbowSign:-1},
-    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[78,120], kneeSign:1, elbowSign:-1}
+    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[72,140], kneeSign:-1, elbowSign:1},
+    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[78,120], kneeSign:-1, elbowSign:1},
+    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[80,100], kneeSign:-1, elbowSign:1},
+    {hip:[36,132],torso:82,ankN:[16,160],ankF:[10,161], handN:[92,158],handF:[78,120], kneeSign:-1, elbowSign:1}
   ]},
 
 // The arm keys turn the same way all round, so found from the paths the side
@@ -914,15 +914,15 @@ var EXERCISES = [
     {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[94,80], handF:[88,82], elbowSign:1}
   ]},
 
-{ id:"curl_reverse", tempo:[420,420,520,520], name:"Reverse barbell curl",
+{ id:"curl_reverse", tempo:[400,400,700,700], name:"Reverse barbell curl",
   real:"A barbell curled with the hands facing DOWN. Same pinned elbows as any curl, but the pronated grip takes the biceps out of their strongest position and loads the forearm extensors and the brachioradialis instead. It will feel weak compared to a normal curl; that is the point, so go lighter.",
-  changed:"New. The joints move the way any curl does, because they do: what makes this a different exercise is the grip and the bar, which the rig says with the implement rather than by inventing a different arc.",
+  changed:"New. The joints move the way any curl does, because they do: what makes this a different exercise is the grip and the bar, which the rig says with the implement rather than by inventing a different arc. It starts from straight arms with the upper arms still, and lowers slower than it lifts.",
   equip:"barbell", active:"arms",
   frames:[
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[60,112],handF:[54,111], elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[71,84], handF:[65,83],  elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[70,98], handF:[64,97],  elbowSign:1}
+    {hip:[55,105.4],torso:2,ankN:[56,163],ankF:[50,163], armN:[178,176]},
+    {hip:[55,105.4],torso:2,ankN:[56,163],ankF:[50,163], armN:[176,92]},
+    {hip:[55,105.4],torso:2,ankN:[56,163],ankF:[50,163], armN:[170,40]},
+    {hip:[55,105.4],torso:2,ankN:[56,163],ankF:[50,163], armN:[176,92]}
   ]},
 
 { id:"farmerscarry", tempo:[340,340,340,340], name:"Farmer\'s carry",
@@ -938,71 +938,73 @@ var EXERCISES = [
 
 { id:"pushup", tempo:[480,480,380,380], name:"Push-up",
   real:"Hands under the shoulders, body one rigid line from heel to head. Lower until the chest is a fist off the floor with the elbows tracking back at about forty-five degrees, not flared to the sides, then press away. The hips do not sag or pike.",
-  changed:"The hands are pinned to the floor and the BODY travels, which is the movement. The old pose swung the arms while the torso stayed put.",
+  changed:"The hands are pinned to the floor and the BODY travels, pivoting on the toes in one straight line from heel to head, with the arms locked out at the top and the elbows back beside the ribs at the bottom. It used to swing the arms while the torso stayed put, then bent the knees and elbows the wrong way and piked the hips.",
   equip:null, active:"arms", floor:true,
   frames:[
-    {hip:[52,126],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
-    {hip:[52,133],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
-    {hip:[52,140],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
-    {hip:[52,133],torso:92,ankN:[6,161],ankF:[2,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1}
+    {hip:[58.9,137.4],torso:65.9,ankN:[6,161],ankF:[1,161], footRot:20, handN:[91,163],handF:[85,163], kneeSign:-1, elbowSign:1},
+    {hip:[61.9,145.9],torso:74.9,ankN:[6,161],ankF:[1,161], footRot:20, handN:[91,163],handF:[85,163], kneeSign:-1, elbowSign:1, armScaleN:0.9, armScaleF:0.9},
+    {hip:[63.5,154.1],torso:83.1,ankN:[6,161],ankF:[1,161], footRot:20, handN:[91,163],handF:[85,163], kneeSign:-1, elbowSign:1, armScaleN:0.75, armScaleF:0.75},
+    {hip:[61.9,145.9],torso:74.9,ankN:[6,161],ankF:[1,161], footRot:20, handN:[91,163],handF:[85,163], kneeSign:-1, elbowSign:1, armScaleN:0.9, armScaleF:0.9}
   ]},
 
 { id:"plank", tempo:[420,900,900,420], name:"Plank",
   real:"Forearms flat on the floor, elbows under the shoulders, body one line from heel to head. Squeeze the glutes and pull the ribs down so the lower back does not sag. It is a hold, so nothing should be moving except your breathing.",
-  changed:"It is on the forearms with the elbows under the shoulders, and it holds instead of cycling. The old pose was a generic straight-body shape that could have been anything.",
+  changed:"It rests on the forearms, flat on the floor with the elbows right under the shoulders, and the legs are straight. It used to prop itself on a strut under the face with the knees bent the wrong way.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[44,137],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1},
-    {hip:[44,138],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1},
-    {hip:[44,138],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1},
-    {hip:[44,137],torso:92,ankN:[4,163],ankF:[0,162], handN:[97,157],handF:[89,157], kneeSign:1, elbowSign:-1}
+    {hip:[60.5,150.4],torso:77.4,ankN:[4,163],ankF:[-1,163], handN:[113,164],handF:[107,164], kneeSign:-1, elbowSign:1},
+    {hip:[60.5,150.9],torso:77.4,ankN:[4,163],ankF:[-1,163], handN:[113,164],handF:[107,164], kneeSign:-1, elbowSign:1},
+    {hip:[60.5,150.9],torso:77.4,ankN:[4,163],ankF:[-1,163], handN:[113,164],handF:[107,164], kneeSign:-1, elbowSign:1},
+    {hip:[60.5,150.4],torso:77.4,ankN:[4,163],ankF:[-1,163], handN:[113,164],handF:[107,164], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"mtnclimb", tempo:[240,240,240,240], name:"Mountain climbers",
   real:"Hold a push-up top position and drive the knees to the chest one at a time. The hips stay low and level: as soon as they pike up toward the ceiling it becomes a hip flexor exercise and the core stops working.",
-  changed:"The knees now drive alternately toward the chest from a held plank, rather than the whole body cycling. Which side is working is the movement.",
+  changed:"The knees drive alternately toward the chest from a straight-armed plank, the foot leaving the floor. It used to bend the knee backwards and down behind the hip, so it read as kneeling.",
   equip:null, active:"legs", floor:true,
   frames:[
-    {hip:[50,128],torso:92,ankN:[8,161],ankF:[4,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
-    {hip:[50,128],torso:92,ankN:[58,150],ankF:[4,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
-    {hip:[50,128],torso:92,ankN:[8,161],ankF:[4,160], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1},
-    {hip:[50,128],torso:92,ankN:[8,161],ankF:[54,149], handN:[94,163],handF:[86,163], kneeSign:1, elbowSign:-1}
+    {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    {hip:[60.9,137.4],torso:65.9,ankN:[56,153],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[3,161], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1},
+    {hip:[60.9,137.4],torso:65.9,ankN:[8,161],ankF:[51,153], footRot:20, handN:[93,163],handF:[87,163], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"burpee", tempo:[300,260,300,240,260,300,340], name:"Burpee",
+{ id:"burpee", tempo:[300,260,240,300,220,280,300,340], name:"Burpee",
   real:"Stand, drop the hands to the floor, kick the feet back to a plank, snap them in again, then jump and land soft. The plank is the bit people skip: the hips should reach a straight line before the feet come back, or it turns into a squat thrust with extra steps.",
-  changed:"All five positions are there in order, including the plank and the jump. The old pose was a two-frame crouch that showed neither. The arms swing forward and up on the way out of the squat rather than folding through the shoulder, which is both what happens and the only path the joint can actually take.",
+  changed:"All five positions are there in order, and the plank is a real one, straight from heel to head on locked arms and held for a moment before the feet come back. The jump reaches full extension. The old pose was a two-frame crouch that showed neither, and then bent the elbows the wrong way and flashed a crawl for the plank.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[55,107],torso:4, ankN:[60,163],ankF:[50,163], handN:[59,111],handF:[53,111], kneeSign:-1, elbowSign:-1},
-    {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
-    {hip:[46,136],torso:92,ankN:[-5,161],ankF:[-10,160],handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
-    {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:-1},
-    {hip:[55,112],torso:8, ankN:[60,163],ankF:[50,163], handN:[78,100],handF:[72,102], kneeSign:-1, elbowSign:-1},
-    {hip:[55,96], torso:2, ankN:[60,152],ankF:[50,151], handN:[58,26], handF:[52,26],  kneeSign:-1, elbowSign:-1},
-    {hip:[55,110],torso:6, ankN:[60,163],ankF:[50,163], handN:[74,100],handF:[68,102], kneeSign:-1, elbowSign:-1}
+    {hip:[58,105.5],torso:4, ankN:[60,163],ankF:[50,163], handN:[62,110],handF:[56,110], kneeSign:-1, elbowSign:1},
+    {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:1},
+    {hip:[47.9,137.4],torso:65.9,ankN:[-5,161],ankF:[-10,161], footRot:20, handN:[80,163],handF:[74,163], kneeSign:-1, elbowSign:1},
+    {hip:[47.9,137.4],torso:65.9,ankN:[-5,161],ankF:[-10,161], footRot:20, handN:[80,163],handF:[74,163], kneeSign:-1, elbowSign:1},
+    {hip:[50,145],torso:60,ankN:[60,163],ankF:[50,163], handN:[80,163],handF:[72,163], kneeSign:-1, elbowSign:1},
+    {hip:[55,112],torso:8, ankN:[60,163],ankF:[50,163], handN:[78,100],handF:[72,102], kneeSign:-1, elbowSign:1},
+    {hip:[55,95], torso:2, ankN:[56,152.8],ankF:[50,152.8], handN:[60,24],handF:[54,24], kneeSign:-1, elbowSign:1},
+    {hip:[55,110],torso:6, ankN:[60,163],ankF:[50,163], handN:[74,100],handF:[68,102], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"deadbug", tempo:[760,700,760,700], name:"Dead bug", flag:true,
   real:"Lying flat on the back. Opposite arm and leg extend away long and low while the other pair holds a 90/90 tabletop, then it alternates. The lower back stays pinned throughout.",
-  changed:"Now genuinely alternates diagonal pairs with the body flat on the floor: one side holds tabletop (thigh vertical, shin horizontal) while the opposite arm and leg reach out long and low.",
+  changed:"Now genuinely alternates diagonal pairs with the body flat on the floor: one side holds tabletop (thigh vertical, shin horizontal) while the opposite arm and leg reach out long and low. It used to reach with the arm and leg of the same side.",
   equip:null, active:null, floor:true,
   frames:[
     {hip:[80,158],torso:270, ankN:[109,129],ankF:[104,126], armN:[0,0],armF:[0,0], kneeSign:-1},
-    {hip:[80,158],torso:270, ankN:[136,154],ankF:[104,126], armN:[284,284],armF:[0,0], kneeSign:-1},
+    {hip:[80,158],torso:270, ankN:[136,154],ankF:[104,126], armN:[0,0],armF:[284,284], kneeSign:-1},
     {hip:[80,158],torso:270, ankN:[109,129],ankF:[104,126], armN:[0,0],armF:[0,0], kneeSign:-1},
-    {hip:[80,158],torso:270, ankN:[109,129],ankF:[131,151], armN:[0,0],armF:[284,284], kneeSign:-1}
+    {hip:[80,158],torso:270, ankN:[109,129],ankF:[131,151], armN:[284,284],armF:[0,0], kneeSign:-1}
   ]},
 
-{ id:"jabcross", tempo:[170,240,170,240], name:"Jab-cross combo", flag:true,
+{ id:"jabcross", tempo:[170,150,170,170,900], name:"Jab-cross combo", flag:true,
   real:"Staggered stance, lead foot forward, rear foot back and turned out. The jab fires from the lead hand while the rear hand guards the chin; the cross then fires from the rear hand with the hips and rear shoulder rotating through. The guard hand never drops.",
-  changed:"The jab and cross were using identical arm angles, so only the limb differed and both punches looked the same. The cross now reaches further, rotates the torso more than twice as far, drives the hip forward and lifts the rear heel, which is what actually separates it from a jab.",
+  changed:"The jab and cross were using identical arm angles, so only the limb differed and both punches looked the same. The cross now reaches further, rotates the torso more than twice as far, drives the hip forward and lifts the rear heel. The guard sits at the chin, each punch snaps back faster than it went out, and the combo resets in guard before the next one.",
   equip:null, active:"armN",
   frames:[
-    {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
-    {hip:[56,112],torso:10,ankN:[70,163],ankF:[44,163], armN:[95,92],  armF:[172,15]},
-    {hip:[55,112],torso:8, ankN:[70,163],ankF:[44,163], armN:[172,15], armF:[172,15]},
-    {hip:[60,111],torso:20,ankN:[70,163],ankF:[46,158], armN:[168,20], armF:[88,86]}
+    {hip:[55,109],torso:8, ankN:[70,163],ankF:[44,163], armN:[140,348], armF:[150,352]},
+    {hip:[56,109],torso:10,ankN:[70,163],ankF:[44,163], armN:[95,92],  armF:[150,352]},
+    {hip:[55,109],torso:8, ankN:[70,163],ankF:[44,163], armN:[140,348], armF:[150,352]},
+    {hip:[60,108],torso:18,ankN:[70,163],ankF:[46,159], armN:[140,348], armF:[88,86]},
+    {hip:[55,109],torso:8, ankN:[70,163],ankF:[44,163], armN:[140,348], armF:[150,352]}
   ]}
 ];
 
@@ -1410,10 +1412,10 @@ var FRONTS = {
   // over its foot rather than caving inward is what this view is worth having
   // for, and the legs swap roles across the four frames because it walks.
   lunge_walk:[
-    {hipY:116,footL:[54,150],footR:[80,163],handL:[52,148],handR:[88,148]},
-    {hipY:128,footL:[52,144],footR:[80,163],handL:[52,160],handR:[88,160]},
-    {hipY:116,footL:[58,158],footR:[80,163],handL:[52,148],handR:[88,148]},
-    {hipY:128,footL:[56,163],footR:[82,146],handL:[52,160],handR:[88,160]}],
+    {hipY:131,footL:[60,163],footR:[80,163],kneeL:[60.5,160],kneeR:[79.5,134],handL:[52,137],handR:[88,137]},
+    {hipY:107,footL:[60,150],footR:[80,163],kneeL:[60.5,127],kneeR:[79.5,134.7],handL:[52,113],handR:[88,113]},
+    {hipY:131,footL:[60,163],footR:[80,163],kneeL:[60.5,134],kneeR:[79.5,160],handL:[52,137],handR:[88,137]},
+    {hipY:107,footL:[60,163],footR:[80,150],kneeL:[60.5,134.7],kneeR:[79.5,127],handL:[52,113],handR:[88,113]}],
 
   // Glute bridge seen from ABOVE (frontPlan): flat on your back, so the frontal
   // plane faces the ceiling. The hips rising travel toward the camera and move
@@ -1476,54 +1478,41 @@ var FRONTS = {
     {hipY:134,footL:[61,163],footR:[79,163],kneeL:[60,154],kneeR:[80,154],handL:[63,114],handR:[77,114],elbL:[49,120],elbR:[91,120]},
     {hipY:134,footL:[61,163],footR:[79,163],kneeL:[60,154],kneeR:[80,154],handL:[63,114],handR:[77,114],elbL:[49,120],elbR:[91,120]}],
 
-  // Dead bug from above: opposite arm and leg reach away while the other pair
-  // holds tabletop. Which diagonal is working is only visible from here.
-  deadbug:[
-    {hipY:150,torsoScale:0.5,footL:[56,120],footR:[84,120],kneeL:[54,134],kneeR:[86,134],
-     handL:[52,108],handR:[88,108],elbL:[46,124],elbR:[94,124]},
-    {hipY:150,torsoScale:0.5,footL:[58,96], footR:[84,120],kneeL:[56,122],kneeR:[86,134],
-     handL:[52,108],handR:[92,146],elbL:[46,124],elbR:[96,130]},
-    {hipY:150,torsoScale:0.5,footL:[56,120],footR:[84,120],kneeL:[54,134],kneeR:[86,134],
-     handL:[52,108],handR:[88,108],elbL:[46,124],elbR:[94,124]},
-    {hipY:150,torsoScale:0.5,footL:[56,120],footR:[82,96], kneeL:[54,134],kneeR:[84,122],
-     handL:[48,146],handR:[88,108],elbL:[44,130],elbR:[94,124]}],
-
-  // Floor work seen from ABOVE (frontPlan). Hand and foot width is the whole
-  // point here: a push-up with the hands too wide, or a plank with the elbows
-  // outside the shoulders, is the fault you cannot see from the side.
-  pushup:[
-    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
-    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[32,118],elbR:[108,118]},
-    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[28,124],elbR:[112,124]},
-    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[32,118],elbR:[108,118]}],
-
-  plank:[
-    {hipY:132,footL:[62,178],footR:[78,178],kneeL:[61,157],kneeR:[79,157],
-     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]},
-    {hipY:133,footL:[62,178],footR:[78,178],kneeL:[61,158],kneeR:[79,158],
-     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]},
-    {hipY:133,footL:[62,178],footR:[78,178],kneeL:[61,158],kneeR:[79,158],
-     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]},
-    {hipY:132,footL:[62,178],footR:[78,178],kneeL:[61,157],kneeR:[79,157],
-     handL:[58,92],handR:[82,92],elbL:[54,110],elbR:[86,110]}],
-
-  // Which knee is driving is only visible from here.
-  mtnclimb:[
-    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
-    {hipY:132,footL:[64,146],footR:[78,176],kneeL:[62,140],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
-    {hipY:132,footL:[62,176],footR:[78,176],kneeL:[61,156],kneeR:[79,156],
-     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]},
-    {hipY:132,footL:[62,176],footR:[76,146],kneeL:[61,156],kneeR:[78,140],
-     handL:[42,104],handR:[98,104],elbL:[40,112],elbR:[100,112]}],
-
 // Every other front view is DERIVED from the side frames. See frontFromSide().
 };
+// Floor work seen from ABOVE (frontPlan). Hand and foot width is the whole
+// point here: a push-up with the hands too wide, or a plank with the elbows
+// outside the shoulders, is the fault you cannot see from the side. Face down,
+// the side view's near limbs are L. The push-up's hands sit a little wider than
+// the shoulders and stay put while the shoulders slide past them, the elbows
+// going back at about 45 degrees rather than out in a T. The plank's forearms
+// run forward, parallel, from elbows under the shoulders. Face up, the dead
+// bug's near limbs are R: the near leg reaches with the far arm.
+(function(){
+  function ext(a,b){ var o={}, k; for(k in a) o[k]=a[k]; for(k in b) o[k]=b[k]; return o; }
+  var top={hipY:128,torsoScale:0.91,footL:[62,181],footR:[78,181],kneeL:[61.5,154.5],kneeR:[78.5,154.5],
+    handL:[51,96],handR:[89,96],elbL:[53,97.5],elbR:[87,97.5],armScaleL:0.25,armScaleR:0.25};
+  var mid=ext(top,{hipY:125,torsoScale:0.966,kneeL:[61.5,153],kneeR:[78.5,153],elbL:[47,101],elbR:[93,101],armScaleL:0.8,armScaleR:0.8});
+  var bot=ext(top,{hipY:123.4,torsoScale:0.99,kneeL:[61.5,152],kneeR:[78.5,152],elbL:[42,104],elbR:[98,104],armScaleL:1,armScaleR:1});
+  FRONTS.pushup=[top,mid,bot,mid];
+  var pl={hipY:124,torsoScale:0.976,footL:[62,180.5],footR:[78,180.5],kneeL:[61.5,152],kneeR:[78.5,152],
+    handL:[54,72],handR:[86,72],elbL:[54,91.5],elbR:[86,91.5]};
+  FRONTS.plank=[pl,ext(pl,{hipY:124.6}),ext(pl,{hipY:124.6}),pl];
+  // Which knee is driving is only visible from here: it travels up toward the
+  // chest, as far as the side view's.
+  FRONTS.mtnclimb=[top,ext(top,{footL:[63,133],kneeL:[62,104.5]}),top,ext(top,{footR:[77,133],kneeR:[78,104.5]})];
+  var db={hipY:104,footL:[61,133],footR:[79,133],kneeL:[61,106],kneeR:[79,106],handL:[54,72],handR:[86,72],armScaleL:0.15,armScaleR:0.15};
+  FRONTS.deadbug=[db,ext(db,{footR:[78,161],kneeR:[78.5,133],handL:[54,31],elbL:[54,49.5],armScaleL:1}),
+    db,ext(db,{footL:[62,161],kneeL:[61.5,133],handR:[86,31],elbR:[86,49.5],armScaleR:1})];
+  // Drawn 5 higher than the side view's floor plane puts them, so the feet
+  // stay inside the panel, which ends at 186 (a plan view has no ground).
+  ['pushup','plank','mtnclimb'].forEach(function(id){ FRONTS[id]=FRONTS[id].map(function(f){
+    var o=ext(f,{hipY:f.hipY-5}); for(var k in o) if(o[k] instanceof Array) o[k]=[o[k][0],o[k][1]-5]; return o; }); });
+  // The combo resets in guard (a fifth frame); the rear foot pivots on its
+  // ball on the cross rather than leaving the floor.
+  var j=FRONTS.jabcross; j[3].footL=[58,162]; j[3].kneeL=[59,136]; j.push(j[0]);
+  j.forEach(function(f,i){ f.hipY=i===3?108:109; });
+})();
 
 // A hinge or a squat bends front-to-back, so its front view is that same
 // movement projected: joint heights are exactly the side view's, the torso
