@@ -661,12 +661,12 @@ var EXERCISES = [
 { id:"jumpingjack", tempo:[240,240,240,240], name:"Jumping jacks",
   real:"Feet jump out wide as the arms sweep overhead, then both come back together. Land on the balls of the feet with soft knees. It is a warm-up movement, so rhythm matters more than height.",
   changed:"The arms and legs now open and close together, which is the whole movement and the one thing the shared JUMP pose could not do.",
-  equip:null, active:null, handPolar:true, frontW:136, still:2,
+  equip:null, active:null, handPolar:'front', frontW:136, still:2,
   frames:[
     {hip:[56,105.5],torso:2,ankN:[58,163],ankF:[53,163], handN:[57,111],handF:[52,111], armScaleN:1,   armScaleF:1},
-    {hip:[55,102],  torso:2,ankN:[58,158],ankF:[53,158], handN:[56.2,69.5], handF:[51.2,69.5],  armScaleN:0.06,armScaleF:0.06},
+    {hip:[55,102],  torso:2,ankN:[58,158],ankF:[53,158], handN:[58.6,68], handF:[53.6,68],  armScaleN:0.06,armScaleF:0.06},
     {hip:[55,109],  torso:2,ankN:[58,163],ankF:[53,163], handN:[58,36], handF:[53,36],  armScaleN:1,   armScaleF:1},
-    {hip:[55,102],  torso:2,ankN:[58,158],ankF:[53,158], handN:[56.2,69.5], handF:[51.2,69.5],  armScaleN:0.06,armScaleF:0.06}
+    {hip:[55,102],  torso:2,ankN:[58,158],ankF:[53,158], handN:[58.6,68], handF:[53.6,68],  armScaleN:0.06,armScaleF:0.06}
   ]},
 
 { id:"highknees", tempo:[200,200,200,200], name:"High knees",
@@ -704,13 +704,13 @@ var EXERCISES = [
 
 { id:"couchstretch", tempo:[700,700,1600,700], name:"Couch stretch",
   real:"Same half-kneeling shape but the back foot is up against a wall or couch, so the quad is stretched at the knee as well as the hip. Tuck the pelvis and come upright only as far as you can hold without the lower back arching. It is brutal; ease into it.",
-  changed:"The rear shin is now vertical against a wall behind, which is the entire difference from a plain hip flexor stretch. Both used to share one KNEEL pose.",
+  changed:"The rear foot now rests up a wall behind, with the knee a little way out from it so the shin leans back against the wall, the usual way in before the knee goes right into the corner. The foot on the wall is the entire difference from a plain hip flexor stretch. Both used to share one KNEEL pose.",
   equip:null, active:null, stops:[0,2,3], still:2, props:[[18,104,7,66]],
   frames:[
-    {hip:[51,135],torso:14,ankN:[80,163],ankF:[27,134], footF:-90, handN:[66,128],handF:[58,130], kneeSign:-1, elbowSign:1},
-    {hip:[52,133],torso:7, ankN:[80,163],ankF:[27,134], footF:-90, handN:[66,127],handF:[58,129], kneeSign:-1, elbowSign:1},
-    {hip:[54,132],torso:1, ankN:[80,163],ankF:[27,134], footF:-90, handN:[65,126],handF:[57,128], kneeSign:-1, elbowSign:1},
-    {hip:[54,132],torso:1, ankN:[80,163],ankF:[27,134], footF:-90, handN:[65,126],handF:[57,128], kneeSign:-1, elbowSign:1}
+    {hip:[51,135],torso:14,ankN:[80,163],ankF:[25,134], footF:-90, handN:[66,128],handF:[58,130], kneeSign:-1, elbowSign:1},
+    {hip:[52,133],torso:7, ankN:[80,163],ankF:[25,134], footF:-90, handN:[66,127],handF:[58,129], kneeSign:-1, elbowSign:1},
+    {hip:[54,132],torso:1, ankN:[80,163],ankF:[25,134], footF:-90, handN:[65,126],handF:[57,128], kneeSign:-1, elbowSign:1},
+    {hip:[54,132],torso:1, ankN:[80,163],ankF:[25,134], footF:-90, handN:[65,126],handF:[57,128], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"childspose", tempo:[900,700,900,700], name:"Child\'s pose",
@@ -928,7 +928,7 @@ var EXERCISES = [
      armScaleN:1,   armScaleF:1,   elbowSign:1},
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,101],handF:[51,100],
      armScaleN:0.74,armScaleF:0.74,elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,81], handF:[51,80],
+    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,82], handF:[51,82],
      armScaleN:0.24,armScaleF:0.24,elbowSign:1},
     {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,101],handF:[51,100],
      armScaleN:0.74,armScaleF:0.74,elbowSign:1}
@@ -1347,7 +1347,7 @@ var FRONTS = {
     {hipY:133,footL:[61,164],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[52,129],handR:[88,129]},
     {hipY:133,footL:[61,164],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[52,129],handR:[88,129]}],
 
-  // Couch stretch from the front: same shape, but the rear shin is vertical up
+  // Couch stretch from the front: same shape, but the rear shin leans back up
   // a wall behind, so the rear foot sits high on screen, right above its knee,
   // rather than on the floor.
   couchstretch:[

@@ -719,6 +719,17 @@ EX.forEach(function(ex){
       S[0].handN.y-S[T].handN.y>40,'travel '+r(S[0].handN.y-S[T].handN.y));
     check(ex.id,'from the side the feet stay together', S.every(function(x){ return Math.abs(x.ankN.x-x.ankF.x)<=6; }),
       'stance '+S.map(function(x){ return r(x.ankN.x-x.ankF.x); }).join(','));
+    // From the side the arms move in the plane facing the camera: straight,
+    // foreshortened, the hand on the shoulder's vertical line. Swept as an
+    // angle about the shoulder (handPolar) through the end-on keyframe, the
+    // angle passed through forward: a curl at the chest on the way out and a
+    // bent-arm front raise on the way up.
+    var jw=0, jwAt='';
+    for(var q=0;q<96;q++){ var js=rig.solve(rig.poseAt(ex,q/96));
+      [['sh','elbN','handN','armScaleN'],['shF','elbF','handF','armScaleF']].forEach(function(j){ if(js[j[3]]<0.3) return;
+        var off=Math.max(Math.abs(js[j[2]].x-js[j[0]].x)-4,140-angAt(js[j[0]],js[j[1]],js[j[2]]));
+        if(off>jw){ jw=off; jwAt=j[1]+' at u='+r(q/96)+': hand '+r(js[j[2]].x-js[j[0]].x)+' ahead of the shoulder, elbow '+r(angAt(js[j[0]],js[j[1]],js[j[2]])); } }); }
+    check(ex.id,'from the side the arms stay straight and over the shoulder, no front raise',jw<=0,jwAt);
     check(ex.id+' front','the legs open and close', (JF[jT].footR.x-JF[jT].footL.x)-(JF[0].footR.x-JF[0].footL.x)>20,
       'stance '+r(JF[0].footR.x-JF[0].footL.x)+' -> '+r(JF[jT].footR.x-JF[jT].footL.x));
     check(ex.id+' front','arms and legs move together, not in sequence',
@@ -737,9 +748,14 @@ EX.forEach(function(ex){
   }
   if(ex.id==='couchstretch'){
     var wall=ex.props&&ex.props[0];
-    check(ex.id,'the rear shin is up against the wall, which is the whole difference',
+    check(ex.id,'the rear foot is up against the wall, which is the whole difference',
       !!wall && ex.frames[0].ankF[1]<GROUND-30 && Math.abs(ex.frames[0].ankF[0]-(wall[0]+wall[2]))<10,
       'rear foot '+JSON.stringify(ex.frames[0].ankF)+' wall '+JSON.stringify(wall));
+    // The top of the rear foot lies on the wall. With the ankle 2 off it, the
+    // foot (drawn 1 to 6 beside its ankle) stood 3 clear of the wall, a small
+    // block hanging beside the end of the shin.
+    var gap=Math.max.apply(null,S.map(function(x){ return Math.min.apply(null,rig.footAt(x.ankF,x.footF).map(function(q){ return q.x; }))-(wall[0]+wall[2]); }));
+    check(ex.id,'the top of the rear foot lies on the wall',Math.abs(gap)<=1.5,'foot '+r(gap)+' off the wall');
   }
   if(ex.id==='ankle_mob'){
     var w=ex.props&&ex.props[0];

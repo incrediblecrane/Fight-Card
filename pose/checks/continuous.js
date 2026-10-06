@@ -116,6 +116,16 @@ var EDGE=[
   {id:'edge polar sweep',handPolar:true,frames:[
     {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[76,104],handF:[71,104]},
     {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[63,34],handF:[58,34]}]},
+  // handPolar:'front' sweeps the hands round the shoulders in the front view
+  // only: from the side a jack's arm passes end on through the shoulder, and
+  // an angle there has no direction, so the side hands blend in a line.
+  {id:'edge polar front only',handPolar:'front',frames:[
+    {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[57,111],handF:[52,111],armScaleN:1,armScaleF:1},
+    {hip:[55,102],torso:2,ankN:[58,158],ankF:[53,158],handN:[58.6,68],handF:[53.6,68],armScaleN:0.06,armScaleF:0.06},
+    {hip:[55,109],torso:2,ankN:[58,163],ankF:[53,163],handN:[58,36],handF:[53,36]}],front:[
+    {hipY:105.5,footL:[62,163],footR:[78,163],handL:[52,110.5],handR:[88,110.5]},
+    {hipY:102,footL:[50,158],footR:[90,158],handL:[14,71],handR:[126,71]},
+    {hipY:109,footL:[42,163],footR:[98,163],handL:[61,35],handR:[79,35]}]},
   // A ball let go of on one keyframe (ballAt) and back in the hands.
   {id:'edge ball',equip:'ball',frames:[
     {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[59,34],handF:[53,36]},
@@ -167,7 +177,7 @@ EX.concat(EDGE).forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id]||shipped(ex);
   parity(ex.id+' side',function(u){ return rig.solve(rig.poseAt(ex,u)); },function(u){ return app.solve(app.poseAt(ax,u)); });
 });
-EX.concat(EDGEFRONT).forEach(function(ex){
+EX.concat(EDGEFRONT,EDGE.filter(function(e){ return e.front; })).forEach(function(ex){
   if(!ex.front) return;
   var ax=app.RIGFRAMES[ex.id]||shipped(ex);
   parity(ex.id+' front',function(u){ return rig.solveFront(rig.frontAt(ex,u)); },function(u){ return app.solveFront(app.frontAt(ax,u)); });
@@ -484,6 +494,11 @@ EX.forEach(function(ex){ ck(ex.id,'rests at the reviewed keyframes (pose/checks/
 // sweeps a straight arm round its shoulder. The rigs listed still fold and
 // print as warnings while they are re-authored; any other rig folding fails,
 // and a listed one that no longer does says so.
+// An arm drawn under 0.3 of its length (armScale: pointing at the camera) is
+// a stub whose bend nobody can see, so its elbow neither sets the baseline
+// nor counts as a fold. Read at a keyframe, it let a visible arm fold mid
+// segment: the jack's side arm is 0.06 long and bent to 76 degrees at the
+// half-raised keyframe, so a curl to 91 on the way there passed.
 var FOLDING={kb_snatch:'front',kb_press:'front',
   sq_jump:'front',boxjump:'front',broadjump:'front',medballslam:'front',thoracic:'front',shadowbox:'front',bagspeed:'front',
   skierg:'side front',pulldown_straight:'front',burpee:'side front',deadbug:'front'};
@@ -491,13 +506,15 @@ var foldWarn=[], foldDone=[];
 function inner(a,b,c){ return ang({x:a.x-b.x,y:a.y-b.y},{x:c.x-b.x,y:c.y-b.y}); }
 EX.concat(EDGE,EDGEFRONT).filter(function(e){ return !/^edge/.test(e.id)||e.handPolar; }).forEach(function(ex){
   var ku=keyAt(ex), n=ku.length, known=(FOLDING[ex.id]||'').split(' ').filter(Boolean);
-  [['side',ex.frames,function(u){ return rig.solve(rig.poseAt(ex,u)); },[['sh','elbN','handN'],['shF','elbF','handF']]],
-   ['front',ex.front,function(u){ return rig.solveFront(rig.frontAt(ex,u)); },[['shL','elbL','handL'],['shR','elbR','handR']]]].forEach(function(v){
+  [['side',ex.frames,function(u){ return rig.solve(rig.poseAt(ex,u)); },[['sh','elbN','handN','armScaleN'],['shF','elbF','handF','armScaleF']]],
+   ['front',ex.front,function(u){ return rig.solveFront(rig.frontAt(ex,u)); },[['shL','elbL','handL','armScaleL'],['shR','elbR','handR','armScaleR']]]].forEach(function(v){
     if(!v[1]) return; var worst=0, where='';
+    function seen(s,j){ return s[j[3]]===undefined||s[j[3]]>=0.3; }
     for(var i=0;i<n;i++){ if(ex.loop==='cut'&&i===n-1) continue;
       var u0=ku[i], u1=i+1<n?ku[i+1]:1, a=v[2](u0), b=v[2](u1-1e-9);
-      v[3].forEach(function(j){ var lo=Math.min(inner(a[j[0]],a[j[1]],a[j[2]]),inner(b[j[0]],b[j[1]],b[j[2]]));
-        for(var q=1;q<40;q++){ var m=v[2](u0+(u1-u0)*q/40), e=lo-15-inner(m[j[0]],m[j[1]],m[j[2]]);
+      v[3].forEach(function(j){ var ends=[a,b].filter(function(s){ return seen(s,j); }).map(function(s){ return inner(s[j[0]],s[j[1]],s[j[2]]); });
+        var lo=ends.length?Math.min.apply(null,ends):180;
+        for(var q=1;q<40;q++){ var m=v[2](u0+(u1-u0)*q/40); if(!seen(m,j)) continue; var e=lo-15-inner(m[j[0]],m[j[1]],m[j[2]]);
           if(e>worst){ worst=e; where=j[1]+' folds to '+r(inner(m[j[0]],m[j[1]],m[j[2]]))+' degrees between keyframes '+i+' and '+((i+1)%n)+', which are at '+r(lo); } } });
     }
     var listed=known.indexOf(v[0])>=0;

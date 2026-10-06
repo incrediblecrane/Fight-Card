@@ -165,6 +165,10 @@ function handOf(f,far){
 // close to the shoulder and the elbow folds to reach it. A rig with
 // handPolar blends each hand as an angle and a reach about its own shoulder
 // instead, so a straight arm sweeps an arc and stays straight.
+// handPolar:'front' does it in the front view only. A jack's arm sweeps in
+// the plane facing the camera, so from the side it passes end on through the
+// shoulder, where an angle has no direction: blended as one, it swung
+// through forward, a curl and then a bent-arm front raise.
 function polarHand(A,B,t,f,key,far){
   if(!f[key]) return;
   var a=handOf(A,far), b=handOf(B,far), sa=shoulderOf(A,far), sb=shoulderOf(B,far), so=shoulderOf(f,far);
@@ -223,7 +227,7 @@ function lerpFrame(A,B,t,ex){
     if((A.armF||B.armF) && fa && fb) f.armF=[lerpAng(fa[0],fb[0],t), lerpAng(fa[1],fb[1],t)];
     else if(f.armN) f.armF=f.armN;
   }
-  if(ex&&ex.handPolar){ polarHand(A,B,t,f,'handN',false); polarHand(A,B,t,f,'handF',true); }
+  if(ex&&ex.handPolar&&ex.handPolar!=='front'){ polarHand(A,B,t,f,'handN',false); polarHand(A,B,t,f,'handF',true); }
   keepBend(A,B,t,f,'handN','armScaleN',false); keepBend(A,B,t,f,'handF','armScaleF',true);
   // A ball let go of (ballAt on a keyframe: on the floor after a slam, at the
   // wall after a throw) travels from the hands to there and back; on a
