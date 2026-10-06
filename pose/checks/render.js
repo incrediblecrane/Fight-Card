@@ -63,12 +63,29 @@ setTimeout(function(){
     var fw=cards[i].querySelector('.figwrap').style.flexGrow;
     if(ex.front&&+fw!==b.w) fails.push(ex.id+': the preview\'s side panel takes '+fw+' of the row, the app '+b.w);
   });
+  // A spine that bows (bow on a frame: the cat-cow) is drawn bent at
+  // mid-spine, one six-point shape, in the preview and the app alike. The
+  // trunk used to be one straight segment, so a cat-cow could only pump its
+  // hips up and down.
+  var app2=new Function('hasOwn',cut2('var RL=','function figureSVG(')+';return {RIGMAP:RIGMAP,rigSVG:rigSVG,rSolve:rSolve,rPoseAt:rPoseAt,rigFor:rigFor};')(function(o,k){ return Object.prototype.hasOwnProperty.call(o,k); });
+  EX.forEach(function(ex,i){ if(!ex.frames.some(function(f){ return f.bow; })||!cards[i]) return;
+    var k=ex.frames.reduce(function(a,f,j){ return Math.abs(f.bow||0)>Math.abs(ex.frames[a].bow||0)?j:a; },0), t=rig2(ex,k);
+    function bent(svg){ return [].some.call(svg.querySelectorAll('polygon'),function(p){ var q=p.getAttribute('points').trim().split(/\s+/); return q.length===6; }); }
+    var div=d.createElement('div'); div.innerHTML=app2.rigSVG(exOf[ex.id],t);
+    var a=app2.rSolve(app2.rPoseAt(app2.rigFor(exOf[ex.id]),t));
+    if(!bent(div.querySelector('svg'))) fails.push(ex.id+': the app draws a bowed spine straight');
+    if(Math.abs(Math.hypot(a.mid.x-(a.hip.x+a.sh.x)/2,a.mid.y-(a.hip.y+a.sh.y)/2)-Math.abs(ex.frames[k].bow))>0.01) fails.push(ex.id+': the app\'s mid-spine is not off the line by the bow');
+    if(!bent(cards[i].querySelector('.figwrap svg'))) fails.push(ex.id+': the preview draws a bowed spine straight');
+  });
   // And it has to be still running, not merely to have run once.
   var beat=w.document.querySelector('.figwrap svg polygon');
   var before=beat&&beat.getAttribute('points');
   w.setTimeout(function(){ finish(before, beat); }, 260);
 }, 700);
 
+// Where in the rep (0 to 1) keyframe k falls.
+function rig2(ex,k){ var t=ex.tempo||ex.frames.map(function(){ return 1; }), a=0, tot=t.reduce(function(x,y){ return x+y; },0);
+  for(var i=0;i<k;i++) a+=t[i]; return a/tot; }
 function finish(before, beat){
   var svgs=w.document.querySelectorAll('.figwrap svg');
   var expectSide=EX.length, expectFront=EX.filter(function(e){return e.front;}).length;

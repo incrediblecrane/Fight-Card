@@ -7,6 +7,16 @@ function segPts(A,B,w1,w2){
           [B.x-px*w2/2,B.y-py*w2/2],[B.x+px*w2/2,B.y+py*w2/2]]
     .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
 }
+// A trunk that bows (bow on a frame): one tapered shape bent at mid-spine,
+// its edges mitred there, so it is the same one shape as a straight trunk.
+function spinePts(A,M,B,w1,wm,w2){
+  function nrm(P,Q){ var dx=Q.x-P.x, dy=Q.y-P.y, l=Math.sqrt(dx*dx+dy*dy)||1; return [-dy/l,dx/l]; }
+  var a=nrm(A,M), b=nrm(M,B), m=[a[0]+b[0],a[1]+b[1]], ml=Math.sqrt(m[0]*m[0]+m[1]*m[1])||1;
+  m=[m[0]/ml,m[1]/ml]; var k=wm/2/Math.max(0.5,m[0]*a[0]+m[1]*a[1]);
+  function pt(P,n,w){ return (P.x+n[0]*w).toFixed(1)+','+(P.y+n[1]*w).toFixed(1); }
+  return [pt(A,a,w1/2),pt(M,m,k),pt(B,b,w2/2),pt(B,b,-w2/2),pt(M,m,-k),pt(A,a,-w1/2)].join(' ');
+}
+function bowed(ex){ return ex.frames.some(function(f){ return f.bow!==undefined; }); }
 // The figure always faces +x, so the toe always points +x. This used to be
 // derived from whether the knee was forward of the ankle, which flipped the
 // foot backwards through most of every squat. The foot is the app's: a block
@@ -173,7 +183,7 @@ function update(ex,ref,u){
   setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true,s.footN);
   setLimb('ncut',s.sh,s.elbN,s.handN,[8,6,4.5],false);
   setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
-  R.torso.setAttribute('points',segPts(s.hip,s.sh,13,17));
+  R.torso.setAttribute('points',bowed(ex)?spinePts(s.hip,s.mid,s.sh,13,15,17):segPts(s.hip,s.sh,13,17));
   R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
   R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
   R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));

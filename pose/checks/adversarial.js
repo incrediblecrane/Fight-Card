@@ -13,22 +13,21 @@ EX.forEach(function(ex){
     ck(tag,'thigh length intact', Math.abs(d(s.hip,s.kneeN)-L.THIGH)<0.6,'got '+r(d(s.hip,s.kneeN)));
     ck(tag,'shin length intact', Math.abs(d(s.kneeN,s.ankN)-L.SHIN)<0.6,'got '+r(d(s.kneeN,s.ankN)));
     // armScaleN is projection, not stretching: an arm swinging out of this
-    // plane is drawn short on purpose, so the length it must hold is scaled.
-    var aN=s.armScaleN===undefined?1:s.armScaleN;
-    ck(tag,'upper arm length intact', Math.abs(d(s.sh,s.elbN)-L.UPPER*aN)<0.6,
-      'got '+r(d(s.sh,s.elbN))+' of '+r(L.UPPER*aN));
-    ck(tag,'forearm length intact', Math.abs(d(s.elbN,s.handN)-L.FORE*aN)<0.6,
-      'got '+r(d(s.elbN,s.handN))+' of '+r(L.FORE*aN));
+    // plane is drawn short on purpose (upperN/foreN one segment of it), so the
+    // length each segment must hold is the drawn one (lenN).
+    ck(tag,'upper arm length intact', Math.abs(d(s.sh,s.elbN)-s.lenN[0])<0.6,
+      'got '+r(d(s.sh,s.elbN))+' of '+r(s.lenN[0]));
+    ck(tag,'forearm length intact', Math.abs(d(s.elbN,s.handN)-s.lenN[1])<0.6,
+      'got '+r(d(s.elbN,s.handN))+' of '+r(s.lenN[1]));
     // The far limbs too. Checking only the near ones let a broad-jump
     // take-off draw the far shin 2 units (7%) long through every suite: the
     // far ankle sat 10 behind the near one while the far hip is only 5 behind.
-    var aF=s.armScaleF===undefined?1:s.armScaleF;
     ck(tag,'far thigh length intact', Math.abs(d(s.hipF,s.kneeF)-L.THIGH)<0.6,'got '+r(d(s.hipF,s.kneeF)));
     ck(tag,'far shin length intact', Math.abs(d(s.kneeF,s.ankF)-L.SHIN)<0.6,'got '+r(d(s.kneeF,s.ankF)));
-    ck(tag,'far upper arm length intact', Math.abs(d(s.shF,s.elbF)-L.UPPER*aF)<0.6,
-      'got '+r(d(s.shF,s.elbF))+' of '+r(L.UPPER*aF));
-    ck(tag,'far forearm length intact', Math.abs(d(s.elbF,s.handF)-L.FORE*aF)<0.6,
-      'got '+r(d(s.elbF,s.handF))+' of '+r(L.FORE*aF));
+    ck(tag,'far upper arm length intact', Math.abs(d(s.shF,s.elbF)-s.lenF[0])<0.6,
+      'got '+r(d(s.shF,s.elbF))+' of '+r(s.lenF[0]));
+    ck(tag,'far forearm length intact', Math.abs(d(s.elbF,s.handF)-s.lenF[1])<0.6,
+      'got '+r(d(s.elbF,s.handF))+' of '+r(s.lenF[1]));
     // PROPORTION: 7.5-head canon sanity, head must be small relative to the body.
     ck(tag,'head is not oversized', L.HEAD_R*2 < L.TORSO*0.55,'head dia '+(L.HEAD_R*2)+' vs torso '+L.TORSO);
   });
@@ -185,7 +184,7 @@ EX.forEach(function(ex){
 // are being re-authored (their toes and rear feet need footN and footF), so
 // they print as warnings; any other rig breaking it fails, and a listed rig
 // that comes right says so, so the list only shrinks.
-var FOOTING={catcow:'hover',thoracic:'hover',ankle_mob:'hover',rowerg:'sink'};
+var FOOTING={rowerg:'sink'};
 var footWarn=[], footDone=[];
 function surfaces(ex){ var t=[{x0:-1e9,x1:1e9,y:GROUND,h:1e9}];
   (ex.props||[]).forEach(function(p){ if(!p[5]) t.push({x0:p[0],x1:p[0]+p[2],y:p[1],h:p[3]}); }); return t; }

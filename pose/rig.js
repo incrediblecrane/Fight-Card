@@ -29,7 +29,8 @@ function ik(root,end,l1,l2,sign){
 function solve(f){
   var hip=P(f.hip[0],f.hip[1]);
   var shBase=add(hip,dir(f.torso,L.TORSO));
-  var head=add(shBase,dir(f.torso,L.HEAD_OFF));
+  // nod turns the head off the line of the trunk (positive tucks the chin).
+  var head=add(shBase,dir(f.torso+(f.nod||0),L.HEAD_OFF));
   // A shrug is the one movement with no joint angle behind it: the shoulder
   // girdle rides up the ribcage toward a head that stays put. Every other DOF
   // here is an angle, so without this the figure cannot move at all.
@@ -49,22 +50,39 @@ function solve(f){
   // lateral raise came out as a curl. This is the same mechanism solveFront
   // has for an arm pointing at the camera.
   var aN=f.armScaleN===undefined?1:f.armScaleN, aF=f.armScaleF===undefined?1:f.armScaleF;
+  var lN=armLen(f,false), lF=armLen(f,true);
   var elbN,handN,elbF,handF;
-  if(f.handN){ handN=P(f.handN[0],f.handN[1]); elbN=ik(sh,handN,L.UPPER*aN,L.FORE*aN,es); }
-  else { var an=f.armN||[178,178]; elbN=add(sh,dir(an[0],L.UPPER*aN)); handN=add(elbN,dir(an[1],L.FORE*aN)); }
-  if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,L.UPPER*aF,L.FORE*aF,es); }
-  else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],L.UPPER*aF)); handF=add(elbF,dir(af[1],L.FORE*aF)); }
+  if(f.handN){ handN=P(f.handN[0],f.handN[1]); elbN=ik(sh,handN,lN[0],lN[1],es); }
+  else { var an=f.armN||[178,178]; elbN=add(sh,dir(an[0],lN[0])); handN=add(elbN,dir(an[1],lN[1])); }
+  if(f.handF){ handF=P(f.handF[0],f.handF[1]); elbF=ik(shF,handF,lF[0],lF[1],es); }
+  else { var af=f.armF||f.armN||[178,178]; elbF=add(shF,dir(af[0],lF[0])); handF=add(elbF,dir(af[1],lF[1])); }
+  // The spine bows off the straight line from hip to shoulder (bow, positive
+  // rounding the back, negative arching it), through a point half way along.
+  // The hip and the shoulder stay where the torso angle puts them, so every
+  // check on them still holds; only the drawing of the back changes. One
+  // rigid segment could only pump the hips up and down, which is what the
+  // cat-cow used to be.
+  var bw=f.bow||0, tr=f.torso*Math.PI/180, mid=P((hip.x+sh.x)/2-bw*Math.cos(tr),(hip.y+sh.y)/2-bw*Math.sin(tr));
 
   var o={hip:hip,sh:sh,head:head,hipF:hipF,shF:shF,
     ankN:ankN,ankF:ankF,kneeN:kneeN,kneeF:kneeF,
-    elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,
-    armScaleN:aN,armScaleF:aF,
+    elbN:elbN,handN:handN,elbF:elbF,handF:handF,torso:f.torso,mid:mid,
+    armScaleN:aN,armScaleF:aF,lenN:lN,lenF:lF,
     footN:pitch(f,'N'),footF:pitch(f,'F')};
   // A ball out of the hands (ballAt), and where a skipping rope has turned to.
   if(f.ballAt) o.ball=P(f.ballAt[0],f.ballAt[1]);
   if(f.rope!==undefined) o.rope=f.rope;
   return o;
 }
+// How long an arm's two segments are drawn, [upper arm, forearm]: armScale
+// shortens both alike (an arm swinging toward the camera), and upperN/foreN
+// (upperF/foreF for the far arm) one of them on top of that, for an arm whose
+// upper arm and forearm point different ways out of the picture. At the top
+// of a pull-up the upper arm points out to the side and the forearm straight
+// up, and at the end of a face pull the upper arm is out wide beside the ear:
+// one scale for both put the elbow in front of the face or drew a stub.
+function armLen(f,far){ var k=far?'F':'N', a=f['armScale'+k], u=f['upper'+k], w=f['fore'+k];
+  if(a===undefined) a=1; return [L.UPPER*a*(u===undefined?1:u), L.FORE*a*(w===undefined?1:w)]; }
 // A foot's pitch: its own footN/footF, else footRot, which sets both.
 function pitch(f,k){ var v=f['foot'+k]; return v===undefined?(f.footRot||0):v; }
 // The foot as drawn from the side: a block hinged at the ankle, toe toward +x
@@ -102,7 +120,7 @@ function bellAt(ex,s){
   if(ex.bellUp) return {x:h.x, y:h.y-D, d:P(0,-1)};
   var fx=h.x-s.elbN.x, fy=h.y-s.elbN.y, fl=Math.hypot(fx,fy)||1; fx/=fl; fy/=fl;
   var ax=h.x-s.sh.x, ay=h.y-s.sh.y, al=Math.hypot(ax,ay)||1;
-  var k=ramp(0.88,0.97,al/((L.UPPER+L.FORE)*s.armScaleN));
+  var k=ramp(0.88,0.97,al/(s.lenN[0]+s.lenN[1]));
   var e=Math.atan2(-fx,-fy), r1=((Math.atan2(k*ax/al,(1-k)+k*ay/al)-e)%T+T)%T, r0=T-0.4636;
   var b=Math.max(0,Math.min(1,(Math.acos(Math.max(-1,Math.min(1,-fy)))*180/Math.PI-30)/68));
   var a=e+r0+(r1-r0)*b, len=lerp(11,D,b), d=P(Math.sin(a),Math.cos(a));
@@ -131,7 +149,7 @@ function bellFront(ex,f){
 // A one-handed lift's load names this hand, since the side view draws the
 // implement in the near hand.
 function nearSide(ex){ return ex.frontPlan&&ex.frames&&Math.sin(ex.frames[0].torso*Math.PI/180)>0?'L':'R'; }
-if(typeof module!=='undefined') module.exports={L:L,GROUND:GROUND,ANKLE_Y:ANKLE_Y,STAND_HIP_Y:STAND_HIP_Y,solve:solve,ik:ik,dir:dir,add:add,P:P,footAt:footAt,bellAt:bellAt,bellFront:bellFront,nearSide:nearSide};
+if(typeof module!=='undefined') module.exports={L:L,armLen:armLen,GROUND:GROUND,ANKLE_Y:ANKLE_Y,STAND_HIP_Y:STAND_HIP_Y,solve:solve,ik:ik,dir:dir,add:add,P:P,footAt:footAt,bellAt:bellAt,bellFront:bellFront,nearSide:nearSide};
 
 // ---- continuous interpolation -------------------------------------------
 function lerp(a,b,t){ return a+(b-a)*t; }
@@ -150,9 +168,9 @@ function shoulderOf(f,far){
   return far?add(sh,{x:-5,y:0}):sh;
 }
 function handFromAngles(f,arm,far){
-  var sh=shoulderOf(f,far), a=(far?f.armScaleF:f.armScaleN); if(a===undefined) a=1;
-  var elb=add(sh,dir(arm[0],L.UPPER*a));
-  var h=add(elb,dir(arm[1],L.FORE*a));
+  var sh=shoulderOf(f,far), l=armLen(f,far);
+  var elb=add(sh,dir(arm[0],l[0]));
+  var h=add(elb,dir(arm[1],l[1]));
   return [h.x,h.y];
 }
 // Where a keyframe's hand is, whichever way its arm is given (as solve reads it).
@@ -188,10 +206,11 @@ function polarAt(a,b,sa,sb,so,t){
 // a keyframe sets a scale.
 function keepBend(A,B,t,f,key,sk,far){
   if(!f[key] || (A[sk]===undefined && B[sk]===undefined)) return;
-  function bend(F){ var h=handOf(F,far), s=shoulderOf(F,far); return Math.hypot(h[0]-s.x,h[1]-s.y)/((L.UPPER+L.FORE)*(F[sk]===undefined?1:F[sk])); }
-  var r=lerp(bend(A),bend(B),t), s=shoulderOf(f,far), d=Math.hypot(f[key][0]-s.x,f[key][1]-s.y);
-  if(r>0.05) f[sk]=Math.max(0.06,Math.min(1,d/((L.UPPER+L.FORE)*r)));
+  function bend(F){ var h=handOf(F,far), s=shoulderOf(F,far), l=armLen(F,far); return Math.hypot(h[0]-s.x,h[1]-s.y)/(l[0]+l[1]); }
+  var r=lerp(bend(A),bend(B),t), s=shoulderOf(f,far), d=Math.hypot(f[key][0]-s.x,f[key][1]-s.y), l=armLen(f,far), a=f[sk]===undefined?1:f[sk];
+  if(r>0.05) f[sk]=Math.max(0.06,Math.min(1,d*a/((l[0]+l[1])*r)));
 }
+function seg(F,k){ return F[k]===undefined?1:F[k]; }
 // Blend two keyframes into a valid in-between pose. ex, the rig, carries the
 // options that change how (handPolar).
 function lerpFrame(A,B,t,ex){
@@ -204,7 +223,9 @@ function lerpFrame(A,B,t,ex){
           // limb line instead of jumping across it.
           kneeSign:lerp(A.kneeSign===undefined?-1:A.kneeSign,B.kneeSign===undefined?-1:B.kneeSign,t),
           elbowSign:lerp(A.elbowSign===undefined?1:A.elbowSign,B.elbowSign===undefined?1:B.elbowSign,t),
-          shrug:lerp(A.shrug||0,B.shrug||0,t),
+          shrug:lerp(A.shrug||0,B.shrug||0,t), bow:lerp(A.bow||0,B.bow||0,t), nod:lerp(A.nod||0,B.nod||0,t),
+          upperN:lerp(seg(A,'upperN'),seg(B,'upperN'),t), foreN:lerp(seg(A,'foreN'),seg(B,'foreN'),t),
+          upperF:lerp(seg(A,'upperF'),seg(B,'upperF'),t), foreF:lerp(seg(A,'foreF'),seg(B,'foreF'),t),
           armScaleN:lerp(A.armScaleN===undefined?1:A.armScaleN,B.armScaleN===undefined?1:B.armScaleN,t),
           armScaleF:lerp(A.armScaleF===undefined?1:A.armScaleF,B.armScaleF===undefined?1:B.armScaleF,t),
           footN:lerp(pitch(A,'N'),pitch(B,'N'),t), footF:lerp(pitch(A,'F'),pitch(B,'F'),t) };

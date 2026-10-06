@@ -13,7 +13,7 @@ function straightThroughout(ex){
   var worst=1;
   for(var u=0;u<1;u+=0.01){
     var s=rig.solve(rig.poseAt(ex,u));
-    var max=(L.UPPER+L.FORE)*(s.armScaleN===undefined?1:s.armScaleN);
+    var max=s.lenN[0]+s.lenN[1];
     if(max>0.5) worst=Math.min(worst, Math.hypot(s.handN.x-s.sh.x,s.handN.y-s.sh.y)/max);
   }
   return worst;
@@ -520,6 +520,27 @@ EX.forEach(function(ex){
     check(ex.id,'the torso folds over the slam rather than staying upright', ex.frames[T].torso>40,
       'torso '+ex.frames[T].torso);
   }
+  // The side elbows of three lifts whose upper arm and forearm point
+  // different ways out of the picture, drawn at their own lengths (upperN,
+  // foreN). One scale for the whole arm put the pull-up's elbow in front of
+  // the face at the top, finished the face pull with the elbows up by the
+  // crown, and held the front squat's bar at the mouth.
+  if(ex.id==='pullup'){
+    var pt=S[T], fa=Math.abs(Math.atan2(pt.handN.x-pt.elbN.x,pt.elbN.y-pt.handN.y)*180/Math.PI);
+    check(ex.id,'at the top the elbow is down by the side and the forearm near vertical',pt.elbN.y>pt.sh.y+4 && Math.abs(pt.elbN.x-pt.sh.x)<8 && fa<20,
+      'elbow '+r(pt.elbN.x)+','+r(pt.elbN.y)+' shoulder '+r(pt.sh.x)+','+r(pt.sh.y)+' forearm '+r(fa)+' degrees off vertical');
+  }
+  if(ex.id==='facepull'){
+    var ft=S[T];
+    check(ex.id,'it finishes with the hands at the ears and the elbows out at shoulder height',
+      dist(ft.handN,ft.head)<L.HEAD_R && Math.abs(ft.elbN.y-ft.sh.y)<6 && ft.handN.y<ft.elbN.y-10,
+      'hand '+r(dist(ft.handN,ft.head))+' from the head, elbow '+r(ft.elbN.y-ft.sh.y)+' below the shoulder');
+  }
+  if(ex.id==='frontsquat'){
+    check(ex.id,'the bar rests on the front of the shoulders, below the chin',
+      S.every(function(x){ return x.handN.y>=x.head.y+L.HEAD_R+2 && x.handN.y<x.sh.y && Math.abs(x.handN.x-x.sh.x)<9; }),
+      'bar '+r(S[0].handN.x)+','+r(S[0].handN.y)+' chin '+r(S[0].head.y+L.HEAD_R)+' shoulder '+r(S[0].sh.x)+','+r(S[0].sh.y));
+  }
   if(ex.id==='facepull'){
     // The front view is the exercise: elbows flaring wide while the hands come
     // to the ears is the only thing separating a face pull from a row. It was
@@ -758,21 +779,41 @@ EX.forEach(function(ex){
     check(ex.id,'the top of the rear foot lies on the wall',Math.abs(gap)<=1.5,'foot '+r(gap)+' off the wall');
   }
   if(ex.id==='ankle_mob'){
-    var w=ex.props&&ex.props[0];
+    // Read at the keyframe whose knee is furthest forward: the peak comes
+    // first, so the reduced-motion still shows the knee at the wall.
+    var w=ex.props&&ex.props[0], K=S.reduce(function(a,x){ return x.kneeN.x>a.kneeN.x?x:a; }), toe=rig.footAt(S[0].ankN,S[0].footN)[0].x;
     check(ex.id,'the knee travels forward toward the wall and gets close to it',
-      !!w && (w[0]-S[T].kneeN.x)<8 && S[T].kneeN.x>S[0].kneeN.x+3,
-      'knee '+r(S[0].kneeN.x)+' -> '+r(S[T].kneeN.x)+' wall at '+(w&&w[0]));
+      !!w && (w[0]-K.kneeN.x)<5 && K.kneeN.x>S[0].kneeN.x+3,
+      'knee '+r(S[0].kneeN.x)+' -> '+r(K.kneeN.x)+' wall at '+(w&&w[0]));
+    // A knee-to-wall test needs a distance to test: the toes start a hand's
+    // width from the wall (they used to touch it), and the shin tips well
+    // past upright, 30 degrees or more (it reached 18).
+    check(ex.id,'the toes start a hand\'s width from the wall',!!w && w[0]-toe>=5,'toe '+r(toe)+' wall '+(w&&w[0]));
+    var shin=Math.atan2(K.kneeN.x-K.ankN.x,K.ankN.y-K.kneeN.y)*180/Math.PI;
+    check(ex.id,'the shin tips 30 degrees or more past upright at the wall',shin>=30,'shin '+r(shin)+' degrees');
     check(ex.id,'the heel never lifts, which is the point of the test',
       S.every(function(x){return x.ankN.y===GROUND-7;}),'the heel came up');
+  }
+  if(['catcow','thoracic'].indexOf(ex.id)>=0){
+    // Hands and knees: knees on the floor under the hips, the supporting hand
+    // under its shoulder. Both used to kneel with the knees in the air.
+    S.forEach(function(x,i){ check(ex.id,'frame '+i+' kneels with the knees on the floor under the hips',
+      x.kneeN.y>GROUND-8 && Math.abs(x.kneeN.x-x.hip.x)<6,'knee '+r(x.kneeN.x)+','+r(x.kneeN.y)+' hip x '+r(x.hip.x)); });
+    check(ex.id,'the supporting hand is on the floor under the shoulder',
+      S.every(function(x){ return x.handF.y>GROUND-8 && Math.abs(x.handF.x-x.shF.x)<6; }),'hand '+r(S[0].handF.x)+','+r(S[0].handF.y)+' shoulder x '+r(S[0].shF.x));
   }
   if(ex.id==='catcow'){
     check(ex.id,'the hands stay planted under the shoulders',
       S.every(function(x){return x.handN.x===S[0].handN.x && x.handN.y===S[0].handN.y;}),'a hand moved');
-    check(ex.id,'the shoulders stay put; it is the pelvis that rocks',
-      S.every(function(x){return Math.abs(x.sh.y-S[0].sh.y)<3;}),
-      'shoulder moved '+r(Math.max.apply(null,S.map(function(x){return Math.abs(x.sh.y-S[0].sh.y);}))));
-    check(ex.id,'the pelvis actually tilts through a range', Math.abs(S[T].hip.y-S[0].hip.y)>10,
-      'pelvis travel '+r(Math.abs(S[T].hip.y-S[0].hip.y)));
+    check(ex.id,'the hips and shoulders stay put; it is the spine that moves',
+      S.every(function(x){return dist(x.sh,S[0].sh)<0.5 && dist(x.hip,S[0].hip)<0.5;}),'the hips or shoulders moved');
+    // The back arches (cow, the spine dropping) and rounds (cat): the spine
+    // bows, the head lifting for the cow and tucking for the cat. It used to
+    // pump the hips 16 up and down on a straight back.
+    var bows=ex.frames.map(function(f){ return f.bow||0; }), nods=ex.frames.map(function(f){ return f.nod||0; });
+    check(ex.id,'the back arches and rounds through a range',Math.min.apply(null,bows)<=-4 && Math.max.apply(null,bows)>=6,'bow '+bows.join(', '));
+    check(ex.id,'the head lifts with the arch and tucks with the round',
+      ex.frames.every(function(f){ return (f.bow||0)*(f.nod||0)>=0; }) && Math.min.apply(null,nods)<=-15 && Math.max.apply(null,nods)>=25,'nod '+nods.join(', '));
   }
   if(ex.id==='childspose'){
     check(ex.id,'it sits back onto the heels with the arms stretched long forward',
@@ -783,28 +824,40 @@ EX.forEach(function(ex){
       x.kneeN.y>GROUND-8 && x.head.y+L.HEAD_R>GROUND-6,'knee '+r(x.kneeN.y)+' head '+r(x.head.y)); });
   }
   if(ex.id==='worldsgreatest'){
-    check(ex.id,'the inside hand stays planted by the front foot',
-      S.every(function(x){return x.handN.x===S[0].handN.x && x.handN.y===S[0].handN.y;}),'the planted hand moved');
-    check(ex.id,'the free arm reaches to the ceiling', S[0].handF.y-S[T].handF.y>50,
-      'reach travel '+r(S[0].handF.y-S[T].handF.y));
+    // The far hand is planted, on the floor inside the front foot, and the
+    // near arm, on the side of the front leg, turns from the floor to the
+    // ceiling. The far one used to reach while the near one hovered.
+    var up=S.reduce(function(a,x){ return x.handN.y<a.handN.y?x:a; }), dn=S.reduce(function(a,x){ return x.handN.y>a.handN.y?x:a; });
+    check(ex.id,'the inside hand stays planted on the floor by the front foot',
+      S.every(function(x){return x.handF.x===S[0].handF.x && x.handF.y===S[0].handF.y && x.handF.y>GROUND-8;}),'the planted hand at '+r(S[0].handF.x)+','+r(S[0].handF.y));
+    check(ex.id,'the free arm reaches from the floor to the ceiling', dn.handN.y-up.handN.y>50 && up.handN.y<up.head.y,
+      'reach travel '+r(dn.handN.y-up.handN.y));
+    check(ex.id,'the back knee is down',S.every(function(x){ return x.kneeF.y>GROUND-8; }),'back knee y '+r(S[0].kneeF.y));
     check(ex.id,'it is a deep lunge underneath', S[0].ankN.x-S[0].ankF.x>50,'stride '+r(S[0].ankN.x-S[0].ankF.x));
   }
   if(ex.id==='hamstring'){
-    check(ex.id,'the front leg is straight',
-      S.every(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y)>L.THIGH+L.SHIN-12;}),
+    // A soft knee only: within 2 of full length (it was 12, and let a half
+    // squat with the front heel in the air through).
+    check(ex.id,'the front leg is straight with the heel on the floor',
+      S.every(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y)>L.THIGH+L.SHIN-2 && x.ankN.y===rig.ANKLE_Y;}),
       'shortest hip-ankle '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y);}))));
     check(ex.id,'it hinges further over as it goes', ex.frames[T].torso>ex.frames[0].torso+8,
       'torso '+ex.frames[0].torso+' -> '+ex.frames[T].torso);
   }
   if(ex.id==='shoulderdisloc'){
-    check(ex.id,'the stick travels from in front of the thighs to behind the head',
-      S[0].handN.y>S[0].hip.y-10 && S[T].handN.y<S[T].head.y,
-      'start '+r(S[0].handN.y)+' hip '+r(S[0].hip.y)+' top '+r(S[T].handN.y)+' head '+r(S[T].head.y));
+    // Thighs, overhead (the still), behind to the glutes, and back the same
+    // way over the top. The arms used to come back the short way, swinging
+    // down through the hips.
+    var top=S[ex.still===undefined?1:ex.still], bk=S.filter(function(x){ return x.handN.x<x.sh.x; }).reduce(function(a,x){ return !a||x.handN.y>a.handN.y?x:a; },null)||S[0];
+    check(ex.id,'the stick travels from in front of the thighs, over the head, to behind at the glutes',
+      S[0].handN.y>S[0].hip.y-10 && top.handN.y<top.head.y && bk.handN.x<bk.sh.x && bk.handN.y>bk.hip.y-10,
+      'start '+r(S[0].handN.y)+' hip '+r(S[0].hip.y)+' top '+r(top.handN.y)+' head '+r(top.head.y)+' behind '+r(bk.handN.x)+','+r(bk.handN.y));
+    var steps=ex.frames.map(function(f,i){ var a=f.armN[0], b=ex.frames[(i+1)%ex.frames.length].armN[0]; return ((b-a)%360+540)%360-180; });
+    check(ex.id,'it comes back the way it went, over the top: the arms never turn all the way round',
+      Math.abs(steps.reduce(function(a,b){ return a+b; },0))<1 && steps.every(function(x){ return Math.abs(x)<180; }),'steps '+steps.join(', '));
     check(ex.id,'the arms stay locked straight the whole way',
       S.every(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y)>L.UPPER+L.FORE-2;}),
       'shortest reach '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);}))));
-    check(ex.id,'it goes past vertical and behind, not just up to overhead',
-      S[3].handN.x<S[3].sh.x,'end hand '+r(S[3].handN.x)+' shoulder '+r(S[3].sh.x));
   }
   if(ex.id==='pigeon'){
     check(ex.id,'the front shin is folded across, not straight out',
@@ -825,17 +878,26 @@ EX.forEach(function(ex){
     check(ex.id,'both knees are folded, neither leg is straight',
       S.every(function(x){return Math.hypot(x.hip.x-x.ankN.x,x.hip.y-x.ankN.y)<L.THIGH+L.SHIN-8 &&
                                   Math.hypot(x.hipF.x-x.ankF.x,x.hipF.y-x.ankF.y)<L.THIGH+L.SHIN-8;}),'a leg was straight');
+    // Down to one side and then the other: the two lying-down keyframes put
+    // the legs on opposite sides.
     check(ex.id,'the front view carries the rotation the side view cannot',
-      !!ex.front && Math.abs(ex.front[0].footL[0]-ex.front[TF].footL[0])>4,
+      !!ex.front && Math.abs(ex.front[1].footL[0]-ex.front[3].footL[0])>20 && Math.abs(ex.front[1].kneeR[0]-ex.front[3].kneeR[0])>20,
       'front feet did not travel');
+    check(ex.id,'the hands are off the floor',S.every(function(x){ return x.handN.y<GROUND-20 && x.handF.y<GROUND-20; }),'hand y '+r(S[0].handN.y));
   }
   if(ex.id==='thoracic'){
     check(ex.id,'the hips stay square while the top arm opens',
       S.every(function(x){return x.hip.x===S[0].hip.x && x.hip.y===S[0].hip.y;}),'the hips turned');
-    check(ex.id,'the top hand opens upward through a real range', S[0].handF.y-S[T].handF.y>25,
-      'travel '+r(S[0].handF.y-S[T].handF.y));
+    // The near hand stays behind the head and its elbow turns from the
+    // ceiling (the still) to tucked under the chest. The far arm used to flap
+    // up and down from the shoulder with no hand behind the head at all.
+    var ey=S.map(function(x){ return x.elbN.y; });
+    check(ex.id,'the elbow turns up to the ceiling and down under the chest', Math.max.apply(null,ey)-Math.min.apply(null,ey)>25 &&
+      S[ex.still].elbN.y===Math.min.apply(null,ey) && S[ex.still].elbN.y<S[ex.still].sh.y-15,'elbow y '+ey.map(r).join(', '));
+    check(ex.id,'the hand stays behind the head',S.every(function(x){ return dist(x.handN,x.head)<L.HEAD_R+2 && x.handN.y<x.head.y; }),
+      'hand '+r(dist(S[0].handN,S[0].head))+' from the head');
     check(ex.id,'the supporting hand stays planted',
-      S.every(function(x){return x.handN.y===S[0].handN.y;}),'the support hand moved');
+      S.every(function(x){return x.handF.y===S[0].handF.y;}),'the support hand moved');
   }
   if(ex.id==='shadowbox'||ex.id==='bagspeed'){
     check(ex.id,'the stance is staggered', Math.abs(S[0].ankN.x-S[0].ankF.x)>20,
@@ -1052,12 +1114,13 @@ EX.forEach(function(ex){
    batch is re-authored. A list names the standing keyframes; 'none' marks a rig whose upright frames are not
    standing on both feet (a split stance, a walk), which the warning would
    otherwise ask to stand tall. */
+function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
 function angAt(a,b,c){ var d=Math.abs(Math.atan2(a.y-b.y,a.x-b.x)-Math.atan2(c.y-b.y,c.x-b.x))*180/Math.PI; return d>180?360-d:d; }
 var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadlift:'turn', ohp:'all', kbswing:'after',
   facepull:'all', triceps_ext:'all', kb_press:'all', platepinch:'top', kb_clean:[1,2,3,4,5,6], kb_snatch:[1,2,3,4,5],
   splitsq_bulg:'none', farmerscarry:'none', suitcasecarry:'none', kb_bottomsup:'none',
   curl_reverse:'all', burpee:[0], jabcross:'none', lunge_walk:'none',
-  palloffpress:'all', kb_tgu:[8], jumpingjack:[0], woodchopper:'none', sprint:'none', highknees:'none', briskwalkjog:'none', boxjump:'none'};
+  palloffpress:'all', shoulderdisloc:'all', kb_tgu:[8], jumpingjack:[0], woodchopper:'none', sprint:'none', highknees:'none', briskwalkjog:'none', boxjump:'none'};
 (function standingTall(){
   EX.forEach(function(ex){
     var how=STANDING[ex.id], T=rig.turn(ex), bad=[];
@@ -1155,7 +1218,12 @@ var PLATE_EDGE=15+1.75, PLATE_EDGE_F=13+1.5;
    rigs listed slide or swing a foot the wrong way today and are being
    re-authored, so they print as warnings; any other rig doing it fails, and
    a listed one that comes right says so. */
-var GAIT={shadowbox:'swing'};
+var GAIT={};
+// The 90/90's legs fall to the side from knees up: seen from the side its feet
+// pivot where they are while the shins swing out of the picture, which this
+// view can only draw as the feet moving along the floor toward the hip and
+// back. Nothing slides there.
+var PIVOT={nine0:'slide'};
 (function walking(){
   var done=[];
   EX.forEach(function(ex){
@@ -1171,6 +1239,7 @@ var GAIT={shadowbox:'swing'};
         if(!down(a)&&!down(b)){ back=Math.min(0,back+dx); if(back<bw){ bw=back; bwAt=k+' at u='+r(i/N*100)/100; } } else back=0; } });
     [['slide','a foot on the floor never slides forward under a still hip',fw<=1,'slides forward '+r(fw)+', '+fwAt],
      ['swing','a walk\'s lifted foot swings forward, never back (no moonwalk)',!walk||bw>=-1,'swings back '+r(-bw)+', '+bwAt]].forEach(function(c){
+      if((PIVOT[ex.id]||'').split(' ').indexOf(c[0])>=0) return;
       if(known.indexOf(c[0])>=0){ if(c[2]) done.push(ex.id+' '+c[0]); else soft(ex.id,c[1]+' (listed in GAIT, being re-authored)',false,c[3]); }
       else check(ex.id,c[1],c[2],c[3]); });
   });
@@ -1242,16 +1311,22 @@ var GAIT={shadowbox:'swing'};
   });
   // Rear-hip extension: how far the rear thigh hangs behind the line of the
   // trunk. 10 to 20 degrees is all a hip has; more is the lower back arching.
-  ['couchstretch','hipflexor'].forEach(function(id){
-    var worst=0;
+  ['couchstretch','hipflexor','pigeon','hamstring'].forEach(function(id){
+    var worst=0; if(id==='pigeon'||id==='hamstring') return hold(id);
     at(get(id),96).forEach(function(s){ var tr=Math.atan2(s.hipF.x-s.shF.x,s.hipF.y-s.shF.y), th=Math.atan2(s.kneeF.x-s.hipF.x,s.kneeF.y-s.hipF.y);
       worst=Math.max(worst,(tr-th)*180/Math.PI); });
     check(id,'the rear hip extends 25 degrees or less behind the trunk, no lumbar arch',worst<=25,'rear hip '+r(worst)+' degrees behind the trunk');
-    // A stretch eases in and is held, not pulsed: the end keyframe is held
-    // (repeated) and rests at both ends of the hold.
-    var ex=get(id), n=ex.frames.length, held=ex.frames.filter(function(f,i){ return JSON.stringify(f)===JSON.stringify(ex.frames[(i+1)%n]); }).length;
-    check(id,'it eases into the stretch and holds it',held>=1 && rig.tempoOf(ex).reduce(function(a,b){ return Math.max(a,b); })>=1200,'held keyframes '+held+', longest segment '+Math.max.apply(null,rig.tempoOf(ex))+' ms');
+    hold(id);
   });
+  // A stretch eases in and is held, not pulsed: the end keyframe is held
+  // (repeated), in both views, for at least a second. The pigeon and the
+  // hamstring stretch used to fold in and out every 2.4 s.
+  function hold(id){
+    var ex=get(id), n=ex.frames.length, ms=rig.cycleMs(ex)/rig.tempoOf(ex).reduce(function(a,b){ return a+b; },0);
+    function same(fr,i){ return !fr||JSON.stringify(fr[i])===JSON.stringify(fr[(i+1)%n]); }
+    var held=ex.frames.map(function(f,i){ return same(ex.frames,i)&&same(ex.front,i)?rig.tempoOf(ex)[i]*ms:0; });
+    check(id,'it eases into the stretch and holds it',Math.max.apply(null,held)>=1000,'held '+held.map(Math.round).join(', ')+' ms');
+  }
 })();
 
 // Frame 2 is the bottom of the usual four-frame rep and nothing more: a rig

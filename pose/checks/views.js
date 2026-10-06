@@ -100,8 +100,16 @@ EX.filter(function(e){return e.front;}).forEach(function(ex){
   // Exact equality here; the whole-rep drift bound is checked separately.
   if(ex.id==='pullup') ck(ex.id+' front','hands stay fixed on the bar',
     A.handL.x===B.handL.x && Math.abs(A.handL.y-B.handL.y)<1.2,'hands moved');
-  if(ex.id==='jabcross'){
-    var g=rig.solveFront(ex.front[0]), jb=rig.solveFront(ex.front[1]), cr=rig.solveFront(ex.front[3]);
+  // Shadowboxing and the bag combo throw the same straight shots, and both
+  // used to throw them out sideways like hooks. Each is read off its own
+  // keyframes: the jab where the near (R) fist is furthest from its guard
+  // spot, the cross where the far (L) one is, the guard at frame 0 or the
+  // keyframe before the jab.
+  if(['jabcross','shadowbox','bagspeed'].indexOf(ex.id)>=0){
+    var Fs=ex.front.map(rig.solveFront), n0=Fs.length;
+    function far(k){ return Fs.reduce(function(a,x,i){ return x['fist'+k]>Fs[a]['fist'+k]?i:a; },0); }
+    var ji=far('R'), ci=far('L'), gi=ji===0?n0-1:0;
+    var g=Fs[gi], jb=Fs[ji], cr=Fs[ci];
     // A straight punch goes at the camera, so it must foreshorten toward the
     // centreline and grow, never swing out sideways like a hook.
     ck(ex.id+' front','jab fist travels toward the centreline, not outward',
@@ -217,7 +225,7 @@ EX.forEach(function(ex){
 // The rigs listed below break it today and are being re-authored, so they
 // print as warnings; any other rig breaking it fails, and a listed rig that
 // comes right says so, so the list only shrinks.
-var HANDED={worldsgreatest:'hand'};
+var HANDED={};
 var handWarn=[], handDone=[];
 function sides(ex){
   var nr=rig.nearSide(ex), fr=nr==='L'?'R':'L', plan=!!ex.frontPlan, out={};

@@ -11,19 +11,19 @@ EX.forEach(function(ex){
   for(var i=0;i<SAMPLES;i++){
     var s=rig.solve(rig.poseAt(ex,i/SAMPLES));
     // limb integrity across the WHOLE motion, not just keyframes
-    // An arm may be drawn SHORT on purpose (armScaleN/F) when it swings out of
-    // this plane, so what must hold is its scaled length, not its full one.
-    var aN=s.armScaleN===undefined?1:s.armScaleN, aF=s.armScaleF===undefined?1:s.armScaleF;
+    // An arm may be drawn SHORT on purpose (armScaleN/F, and upperN/foreN for
+    // one segment) when it swings out of this plane, so what must hold is each
+    // segment's drawn length (lenN, lenF), not its full one.
     worstStretch=Math.max(worstStretch,
       Math.abs(d(s.hip,s.kneeN)-L.THIGH), Math.abs(d(s.kneeN,s.ankN)-L.SHIN),
-      Math.abs(d(s.sh,s.elbN)-L.UPPER*aN), Math.abs(d(s.elbN,s.handN)-L.FORE*aN),
+      Math.abs(d(s.sh,s.elbN)-s.lenN[0]), Math.abs(d(s.elbN,s.handN)-s.lenN[1]),
       Math.abs(d(s.hipF,s.kneeF)-L.THIGH), Math.abs(d(s.kneeF,s.ankF)-L.SHIN),
-      Math.abs(d(s.shF,s.elbF)-L.UPPER*aF), Math.abs(d(s.elbF,s.handF)-L.FORE*aF));
+      Math.abs(d(s.shF,s.elbF)-s.lenF[0]), Math.abs(d(s.elbF,s.handF)-s.lenF[1]));
     // reach: a limb asked to span more than its length would be silently stretched
     var legReach=d(s.hip,s.ankN), armReach=d(s.sh,s.handN);
     ck(ex.id,'leg never asked to over-extend (sample '+i+')', legReach<=L.THIGH+L.SHIN+0.5,'reach '+r(legReach));
-    ck(ex.id,'arm never asked to over-extend (sample '+i+')', armReach<=(L.UPPER+L.FORE)*aN+0.5,
-      'reach '+r(armReach)+' of '+r((L.UPPER+L.FORE)*aN));
+    ck(ex.id,'arm never asked to over-extend (sample '+i+')', armReach<=s.lenN[0]+s.lenN[1]+0.5,
+      'reach '+r(armReach)+' of '+r(s.lenN[0]+s.lenN[1]));
     var low=Math.max(s.ankN.y,s.ankF.y,s.kneeN.y,s.hip.y,s.handN.y,s.head.y+L.HEAD_R);
     if(low>GROUND+2) floorBreak++;
     if(planted) ankles.push(s.ankN.x+','+s.ankN.y);
@@ -48,8 +48,8 @@ EX.forEach(function(ex){
   for(var i=0;i<400;i++){ var s=rig.solve(rig.poseAt(ex,i/400));
     [['thigh',d(s.hip,s.kneeN)-L.THIGH],['shin',d(s.kneeN,s.ankN)-L.SHIN],
      ['far thigh',d(s.hipF,s.kneeF)-L.THIGH],['far shin',d(s.kneeF,s.ankF)-L.SHIN],
-     ['upper arm',d(s.sh,s.elbN)-L.UPPER*s.armScaleN],['forearm',d(s.elbN,s.handN)-L.FORE*s.armScaleN],
-     ['far upper arm',d(s.shF,s.elbF)-L.UPPER*s.armScaleF],['far forearm',d(s.elbF,s.handF)-L.FORE*s.armScaleF]
+     ['upper arm',d(s.sh,s.elbN)-s.lenN[0]],['forearm',d(s.elbN,s.handN)-s.lenN[1]],
+     ['far upper arm',d(s.shF,s.elbF)-s.lenF[0]],['far forearm',d(s.elbF,s.handF)-s.lenF[1]]
     ].forEach(function(q){ if(Math.abs(q[1])>worst){ worst=Math.abs(q[1]); where=q[0]+' at u='+(i/400); } });
   }
   ck(ex.id,'no limb stretches anywhere in the rep (fine)', worst<0.8,'worst '+r(worst)+' '+where);
@@ -131,6 +131,28 @@ var EDGE=[
     {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[59,34],handF:[53,36]},
     {hip:[44,122],torso:50,ankN:[58,163],ankF:[53,163],handN:[80,138],handF:[74,140],ballAt:[80,159]},
     {hip:[50,114],torso:26,ankN:[58,163],ankF:[53,163],handN:[70,84],handF:[64,86]}]}];
+// A trunk bowing through the rep (bow, nod) and an arm whose upper arm and
+// forearm are drawn short apart (upperN/foreN, upperF/foreF), angles and
+// targets both.
+EDGE.push({id:'edge bow, nod and split arm',frames:[
+  {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],handN:[60,40],handF:[55,40]},
+  {hip:[55,96],torso:6,ankN:[58,154],ankF:[53,154],handN:[62,40],handF:[57,40],armScaleN:0.9,upperN:0.5,foreF:0.8,bow:4,nod:20},
+  {hip:[55,105.5],torso:2,ankN:[58,163],ankF:[53,163],armN:[60,10],armF:[150,20],upperF:0.6,foreN:0.8,bow:-3,nod:-15}]});
+// The spine's mid point sits off the hip-to-shoulder line by the bow, on the
+// back's side for a positive (rounded) one, and the head turns by the nod;
+// hip and shoulder do not move. Each arm segment is drawn at its own length.
+(function(){
+  var f={hip:[50,120],torso:90,ankN:[20,163],ankF:[15,163],armN:[180,180],armScaleN:0.8,upperN:0.5,foreF:0.5};
+  var a=rig.solve(f), b=rig.solve(Object.assign({},f,{bow:6,nod:30}));
+  ck('bow and nod','the mid-spine bows off the line from hip to shoulder, hip and shoulder fixed',
+    !!b.mid&&d(b.mid,{x:67,y:114})<1e-9&&d(a.mid,{x:67,y:120})<1e-9&&d(a.sh,b.sh)<1e-9&&d(a.hip,b.hip)<1e-9,JSON.stringify(b.mid));
+  ck('bow and nod','the head turns by the nod about the shoulder',
+    d(b.head,rig.add(b.sh,rig.dir(120,L.HEAD_OFF)))<1e-9&&d(a.head,rig.add(a.sh,rig.dir(90,L.HEAD_OFF)))<1e-9,JSON.stringify(b.head));
+  ck('split arm','the upper arm and forearm are drawn at their own lengths',
+    Math.abs(d(a.sh,a.elbN)-L.UPPER*0.4)<1e-9&&Math.abs(d(a.elbN,a.handN)-L.FORE*0.8)<1e-9&&
+    Math.abs(d(a.shF,a.elbF)-L.UPPER)<1e-9&&Math.abs(d(a.elbF,a.handF)-L.FORE*0.5)<1e-9,
+    r(d(a.sh,a.elbN))+' '+r(d(a.elbN,a.handN))+' '+r(d(a.shF,a.elbF))+' '+r(d(a.elbF,a.handF)));
+})();
 // The authored eases are exactly the curves they name.
 (function(){
   var ex=EDGE.filter(function(e){ return e.id==='edge authored stops and ease'; })[0], w=rig.warp(ex);
@@ -272,7 +294,7 @@ EX.filter(function(e){ return e.equip==='kettlebell'; }).forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id], worst=0, where='', far=0, farAt='', par=0, parAt='', cross='', fc=null;
   for(var i=0;i<=FINE;i++){ var u=i/FINE, s=rig.solve(rig.poseAt(ex,u)), b=rig.bellAt(ex,s), h=s.handN;
     var off={x:b.x-h.x,y:b.y-h.y}, len=Math.hypot(off.x,off.y), want=null;
-    var fx=h.x-s.elbN.x, fy=(h.y-s.elbN.y)/Math.hypot(fx,h.y-s.elbN.y), reach=d(s.sh,h)/((L.UPPER+L.FORE)*s.armScaleN);
+    var fx=h.x-s.elbN.x, fy=(h.y-s.elbN.y)/Math.hypot(fx,h.y-s.elbN.y), reach=d(s.sh,h)/(s.lenN[0]+s.lenN[1]);
     // Racked once the forearm is within 30 degrees of straight up, hanging
     // or in line once it is past 98 (it used to switch over between -0.3 and
     // 0.05 of the forearm's unit y, about 20 degrees, which a snatch swept in
@@ -325,8 +347,8 @@ EX.forEach(function(ex){ var ax=app.RIGFRAMES[ex.id], w=0;
 // The rigs listed below already break the range and are being re-authored, so
 // for now they print as warnings. Any other rig breaking it fails, and a
 // listed rig that has come back inside it says so, so the list only shrinks.
-var BENDS={backsquat:'elbF elbN',facepull:'elbF elbN',press_push:'elbF',
-  worldsgreatest:'elbF',shadowbox:'elbF elbN',bagspeed:'elbF elbN',skierg:'elbN'};
+var BENDS={backsquat:'elbF elbN',press_push:'elbF',
+  bagspeed:'elbF elbN',skierg:'elbN'};
 // Floor and prone rigs are done: a face-down plank whose knees bent the wrong
 // way is what this check was written for, so none of them may be listed.
 Object.keys(BENDS).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
@@ -334,15 +356,25 @@ Object.keys(BENDS).forEach(function(id){ var ex=EX.filter(function(e){ return e.
 // A shin that runs across the body, into the picture, is drawn folded flat
 // under its thigh from the side: the pigeon's front leg bends about 90 degrees
 // but shows 160 to 166. Such a joint may fold to 170.
-var FOLDS={pigeon:'kneeN'};
+// The 90/90's shins fold under the thighs the same way as its legs lie down
+// to the side.
+var FOLDS={pigeon:'kneeN',nine0:'kneeN kneeF'};
+// An arm working across the picture rather than in it has no front or back
+// to bend toward here: the thoracic rotation's elbow turns up to the ceiling
+// round a hand held behind the head, and seen from the side its forearm runs
+// forward from the raised elbow to the head. Its range is not checked.
+var ACROSS={thoracic:'elbN'};
 var bendWarn=[], bendDone=[];
 function head(p,q){ return Math.atan2(q.x-p.x,-(q.y-p.y))*180/Math.PI; }
 function flex(a,b,c){ return ((head(a,b)-head(b,c))%360+540)%360-180; }
 EX.forEach(function(ex){
   var out={};
   for(var i=0;i<240;i++){ var s=rig.solve(rig.poseAt(ex,i/240)), u=i/240;
-    [['elbN',flex(s.sh,s.elbN,s.handN)],['elbF',flex(s.shF,s.elbF,s.handF)],
-     ['kneeN',-flex(s.hip,s.kneeN,s.ankN)],['kneeF',-flex(s.hipF,s.kneeF,s.ankF)]].forEach(function(q){
+    // An arm drawn under 0.3 of its length (pointing at the camera) is a stub
+    // whose bend nobody can see, as for the folding check below.
+    [['elbN',flex(s.sh,s.elbN,s.handN),s.armScaleN],['elbF',flex(s.shF,s.elbF,s.handF),s.armScaleF],
+     ['kneeN',-flex(s.hip,s.kneeN,s.ankN),1],['kneeF',-flex(s.hipF,s.kneeF,s.ankF),1]].forEach(function(q){
+      if(q[2]<0.3||(ACROSS[ex.id]||'').split(' ').indexOf(q[0])>=0) return;
       var top=(FOLDS[ex.id]||'').split(' ').indexOf(q[0])>=0?170:160, over=q[1]<-10?-10-q[1]:q[1]>top?q[1]-top:0;
       if(over>0 && (!out[q[0]]||over>out[q[0]].o)) out[q[0]]={o:over,v:q[1],u:u};
     });
@@ -410,7 +442,7 @@ EX.forEach(function(ex){
 // 'out' from take-off to the apex or 'in' from the apex to the landing) moves
 // at the speed of a body thrown and falling, and lands at speed on purpose, so
 // there the limit is 10.
-var WHIPS={worldsgreatest:'side',bagspeed:'side',burpee:'side'};
+var WHIPS={bagspeed:'side',burpee:'side'};
 var whipWarn=[], whipDone=[];
 EX.forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id], known=(WHIPS[ex.id]||'').split(' ').filter(Boolean), N=1152, W=N/144;
@@ -500,8 +532,8 @@ EX.forEach(function(ex){ ck(ex.id,'rests at the reviewed keyframes (pose/checks/
 // segment: the jack's side arm is 0.06 long and bent to 76 degrees at the
 // half-raised keyframe, so a curl to 91 on the way there passed.
 var FOLDING={kb_snatch:'front',kb_press:'front',
-  sq_jump:'front',boxjump:'front',broadjump:'front',medballslam:'front',thoracic:'front',shadowbox:'front',bagspeed:'front',
-  skierg:'side front',pulldown_straight:'front',burpee:'side front',deadbug:'front'};
+  sq_jump:'front',boxjump:'front',broadjump:'front',medballslam:'front',
+  skierg:'side front',burpee:'side front',deadbug:'front'};
 var foldWarn=[], foldDone=[];
 function inner(a,b,c){ return ang({x:a.x-b.x,y:a.y-b.y},{x:c.x-b.x,y:c.y-b.y}); }
 EX.concat(EDGE,EDGEFRONT).filter(function(e){ return !/^edge/.test(e.id)||e.handPolar; }).forEach(function(ex){

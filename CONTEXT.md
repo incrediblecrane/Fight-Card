@@ -882,7 +882,11 @@ the camera). The front dumbbell raise ships with none: the frontal projection
 collapses onto the shoulders, so its second panel is the finish of the side
 view. The side plank ships with none either: seen from above, someone lying on
 their side is a profile, which the front solver (its torso always square to
-the camera) drew as a seated butterfly stretch.
+the camera) drew as a seated butterfly stretch. Cat-cow and the thoracic rotation ship
+with none (seen from above, a back arching and an elbow turning to the ceiling
+are both movements toward the camera), nor do child's pose and the pigeon,
+whose second panels read on a phone as someone seated with their hands up
+and as a small dark blob.
 
 **Foreshortened leg**:
 A leg pointing toward or away from the camera in a second panel. The front
@@ -892,7 +896,7 @@ the stretches, most plan views). So a front knee not given by hand is filled
 in from the side view (`exercises.js`): at the side knee's height in a front
 view, or its share of the way to the foot from above, and on the hip-to-foot
 line sideways. `kneeOut` keeps the sideways bend for legs that really splay
-(pigeon, 90/90, child's pose) and marks the squats and presses whose knees
+(the 90/90) and marks the squats and presses whose knees
 track out over the toes. `views.js` fails a second-panel knee more than 6
 off its hip-to-foot line in any other rig.
 
@@ -904,7 +908,13 @@ Looking down at someone on the floor. No gravity and no ground line; labelled
 How much of its true length an arm projects in a view, 1 being square to the
 camera (`armScaleL`/`armScaleR` on a front frame, `armScaleN`/`armScaleF` on a
 side one). The only way to draw an arm pointing at the viewer, because the
-solver bends limbs rather than shortening them. Between keyframes a shortened
+solver bends limbs rather than shortening them. `upperN`/`foreN`
+(`upperF`/`foreF` for the far arm) shorten one segment on top of that, for an
+arm whose upper arm and forearm point different ways out of the picture: the
+top of a pull-up (upper arm out to the side, forearm straight up), the end of
+a face pull, the front squat's rack (forearm turned in toward the neck). One
+scale for both put the pull-up's elbow in front of the face and held the
+front squat's bar at the mouth. Between keyframes a shortened
 arm keeps its bend (`keepBend`): the hand's reach over the arm's drawn length
 blends from one keyframe's to the next and the scale follows, where blending
 the hand and the scale apart folded a fly's elbow into a hug half way through.
@@ -916,6 +926,16 @@ views, rather than in a straight line that cuts the corner past the shoulder
 and folds the elbow. Not given an elbow by hand. `continuous.js` fails an
 elbow that closes more than 15 degrees tighter between two keyframes than at
 either; rigs still to fix are listed in `FOLDING`.
+
+**Spine** (`bow`, `nod`):
+The trunk is drawn from the hip to the shoulder through a mid-spine point
+that sits `bow` off the straight line between them (positive rounds the back,
+negative arches it), and the head turns `nod` degrees off the trunk's line
+(positive tucks the chin). Hip and shoulder stay where the torso angle puts
+them, so every check on them holds. A rig with any `bow` draws the trunk as
+one shape bent at mid-spine. The cat-cow used to pump its hips up and down on
+a straight back with the knees in the air, a hip hinge rather than a spinal
+movement; child's pose rounds its back.
 
 **Bend sign**:
 Which of the two mirror IK solutions a knee or elbow takes. Decided at
@@ -975,7 +995,11 @@ is `kneeSign:-1` and `elbowSign:1` far more often than not, and the push-up,
 plank and mountain climber once shipped with knees bent 57 to 133 degrees the
 wrong way. A shin running across the body into the picture is drawn folded
 flat under its thigh (the pigeon's front leg), so `FOLDS` lets that joint
-reach 170.
+reach 170 (the 90/90's shins too). An arm drawn under 0.3 of its length is a
+stub whose bend cannot be seen and is not checked, and `ACROSS` names the
+joints that work across the picture rather than in it (the thoracic
+rotation's elbow turning up round a hand behind the head), whose drawn bend is
+a projection with no front or back.
 
 **Prone**:
 Face down on hands or forearms (push-up, plank, mountain climber, the
@@ -1000,7 +1024,9 @@ carries used to moonwalk, the planted foot sliding forward 20 a step. Half
 way through a stride the far foot is the one swinging, so the second panel
 lifts L there and R half way back. A walk rests only where each foot lands
 (`stops:[0,2]`); its second panel, where a foot just rises and sets down,
-also at the top of each lift (`frontStops`). `analyse.js` (`GAIT`) fails a
+also at the top of each lift (`frontStops`). The 90/90's feet pivot where
+they are while its legs fall to the side, which the side view can only draw
+as feet moving along the floor, so `PIVOT` excuses it from the slide check. `analyse.js` (`GAIT`) fails a
 rig that slides or swings a foot the wrong way; rigs listed there print as
 warnings while they are re-authored.
 
@@ -1089,7 +1115,8 @@ back to overhead drew a backward circle over the head every stride.
 
 **Stretch hold**:
 A stretch eases in and is held (its end keyframe repeated, a stop at both
-ends of the hold), never pulsed, and a half-kneeling stretch keeps the rear
+ends of the hold, for a second or more in both views), never pulsed: the couch
+and hip flexor stretches, the pigeon and the hamstring stretch, and a half-kneeling stretch keeps the rear
 hip within 25 degrees behind the trunk; more is the lower back arching.
 
 **Axis**:
