@@ -398,6 +398,8 @@ console.log('\nMOTION GUIDES');
 // shape each in every frame of both panels, so the figure still moves in
 // place, and the page shows them only while the figure stands still.
 function guide(sh,k){ return sh.filter(function(p){ return p.a['data-g']===k; }); }
+// The path is runs of new ground (M x,y L x,y ...), each a list of [x,y].
+function runsOf(d){ return d?d.split(/\s*M/).filter(Boolean).map(function(r){ return r.split(/\s*L/).map(function(q){ return q.split(',').map(Number); }); }):[]; }
 function arrowOf(sh){ var a=guide(sh,'arrow')[0]; return (a.a.d.match(/-?[\d.]+,-?[\d.]+/g)||[]).map(function(q){ return q.split(',').map(Number); }); }
 t('every rig has a ghost, a path and an arrow, one shape each, in both panels and every frame: the ghost under the figure, the path and arrow over it', function(){
   var bad=[];
@@ -423,7 +425,7 @@ t('the ghost shows the other end of the rep: the standing start at the bottom of
         assert.ok(Math.abs(Math.min.apply(null,now)-Math.min.apply(null,fy))>6,id+(k?' front':' side')+' u='+u.toFixed(2)+': the ghost is where the figure is'); }); }); });
 });
 t('a squat\'s bar path runs straight up and down, and the arrow points the way the bar goes next: down from the top, up from the bottom', function(){
-  var sh=shapes(app.rigSVG(EXOF.backsquat,0)), pts=guide(sh,'path')[0].a.points.split(' ').map(function(q){ return q.split(',').map(Number); });
+  var sh=shapes(app.rigSVG(EXOF.backsquat,0)), pts=[].concat.apply([],runsOf(guide(sh,'path')[0].a.d));
   var xs=pts.map(function(q){ return q[0]; }), ys=pts.map(function(q){ return q[1]; });
   assert.ok(Math.max.apply(null,xs)-Math.min.apply(null,xs)<6&&Math.max.apply(null,ys)-Math.min.apply(null,ys)>25,'the bar path is '+(Math.max.apply(null,xs)-Math.min.apply(null,xs)).toFixed(1)+' wide and '+(Math.max.apply(null,ys)-Math.min.apply(null,ys)).toFixed(1)+' tall');
   var s=app.rSolve(app.rPoseAt(rex('backsquat'),0.02));
@@ -436,10 +438,63 @@ t('a squat\'s bar path runs straight up and down, and the arrow points the way t
 });
 t('a path that hardly moves is left out, and the arrow shrinks to a point while the body holds still', function(){
   var sh=shapes(app.rigSVG(EXOF.sprint,0));
-  assert.strictEqual(guide(sh,'path')[0].a.points,'','a sprint\'s hip path is drawn: '+guide(sh,'path')[0].a.points.slice(0,60));
+  assert.strictEqual(guide(sh,'path')[0].a.d,'','a sprint\'s hip path is drawn: '+guide(sh,'path')[0].a.d.slice(0,60));
   var held=RIGS.filter(function(id){ return arrowOf(shapes(app.rigSVG(EXOF[id],0))).every(function(q,i,a){ return q[0]===a[0][0]&&q[1]===a[0][1]; }); });
   assert.ok(held.indexOf('plank')>=0,'a plank\'s arrow points somewhere: '+JSON.stringify(arrowOf(shapes(app.rigSVG(EXOF.plank,0)))));
   assert.ok(held.indexOf('backsquat')<0,'a squat\'s arrow is a point');
+});
+// The still is where the guides show, and a still keyframe is often followed
+// by a hold or a slow start: the arrow looks on to where the point first
+// moves, so it points the way the rep goes on every panel that has a path,
+// and is a point on one that has none (it would float with no path under it).
+function isPoint(a){ return a.every(function(q){ return q[0]===a[0][0]&&q[1]===a[0][1]; }); }
+t('at every rig\'s still the arrow points the way the rep goes on, on every panel with a path, and is a point with no path', function(){
+  var held=[], loose=[];
+  RIGS.forEach(function(id){ var u=app.rStillU(rex(id));
+    [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){ var svg=f(EXOF[id],u); if(!svg) return;
+      var sh=shapes(svg), p=guide(sh,'path')[0].a.d, pt=isPoint(arrowOf(sh));
+      if(p&&pt) held.push(id+(v?' front':' side')); if(!p&&!pt) loose.push(id+(v?' front':' side')); }); });
+  assert.ok(!held.length,held.length+' panels show a path and no direction at the still: '+held.join(', '));
+  assert.ok(!loose.length,loose.length+' panels draw an arrow with no path under it: '+loose.join(', '));
+});
+// The ghost is one path of many overlapping parts filled nonzero: a part
+// wound the other way cancels where it overlaps and leaves a hole (a bite out
+// of the head at the neck, a criss-cross in the arms over the chest).
+function areaOf(P){ var a=0; for(var i=0;i<P.length;i++){ var p=P[i], q=P[(i+1)%P.length]; a+=p[0]*q[1]-q[0]*p[1]; } return a/2; }
+t('every part of the ghost winds the same way, so where parts overlap it stays solid, in every rig and both panels', function(){
+  var bad=[];
+  RIGS.forEach(function(id){ [0,app.rStillU(rex(id))].forEach(function(u){ [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){ var svg=f(EXOF[id],u); if(!svg) return;
+    var subs=guide(shapes(svg),'ghost')[0].a.d.split(/(?=M)/), sg=subs.map(function(sp){ return areaOf(pathPts(sp))>0?1:-1; });
+    var odd=sg.map(function(x,k){ return x!==sg[0]?k:-1; }).filter(function(k){ return k>=0; });
+    if(odd.length&&bad.indexOf(id+(v?' front':' side'))<0) bad.push(id+(v?' front':' side')+' (parts '+odd.join(',')+' of '+subs.length+')'); }); }); });
+  assert.ok(!bad.length,bad.length+' ghosts have parts wound the other way: '+bad.slice(0,8).join(', '));
+});
+// A path that goes down and comes back up the same way is drawn once: two
+// dashed passes a hair apart fill each other's gaps and read as a solid line.
+t('a path the rep goes back along is drawn one way only, so its dashes show', function(){
+  var bad=[];
+  RIGS.forEach(function(id){ [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){ var svg=f(EXOF[id],0); if(!svg) return;
+    var R=runsOf(guide(shapes(svg),'path')[0].a.d); if(!R.length) return;
+    function sd(q,a,b){ var dx=b[0]-a[0], dy=b[1]-a[1], l=dx*dx+dy*dy||1e-9, s=Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/l)); return Math.hypot(q[0]-a[0]-s*dx,q[1]-a[1]-s*dy); }
+    // Each drawn point (a run's first point is where it leaves the line, so
+    // on it) against every segment drawn before it, but its own last three.
+    var segs=[], back=0, n=0;
+    R.forEach(function(P){ P.forEach(function(q,i){ n++;
+      if(i&&Math.hypot(q[0]-P[i-1][0],q[1]-P[i-1][1])>0.3&&segs.slice(0,Math.max(0,segs.length-3)).some(function(s){ return sd(q,s[0],s[1])<1; })) back++;
+      if(i) segs.push([P[i-1],q]); }); });
+    if(back>n*0.3) bad.push(id+(v?' front':' side')+' ('+back+' of '+n+' points)'); }); });
+  assert.ok(!bad.length,bad.length+' paths are drawn twice over: '+bad.join(', '));
+});
+// While the figure moves the guides are hidden, so a playing frame is drawn
+// without them: no ghost to build, no path, the arrow a point, the same
+// shapes as a still frame so the figure still moves in place.
+t('a frame drawn bare (while the figure moves) has the same shapes with the guides left empty', function(){
+  ['backsquat','goblet','kb_snatch'].forEach(function(id){ [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){
+    var full=shapes(f(EXOF[id],0.3)), bare=shapes(f(EXOF[id],0.3,1));
+    assert.deepStrictEqual(bare.map(function(p){ return p.n+(p.a['data-g']||''); }),full.map(function(p){ return p.n+(p.a['data-g']||''); }),id+(v?' front':' side')+': a bare frame has other shapes');
+    assert.strictEqual(guide(bare,'ghost')[0].a.d,'',id+(v?' front':' side')+': a bare frame builds the ghost');
+    assert.strictEqual(guide(bare,'path')[0].a.d,'',id+(v?' front':' side')+': a bare frame draws the path');
+    assert.ok(isPoint(arrowOf(bare)),id+(v?' front':' side')+': a bare frame draws the arrow'); }); });
 });
 t('the guides are hidden unless the figure is marked to show them, in a shade of their own in both themes', function(){
   assert.ok(/#fig-live \[data-g\],#fig-live-front \[data-g\]\{visibility:hidden;\}/.test(css),'the guides are not hidden by default');

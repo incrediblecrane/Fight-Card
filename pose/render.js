@@ -291,7 +291,7 @@ function rigFrontSVG(ex,u,bx){
   if(bar&&!back) o+=rEquipFront(ex,s);
   o+=rDot('handL',s.handL,rF(a[3]*s.fistL),armCol,1)+rDot('handR',s.handR,rF(a[3]*s.fistR),armCol,1);
   if(!bar) o+=rEquipFront(ex,s);
-  return o+rope[1]+rPath(gd.pf)+rArrow(rTrackFront(ex,s),rTrackFront(ex,solveFront(frontAt(ex,u+0.05))))+'</svg>';
+  return o+rope[1]+rPath(gd.pf)+rArrow(gd.pf,rTrackFront(ex,s),function(v){ return rTrackFront(ex,solveFront(frontAt(ex,v))); },u)+'</svg>';
 }
 
 // Side view, back to front: far leg and arm, the body, the near leg, the
@@ -330,7 +330,7 @@ function rigSVG(ex,u,bx){
   o+=arm('N',s.sh,s.elbN,s.handN,armCol,RW.arm,1);
   if(top) o+=rEquip(ex,s);
   if(rq) o+='<path d="'+rRopePath(s.handN,rq,s.rope)+rst;
-  return o+rPath(gd.ps)+rArrow(rTrack(ex,s),rTrack(ex,solve(poseAt(ex,u+0.05))))+'</svg>';
+  return o+rPath(gd.ps)+rArrow(gd.ps,rTrack(ex,s),function(v){ return rTrack(ex,solve(poseAt(ex,v))); },u)+'</svg>';
 }
 
 
@@ -345,8 +345,8 @@ function rStillU(ex){
 // faint ghost of the other end of the rep, the path the bar (or the hip, or
 // the shoulders) takes over the whole rep, and a small arrow on that path
 // pointing the way the movement goes next. Each is one shape in every frame,
-// the arrow shrunk to a point when nothing moves, so the live figure still
-// moves in place. The ghost and the path are worked out once per rig.
+// so the figure still moves in place. The ghost and the path are worked out
+// once per rig.
 var rGuides={};
 // What the path follows: the implement in the hand, else the shoulders for an
 // arm drill or a hang, else the hip.
@@ -365,29 +365,47 @@ function rTrackFront(ex,s){
   if(q&&q!=='fixedbar'&&q!=='rope') return ex.load==='L'?s.handL:s.handR;
   return q==='fixedbar'||ex.active==='arms'||ex.active==='armN'?s.shC:s.hipC;
 }
-// The ghost: the whole body as one shape, in a shade just off the panel.
+// The ghost: the whole body as one shape, in a shade just off the panel. Its
+// parts overlap and fill nonzero, so every part winds the way a limb does
+// (rWound): one wound the other way cancels where they overlap and leaves a
+// hole, a bite out of the head at the neck or a criss-cross over the chest.
+function rWound(P){
+  var a=0; for(var i=0;i<P.length;i++){ var p=P[i], q=P[(i+1)%P.length]; a+=p.x*q.y-q.x*p.y; }
+  return rSmooth(a>0?P.slice().reverse():P);
+}
 function rGhostSide(s){
   var a=RW.arm, l=RW.leg;
-  return rCap(s.hipF,l[0],s.kneeF,l[1])+rCap(s.kneeF,l[1],s.ankF,l[2])+rSmooth(rShoePts(s.ankF,s.footF))+
-    rCap(s.shF,a[0],s.elbF,a[1])+rCap(s.elbF,a[1],s.handF,a[2])+rSmooth(rTorsoPts(s.hip,s.mid,s.sh))+
-    rCap(s.hip,l[0],s.kneeN,l[1])+rCap(s.kneeN,l[1],s.ankN,l[2])+rSmooth(rShoePts(s.ankN,s.footN))+
-    rNeck(s.sh,s.head)+rSmooth(rHeadPts(s.sh,s.head))+rCap(s.sh,a[0],s.elbN,a[1])+rCap(s.elbN,a[1],s.handN,a[2]);
+  return rCap(s.hipF,l[0],s.kneeF,l[1])+rCap(s.kneeF,l[1],s.ankF,l[2])+rWound(rShoePts(s.ankF,s.footF))+
+    rCap(s.shF,a[0],s.elbF,a[1])+rCap(s.elbF,a[1],s.handF,a[2])+rWound(rTorsoPts(s.hip,s.mid,s.sh))+
+    rCap(s.hip,l[0],s.kneeN,l[1])+rCap(s.kneeN,l[1],s.ankN,l[2])+rWound(rShoePts(s.ankN,s.footN))+
+    rNeck(s.sh,s.head)+rWound(rHeadPts(s.sh,s.head))+rCap(s.sh,a[0],s.elbN,a[1])+rCap(s.elbN,a[1],s.handN,a[2]);
 }
 function rGhostFront(s){
   var a=RW.farm, l=RW.fleg, h=s.head;
   return rCap(s.hipL,l[0],s.kneeL,l[1])+rCap(s.kneeL,l[1],s.footL,l[2])+rCap(s.hipR,l[0],s.kneeR,l[1])+rCap(s.kneeR,l[1],s.footR,l[2])+
-    rSmooth(rTorsoFrontPts(s))+rCap(s.shC,3.8,h,3.2)+'M'+rF(h.x-7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x+7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x-7)+','+rF(h.y)+'Z'+
+    rWound(rTorsoFrontPts(s))+rCap(s.shC,3.8,h,3.2)+'M'+rF(h.x-7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x+7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x-7)+','+rF(h.y)+'Z'+
     rCap(s.shL,a[0],s.elbL,a[1])+rCap(s.elbL,a[1],s.handL,a[2])+rCap(s.shR,a[0],s.elbR,a[1])+rCap(s.elbR,a[1],s.handR,a[2]);
 }
 // Worked out once per rig: both ends of the rep (the start and the still) as
 // ghosts, and each panel's path. A path that hardly moves (a sprint's hip) is
-// left out: a dot of dashes says nothing.
+// left out: a dot of dashes says nothing. Where the rep goes back along the
+// way it came (a squat's bar coming up) the path is drawn once: two dashed
+// passes a hair apart fill each other's gaps and read as a solid line. So the
+// path is runs of new ground, each from where it leaves the line drawn so far.
 function rGuideOf(key,ex){
   if(Object.prototype.hasOwnProperty.call(rGuides,key)) return rGuides[key];
   var N=48, ends=[0,rStillU(ex)], g={ends:ends, side:[], front:[], ps:'', pf:''};
-  function line(pts){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-    pts.forEach(function(p){ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); });
-    return Math.max(x1-x0,y1-y0)<6?'':pts.map(rXY).join(' '); }
+  function near(q,P){ for(var i=0;i+1<P.length;i++){ var a=P[i], dx=P[i+1].x-a.x, dy=P[i+1].y-a.y, t=Math.max(0,Math.min(1,((q.x-a.x)*dx+(q.y-a.y)*dy)/(dx*dx+dy*dy||1)));
+      if(Math.hypot(q.x-a.x-t*dx,q.y-a.y-t*dy)<1.5) return true; } return false; }
+  function line(all){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9, runs=[], run=null, last=-9;
+    all.forEach(function(q,i){
+      if(runs.some(function(r){ return near(q,r); })||(run&&near(q,run.slice(0,-2)))){ if(run) runs.push(run); run=null; return; }
+      // A step or two off the line (a slow start) carries the last run on.
+      if(!run) run=last>=i-3&&runs.length?runs.pop().concat(all.slice(last+1,i)):i?[all[i-1]]:[];
+      run.push(q); last=i; });
+    if(run) runs.push(run);
+    all.forEach(function(p){ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); });
+    return Math.max(x1-x0,y1-y0)<6?'':runs.map(function(r){ return 'M'+r.map(rXY).join(' L'); }).join(' '); }
   ends.forEach(function(u){ g.side.push(rGhostSide(solve(poseAt(ex,u)))); if(ex.front) g.front.push(rGhostFront(solveFront(frontAt(ex,u)))); });
   var ps=[], pf=[];
   for(var i=0;i<=N;i++){ ps.push(rTrack(ex,solve(poseAt(ex,i/N)))); if(ex.front) pf.push(rTrackFront(ex,solveFront(frontAt(ex,i/N)))); }
@@ -402,15 +420,18 @@ function rGhostEnd(ex,g,u){
     ['hip','sh','head','handN','handF','kneeN','ankN'].forEach(function(k){ d+=Math.hypot(a[k].x-b[k].x,a[k].y-b[k].y); }); return d; }
   return far(g.ends[0])>=far(g.ends[1])?0:1;
 }
-// The arrow: where the tracked point goes over the next twentieth of the rep,
-// a small head on the path pointing that way; a point when it holds.
-function rArrow(c,n){
+// The arrow: a small head on the path (p) at the tracked point (c), pointing
+// where it goes next (at(v), the point at v in the rep). A still is often
+// followed by a hold or a slow start, so it looks on to where the point first
+// moves. With no path it is a point: an arrow alone would float.
+function rArrow(p,c,at,u){
+  var n=c; if(p) for(var i=1;i<=48&&Math.hypot(n.x-c.x,n.y-c.y)<1;i++) n=at(u+i/48);
   var dx=n.x-c.x, dy=n.y-c.y, l=Math.hypot(dx,dy), k=l<1?0:1, ux=k*dx/(l||1), uy=k*dy/(l||1);
   var tip=rP(c.x+ux*6,c.y+uy*6), a=rP(c.x-uy*3.4,c.y+ux*3.4), b=rP(c.x+uy*3.4,c.y-ux*3.4);
   return '<path data-g="arrow" d="M'+rXY(tip)+' L'+rXY(a)+' L'+rXY(b)+'Z" fill="var(--accent)" stroke="var(--surface-raised)" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/>';
 }
 function rGhost(d){ return '<path data-g="ghost" d="'+d+'" fill="var(--fig-ghost)"/>'; }
-function rPath(p){ return '<polyline data-g="path" points="'+p+'" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="2.4 2.6" stroke-linecap="round" opacity="0.85"/>'; }
+function rPath(p){ return '<path data-g="path" d="'+p+'" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="2.4 2.6" stroke-linecap="round" opacity="0.85"/>'; }
 
 // ---- drawn in place, as the app draws its live figure ----
 // A frame gives every shape of the drawing its new attributes rather than

@@ -46,7 +46,7 @@ function world(rig0,opt){
   var names=Object.keys(env);
   var api=new Function(names.join(','),
     'var poseTimer=null, poseFlip=false;\n'+
-    'function rigSVG(id,u){ return "<svg u=\\""+u+"\\"></svg>"; } function rigFrontSVG(){ return ""; } function figureSVG(){ return ""; }\n'+
+    'function rigSVG(id,u,b){ return "<svg u=\\""+u+"\\" b=\\""+(b?1:0)+"\\"></svg>"; } function rigFrontSVG(){ return ""; } function figureSVG(){ return ""; }\n'+
     src+';\nreturn {start:startPoseLoop, stop:stopPoseLoop, still:rigStillU, rigFor:rigFor, RIGFRAMES:RIGFRAMES, tap:typeof tapFigure==="function"?tapFigure:function(){}};'
   ).apply(null,names.map(function(k){ return env[k]; }));
   // Run the clock forward: timers as they fall due, frames on each refresh.
@@ -183,7 +183,12 @@ console.log('\nTHE GUIDES');
 // The ghost, the path and the arrow (rigSVG's motion guides) show while the
 // figure stands still and never while it moves: on a moving figure at phone
 // size they were one thing too many to follow.
-function guides(w){ return w.el.attrs['data-guides']; }
+// A frame drawn while the figure moves is drawn bare (rigSVG's third
+// argument): the guides are hidden then, so building them is wasted work.
+function guides(w){ var on=w.el.attrs['data-guides'], b=/ b="1"/.test(w.el.innerHTML);
+  if(on==='on'&&b) throw new Error('the guides show on a frame drawn without them');
+  if(on==='off'&&!b) throw new Error('a moving frame is drawn with its guides');
+  return on; }
 t('the reduced-motion still shows the guides; the rep a tap plays hides them, and they come back when it stops', function(){
   var w=world('backsquat',{still:true}); w.api.start();
   assert.strictEqual(guides(w),'on','the still does not show its guides');

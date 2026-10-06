@@ -1178,13 +1178,19 @@ a ghost of the other end of the rep (the start or the still, whichever the
 figure is further from) in `--fig-ghost` under the figure, then over it a
 dashed path of the bar (the implement in the hand, else the shoulders for an
 arm drill or a hang, else the hip; left out when it moves under 6 units) and
-a small arrow on it pointing the way it goes over the next twentieth of the
-rep, shrunk to a point while the body holds. Each is one shape in every frame
-(`data-g`), so the figure still moves in place. They show only while the
-figure stands still (`data-guides="on"` on `#fig-live`): the reduced-motion
-still, the end of a tapped rep, and a figure paused with a tap. On a moving
-figure at phone size they were one thing too many to follow, and the ghost
-swaps ends half way through the rep.
+a small arrow on it pointing the way the point goes next (looking on past a
+hold or a slow start to where it first moves), shrunk to a point when there
+is no path. The ghost is one path of overlapping parts filled nonzero, so
+every part winds the same way (`rWound`) or an overlap leaves a hole. Where
+the rep comes back the way it went (a squat's bar coming up) the path is drawn
+once, as runs of new ground: two dashed passes a hair apart read as a solid
+line. Each is one shape in every frame (`data-g`), so the figure still moves
+in place. They show only while the figure stands still (`data-guides="on"` on
+`#fig-live`): the reduced-motion still, the end of a tapped rep, and a figure
+paused with a tap. On a moving figure at phone size they were one thing too
+many to follow, and the ghost swaps ends half way through the rep. So a frame
+drawn while the figure moves is drawn bare (`rigSVG(id,u,bare)`, `drawRig`
+without its third argument): the guides left empty, no ghost built.
 
 **Preview drawing**:
 `pose/render.js` draws the preview with a copy of the app's `rigSVG` and
