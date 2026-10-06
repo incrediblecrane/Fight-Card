@@ -1,34 +1,6 @@
-var NS='http://www.w3.org/2000/svg';
-function el(tag,attrs){ var n=document.createElementNS(NS,tag); for(var k in attrs) n.setAttribute(k,attrs[k]); return n; }
-function segPts(A,B,w1,w2){
-  var dx=B.x-A.x, dy=B.y-A.y, len=Math.sqrt(dx*dx+dy*dy)||1;
-  var px=-dy/len, py=dx/len;
-  return [[A.x+px*w1/2,A.y+py*w1/2],[A.x-px*w1/2,A.y-py*w1/2],
-          [B.x-px*w2/2,B.y-py*w2/2],[B.x+px*w2/2,B.y+py*w2/2]]
-    .map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
-}
-// A trunk that bows (bow on a frame): one tapered shape bent at mid-spine,
-// its edges mitred there, so it is the same one shape as a straight trunk.
-function spinePts(A,M,B,w1,wm,w2){
-  function nrm(P,Q){ var dx=Q.x-P.x, dy=Q.y-P.y, l=Math.sqrt(dx*dx+dy*dy)||1; return [-dy/l,dx/l]; }
-  var a=nrm(A,M), b=nrm(M,B), m=[a[0]+b[0],a[1]+b[1]], ml=Math.sqrt(m[0]*m[0]+m[1]*m[1])||1;
-  m=[m[0]/ml,m[1]/ml]; var k=wm/2/Math.max(0.5,m[0]*a[0]+m[1]*a[1]);
-  function pt(P,n,w){ return (P.x+n[0]*w).toFixed(1)+','+(P.y+n[1]*w).toFixed(1); }
-  return [pt(A,a,w1/2),pt(M,m,k),pt(B,b,w2/2),pt(B,b,-w2/2),pt(M,m,-k),pt(A,a,-w1/2)].join(' ');
-}
-function bowed(ex){ return ex.frames.some(function(f){ return f.bow!==undefined; }); }
-// The figure always faces +x, so the toe always points +x. This used to be
-// derived from whether the knee was forward of the ankle, which flipped the
-// foot backwards through most of every squat. The foot is the app's: a block
-// hinged at the ankle, pitched by footN/footF (rig.js footAt).
-function footPts(ank,rot){ return footAt(ank,rot).map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' '); }
-// A rope strand from a hand to the far end of its loop (rig.js ropeAt), bowed
-// back against the way it turns, as the app draws it.
-function ropePath(h,q,a){
-  var r=a*Math.PI/180, vx=28*Math.cos(r), vy=60*Math.sin(r), vl=Math.hypot(vx,vy)||1;
-  var cx=(h.x+q.x)/2-vx/vl*8, cy=(h.y+q.y)/2-vy/vl*8;
-  return 'M'+h.x.toFixed(1)+' '+h.y.toFixed(1)+' Q'+cx.toFixed(1)+' '+cy.toFixed(1)+' '+q.x.toFixed(1)+' '+q.y.toFixed(1);
-}
+// The preview: every rig drawn as the app draws it. The drawing is the app's
+// own (rigSVG and rigFrontSVG in index.html, copied here onto rig.js's solver),
+// and pose/checks/render.js fails unless the two draw the same shapes.
 // Precompute the bar path over a full rep so it can be shown as a trace.
 function barPath(ex){
   if(!ex.equip||ex.equip==='fixedbar') return null;
@@ -77,328 +49,341 @@ function boxOf(ex){
   var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2)), fw=ex.frontW||100;
   return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y, fx:70-fw/2, fw:fw};
 }
-// A prop has an edge of its own (--prop, 3:1 against the panel).
-function propEl(p){
-  var a={x:p[0],y:p[1],width:p[2],height:p[3],rx:p[4]===undefined?2:p[4],fill:'var(--prop-fill)',stroke:'var(--prop)','stroke-width':1.5};
-  if(p[5]) a.transform='rotate('+p[5]+' '+(p[0]+p[2]/2)+' '+(p[1]+p[3]/2)+')';
-  return el('rect',a);
-}
-// The floor runs the whole width of the panel; the panel clips it.
-function groundEl(x0,x1){ return el('line',{x1:x0-200,y1:GROUND,x2:x1+200,y2:GROUND,stroke:'var(--ground)','stroke-width':2}); }
-function buildFigure(ex,host,bx){
-  bx=bx||boxOf(ex);
-  var svg=el('svg',{viewBox:bx.x+' '+bx.y+' '+bx.w+' '+bx.h,preserveAspectRatio:'xMidYMax meet',role:'img','aria-label':ex.name+' animation'});
-  var ink='var(--text)', far='var(--text-faint)', hi='var(--accent)', soft='var(--text-soft)';
-  var legCol = ex.active==='legs'?hi:ink;
-  var armCol = (ex.active==='arms'||ex.active==='armN')?hi:ink;
-  svg.appendChild(groundEl(bx.x,bx.x+bx.w));
-  // Props are part of the movement, not decoration: a split squat without the
-  // bench behind it is a lunge, and a wall sit without the wall is a squat.
-  (ex.props||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
-  var bp=barPath(ex), trace=null;
-  if(bp){ trace=el('polyline',{points:bp,fill:'none',stroke:'var(--accent)','stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0}); svg.appendChild(trace); }
-  var R={};
-  // edge: drawn in panel colour with a stroke, under the near arm, as the cut
-  // line that keeps it visible where it crosses the body or passes the head.
-  function pair(name,col,w,isLeg,edge){
-    var st=edge?{stroke:col,'stroke-width':2.6,'stroke-linejoin':'round'}:{};
-    function mk(t,a){ for(var k in st) a[k]=st[k]; return el(t,a); }
-    R[name+'1']=mk('polygon',{fill:col}); R[name+'j']=mk('circle',{r:w[1]/2,fill:col});
-    R[name+'2']=mk('polygon',{fill:col});
-    R[name+'e']= isLeg ? el('polygon',{fill:col}) : mk('circle',{r:w[2]/2+0.8,fill:col});
-    [R[name+'1'],R[name+'j'],R[name+'2'],R[name+'e']].forEach(function(n){svg.appendChild(n);});
-  }
-  // The implement is in the near hand: in front of the body, under the arm.
-  var eq=el('g',{});
-  // An implement is drawn as it PROJECTS in this view, not as a generic icon.
-  // A barbell runs across the body, so from the side its axis points at the
-  // viewer: you see the plate face-on as a disc with the bar end as a hub. It
-  // used to be drawn as a 68-wide horizontal bar here, which is what a barbell
-  // looks like from the FRONT. Scale is honest: a 45cm plate is r=15 against a
-  // 120-unit figure. axis: 'lateral' runs across the body, 'sagittal' front to
-  // back (a dumbbell hanging in a neutral grip), 'vertical' upright (a goblet).
-  var axis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
-  if(ex.equip==='barbell'){
-    R.plate=el('circle',{r:15,fill:'none',stroke:soft,'stroke-width':3.5});
-    R.hub=el('circle',{r:3.5,fill:soft});
-    eq.appendChild(R.plate); eq.appendChild(R.hub);
-  } else if(ex.equip==='fixedbar'){
-    R.hub=el('circle',{r:3.2,fill:soft});
-    eq.appendChild(R.hub);
-  } else if(ex.equip==='dumbbell' && axis==='vertical'){
-    R.db=el('rect',{width:8,height:22,rx:3,fill:soft}); R.d1=el('rect',{width:16,height:7,rx:2,fill:soft}); R.d2=el('rect',{width:16,height:7,rx:2,fill:soft});
-    eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
-  } else if(ex.equip==='dumbbell' && axis==='lateral'){
-    // A pressed or supinated-curl dumbbell has its handle across the body, so
-    // from the side you look down the handle and see one bell face.
-    R.bell=el('circle',{r:6.5,fill:soft}); eq.appendChild(R.bell);
-  } else if(ex.equip==='cable'){
-    // With no anchorAt the cable runs toward the camera: only the handle shows.
-    if(ex.anchorAt){ R.cable=el('line',{stroke:soft,'stroke-width':1.8}); eq.appendChild(R.cable); }
-    R.grip=el('rect',{width:5,height:13,rx:2.5,fill:soft}); eq.appendChild(R.grip);
-  } else if(ex.equip==='ball'){
-    R.ball=el('circle',{r:11,fill:'none',stroke:soft,'stroke-width':3}); R.bhub=el('circle',{r:3,fill:soft});
-    eq.appendChild(R.ball); eq.appendChild(R.bhub);
-  } else if(ex.equip==='dumbbell'){
-    // Hanging in a neutral grip the handle runs front to back, so from the side
-    // you see the whole dumbbell in profile, lying horizontal.
-    R.db=el('rect',{width:22,height:7,rx:3,fill:soft}); R.d1=el('rect',{width:7,height:17,rx:2,fill:soft}); R.d2=el('rect',{width:7,height:17,rx:2,fill:soft});
-    eq.appendChild(R.db); eq.appendChild(R.d1); eq.appendChild(R.d2);
-  } else if(ex.equip==='plate'){
-    // A plate seen edge on, pinched by its rim: it hangs below the fist.
-    R.pp=el('ellipse',{rx:4.5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3}); eq.appendChild(R.pp);
-  } else if(ex.equip==='kettlebell'){
-    R.kb=el('circle',{r:10,fill:soft}); R.kh=el('path',{fill:'none',stroke:soft,'stroke-width':3.5});
-    eq.appendChild(R.kb); eq.appendChild(R.kh);
-  }
-  // Back to front, as the app: a rope's far strand, far leg and arm, the body,
-  // the near leg, the implement, the head, the near arm, then a bar or a
-  // pinched plate, and a rope's near strand.
-  var rope={fill:'none',stroke:soft,'stroke-width':1.6};
-  if(ex.equip==='rope'){ R.ropeF=el('path',rope); svg.appendChild(R.ropeF); }
-  pair('fleg',far,[10,7,5],true); pair('farm',far,[7,5,4],false);
-  R.torso=el('polygon',{fill:ink}); R.hip=el('circle',{r:6.5,fill:ink}); R.sh=el('circle',{r:8.5,fill:ink});
-  svg.appendChild(R.torso); svg.appendChild(R.hip); svg.appendChild(R.sh);
-  var top=ex.equip==='barbell'||ex.equip==='fixedbar'||ex.equip==='plate';
-  pair('nleg',legCol,[11,8,5.5],true);
-  if(!top) svg.appendChild(eq);
-  R.head=el('circle',{r:L.HEAD_R,fill:ink}); svg.appendChild(R.head);
-  pair('ncut','var(--surface-raised)',[8,6,4.5],false,true); pair('narm',armCol,[8,6,4.5],false);
-  if(top) svg.appendChild(eq);
-  if(ex.equip==='rope'){ R.ropeN=el('path',rope); svg.appendChild(R.ropeN); }
-  host.appendChild(svg);
-  return {R:R,trace:trace,svg:svg};
-}
-function update(ex,ref,u){
-  var s=solve(poseAt(ex,u)), R=ref.R;
-  function setLimb(n,a,b,c,w,isLeg,rot){
-    R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
-    R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
-    R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
-    if(isLeg) R[n+'e'].setAttribute('points',footPts(c,rot));
-    else { R[n+'e'].setAttribute('cx',c.x.toFixed(1)); R[n+'e'].setAttribute('cy',c.y.toFixed(1)); }
-  }
-  setLimb('fleg',s.hipF,s.kneeF,s.ankF,[10,7,5],true,s.footF);
-  setLimb('farm',s.shF,s.elbF,s.handF,[7,5,4],false);
-  setLimb('nleg',s.hip,s.kneeN,s.ankN,[11,8,5.5],true,s.footN);
-  setLimb('ncut',s.sh,s.elbN,s.handN,[8,6,4.5],false);
-  setLimb('narm',s.sh,s.elbN,s.handN,[8,6,4.5],false);
-  R.torso.setAttribute('points',bowed(ex)?spinePts(s.hip,s.mid,s.sh,13,15,17):segPts(s.hip,s.sh,13,17));
-  R.hip.setAttribute('cx',s.hip.x.toFixed(1)); R.hip.setAttribute('cy',s.hip.y.toFixed(1));
-  R.sh.setAttribute('cx',s.sh.x.toFixed(1));  R.sh.setAttribute('cy',s.sh.y.toFixed(1));
-  R.head.setAttribute('cx',s.head.x.toFixed(1)); R.head.setAttribute('cy',s.head.y.toFixed(1));
-  // Only a bar with barAt is bolted in place; a broomstick or a rower handle
-  // uses the same mark but travels with the hands.
-  var p = (ex.equip==='fixedbar'&&ex.barAt) ? {x:ex.barAt[0],y:ex.barAt[1]} : s.handN;
-  var axis2 = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
-  if(R.plate){ R.plate.setAttribute('cx',p.x.toFixed(1)); R.plate.setAttribute('cy',p.y.toFixed(1)); }
-  if(R.pp){ R.pp.setAttribute('cx',p.x.toFixed(1)); R.pp.setAttribute('cy',(p.y+9).toFixed(1)); }
-  if(R.hub){ R.hub.setAttribute('cx',p.x.toFixed(1)); R.hub.setAttribute('cy',p.y.toFixed(1)); }
-  if(R.bell){ R.bell.setAttribute('cx',p.x.toFixed(1)); R.bell.setAttribute('cy',p.y.toFixed(1)); }
-  if(R.cable){
-    R.cable.setAttribute('x1',ex.anchorAt[0]); R.cable.setAttribute('y1',ex.anchorAt[1]);
-    R.cable.setAttribute('x2',p.x.toFixed(1)); R.cable.setAttribute('y2',p.y.toFixed(1));
-  }
-  if(R.grip){ R.grip.setAttribute('x',(p.x-2.5).toFixed(1)); R.grip.setAttribute('y',(p.y-6.5).toFixed(1)); }
-  // A ball let go of (ballAt) is where the rig puts it, else in the near hand.
-  if(R.ball){ var b=s.ball||s.handN; [R.ball,R.bhub].forEach(function(n){ n.setAttribute('cx',b.x.toFixed(1)); n.setAttribute('cy',b.y.toFixed(1)); }); }
-  if(R.ropeN){ var q=ropeAt(s);
-    R.ropeF.setAttribute('d',ropePath(s.handF,{x:q.x-5,y:q.y},s.rope)); R.ropeN.setAttribute('d',ropePath(s.handN,q,s.rope)); }
-  if(R.db && axis2==='vertical'){
-    R.db.setAttribute('x',(p.x-4).toFixed(1)); R.db.setAttribute('y',(p.y-11).toFixed(1));
-    R.d1.setAttribute('x',(p.x-8).toFixed(1)); R.d1.setAttribute('y',(p.y-14).toFixed(1));
-    R.d2.setAttribute('x',(p.x-8).toFixed(1)); R.d2.setAttribute('y',(p.y+7).toFixed(1));
-  } else if(R.db){
-    R.db.setAttribute('x',(p.x-11).toFixed(1)); R.db.setAttribute('y',(p.y-3.5).toFixed(1));
-    R.d1.setAttribute('x',(p.x-14).toFixed(1)); R.d1.setAttribute('y',(p.y-8.5).toFixed(1));
-    R.d2.setAttribute('x',(p.x+7).toFixed(1));  R.d2.setAttribute('y',(p.y-8.5).toFixed(1));
-  }
-  // A kettlebell lies where rig.js bellAt puts it; the handle loops round the
-  // fist on the side away from the bell.
-  if(R.kb){ var kb=bellAt(ex,s), kd=kb.d; R.kb.setAttribute('cx',kb.x.toFixed(1)); R.kb.setAttribute('cy',kb.y.toFixed(1));
-            R.kh.setAttribute('d','M'+(p.x+4*kd.x+6*kd.y).toFixed(1)+' '+(p.y+4*kd.y-6*kd.x).toFixed(1)+' Q'+(p.x-8*kd.x).toFixed(1)+' '+(p.y-8*kd.y).toFixed(1)+' '+(p.x+4*kd.x-6*kd.y).toFixed(1)+' '+(p.y+4*kd.y+6*kd.x).toFixed(1)); }
+// ---- the app's drawing ----
+function rP(x,y){ return {x:x,y:y}; }
+// A rope strand from a hand to the far end of the loop, bowed back against
+// the way the rope is turning.
+function rRopePath(h,q,a){
+  var r=a*Math.PI/180, vx=28*Math.cos(r), vy=60*Math.sin(r), vl=Math.hypot(vx,vy)||1;
+  var cx=(h.x+q.x)/2-vx/vl*8, cy=(h.y+q.y)/2-vy/vl*8;
+  return 'M'+h.x.toFixed(1)+' '+h.y.toFixed(1)+' Q'+cx.toFixed(1)+' '+cy.toFixed(1)+' '+q.x.toFixed(1)+' '+q.y.toFixed(1);
 }
 
-// ---- front-plane rendering ----
-// Layered as the app draws it: legs behind the body unless a knee comes up
-// above its hip, the head behind the arms unless the rig holds them behind it
-// (behindHead), and a stick behind the back (its side-view hands behind the
-// hip) behind the body.
-function buildFront(ex,host,bx){
-  bx=bx||boxOf(ex);
-  var svg=el('svg',{viewBox:bx.fx+' '+bx.y+' '+bx.fw+' '+bx.h,role:'img','aria-label':ex.name+' front view'});
-  var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
-  var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
-  if(!ex.frontPlan) svg.appendChild(groundEl(bx.fx,bx.fx+bx.fw));
-  (ex.planProps||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
-  var R={svg:svg};
-  // A rope's arch behind the body (on its way over), and in front (on its way
-  // down and under), as the app.
-  var rope={fill:'none',stroke:soft,'stroke-width':1.6};
-  if(ex.equip==='rope'){ R.ropeB=el('path',rope); svg.appendChild(R.ropeB); }
-  // An arm foreshortened toward the camera lies on top of the torso in the same
-  // ink, so it disappears into the silhouette. A surface-coloured outline is
-  // what separates it; legs sit outside the body and do not need one.
-  function limb(n,col,w,outline){
-    var o = outline?{stroke:'var(--surface-raised)','stroke-width':1.6,'stroke-linejoin':'round'}:{};
-    function mk(t,a){ for(var k in o) a[k]=o[k]; return el(t,a); }
-    R[n+'1']=mk('polygon',{fill:col}); R[n+'j']=mk('circle',{r:w[1]/2,fill:col});
-    R[n+'2']=mk('polygon',{fill:col});
-    var g=el('g',{}); [R[n+'1'],R[n+'j'],R[n+'2']].forEach(function(x){g.appendChild(x);}); svg.appendChild(g); return g;
-  }
-  // The stick's place behind the body, and each leg's two places.
-  R.backAt=el('g',{}); svg.appendChild(R.backAt);
-  R.gLegL=limb('flegL',legCol,[11,8,5.5]); R.gLegR=limb('flegR',legCol,[11,8,5.5]);
-  R.ffootL=el('ellipse',{rx:7,ry:4,fill:legCol}); R.ffootR=el('ellipse',{rx:7,ry:4,fill:legCol});
-  R.gLegL.appendChild(R.ffootL); R.gLegR.appendChild(R.ffootR);
-  R.legsBack=el('g',{}); svg.appendChild(R.legsBack);
-  R.fneck=el('rect',{width:7,height:12,rx:3,fill:ink}); svg.appendChild(R.fneck);
-  R.ftorso=el('polygon',{fill:ink}); svg.appendChild(R.ftorso);
-  R.fhipL=el('circle',{r:5.5,fill:ink}); R.fhipR=el('circle',{r:5.5,fill:ink});
-  svg.appendChild(R.fhipL); svg.appendChild(R.fhipR);
-  R.legsUp=el('g',{}); svg.appendChild(R.legsUp);
-  R.fhead=el('circle',{r:L.HEAD_R,fill:ink});
-  if(!ex.behindHead) svg.appendChild(R.fhead);
-  limb('farmL',armCol,[8,6,4.5],true); limb('farmR',armCol,[8,6,4.5],true);
-  R.fshL=el('circle',{r:6.5,fill:ink}); R.fshR=el('circle',{r:6.5,fill:ink});
-  svg.appendChild(R.fshL); svg.appendChild(R.fshR);
-  if(ex.behindHead) svg.appendChild(R.fhead);
-  R.fhandL=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
-  R.fhandR=el('circle',{fill:armCol,stroke:'var(--surface-raised)','stroke-width':2});
-  // A bar is gripped, so the hands go on top of it; a bell hangs from the
-  // hands, so it goes on top of them.
-  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
-    R.fbar=el('rect',{height:5,rx:2.5,fill:soft});
-    R.fpL=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
-    R.fpR=el('ellipse',{rx:5,ry:13,fill:'var(--surface)',stroke:soft,'stroke-width':3});
-    svg.appendChild(R.fbar); R.barAt=R.fbar.previousSibling;
-    if(ex.equip==='barbell'){ svg.appendChild(R.fpL); svg.appendChild(R.fpR); }
-  }
-  svg.appendChild(R.fhandL); svg.appendChild(R.fhandR);
-  if(ex.equip==='kettlebell'){
-    // One bell: in the loaded hand of a one-handed lift (load), else both
-    // hands share its handle and it hangs as a single mass below them.
-    R.fkbH=el('path',{fill:'none',stroke:soft,'stroke-width':3.4,'stroke-linecap':'round'});
-    R.fkb=el('circle',{r:9,fill:soft});
-    svg.appendChild(R.fkbH); svg.appendChild(R.fkb);
-  }
-  var faxis = ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral');
-  if(ex.equip==='dumbbell' && faxis==='vertical'){
-    R.fdb=el('rect',{width:9,height:20,rx:3,fill:soft});
-    R.fdb1=el('rect',{width:19,height:7,rx:2.5,fill:soft});
-    R.fdb2=el('rect',{width:19,height:7,rx:2.5,fill:soft});
-    svg.appendChild(R.fdb); svg.appendChild(R.fdb1); svg.appendChild(R.fdb2);
-  } else if(ex.equip==='dumbbell' && faxis==='lateral'){
-    // Handle across the body: from the front you see the whole dumbbell in
-    // profile at each hand. This is what separates a hammer curl from a
-    // supinated curl at a glance, in both views.
-    R.fdbL=el('g',{}); R.fdbR=el('g',{});
-    [['L',R.fdbL],['R',R.fdbR]].forEach(function(pr){
-      R['fh'+pr[0]]=el('rect',{width:20,height:6,rx:3,fill:soft});
-      R['fc'+pr[0]+'1']=el('rect',{width:6,height:16,rx:2,fill:soft});
-      R['fc'+pr[0]+'2']=el('rect',{width:6,height:16,rx:2,fill:soft});
-      pr[1].appendChild(R['fh'+pr[0]]); pr[1].appendChild(R['fc'+pr[0]+'1']); pr[1].appendChild(R['fc'+pr[0]+'2']);
-      svg.appendChild(pr[1]);
-    });
-  } else if(ex.equip==='dumbbell'){
-    // Handle running front to back means you look straight down its axis: one
-    // bell face per hand, not a dumbbell lying sideways across the body.
-    R.fbellL=el('circle',{r:6,fill:soft}); R.fbellR=el('circle',{r:6,fill:soft});
-    svg.appendChild(R.fbellL); svg.appendChild(R.fbellR);
-  } else if(ex.equip==='plate'){
-    // Face on from the front, one per hand, hanging from the pinch at the rim.
-    R.fppL=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3}); R.fppR=el('circle',{r:10,fill:'none',stroke:soft,'stroke-width':3});
-    svg.appendChild(R.fppL); svg.appendChild(R.fppR);
-  } else if(ex.equip==='cable'){
-    // One anchor ([x,y]) is one cable to one handle; two are one per hand.
-    R.fcabL=el('line',{stroke:soft,'stroke-width':1.8}); R.fgripL=el('rect',{width:5,height:13,rx:2.5,fill:soft});
-    svg.appendChild(R.fcabL); svg.appendChild(R.fgripL);
-    if(!ex.anchorFront||ex.anchorFront.length>=4){ R.fcabR=el('line',{stroke:soft,'stroke-width':1.8}); R.fgripR=el('rect',{width:5,height:13,rx:2.5,fill:soft});
-      svg.appendChild(R.fcabR); svg.appendChild(R.fgripR); }
-  } else if(ex.equip==='ball'){
-    R.fball=el('circle',{r:11,fill:'none',stroke:soft,'stroke-width':3}); R.fbhub=el('circle',{r:3,fill:soft});
-    svg.appendChild(R.fball); svg.appendChild(R.fbhub);
-  }
-  if(ex.equip==='rope'){ R.ropeF=el('path',rope); svg.appendChild(R.ropeF); }
-  host.appendChild(svg);
-  return R;
+// ---- the figure's shapes ----
+// Each part of the figure is one shape with the same commands every frame,
+// so a rep moves it in place (drawInPlace) rather than drawing it again.
+function rF(n){ return n.toFixed(1); }
+function rXY(p){ return rF(p.x)+','+rF(p.y); }
+// A limb segment: a tapered capsule, rounded at both joints, its radius rA at
+// A and rB at B (the outer tangents of the two circles and an arc round each).
+function rCap(A,rA,B,rB){
+  var dx=B.x-A.x, dy=B.y-A.y, l=Math.sqrt(dx*dx+dy*dy);
+  if(l<0.05){ dx=0; dy=-0.05; l=0.05; }
+  // A bone seen end on (an arm toward the camera) is short: its root narrows
+  // to fit, so the outline stays round both joints.
+  if(Math.abs(rA-rB)>0.9*l) rA=rB+(rA>rB?0.9:-0.9)*l;
+  var ux=dx/l, uy=dy/l, s=(rA-rB)/l, c=Math.sqrt(1-s*s);
+  var w1=rP(ux*s-uy*c,uy*s+ux*c), w2=rP(ux*s+uy*c,uy*s-ux*c);
+  function at(P,w,r){ return rXY(rP(P.x+w.x*r,P.y+w.y*r)); }
+  return 'M'+at(A,w1,rA)+' L'+at(B,w1,rB)+' A'+rF(rB)+','+rF(rB)+' 0 '+(s<0?1:0)+',0 '+at(B,w2,rB)+
+    ' L'+at(A,w2,rA)+' A'+rF(rA)+','+rF(rA)+' 0 '+(s>0?1:0)+',0 '+at(A,w1,rA)+'Z';
 }
-function updateFront(ex,R,u){
-  var f=frontAt(ex,u); if(!f) return;
-  var s=solveFront(f);
-  // Which layer each leg and the stick are in at this moment.
-  [['gLegL',s.kneeL,s.hipL],['gLegR',s.kneeR,s.hipR]].forEach(function(k){
-    var up=!ex.frontPlan&&k[1].y<k[2].y-1;
-    if(R[k[0]+'up']!==up){ R[k[0]+'up']=up; R.svg.insertBefore(R[k[0]],up?R.legsUp:R.legsBack); } });
-  if(R.fbar&&ex.equip==='fixedbar'&&!ex.barAt&&ex.frames){ var sd=solve(poseAt(ex,u)), back=sd.handN.x<sd.hip.x;
-    if(R.back!==back){ R.back=back; R.svg.insertBefore(R.fbar,back?R.backAt:R.barAt.nextSibling); } }
-  function setL(n,a,b,c,w){
-    R[n+'1'].setAttribute('points',segPts(a,b,w[0],w[1]));
-    R[n+'j'].setAttribute('cx',b.x.toFixed(1)); R[n+'j'].setAttribute('cy',b.y.toFixed(1));
-    R[n+'2'].setAttribute('points',segPts(b,c,w[1],w[2]));
+// A closed curve through the points (Catmull-Rom as cubic Beziers).
+function rSmooth(P){
+  var n=P.length, d='M'+rXY(P[0]);
+  for(var i=0;i<n;i++){ var a=P[(i+n-1)%n], b=P[i], c=P[(i+1)%n], e=P[(i+2)%n];
+    d+=' C'+rXY(rP(b.x+(c.x-a.x)/6,b.y+(c.y-a.y)/6))+' '+rXY(rP(c.x-(e.x-b.x)/6,c.y-(e.y-b.y)/6))+' '+rXY(c); }
+  return d+'Z';
+}
+// The trunk from the side: pelvis, waist and chest along the spine, from the
+// hip through mid-spine (bowed when the rig bows it) to the shoulder. Each
+// station is [how far up the spine, front, back]; the front is the side the
+// figure faces.
+var RTORSO=[[-0.16,2.5,4.5],[-0.04,6,8],[0.18,5.6,7.2],[0.42,5,5.6],[0.66,7.6,6],[0.86,7.2,6.6],[1,5.2,6.6],[1.1,1.8,4.2]];
+function rTorsoPts(hip,mid,sh){
+  var fr=[], bk=[];
+  RTORSO.forEach(function(st){ var lo=st[0]<0.5, A=lo?hip:mid, B=lo?mid:sh, t=(st[0]-(lo?0:0.5))*2;
+    var dx=B.x-A.x, dy=B.y-A.y, l=Math.sqrt(dx*dx+dy*dy)||1, fx=-dy/l, fy=dx/l, cx=A.x+dx*t, cy=A.y+dy*t;
+    fr.push(rP(cx+fx*st[1],cy+fy*st[1])); bk.unshift(rP(cx-fx*st[2],cy-fy*st[2])); });
+  return fr.concat(bk);
+}
+// The head from the side, in profile, turned the way the neck points: the
+// skull, the brow, nose and chin toward the front, so it shows which way the
+// figure faces (down in a push-up, up on a bench). [forward, up] from the
+// head's centre.
+var RHEAD=[[-7,0.5],[-5.4,5.6],[0.2,8],[5.2,5.8],[7.2,1.4],[7.9,-1.4],[6.8,-4.4],[4.8,-6.8],[0.4,-6.4],[-5.2,-4.4]];
+function rHeadPts(sh,head){
+  var dx=head.x-sh.x, dy=head.y-sh.y, l=Math.sqrt(dx*dx+dy*dy)||1, ux=dx/l, uy=dy/l, fx=-uy, fy=ux;
+  return RHEAD.map(function(p){ return rP(head.x+fx*p[0]+ux*p[1], head.y+fy*p[0]+uy*p[1]); });
+}
+function rNeck(sh,head){
+  var dx=head.x-sh.x, dy=head.y-sh.y, l=Math.sqrt(dx*dx+dy*dy)||1, ux=dx/l, uy=dy/l;
+  return rCap(rP(sh.x+ux,sh.y+uy),3.6,rP(head.x-ux*4+uy*0.6,head.y-uy*4-ux*0.6),3);
+}
+// A shoe in profile, toe to +x, hinged at the ankle and pitched as the foot
+// block is (rFootPts), its sole where the block's is.
+var RSHOE=[[-3.4,-1.4],[-4.5,2.8],[-3.6,6],[9.8,6],[10.8,4.6],[8,2.4],[2.8,-1.2]];
+function rShoePts(ank,rot){
+  var r=(rot||0)*Math.PI/180, c=Math.cos(r), sn=Math.sin(r);
+  return RSHOE.map(function(p){ return rP(ank.x+p[0]*c-p[1]*sn, ank.y+p[0]*sn+p[1]*c); });
+}
+// The trunk from the front: shoulders, chest, waist and pelvis between the
+// shoulder line and the hips. [how far down, half width].
+function rTorsoFrontPts(s){
+  var a=rP((s.shL.x+s.shR.x)/2,(s.shL.y+s.shR.y)/2), b=rP((s.hipL.x+s.hipR.x)/2,(s.hipL.y+s.hipR.y)/2);
+  var w=Math.abs(s.shR.x-s.shL.x)/2, hw=Math.abs(s.hipR.x-s.hipL.x)/2;
+  var st=[[-0.02,w*0.55],[0.06,w+1.5],[0.3,w*0.92],[0.62,w*0.74],[0.86,hw+2],[1.04,hw+3],[1.18,hw-3]];
+  function at(t,x){ return rP(a.x+(b.x-a.x)*t+x, a.y+(b.y-a.y)*t); }
+  var P=st.map(function(q){ return at(q[0],q[1]); });
+  P.push(at(1.22,0));
+  return P.concat(st.slice().reverse().map(function(q){ return at(q[0],-q[1]); }),[at(-0.06,0)]);
+}
+// Part radii: [root, joint, end, hand].
+var RW={leg:[6.2,4.3,2.9], legF:[5.6,3.9,2.6], arm:[4.1,3,2.3,3.2], armF:[3.6,2.7,2.1,2.9], fleg:[6.2,4.4,2.9], farm:[4.4,3.1,2.4,3.4]};
+// A cut line: a rim of panel colour under the part's own fill, so a near limb
+// shows where it crosses the body, the head or the other limb.
+var RCUT=' stroke="var(--surface-raised)" stroke-width="2.2" stroke-linejoin="round" paint-order="stroke"';
+function rPart(p,d,col,cut){ return '<path data-p="'+p+'" d="'+d+'" fill="'+col+'"'+(cut?RCUT:'')+'/>'; }
+function rDot(p,c,r,col,cut){ return '<circle data-p="'+p+'" cx="'+rF(c.x)+'" cy="'+rF(c.y)+'" r="'+r+'" fill="'+col+'"'+(cut?RCUT:'')+'/>'; }
+
+// An implement is drawn as it PROJECTS in this view, never as a generic icon.
+// A barbell runs across the body, so from the SIDE its axis points at you and
+// you see the plate as a disc; from the FRONT you see the bar with the plates
+// edge-on. axis: lateral = across the body, sagittal = front to back (a neutral
+// grip), vertical = upright (a goblet). This is why a hammer curl and a bicep
+// curl look different in both views despite identical joint angles.
+function rAxis(ex){ return ex.axis || (ex.equip==='dumbbell' ? 'sagittal' : 'lateral'); }
+function rEquip(ex,s){
+  var soft='var(--text-soft)', ax=rAxis(ex);
+  var p = ex.equip==='fixedbar'&&ex.barAt ? {x:ex.barAt[0],y:ex.barAt[1]} : ex.equip==='ball'&&s.ball ? s.ball : s.handN;
+  var x=p.x.toFixed(1), y=p.y.toFixed(1);
+  if(ex.equip==='barbell') return '<circle cx="'+x+'" cy="'+y+'" r="15" fill="none" stroke="'+soft+'" stroke-width="3.5"/>'+
+    '<circle cx="'+x+'" cy="'+y+'" r="3.5" fill="'+soft+'"/>';
+  if(ex.equip==='fixedbar') return '<circle cx="'+x+'" cy="'+y+'" r="3.2" fill="'+soft+'"/>';
+  // A cable with no anchorAt runs toward or away from the camera (a Pallof
+  // press stands side on to it): only its handle shows.
+  if(ex.equip==='cable') return (ex.anchorAt?'<line x1="'+ex.anchorAt[0]+'" y1="'+ex.anchorAt[1]+'" x2="'+x+'" y2="'+y+'" stroke="'+soft+'" stroke-width="1.8"/>':'')+
+    '<rect x="'+(p.x-2.5).toFixed(1)+'" y="'+(p.y-6.5).toFixed(1)+'" width="5" height="13" rx="2.5" fill="'+soft+'"/>';
+  if(ex.equip==='dumbbell'&&ax==='lateral') return '<circle cx="'+x+'" cy="'+y+'" r="6.5" fill="'+soft+'"/>';
+  if(ex.equip==='dumbbell'&&ax==='vertical') return '<rect x="'+(p.x-4).toFixed(1)+'" y="'+(p.y-11).toFixed(1)+'" width="8" height="22" rx="3" fill="'+soft+'"/>'+
+    '<rect x="'+(p.x-8).toFixed(1)+'" y="'+(p.y-14).toFixed(1)+'" width="16" height="7" rx="2" fill="'+soft+'"/>'+
+    '<rect x="'+(p.x-8).toFixed(1)+'" y="'+(p.y+7).toFixed(1)+'" width="16" height="7" rx="2" fill="'+soft+'"/>';
+  if(ex.equip==='dumbbell') return '<rect x="'+(p.x-11).toFixed(1)+'" y="'+(p.y-3.5).toFixed(1)+'" width="22" height="7" rx="3" fill="'+soft+'"/>'+
+    '<rect x="'+(p.x-14).toFixed(1)+'" y="'+(p.y-8.5).toFixed(1)+'" width="7" height="17" rx="2" fill="'+soft+'"/>'+
+    '<rect x="'+(p.x+7).toFixed(1)+'" y="'+(p.y-8.5).toFixed(1)+'" width="7" height="17" rx="2" fill="'+soft+'"/>';
+  // A med ball is a plain sphere and a pinch plate is a disc seen edge-on: both
+  // read wrong as any of the bar shapes, so they get their own marks.
+  if(ex.equip==='ball') return '<circle cx="'+x+'" cy="'+y+'" r="11" fill="none" stroke="'+soft+'" stroke-width="3"/>'+
+    '<circle cx="'+x+'" cy="'+y+'" r="3" fill="'+soft+'"/>';
+  // A pinch grip holds the plate by its rim, so it hangs below the fist,
+  // nearly edge on: a ring, as the second panel draws a barbell's plates.
+  if(ex.equip==='plate') return '<ellipse cx="'+x+'" cy="'+(p.y+9).toFixed(1)+'" rx="4.5" ry="13" fill="var(--surface)" stroke="'+soft+'" stroke-width="3"/>';
+  // The handle loops round the fist on the side away from the bell.
+  if(ex.equip==='kettlebell'){ var kb=bellAt(ex,s), d=kb.d;
+    return '<circle cx="'+kb.x.toFixed(1)+'" cy="'+kb.y.toFixed(1)+'" r="10" fill="'+soft+'"/>'+
+      '<path d="M'+(p.x+4*d.x+6*d.y).toFixed(1)+' '+(p.y+4*d.y-6*d.x).toFixed(1)+' Q'+(p.x-8*d.x).toFixed(1)+' '+(p.y-8*d.y).toFixed(1)+' '+(p.x+4*d.x-6*d.y).toFixed(1)+' '+(p.y+4*d.y+6*d.x).toFixed(1)+'" fill="none" stroke="'+soft+'" stroke-width="3.5"/>'; }
+  return '';
+}
+
+function rEquipFront(ex,s){
+  var soft='var(--text-soft)', ax=rAxis(ex), L=s.handL, R=s.handR;
+  var y=((L.y+R.y)/2), x1=Math.min(L.x,R.x), x2=Math.max(L.x,R.x);
+  // A one-handed lift (load:'L'|'R') carries its one implement in that hand:
+  // a suitcase carry with a dumbbell in each hand is a farmer's carry.
+  var hands=ex.load?[ex.load==='L'?L:R]:[L,R];
+  if(ex.equip==='barbell'||ex.equip==='fixedbar'){
+    var o='<rect x="'+(x1-16).toFixed(1)+'" y="'+(y-2.5).toFixed(1)+'" width="'+(x2-x1+32).toFixed(1)+'" height="5" rx="2.5" fill="'+soft+'"/>';
+    if(ex.equip==='barbell') o+='<ellipse cx="'+(x1-13).toFixed(1)+'" cy="'+y.toFixed(1)+'" rx="5" ry="13" fill="var(--surface)" stroke="'+soft+'" stroke-width="3"/>'+
+      '<ellipse cx="'+(x2+13).toFixed(1)+'" cy="'+y.toFixed(1)+'" rx="5" ry="13" fill="var(--surface)" stroke="'+soft+'" stroke-width="3"/>';
+    return o;
   }
-  setL('flegL',s.hipL,s.kneeL,s.footL,[11,8,5.5]); setL('flegR',s.hipR,s.kneeR,s.footR,[11,8,5.5]);
-  setL('farmL',s.shL,s.elbL,s.handL,[8,6,4.5]);    setL('farmR',s.shR,s.elbR,s.handR,[8,6,4.5]);
-  [['ffootL',s.footL],['ffootR',s.footR]].forEach(function(p){
-    R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',(p[1].y+3).toFixed(1)); });
-  R.ftorso.setAttribute('points',[s.shL,s.shR,s.hipR,s.hipL].map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '));
-  R.fneck.setAttribute('x',(s.shC.x-4.5).toFixed(1)); R.fneck.setAttribute('y',(s.shC.y-12).toFixed(1));
-  [['fshL',s.shL],['fshR',s.shR],['fhipL',s.hipL],['fhipR',s.hipR]].forEach(function(p){
-    R[p[0]].setAttribute('cx',p[1].x.toFixed(1)); R[p[0]].setAttribute('cy',p[1].y.toFixed(1)); });
-  R.fhead.setAttribute('cx',s.head.x.toFixed(1)); R.fhead.setAttribute('cy',s.head.y.toFixed(1));
-  R.fhandL.setAttribute('cx',s.handL.x.toFixed(1)); R.fhandL.setAttribute('cy',s.handL.y.toFixed(1));
-  R.fhandL.setAttribute('r',(5.5*s.fistL).toFixed(1));
-  R.fhandR.setAttribute('cx',s.handR.x.toFixed(1)); R.fhandR.setAttribute('cy',s.handR.y.toFixed(1));
-  R.fhandR.setAttribute('r',(5.5*s.fistR).toFixed(1));
-  if(R.fbar){
-    var y=(s.handL.y+s.handR.y)/2, x1=Math.min(s.handL.x,s.handR.x), x2=Math.max(s.handL.x,s.handR.x);
-    R.fbar.setAttribute('x',(x1-16).toFixed(1)); R.fbar.setAttribute('y',(y-2.5).toFixed(1));
-    R.fbar.setAttribute('width',(x2-x1+32).toFixed(1));
-    if(R.fpL){ R.fpL.setAttribute('cx',(x1-13).toFixed(1)); R.fpL.setAttribute('cy',y.toFixed(1));
-               R.fpR.setAttribute('cx',(x2+13).toFixed(1)); R.fpR.setAttribute('cy',y.toFixed(1)); }
+  if(ex.equip==='ball'){
+    var bx=s.ball?s.ball.x:(L.x+R.x)/2, by=s.ball?s.ball.y:y;
+    return '<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="11" fill="none" stroke="'+soft+'" stroke-width="3"/>'+
+      '<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="3" fill="'+soft+'"/>';
   }
-  if(R.fkb){
+  // Edge-on from the side, disc face from the front: one plate per hand.
+  if(ex.equip==='plate'){
+    return hands.map(function(q){
+      return '<circle cx="'+q.x.toFixed(1)+'" cy="'+(q.y+7).toFixed(1)+'" r="10" fill="none" stroke="'+soft+'" stroke-width="3"/>';
+    }).join('');
+  }
+  // One anchor ([x,y]) is one cable to one handle, held in both hands (a
+  // woodchopper, a Pallof press) or the loaded one; two are a cable per hand.
+  // Two cables from opposite sides drew a woodchopper as a cable crossover.
+  if(ex.equip==='cable'&&ex.anchorFront){ var af=ex.anchorFront;
+    return (af.length<4?[[ex.load?hands[0]:rP((L.x+R.x)/2,(L.y+R.y)/2),af[0],af[1]]]:[[L,af[0],af[1]],[R,af[2],af[3]]]).map(function(q){
+      return '<line x1="'+q[1]+'" y1="'+q[2]+'" x2="'+q[0].x.toFixed(1)+'" y2="'+q[0].y.toFixed(1)+'" stroke="'+soft+'" stroke-width="1.8"/>'+
+        '<rect x="'+(q[0].x-2.5).toFixed(1)+'" y="'+(q[0].y-6.5).toFixed(1)+'" width="5" height="13" rx="2.5" fill="'+soft+'"/>';
+    }).join('');
+  }
+  if(ex.equip==='dumbbell'&&ax==='vertical'){
+    var mx=(L.x+R.x)/2, my=(L.y+R.y)/2;
+    return '<rect x="'+(mx-4.5).toFixed(1)+'" y="'+(my-10).toFixed(1)+'" width="9" height="20" rx="3" fill="'+soft+'"/>'+
+      '<rect x="'+(mx-9.5).toFixed(1)+'" y="'+(my-14).toFixed(1)+'" width="19" height="7" rx="2.5" fill="'+soft+'"/>'+
+      '<rect x="'+(mx-9.5).toFixed(1)+'" y="'+(my+7).toFixed(1)+'" width="19" height="7" rx="2.5" fill="'+soft+'"/>';
+  }
+  if(ex.equip==='dumbbell'&&ax==='lateral'){
+    return hands.map(function(h){
+      return '<rect x="'+(h.x-10).toFixed(1)+'" y="'+(h.y-3).toFixed(1)+'" width="20" height="6" rx="3" fill="'+soft+'"/>'+
+        '<rect x="'+(h.x-13).toFixed(1)+'" y="'+(h.y-8).toFixed(1)+'" width="6" height="16" rx="2" fill="'+soft+'"/>'+
+        '<rect x="'+(h.x+7).toFixed(1)+'" y="'+(h.y-8).toFixed(1)+'" width="6" height="16" rx="2" fill="'+soft+'"/>';
+    }).join('');
+  }
+  if(ex.equip==='dumbbell') return hands.map(function(h){
+    return '<circle cx="'+h.x.toFixed(1)+'" cy="'+h.y.toFixed(1)+'" r="6" fill="'+soft+'"/>'; }).join('');
+  if(ex.equip==='kettlebell'){
     var kb=bellFront(ex,s), kx=kb.h.x, ky=kb.h.y;
-    R.fkbH.setAttribute('d','M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+
-      ' Q'+kx.toFixed(1)+','+(ky-7*kb.u).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1));
-    R.fkb.setAttribute('cx',kb.x.toFixed(1)); R.fkb.setAttribute('cy',kb.y.toFixed(1));
+    return '<path d="M'+(kx-6).toFixed(1)+','+ky.toFixed(1)+' Q'+kx.toFixed(1)+','+(ky-7*kb.u).toFixed(1)+' '+(kx+6).toFixed(1)+','+ky.toFixed(1)+'" fill="none" stroke="'+soft+'" stroke-width="3.4" stroke-linecap="round"/>'+
+      '<circle cx="'+kb.x.toFixed(1)+'" cy="'+kb.y.toFixed(1)+'" r="9" fill="'+soft+'"/>';
   }
-  // A one-handed lift (load) has its one implement in that hand; the other
-  // hand's is drawn over it.
-  var hL=ex.load==='R'?s.handR:s.handL, hR=ex.load==='L'?s.handL:s.handR;
-  if(R.fhL){
-    [['L',hL],['R',hR]].forEach(function(pr){
-      var h=pr[1];
-      R['fh'+pr[0]].setAttribute('x',(h.x-10).toFixed(1)); R['fh'+pr[0]].setAttribute('y',(h.y-3).toFixed(1));
-      R['fc'+pr[0]+'1'].setAttribute('x',(h.x-13).toFixed(1)); R['fc'+pr[0]+'1'].setAttribute('y',(h.y-8).toFixed(1));
-      R['fc'+pr[0]+'2'].setAttribute('x',(h.x+7).toFixed(1));  R['fc'+pr[0]+'2'].setAttribute('y',(h.y-8).toFixed(1));
-    });
+  return '';
+}
+// A prop is part of the movement (the bench, the box, the wall), so it has an
+// edge of its own (--prop, 3:1 against the panel) rather than a fill the same
+// shade as the floor that vanished in the dark theme.
+function rProp(p){
+  return '<rect x="'+p[0]+'" y="'+p[1]+'" width="'+p[2]+'" height="'+p[3]+'" rx="'+(p[4]===undefined?2:p[4])+'" fill="var(--prop-fill)" stroke="var(--prop)" stroke-width="1.5"'+
+    (p[5]?' transform="rotate('+p[5]+' '+(p[0]+p[2]/2)+' '+(p[1]+p[3]/2)+')"':'')+'/>';
+}
+// The floor runs the whole width of the panel, not only the cropped figure:
+// the svg lets it out and the panel clips it.
+function rGround(x0,x1){ return '<line x1="'+(x0-200)+'" y1="'+GROUND+'" x2="'+(x1+200)+'" y2="'+GROUND+'" stroke="var(--ground)" stroke-width="2"/>'; }
+// A contact shadow under the feet, narrowing as they leave the floor, drawn
+// under the floor line so the floor stays one unbroken line.
+function rShadow(cx,rx,gap){ var k=Math.max(0.3,1-Math.max(0,gap)/45);
+  return '<ellipse data-p="shadow" cx="'+rF(cx)+'" cy="'+GROUND+'" rx="'+rF(rx*k)+'" ry="2.4" fill="var(--fig-shadow)"/>'; }
+// Layered as you would see it: legs behind the body, unless a knee comes up
+// in front of it (a knee raised above its hip: high knees, the catch of a
+// row); the head, then the arms in front of it, unless the rig holds them
+// behind it (behindHead: an overhead triceps extension); a stick behind the
+// back (the end of a shoulder dislocate, its side-view hands behind the hip)
+// behind the body.
+function rigFrontSVG(ex,u,bx){
+  if(!ex.front) return '';
+  var s=solveFront(frontAt(ex,u));
+  var ink='var(--text)', hi='var(--accent)';
+  var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
+  var o='<svg viewBox="'+bx.fx+' '+bx.y+' '+bx.fw+' '+bx.h+'" role="img" aria-label="exercise front view">';
+  // From above, the figure lies on a mat; from the front it stands on the
+  // floor over its shadow.
+  if(ex.frontPlan&&!ex.planProps) o+='<rect data-p="mat" x="'+(bx.fx+8)+'" y="'+(bx.y+4)+'" width="'+(bx.fw-16)+'" height="'+(bx.h-8)+'" rx="8" fill="var(--fig-mat)"/>';
+  else o+=rShadow((s.footL.x+s.footR.x)/2,Math.abs(s.footR.x-s.footL.x)/2+8,GROUND-7-Math.max(s.footL.y,s.footR.y))+rGround(bx.fx,bx.fx+bx.fw);
+  (ex.planProps||[]).forEach(function(p){ o+=rProp(p); });
+  // A skipping rope arches between the hands to the height its loop has
+  // reached: behind the body on the way over, in front of it on the way down
+  // and under. Both places are always drawn, the unused one empty, so every
+  // frame has the same shapes.
+  var rope=['',''];
+  if(ex.equip==='rope'){ var rq=ropeAt(s,70), st='" fill="none" stroke="var(--text-soft)" stroke-width="1.6"/>',
+      mx=((s.handL.x+s.handR.x)/2).toFixed(1), qy=rq.y.toFixed(1),
+      arch='<path d="M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1)+' Q'+s.handL.x.toFixed(1)+' '+qy+' '+mx+' '+qy+' Q'+s.handR.x.toFixed(1)+' '+qy+' '+s.handR.x.toFixed(1)+' '+s.handR.y.toFixed(1)+st,
+      none='<path d="M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1)+st;
+    rope=rq.front?[none,arch]:[arch,none]; }
+  o+=rope[0];
+  var w=RW.fleg, a=RW.farm;
+  // A foot is a shoe seen from the front, its toe turned a little out.
+  function leg(k,h,kn,f,side){ return rPart('thigh'+k,rCap(h,w[0],kn,w[1]),legCol)+rPart('shin'+k,rCap(kn,w[1],f,w[2]),legCol)+
+    (ex.frontPlan?'':'<ellipse data-p="foot'+k+'" cx="'+rF(f.x+side*1.5)+'" cy="'+rF(f.y+4)+'" rx="4.6" ry="3" fill="'+legCol+'"/>'); }
+  // The arms carry a cut line, so one crossing the body or the head shows.
+  function arm(k,sh,e,h){ return rPart('upper'+k,rCap(sh,a[0],e,a[1]),armCol,1)+rPart('fore'+k,rCap(e,a[1],h,a[2]),armCol,1); }
+  var bar=ex.equip==='barbell'||ex.equip==='fixedbar', back=false;
+  if(ex.equip==='fixedbar'&&!ex.barAt&&ex.frames){ var sd=solve(poseAt(ex,u)); back=sd.handN.x<sd.hip.x; }
+  var upL=!ex.frontPlan&&s.kneeL.y<s.hipL.y-1, upR=!ex.frontPlan&&s.kneeR.y<s.hipR.y-1;
+  var legL=leg('L',s.hipL,s.kneeL,s.footL,-1), legR=leg('R',s.hipR,s.kneeR,s.footR,1);
+  var head='<ellipse data-p="head" cx="'+rF(s.head.x)+'" cy="'+rF(s.head.y)+'" rx="7" ry="'+(ex.frontPlan?7:7.8)+'" fill="'+ink+'"/>';
+  if(back) o+=rEquipFront(ex,s);
+  if(!upL) o+=legL;
+  if(!upR) o+=legR;
+  o+=rPart('neck',rCap(s.shC,3.8,s.head,3.2),ink);
+  o+=rPart('torso',rSmooth(rTorsoFrontPts(s)),ink);
+  o+=rDot('capL',rP(s.shL.x,s.shL.y+0.5),5.2,ink)+rDot('capR',rP(s.shR.x,s.shR.y+0.5),5.2,ink);
+  if(upL) o+=legL;
+  if(upR) o+=legR;
+  if(!ex.behindHead) o+=head;
+  o+=arm('L',s.shL,s.elbL,s.handL)+arm('R',s.shR,s.elbR,s.handR);
+  if(ex.behindHead) o+=head;
+  if(bar&&!back) o+=rEquipFront(ex,s);
+  o+=rDot('handL',s.handL,rF(a[3]*s.fistL),armCol,1)+rDot('handR',s.handR,rF(a[3]*s.fistR),armCol,1);
+  if(!bar) o+=rEquipFront(ex,s);
+  return o+rope[1]+'</svg>';
+}
+
+// Side view, back to front: far leg and arm, the body, the near leg, the
+// implement in the near hand (in front of the body, behind the head it hangs
+// past overhead and under the fist that holds it; a kettlebell goes behind
+// the body while that fist is above the hip, so a rack is not a disc on the
+// belly), the neck and head, the near arm with a cut line of panel colour
+// round each part, so it shows where it crosses the body or passes the head,
+// then a bar: the barbell's near plate, or a fixed bar the hands hang from.
+// The far limbs are a lighter shade, the working pair's in a lighter accent,
+// so both limbs of the pair that works read as working.
+function rigSVG(ex,u,bx){
+  var s=solve(poseAt(ex,u));
+  var ink='var(--text)', hi='var(--accent)';
+  var legA=ex.active==='legs', armA=ex.active==='arms'||ex.active==='armN';
+  var legCol=legA?hi:ink, armCol=armA?hi:ink, farLeg=legA?'var(--fig-far-hi)':'var(--fig-far)', farArm=armA?'var(--fig-far-hi)':'var(--fig-far)';
+  var o='<svg viewBox="'+bx.x+' '+bx.y+' '+bx.w+' '+bx.h+'" preserveAspectRatio="xMidYMax meet" role="img" aria-label="exercise animation">';
+  o+=rShadow((s.ankN.x+s.ankF.x)/2+3,Math.abs(s.ankN.x-s.ankF.x)/2+7,GROUND-6-Math.max(s.ankN.y,s.ankF.y))+rGround(bx.x,bx.x+bx.w);
+  (ex.props||[]).forEach(function(p){ o+=rProp(p); });
+  var top=ex.equip==='barbell'||ex.equip==='fixedbar'||ex.equip==='plate', back=ex.equip==='kettlebell'&&s.handN.y<s.hip.y;
+  function leg(k,h,kn,an,rot,col,w,cut){ return rPart('thigh'+k,rCap(h,w[0],kn,w[1]),col,cut)+rPart('shin'+k,rCap(kn,w[1],an,w[2]),col,cut)+rPart('foot'+k,rSmooth(rShoePts(an,rot)),col); }
+  function arm(k,sh,e,hd,col,w,cut){ return rPart('upper'+k,rCap(sh,w[0],e,w[1]),col,cut)+rPart('fore'+k,rCap(e,w[1],hd,w[2]),col,cut)+rDot('hand'+k,hd,w[3],col,cut); }
+  // A skipping rope: the far strand behind everything, the near one over the
+  // near arm, each from its hand to the far end of the loop.
+  var rq=ex.equip==='rope'?ropeAt(s):null, rst='" fill="none" stroke="var(--text-soft)" stroke-width="1.6"/>';
+  if(rq) o+='<path d="'+rRopePath(s.handF,rP(rq.x-5,rq.y),s.rope)+rst;
+  o+=leg('F',s.hipF,s.kneeF,s.ankF,s.footF,farLeg,RW.legF);
+  o+=arm('F',s.shF,s.elbF,s.handF,farArm,RW.armF);
+  if(back) o+=rEquip(ex,s);
+  o+=rPart('torso',rSmooth(rTorsoPts(s.hip,s.mid,s.sh)),ink);
+  o+=leg('N',s.hip,s.kneeN,s.ankN,s.footN,legCol,RW.leg,1);
+  if(!top&&!back) o+=rEquip(ex,s);
+  o+=rPart('neck',rNeck(s.sh,s.head),ink)+rPart('head',rSmooth(rHeadPts(s.sh,s.head)),ink);
+  o+=arm('N',s.sh,s.elbN,s.handN,armCol,RW.arm,1);
+  if(top) o+=rEquip(ex,s);
+  if(rq) o+='<path d="'+rRopePath(s.handN,rq,s.rope)+rst;
+  return o+'</svg>';
+}
+
+
+// ---- drawn in place, as the app draws its live figure ----
+// A frame gives every shape of the drawing its new attributes rather than
+// building the drawing again (the app's drawInPlace): the figure has the same
+// shapes in the same order every frame, and a shape whose kind changes (a
+// leg swinging in front of the body) is swapped on its own.
+function svgShapes(html){
+  return {h:html, s:(html.match(/<[a-z][^>]*>/g)||[]).map(function(tag){
+    var a=[]; tag.replace(/([\w:-]+)="([^"]*)"/g,function(m,k,v){ a.push(k,v); return m; });
+    return {n:tag.match(/^<([\w:-]+)/)[1], a:a};
+  })};
+}
+function drawInPlace(el,d){
+  var svg=el.firstElementChild, s=d.s, kids=svg?svg.children:[];
+  if(!svg || svg.tagName.toLowerCase()!=='svg' || s.length!==kids.length+1){ el.innerHTML=d.h; return; }
+  for(var i=0;i<s.length;i++){
+    var node=i?kids[i-1]:svg, a=s[i].a;
+    if(node.tagName.toLowerCase()!==s[i].n || node.attributes.length*2!==a.length){
+      if(!i){ el.innerHTML=d.h; return; }
+      var nn=document.createElementNS(svg.namespaceURI,s[i].n);
+      for(var k=0;k<a.length;k+=2) nn.setAttribute(a[k],a[k+1]);
+      svg.replaceChild(nn,node); continue;
+    }
+    for(var j=0;j<a.length;j+=2) if(node.getAttribute(a[j])!==a[j+1]) node.setAttribute(a[j],a[j+1]);
   }
-  if(R.fppL){ R.fppL.setAttribute('cx',hL.x.toFixed(1)); R.fppL.setAttribute('cy',(hL.y+7).toFixed(1));
-    R.fppR.setAttribute('cx',hR.x.toFixed(1)); R.fppR.setAttribute('cy',(hR.y+7).toFixed(1)); }
-  if(R.fcabL && ex.anchorFront){ var one=ex.anchorFront.length<4;
-    (one?[['L',ex.load?(ex.load==='L'?s.handL:s.handR):P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2)]]:[['L',s.handL],['R',s.handR]]).forEach(function(pr){
-      var h=pr[1], ax=ex.anchorFront[pr[0]==='L'?0:2], ay=ex.anchorFront[pr[0]==='L'?1:3];
-      R['fcab'+pr[0]].setAttribute('x1',ax); R['fcab'+pr[0]].setAttribute('y1',ay);
-      R['fcab'+pr[0]].setAttribute('x2',h.x.toFixed(1)); R['fcab'+pr[0]].setAttribute('y2',h.y.toFixed(1));
-      R['fgrip'+pr[0]].setAttribute('x',(h.x-2.5).toFixed(1)); R['fgrip'+pr[0]].setAttribute('y',(h.y-6.5).toFixed(1));
-    });
-  }
-  if(R.fbellL){
-    R.fbellL.setAttribute('cx',hL.x.toFixed(1)); R.fbellL.setAttribute('cy',hL.y.toFixed(1));
-    R.fbellR.setAttribute('cx',hR.x.toFixed(1)); R.fbellR.setAttribute('cy',hR.y.toFixed(1));
-  }
-  if(R.fball){ var fb=s.ball||P((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2);
-    [R.fball,R.fbhub].forEach(function(n){ n.setAttribute('cx',fb.x.toFixed(1)); n.setAttribute('cy',fb.y.toFixed(1)); }); }
-  if(R.ropeF){ var rq=ropeAt(s,70), qy=rq.y.toFixed(1), mx=((s.handL.x+s.handR.x)/2).toFixed(1);
-    var arch='M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1)+' Q'+s.handL.x.toFixed(1)+' '+qy+' '+mx+' '+qy+' Q'+s.handR.x.toFixed(1)+' '+qy+' '+s.handR.x.toFixed(1)+' '+s.handR.y.toFixed(1), none='M'+s.handL.x.toFixed(1)+' '+s.handL.y.toFixed(1);
-    R.ropeB.setAttribute('d',rq.front?none:arch); R.ropeF.setAttribute('d',rq.front?arch:none); }
-  if(R.fdb){
-    var mx=(s.handL.x+s.handR.x)/2, my=(s.handL.y+s.handR.y)/2;
-    R.fdb.setAttribute('x',(mx-4.5).toFixed(1));  R.fdb.setAttribute('y',(my-10).toFixed(1));
-    R.fdb1.setAttribute('x',(mx-9.5).toFixed(1)); R.fdb1.setAttribute('y',(my-14).toFixed(1));
-    R.fdb2.setAttribute('x',(mx-9.5).toFixed(1)); R.fdb2.setAttribute('y',(my+7).toFixed(1));
-  }
+}
+// The bar path over the rep, shown as a trace when asked (Bar path).
+var showPath=false, paths={};
+function traceOf(ex){
+  if(!(ex.id in paths)) paths[ex.id]=barPath(ex);
+  return paths[ex.id]?'<polyline data-p="trace" points="'+paths[ex.id]+'" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3" opacity="'+(showPath?0.85:0)+'"/>':'';
+}
+// Each panel draws into a box of its own inside the card's frame, so the
+// frame's label is not taken for the drawing.
+function panel(host){ var b=document.createElement('div'); host.appendChild(b); return b; }
+function buildFigure(ex,host,bx){ return {ex:ex, el:panel(host), bx:bx||boxOf(ex), u:null}; }
+function buildFront(ex,host,bx){ return {ex:ex, el:panel(host), bx:bx||boxOf(ex), u:null}; }
+function update(ex,ref,u){
+  if(ref.u===u&&ref.p===showPath) return; ref.u=u; ref.p=showPath;
+  // The app's drawing, with the bar path laid over the props.
+  var html=rigSVG(ex,u,ref.bx).replace('aria-label="exercise animation"','aria-label="'+ex.name+' animation"'), t=traceOf(ex);
+  if(t){ var k=html.indexOf('<path data-p='); html=html.slice(0,k)+t+html.slice(k); }
+  drawInPlace(ref.el,svgShapes(html)); ref.svg=ref.el.firstElementChild;
+}
+function updateFront(ex,ref,u){
+  if(ref.u===u) return; ref.u=u;
+  drawInPlace(ref.el,svgShapes(rigFrontSVG(ex,u,ref.bx).replace('aria-label="exercise front view"','aria-label="'+ex.name+' front view"')));
+  ref.svg=ref.el.firstElementChild;
 }
 
 var grid=document.getElementById('grid'), refs=[];
@@ -420,15 +405,16 @@ EXERCISES.forEach(function(ex,i){
   ref.front = ex.front ? buildFront(ex,wraps[1],bx) : null;
   refs.push(ref);
 });
-// Each rig plays at its own rep length (cycleMs in rig.js), as in the app. The
-// scrubber sets every figure to the same point of its own rep.
-var playing=true, speed=1, t0=performance.now(), elapsed=0, showPath=false, manual=null;
+// Each rig plays at its own rep length (cycleMs in rig.js) in its own number
+// of frames (stepsOf), as in the app. The scrubber sets every figure to the
+// same point of its own rep.
+var playing=true, speed=1, t0=performance.now(), elapsed=0, manual=null;
 function frame(now){
   if(playing) elapsed=(now-t0)*speed;
-  EXERCISES.forEach(function(ex,i){ var u=manual===null?(elapsed/cycleMs(ex))%1:manual;
+  EXERCISES.forEach(function(ex,i){ var n=stepsOf(ex), u=manual===null?Math.floor((elapsed/cycleMs(ex))%1*n)/n:manual;
     update(ex,refs[i],u); if(refs[i].front) updateFront(ex,refs[i].front,u);
     // A cut (loop:'cut') fades the figure out and in round its swap.
-    var a=String(alphaAt(ex,u)); [refs[i].svg,refs[i].front&&refs[i].front.svg].forEach(function(g){ if(g&&g.getAttribute('opacity')!==a) g.setAttribute('opacity',a); }); });
+    var a=String(alphaAt(ex,u)); [refs[i].el,refs[i].front&&refs[i].front.el].forEach(function(g){ if(g&&g.style.opacity!==a) g.style.opacity=a; }); });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -445,5 +431,4 @@ document.getElementById('slowBtn').addEventListener('click',function(){
 });
 document.getElementById('pathBtn').addEventListener('click',function(){
   showPath=!showPath; this.classList.toggle('on',showPath);
-  refs.forEach(function(r){ if(r.trace) r.trace.setAttribute('opacity', showPath?0.85:0); });
 });

@@ -1144,17 +1144,41 @@ full width of the panel, and props have an edge of their own (`--prop`), both
 at 3:1 or more against the panel. `pose/render.js` crops the preview the same
 way (`boxOf`), and `pose/checks/render.js` fails if the two differ.
 
+**Figure** (the drawing):
+Each part is one shape, named by `data-p` (`torso`, `head`, `neck`,
+`thighN`, `foreF`, `handL`...): limbs are tapered capsules round their two
+joints, the trunk a smooth outline with pelvis, waist and chest (through the
+mid-spine point, so a bowed spine bends), the side view's head a profile with
+brow, nose and chin turned the way the trunk faces (ahead standing, down in a
+push-up, up on a bench), shoes in profile on the foot block's sole, small
+round hands. The far limbs are `--fig-far`, the far limb of the working pair
+`--fig-far-hi` (a lighter accent), so both limbs of the pair that works read as
+working. A contact shadow (`--fig-shadow`) under the feet narrows as they
+leave the floor; seen from above with no bench, the figure lies on a mat
+(`--fig-mat`). Every frame has the same parts in the same order with the same
+path commands, so a rep moves them in place (`drawInPlace`), and
+`test-rigdraw.js` fails a panel whose number of shapes changes.
+
 **Layering**:
 What is drawn over what. Side view, back to front: far leg and arm, body,
 near leg, the implement in the near hand (in front of the body, behind the
-head it hangs past at the top of a press), head, near arm (with a cut line of
-panel colour round it, so it shows where it crosses the body or passes the
-head), then a bar: the barbell's near plate or a fixed bar, or a pinched plate,
+head it hangs past at the top of a press), neck and head, near arm (each part
+with a cut line of panel colour round it, painted under its own fill, so it
+shows where it crosses the body, passes the head or bends over its own
+elbow), then a bar: the barbell's near plate or a fixed bar, or a pinched plate,
 which hangs from the fist by its rim. Second panel: legs
 behind the body unless a knee is raised above its hip, the arms in front of
 the head unless the rig sets `behindHead` (the overhead triceps extension),
 and a stick held behind the back (side-view hands behind the hip) behind the
-body.
+body. The second panel's arms carry the same cut line.
+
+**Preview drawing**:
+`pose/render.js` draws the preview with a copy of the app's `rigSVG` and
+`rigFrontSVG` on `rig.js`'s solver, and plays each rig in its own frames as the
+app does. `pose/checks/render.js` fails unless the preview and the app draw the
+same shapes, in the same order, at the same places, for every rig. Change
+both copies together, as with the solver. It used to be a second renderer of
+its own, which drifted from the app's.
 
 **Live figure**:
 The slide's figure plays the rep at the rig's own length, a frame every 50 ms

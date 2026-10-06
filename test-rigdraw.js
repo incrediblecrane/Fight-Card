@@ -7,7 +7,7 @@ var fs=require('fs'), assert=require('assert');
 var h=fs.readFileSync(process.argv[2]||(__dirname+'/index.html'),'utf8');
 function cut(a,b){ var i=h.indexOf(a), j=h.indexOf(b,i); if(i<0||j<0) throw new Error('could not find '+a+' .. '+b+' in index.html'); return h.slice(i,j); }
 var app=new Function('hasOwn',cut('var RL=','function figureSVG(')+
-  ';return {RL:RL,RGROUND:RGROUND,RIGFRAMES:RIGFRAMES,RIGMAP:RIGMAP,rigFor:rigFor,rSolve:rSolve,rPoseAt:rPoseAt,rSolveFront:rSolveFront,rFrontAt:rFrontAt,rigSVG:rigSVG,rigFrontSVG:rigFrontSVG,rigBox:rigBox,figPairStyle:figPairStyle};')
+  ';return {RL:RL,RGROUND:RGROUND,RIGFRAMES:RIGFRAMES,RIGMAP:RIGMAP,rigFor:rigFor,rSolve:rSolve,rPoseAt:rPoseAt,rSolveFront:rSolveFront,rFrontAt:rFrontAt,rigSVG:rigSVG,rigFrontSVG:rigFrontSVG,rigBox:rigBox,figPairStyle:figPairStyle,rFootPts:rFootPts};')
   (function(o,k){ return Object.prototype.hasOwnProperty.call(o,k); });
 var EXOF={}; Object.keys(app.RIGMAP).forEach(function(k){ if(!EXOF[app.RIGMAP[k]]) EXOF[app.RIGMAP[k]]=k; });
 var RIGS=Object.keys(app.RIGFRAMES).filter(function(id){ return EXOF[id]; });
@@ -24,6 +24,28 @@ function shapes(svg){
   });
 }
 function num(v){ return +v; }
+// The points a path passes through, its curves and arcs sampled: the
+// figure's parts are capsules (two arcs) and smooth closed curves.
+function pathPts(d){
+  var tk=d.match(/[MLCQAZ]|-?[\d.]+/g)||[], i=0, c=null, pts=[], p=[0,0], o=[0,0];
+  function n(){ return +tk[i++]; }
+  while(i<tk.length){ if(/[MLCQAZ]/.test(tk[i])) c=tk[i++];
+    if(c==='Z'){ p=o; continue; }
+    if(c==='M'||c==='L'){ p=[n(),n()]; if(c==='M') o=p; pts.push(p); }
+    else if(c==='Q'||c==='C'){ var q=[p]; for(var k=0;k<(c==='Q'?2:3);k++) q.push([n(),n()]);
+      for(var j=1;j<=12;j++){ var s=j/12, r=q.slice(); while(r.length>1){ var z=[]; for(var m=0;m+1<r.length;m++) z.push([r[m][0]+(r[m+1][0]-r[m][0])*s,r[m][1]+(r[m+1][1]-r[m][1])*s]); r=z; } pts.push(r[0]); }
+      p=q[q.length-1]; }
+    else if(c==='A'){ var rad=n(); n(); n(); var big=n(), sw=n(), e=[n(),n()];
+      // A circular arc: its centre from the two ends, the radius and the flags.
+      var mx=(p[0]-e[0])/2, my=(p[1]-e[1])/2, h2=Math.max(0,rad*rad/(mx*mx+my*my||1)-1), f=Math.sqrt(h2)*(big===sw?-1:1);
+      var cx=(p[0]+e[0])/2+f*my, cy=(p[1]+e[1])/2-f*mx, a0=Math.atan2(p[1]-cy,p[0]-cx), a1=Math.atan2(e[1]-cy,e[0]-cx), da=a1-a0;
+      if(sw&&da<0) da+=2*Math.PI; if(!sw&&da>0) da-=2*Math.PI;
+      var rr=Math.hypot(p[0]-cx,p[1]-cy);
+      for(var j2=1;j2<=16;j2++) pts.push([cx+rr*Math.cos(a0+da*j2/16),cy+rr*Math.sin(a0+da*j2/16)]);
+      p=e; }
+    else i++; }
+  return pts;
+}
 // Every point a shape covers the edge of, stroke included.
 function extent(s){
   var a=s.a, sw=(+a['stroke-width']||0)/2, pts=[], r=0;
@@ -31,7 +53,7 @@ function extent(s){
   else if(s.n==='circle'){ r=+a.r; pts=[[+a.cx,+a.cy]]; }
   else if(s.n==='ellipse'){ pts=[[+a.cx-(+a.rx),+a.cy-(+a.ry)],[+a.cx+(+a.rx),+a.cy+(+a.ry)]]; }
   else if(s.n==='line') pts=[[+a.x1,+a.y1],[+a.x2,+a.y2]];
-  else if(s.n==='path') pts=(a.d.match(/-?[\d.]+[ ,]-?[\d.]+/g)||[]).map(function(p){ return p.split(/[ ,]/).map(num); });
+  else if(s.n==='path') pts=pathPts(a.d);
   else if(s.n==='rect'){ var x=+a.x, y=+a.y, w=+a.width, hh=+a.height, m=(a.transform||'').match(/rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)/);
     pts=[[x,y],[x+w,y],[x+w,y+hh],[x,y+hh]];
     if(m){ var g=m[1]*Math.PI/180, cx=+m[2], cy=+m[3]; pts=pts.map(function(p){ var dx=p[0]-cx, dy=p[1]-cy; return [cx+dx*Math.cos(g)-dy*Math.sin(g), cy+dx*Math.sin(g)+dy*Math.cos(g)]; }); } }
@@ -43,28 +65,31 @@ function extent(s){
 function vbOf(svg){ var v=svg.match(/viewBox="([^"]*)"/)[1].split(' ').map(num); return {x:v[0],y:v[1],w:v[2],h:v[3]}; }
 function near(p,q){ return Math.abs(+p.a.cx-q.x)<0.06 && Math.abs(+p.a.cy-q.y)<0.06; }
 function idx(list,fn){ for(var i=0;i<list.length;i++) if(fn(list[i])) return i; return -1; }
-function torsoPts(f){ return [f.shL,f.shR,f.hipR,f.hipL].map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' '); }
-// The near hand's own circle: not its cut line, the far hand or an implement.
-function isHand(p,q){ return p.n==='circle'&&near(p,q)&&['var(--surface-raised)','var(--text-faint)','var(--text-soft)','none'].indexOf(p.a.fill)<0; }
+// A part of the figure, by the name it is drawn with (data-p): torso, head,
+// handN (the near hand), thighF (the far thigh), upperL (a front left upper arm).
+function part(n){ return function(p){ return p.a['data-p']===n; }; }
 function rex(id){ return app.rigFor(EXOF[id]); }
 
 console.log('\nWHAT LIES IN FRONT OF WHAT');
 t('side view: the near arm is drawn over the head, in every rig', function(){
   var bad=[];
   RIGS.forEach(function(id){ var ex=rex(id), u=0.3, s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));
-    var head=idx(sh,function(p){ return p.n==='circle'&&+p.a.r===app.RL.HEAD_R&&near(p,s.head); });
-    var hand=idx(sh,function(p){ return isHand(p,s.handN); });
+    var head=idx(sh,part('head'));
+    var hand=idx(sh,part('handN'));
     if(head<0||hand<0||head>hand) bad.push(id+' (head '+head+', near hand '+hand+')'); });
   assert.ok(!bad.length,'the head covers the near arm in '+bad.length+': '+bad.slice(0,8).join(', '));
 });
-t('side view: the near arm has a cut line of panel colour under it, so it shows against the body', function(){
+// A cut line is a rim of panel colour painted under each near part's own
+// fill (paint-order stroke), so an arm crossing the body or passing the head
+// stays visible, in both views. It used to be a second copy of the arm.
+function cutLine(p){ return p.a.stroke==='var(--surface-raised)'&&+p.a['stroke-width']>=2&&p.a['paint-order']==='stroke'; }
+t('the near arm has a cut line of panel colour round it, so it shows against the body, in both views', function(){
   var bad=[];
-  RIGS.forEach(function(id){ var ex=rex(id), u=0.3, s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));
-    var cutAt=idx(sh,function(p){ return p.n==='circle'&&near(p,s.handN)&&p.a.fill==='var(--surface-raised)'&&+p.a['stroke-width']>=2; });
-    var hand=idx(sh,function(p){ return isHand(p,s.handN); });
-    var torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.fill==='var(--text)'; });
-    if(!(cutAt>torso&&cutAt<hand)) bad.push(id); });
-  assert.ok(!bad.length,'no cut line between the body and the near arm in '+bad.join(', '));
+  RIGS.forEach(function(id){ var u=0.3, sh=shapes(app.rigSVG(EXOF[id],u)), torso=idx(sh,part('torso'));
+    ['upperN','foreN','handN'].forEach(function(k){ var j=idx(sh,part(k)); if(j<=torso||!cutLine(sh[j])) bad.push(id+' '+k); });
+    if(!rex(id).front) return; var fs2=shapes(app.rigFrontSVG(EXOF[id],u));
+    ['upperL','foreL','handL','upperR','foreR','handR'].forEach(function(k){ var j=idx(fs2,part(k)); if(j<0||!cutLine(fs2[j])) bad.push(id+' front '+k); }); });
+  assert.ok(!bad.length,'no cut line on '+bad.length+' parts: '+bad.slice(0,8).join(', '));
 });
 // An implement in the near hand hid behind the body (a lateral raise's
 // dumbbell) when it was drawn before it. It goes in front of the body and the
@@ -72,15 +97,15 @@ t('side view: the near arm has a cut line of panel colour under it, so it shows 
 // the arm whose hand holds it.
 t('side view: the implement in the near hand is drawn over the body, under the head and the near arm', function(){
   ['goblet','raise_lateral','suitcasecarry','triceps_ext'].forEach(function(id){ var ex=rex(id), s=app.rSolve(app.rPoseAt(ex,0.4)), sh=shapes(app.rigSVG(EXOF[id],0.4));
-    var arm=idx(sh,function(p){ return isHand(p,s.handN); });
-    var head=idx(sh,function(p){ return p.n==='circle'&&+p.a.r===app.RL.HEAD_R&&near(p,s.head); });
-    var torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.fill==='var(--text)'; });
-    var leg=idx(sh,function(p){ return p.n==='circle'&&near(p,s.kneeN)&&p.a.fill!=='var(--text-faint)'; });
+    var arm=idx(sh,part('handN'));
+    var head=idx(sh,part('head'));
+    var torso=idx(sh,part('torso'));
+    var leg=idx(sh,part('shinN'));
     var bell=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'||p.a.stroke==='var(--text-soft)'; });
     assert.ok(bell>torso&&bell>leg,id+': the implement (shape '+bell+') is under the body ('+torso+') or the near leg ('+leg+')');
     assert.ok(bell<head&&bell<arm,id+': the implement (shape '+bell+') is over the head ('+head+') or the near arm ('+arm+')'); });
   ['pullup','bench'].forEach(function(id){ var ex=rex(id), s=app.rSolve(app.rPoseAt(ex,0.4)), sh=shapes(app.rigSVG(EXOF[id],0.4));
-    var arm=idx(sh,function(p){ return isHand(p,s.handN); });
+    var arm=idx(sh,part('handN'));
     var bar=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'||p.a.stroke==='var(--text-soft)'; });
     assert.ok(bar>arm,id+': the bar (shape '+bar+') is under the hands ('+arm+')'); });
 });
@@ -93,7 +118,7 @@ t('side view: the implement in the near hand is drawn over the body, under the h
 // held by a handle. It hangs from the fist by its rim, over the arm.
 t('a pinched plate hangs from the fist by its rim, drawn over the near arm', function(){
   var ex=rex('platepinch'), s=app.rSolve(app.rPoseAt(ex,0.3)), sh=shapes(app.rigSVG(EXOF.platepinch,0.3));
-  var hand=idx(sh,function(p){ return isHand(p,s.handN); });
+  var hand=idx(sh,part('handN'));
   var plate=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'||p.a.stroke==='var(--text-soft)'; });
   assert.ok(plate>hand,'the plate (shape '+plate+') is under the near arm ('+hand+')');
   var e=extent(sh[plate]), top=e.y0+1.5, bot=e.y1-1.5;
@@ -107,9 +132,9 @@ t('a pinched plate hangs from the fist by its rim, drawn over the near arm', fun
 t('side view: a kettlebell held above the hip is drawn behind the body, one hanging below it in front', function(){
   var seen={};
   ['kbswing','kb_clean','kb_snatch','kb_press','kb_bottomsup','kb_tgu'].forEach(function(id){ for(var i=0;i<24;i++){ var u=i/24, ex=rex(id), s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));
-    var torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.fill==='var(--text)'; });
-    var leg=idx(sh,function(p){ return p.n==='circle'&&near(p,s.kneeN)&&p.a.fill!=='var(--text-faint)'; });
-    var arm=idx(sh,function(p){ return isHand(p,s.handN); });
+    var torso=idx(sh,part('torso'));
+    var leg=idx(sh,part('shinN'));
+    var arm=idx(sh,part('handN'));
     var bell=idx(sh,function(p){ return p.a.fill==='var(--text-soft)'; });
     var up=s.handN.y<s.hip.y; seen[up]=1;
     if(up) assert.ok(bell<torso,id+' u='+u.toFixed(2)+': the hand is above the hip but the bell (shape '+bell+') is over the body ('+torso+')');
@@ -132,8 +157,8 @@ t('second panel: a one-handed lift carries its one implement in the loaded hand'
 });
 t('front view: the arms are drawn over the head, unless the rig holds them behind it', function(){
   function order(id,u){ var ex=rex(id), f=app.rSolveFront(app.rFrontAt(ex,u)), sh=shapes(app.rigFrontSVG(EXOF[id],u));
-    var head=idx(sh,function(p){ return p.n==='circle'&&+p.a.r===app.RL.HEAD_R&&near(p,f.head); });
-    var elb=idx(sh,function(p){ return p.n==='circle'&&near(p,f.elbL); });
+    var head=idx(sh,part('head'));
+    var elb=idx(sh,part('foreL'));
     return head-elb; }
   assert.ok(order('jabcross',0.25)<0,'the jab is drawn behind the head');
   assert.ok(order('ohp',0.5)<0,'the press is drawn behind the head');
@@ -142,8 +167,8 @@ t('front view: the arms are drawn over the head, unless the rig holds them behin
 });
 t('front view: a knee raised above its hip is drawn over the body, a standing leg behind it', function(){
   [['press_incline',0.3,true],['backsquat',0,false]].forEach(function(c){ var ex=rex(c[0]), f=app.rSolveFront(app.rFrontAt(ex,c[1])), sh=shapes(app.rigFrontSVG(EXOF[c[0]],c[1]));
-    var torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.points===torsoPts(f); });
-    var knee=idx(sh,function(p){ return p.n==='circle'&&near(p,f.kneeL); });
+    var torso=idx(sh,part('torso'));
+    var knee=idx(sh,part('shinL'));
     assert.ok(c[2]===f.kneeL.y<f.hipL.y-1,c[0]+': the knee is not where this case needs it');
     assert.strictEqual(knee>torso,c[2],c[0]+': knee shape '+knee+', body '+torso); });
 });
@@ -151,7 +176,7 @@ t('front view: the stick goes behind the body once the dislocate takes it behind
   var ex=rex('shoulderdisloc'), seen={};
   for(var i=0;i<24;i++){ var u=i/24, s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigFrontSVG(EXOF.shoulderdisloc,u));
     var bar=idx(sh,function(p){ return p.n==='rect'&&p.a.height==='5'; });
-    var f=app.rSolveFront(app.rFrontAt(ex,u)), torso=idx(sh,function(p){ return p.n==='polygon'&&p.a.points===torsoPts(f); });
+    var f=app.rSolveFront(app.rFrontAt(ex,u)), torso=idx(sh,part('torso'));
     var back=s.handN.x<s.hip.x; seen[back]=1;
     assert.strictEqual(bar<torso,back,'at u='+u.toFixed(2)+' the hands are '+(back?'behind':'in front of')+' the hip but the stick is drawn '+(bar<torso?'behind':'over')+' the body'); }
   assert.ok(seen['true']&&seen['false'],'the dislocate never takes the stick both in front and behind');
@@ -190,7 +215,7 @@ t('a ball let go of is drawn where the rig puts it, not in the hands', function(
 t('skipping draws its rope from the hands, overhead as it lands', function(){
   var ex=rex('skipping'); assert.strictEqual(ex.equip,'rope','skipping has no rope');
   for(var i=0;i<16;i++){ var u=i/16, s=app.rSolve(app.rPoseAt(ex,u)), f=app.rSolveFront(app.rFrontAt(ex,u));
-    var side=shapes(app.rigSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'; }), front=shapes(app.rigFrontSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'; });
+    var side=shapes(app.rigSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'&&!p.a['data-p']; }), front=shapes(app.rigFrontSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'&&!p.a['data-p']; });
     assert.strictEqual(side.length,2,'u='+u+': '+side.length+' strands');
     [s.handF,s.handN].forEach(function(h,j){ assert.ok(side[j].a.d.indexOf('M'+h.x.toFixed(1)+' '+h.y.toFixed(1))===0,'u='+u+': a strand does not start at a hand'); });
     assert.strictEqual(front.length,2,'u='+u+': the front rope changes its shapes');
@@ -198,7 +223,7 @@ t('skipping draws its rope from the hands, overhead as it lands', function(){
     assert.strictEqual(arch.length,1,'u='+u+': '+arch.length+' arches');
     var ys=(arch[0].a.d.match(/-?[\d.]+ -?[\d.]+/g)||[]).map(function(x){ return +x.split(' ')[1]; });
     assert.ok(arch[0].a.d.indexOf('M'+f.handL.x.toFixed(1)+' '+f.handL.y.toFixed(1))===0&&/ -?[\d.]+ -?[\d.]+$/.test(arch[0].a.d)&&Math.abs(ys[ys.length-1]-f.handR.y)<0.06,'u='+u+': the arch does not run between the hands'); }
-  var s0=app.rSolveFront(app.rFrontAt(ex,0)), a0=shapes(app.rigFrontSVG(EXOF.skipping,0)).filter(function(p){ return p.n==='path'&&/ Q/.test(p.a.d); })[0];
+  var s0=app.rSolveFront(app.rFrontAt(ex,0)), a0=shapes(app.rigFrontSVG(EXOF.skipping,0)).filter(function(p){ return p.n==='path'&&!p.a['data-p']&&/ Q/.test(p.a.d); })[0];
   var top=Math.min.apply(null,(a0.a.d.match(/-?[\d.]+ -?[\d.]+/g)||[]).map(function(x){ return +x.split(' ')[1]; }));
   assert.ok(top<s0.head.y,'as the feet land the rope is at y '+top+', not over the head at '+s0.head.y.toFixed(1));
 });
@@ -266,8 +291,8 @@ t('the figure grows with a tablet\'s screen, and the side panel keeps the front\
   assert.ok(/--fig-w:1\.\d{3}/.test(app.figPairStyle(EXOF.bench)),'the bench\'s wide crop has no --fig-w: '+app.figPairStyle(EXOF.bench));
 });
 t('the floor runs the full width of the panel', function(){
-  var sh=shapes(app.rigSVG(EXOF.backsquat,0)), vb=vbOf(app.rigSVG(EXOF.backsquat,0)), g=sh[1];
-  assert.ok(g.n==='line'&&g.a.stroke==='var(--ground)','the first shape is not the floor');
+  var sh=shapes(app.rigSVG(EXOF.backsquat,0)), vb=vbOf(app.rigSVG(EXOF.backsquat,0)), g=sh[sh[1].a['data-p']==='shadow'?2:1];
+  assert.ok(g.n==='line'&&g.a.stroke==='var(--ground)','the floor is not drawn first, under all but the shadow');
   assert.ok(+g.a.x1<vb.x-100&&+g.a.x2>vb.x+vb.w+100,'the floor stops at '+g.a.x1+'..'+g.a.x2);
   assert.ok(/\.fig-wrap\{[^}]*overflow:hidden/.test(css)&&/\.fig-wrap svg\{[^}]*overflow:visible/.test(css),'the panel does not let the floor out of the svg and clip it');
 });
@@ -282,11 +307,88 @@ t('the floor and the props stand out from the panel at 3:1 or more, light and da
     assert.ok(th[1][k],'no --'+k+' in the '+th[0]+' theme');
     var c=ratio(th[1][k],th[1]['surface-raised']);
     assert.ok(c>=3,'--'+k+' is '+c.toFixed(2)+':1 against the panel in the '+th[0]+' theme'); }); });
-  var sq=shapes(app.rigSVG(EXOF.backsquat,0))[1], bn=shapes(app.rigSVG(EXOF.bench,0)).filter(function(p){ return p.n==='rect'; })[0];
+  var sq=shapes(app.rigSVG(EXOF.backsquat,0)).filter(function(p){ return p.n==='line'; })[0], bn=shapes(app.rigSVG(EXOF.bench,0)).filter(function(p){ return p.n==='rect'; })[0];
   assert.strictEqual(sq.a.stroke,'var(--ground)','the floor is drawn in '+sq.a.stroke);
   assert.strictEqual(bn.a.stroke,'var(--prop)','the bench is edged in '+bn.a.stroke);
   var pl=shapes(app.rigFrontSVG(EXOF.bench,0)).filter(function(p){ return p.n==='rect'; })[0];
   assert.strictEqual(pl.a.stroke,'var(--prop)','the bench from above is edged in '+pl.a.stroke);
+});
+
+console.log('\nTHE FIGURE\'S SHAPES');
+// The figure used to be a mannequin: straight-sided limbs, a round head with
+// no face, no neck, a trunk the same width all the way down. Which way it
+// faced, where the chest was and where an arm crossed the body were guesses.
+function pts(sh,k){ var j=idx(sh,part(k)); assert.ok(j>=0,'no '+k+' drawn'); return pathPts(sh[j].a.d); }
+function facing(s){ var dx=s.sh.x-s.hip.x, dy=s.sh.y-s.hip.y, l=Math.hypot(dx,dy); return {x:-dy/l, y:dx/l}; }
+t('side view: the head has a face, turned the way the figure faces (ahead standing, down in a push-up, up on a bench)', function(){
+  [['backsquat',0,'x',1],['pushup',0.5,'y',1],['bench',0,'y',-1]].forEach(function(c){
+    var s=app.rSolve(app.rPoseAt(rex(c[0]),c[1])), f=facing(s), P=pts(shapes(app.rigSVG(EXOF[c[0]],c[1])),'head');
+    assert.ok(f[c[2]]*c[3]>0.5,c[0]+': the trunk does not face the way this case needs');
+    var fwd=-1e9, bk=-1e9; P.forEach(function(p){ var q=(p[0]-s.head.x)*f.x+(p[1]-s.head.y)*f.y; fwd=Math.max(fwd,q); bk=Math.max(bk,-q); });
+    assert.ok(fwd-bk>=0.5,c[0]+': the head reaches '+fwd.toFixed(1)+' ahead and '+bk.toFixed(1)+' behind, so it has no face'); });
+});
+t('a neck joins the head to the shoulders, in both views', function(){
+  RIGS.forEach(function(id){ var ex=rex(id), s=app.rSolve(app.rPoseAt(ex,0.3)), P=pts(shapes(app.rigSVG(EXOF[id],0.3)),'neck');
+    function reach(q){ return Math.min.apply(null,P.map(function(p){ return Math.hypot(p[0]-q.x,p[1]-q.y); })); }
+    assert.ok(reach(s.sh)<4&&reach(s.head)<app.RL.HEAD_R,id+': the neck does not run from the shoulders to the head');
+    if(ex.front) pts(shapes(app.rigFrontSVG(EXOF[id],0.3)),'neck'); });
+});
+// A capsule's arcs: the first round its end, the second round its root.
+function radii(sh,k){ var j=idx(sh,part(k)); assert.ok(j>=0,'no '+k+' drawn'); return (sh[j].a.d.match(/A[\d.]+/g)||[]).map(function(a){ return +a.slice(1); }); }
+// An outline may stray 0.6 past its radius: the end of an arc near half a
+// circle, rounded to 0.1, moves its centre a few tenths, in the browser too.
+t('limbs taper from the root to the end and follow their joints, in both views', function(){
+  RIGS.forEach(function(id){ var ex=rex(id), u=0.3, s=app.rSolve(app.rPoseAt(ex,u)), sh=shapes(app.rigSVG(EXOF[id],u));
+    [['thighN',s.hip,s.kneeN],['shinN',s.kneeN,s.ankN],['upperN',s.sh,s.elbN],['foreN',s.elbN,s.handN],['thighF',s.hipF,s.kneeF],['upperF',s.shF,s.elbF]].forEach(function(c){
+      var r=radii(sh,c[0]); assert.ok(r.length===2&&r[1]>r[0],id+' '+c[0]+': not a tapered capsule ('+r+')');
+      var A=c[1], B=c[2], dx=B.x-A.x, dy=B.y-A.y, L2=dx*dx+dy*dy||1;
+      pts(sh,c[0]).forEach(function(p){ var k=Math.max(0,Math.min(1,((p[0]-A.x)*dx+(p[1]-A.y)*dy)/L2)), d=Math.hypot(p[0]-A.x-dx*k,p[1]-A.y-dy*k);
+        assert.ok(d<=r[1]+0.6,id+' '+c[0]+': the outline strays '+d.toFixed(1)+' off its bone'); }); });
+    if(!ex.front) return; var fs2=shapes(app.rigFrontSVG(EXOF[id],u));
+    ['thighL','shinR','upperL','foreR'].forEach(function(k){ var r=radii(fs2,k); assert.ok(r.length===2&&r[1]>r[0],id+' front '+k+': not a tapered capsule ('+r+')'); }); });
+});
+// The anchor points of a closed smooth outline, in order.
+function anchors(sh,k){ var j=idx(sh,part(k)); assert.ok(j>=0,'no '+k+' drawn'); var d=sh[j].a.d, a=[d.match(/^M(-?[\d.]+),(-?[\d.]+)/).slice(1).map(num)];
+  (d.match(/ (-?[\d.]+),(-?[\d.]+)(?= C|Z)/g)||[]).forEach(function(m){ a.push(m.trim().split(',').map(num)); }); a.pop(); return a; }
+t('the trunk is shaped: chest and pelvis wider than the waist, in both views', function(){
+  RIGS.forEach(function(id){ var ex=rex(id), a=anchors(shapes(app.rigSVG(EXOF[id],0)),'torso');
+    function w(i){ return Math.hypot(a[i][0]-a[a.length-1-i][0],a[i][1]-a[a.length-1-i][1]); }
+    assert.ok(a.length===16&&w(4)>w(3)+1.5&&w(1)>w(3)+1.5,id+': the trunk is '+a.length+' points, pelvis '+(a.length===16?w(1).toFixed(1)+', waist '+w(3).toFixed(1)+', chest '+w(4).toFixed(1):''));
+    if(!ex.front) return; var b=anchors(shapes(app.rigFrontSVG(EXOF[id],0)),'torso');
+    function wf(i){ return Math.abs(b[i][0]-b[14-i][0]); }
+    assert.ok(b.length===16&&wf(1)>wf(3)+3,id+': the front trunk has no chest over its waist'); });
+});
+t('the far limbs are a lighter shade, and the far limb of the working pair is accented too', function(){
+  [['backsquat','thighF','upperF'],['ohp','upperF','thighF']].forEach(function(c){ var sh=shapes(app.rigSVG(EXOF[c[0]],0));
+    assert.strictEqual(sh[idx(sh,part(c[1]))].a.fill,'var(--fig-far-hi)',c[0]+': the far '+c[1]+' of the working pair is not accented');
+    assert.strictEqual(sh[idx(sh,part(c[2]))].a.fill,'var(--fig-far)',c[0]+': the far '+c[2]+' is not the far shade'); });
+  var css=h.slice(h.indexOf(':root{'),h.indexOf('</style>')).replace(/\\\n/g,'\n');
+  var light=tokens(css.slice(0,css.indexOf('}'))), i=css.indexOf(':root[data-theme=dark]{'), dark=tokens(css.slice(i,css.indexOf('}',i)));
+  [['light',light],['dark',dark]].forEach(function(th){ var T=th[1];
+    assert.ok(T['fig-far']&&T['fig-far-hi'],'no far-limb tokens in the '+th[0]+' theme');
+    assert.ok(ratio(T['fig-far'],T['surface-raised'])>=3,th[0]+': the far limbs are '+ratio(T['fig-far'],T['surface-raised']).toFixed(2)+':1 against the panel');
+    assert.ok(ratio(T['fig-far'],T.text)>=3,th[0]+': the far limbs are too close to the near ones ('+ratio(T['fig-far'],T.text).toFixed(2)+':1)');
+    assert.ok(ratio(T['fig-far-hi'],T.accent)>=1.8,th[0]+': the far working limb is too close to the near one'); });
+});
+t('the feet are shoes in profile, toe ahead, the sole where the foot stands', function(){
+  RIGS.forEach(function(id){ var ex=rex(id), s=app.rSolve(app.rPoseAt(ex,0)), sh=shapes(app.rigSVG(EXOF[id],0));
+    [['footN',s.ankN,s.footN],['footF',s.ankF,s.footF]].forEach(function(c){ var P=pts(sh,c[0]), B=app.rFootPts(c[1],c[2]);
+      var lo=Math.max.apply(null,P.map(function(p){ return p[1]; })), blo=Math.max.apply(null,B.map(function(p){ return p.y; }));
+      if(Math.abs(blo-app.RGROUND)<=1.5) assert.ok(Math.abs(lo-blo)<=1,id+' '+c[0]+': the shoe\'s sole is at '+lo.toFixed(1)+', the foot\'s at '+blo.toFixed(1));
+      if(!c[2]) assert.ok(Math.max.apply(null,P.map(function(p){ return p[0]; }))>c[1].x+9,id+' '+c[0]+': the toe does not point ahead'); }); });
+});
+t('a shadow under the feet narrows as a jump leaves the floor; from above the figure lies on a mat', function(){
+  var ex=rex('sq_jump'), u=0, top=1e9;
+  for(var i=0;i<48;i++){ var s=app.rSolve(app.rPoseAt(ex,i/48)), y=Math.max(s.ankN.y,s.ankF.y); if(y<top){ top=y; u=i/48; } }
+  assert.ok(top<app.RGROUND-16,'the jump never leaves the floor');
+  function rx(v){ var sh=shapes(app.rigSVG(EXOF.sq_jump,v)), j=idx(sh,part('shadow')); assert.ok(j>=0,'no shadow under the feet'); return +sh[j].a.rx; }
+  assert.ok(rx(u)<rx(0)*0.8,'the shadow is '+rx(u)+' wide in the air and '+rx(0)+' on the floor');
+  function fx(v){ var sh=shapes(app.rigFrontSVG(EXOF.sq_jump,v)), j=idx(sh,part('shadow')); assert.ok(j>=0,'no shadow under the feet in the second panel'); return +sh[j].a.rx; }
+  var f0=app.rSolveFront(app.rFrontAt(ex,0));
+  assert.ok(fx(0)>=Math.abs(f0.footR.x-f0.footL.x)/2+4,'standing, the second panel\'s shadow ('+fx(0)+') is narrower than the stance');
+  assert.ok(fx(u)<fx(0)*0.8,'the second panel\'s shadow is '+fx(u)+' wide in the air and '+fx(0)+' on the floor');
+  assert.ok(idx(shapes(app.rigFrontSVG(EXOF.pushup,0)),part('mat'))>=0,'the push-up from above has no mat');
+  assert.ok(idx(shapes(app.rigFrontSVG(EXOF.bench,0)),part('mat'))<0,'the bench press from above lies on a mat instead of its bench');
 });
 
 console.log('\nDRAWN IN PLACE');
@@ -303,7 +405,7 @@ t('a rep redraws the figure in place, swapping only a shape whose kind changes, 
   Object.defineProperty(el,'innerHTML',{set:function(v){ rebuilt++; set.call(this,v); }, get:function(){ return win.Element.prototype.__lookupGetter__('innerHTML').call(this); }});
   RIGS.forEach(function(id){ [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){
     var n0=null, ok=true; if(!f(EXOF[id],0)) return; for(var i=0;i<=120;i++){ var html=f(EXOF[id],i/120), d=lib.shapes(html);
-      if(n0!==null && d.s.length!==n0) ok=false; n0=d.s.length;
+      if(n0!==null && d.s.length!==n0){ bad.push(id+(v?' front':' side')+' changes its number of shapes at u='+(i/120).toFixed(3)); break; } n0=d.s.length;
       rebuilt=0; lib.draw(el,d);
       if(i && ok && rebuilt) { bad.push(id+(v?' front':' side')+' at u='+(i/120).toFixed(3)); break; }
       ref.innerHTML=html; if(el.innerHTML!==ref.innerHTML){ bad.push(id+(v?' front':' side')+' draws something else at u='+(i/120).toFixed(3)); break; } } }); });

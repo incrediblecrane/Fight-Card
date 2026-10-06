@@ -748,7 +748,7 @@ srv.listen(0,async function(){
     var got=await p.evaluate(function(){
       var row=document.querySelector('[data-action="toggleex"][data-id="pick:fly_cable_rev"]').closest('.pickrow');
       return {views: row.querySelectorAll('.pickpreview svg').length,
-              shapes: row.querySelectorAll('.pickpreview svg polygon').length,
+              shapes: row.querySelectorAll('.pickpreview svg [data-p]').length,
               cords: row.querySelectorAll('.pickpreview svg line').length};
     });
     assert.strictEqual(got.views,2,'expected two views, got '+got.views);
@@ -800,8 +800,8 @@ srv.listen(0,async function(){
     var got=await p.evaluate(function(){
       var row=document.querySelector('[data-action="toggleex"][data-id="pick:skierg"]').closest('.pickrow');
       return {views: row.querySelectorAll('.pickpreview svg').length,
-              props: row.querySelectorAll('.pickpreview svg rect').length,
-              shapes: row.querySelectorAll('.pickpreview svg polygon').length};
+              props: row.querySelectorAll('.pickpreview svg rect:not([data-p])').length,
+              shapes: row.querySelectorAll('.pickpreview svg [data-p]').length};
     });
     assert.strictEqual(got.views,2,'expected two views, got '+got.views);
     assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
@@ -842,8 +842,8 @@ srv.listen(0,async function(){
     var got=await p.evaluate(function(){
       var row=document.querySelector('[data-action="toggleex"][data-id="pick:situpwallthrow"]').closest('.pickrow');
       return {views: row.querySelectorAll('.pickpreview svg').length,
-              props: row.querySelectorAll('.pickpreview svg rect').length,
-              shapes: row.querySelectorAll('.pickpreview svg polygon').length};
+              props: row.querySelectorAll('.pickpreview svg rect:not([data-p])').length,
+              shapes: row.querySelectorAll('.pickpreview svg [data-p]').length};
     });
     assert.strictEqual(got.views,2,'expected two views, got '+got.views);
     assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
@@ -1127,9 +1127,9 @@ srv.listen(0,async function(){
       var s=await p.evaluate(function(){
         var box=document.getElementById('fig-live-front');
         if(!box) return null;
-        // Only the two hands are drawn with a 2-wide outline.
-        var hands=[].slice.call(box.querySelectorAll('circle[stroke-width="2"]'));
-        var sh=[].slice.call(box.querySelectorAll('circle[r="6.5"]'));
+        // The hands and the shoulders, by the parts they are drawn as.
+        var hands=[].slice.call(box.querySelectorAll('[data-p="handL"],[data-p="handR"]'));
+        var sh=[].slice.call(box.querySelectorAll('[data-p="capL"],[data-p="capR"]'));
         if(hands.length!==2 || sh.length!==2) return null;
         var x=hands.map(function(c){ return +c.getAttribute('cx'); });
         var y=hands.map(function(c){ return +c.getAttribute('cy'); });
@@ -1183,8 +1183,8 @@ srv.listen(0,async function(){
         var svgs=[].slice.call(row.querySelectorAll('.pickpreview svg'));
         return {views:svgs.length,
                 boxes:svgs.map(function(s){ return s.getAttribute('viewBox'); }),
-                shapes:row.querySelectorAll('.pickpreview svg polygon').length,
-                props:row.querySelectorAll('.pickpreview svg rect').length,
+                shapes:row.querySelectorAll('.pickpreview svg [data-p]').length,
+                props:row.querySelectorAll('.pickpreview svg rect:not([data-p])').length,
                 arrow:(row.querySelector('.arrow')||{textContent:'?'}).textContent.trim()};
       }, E.id);
       assert.strictEqual(got.views,2,'expected two views, got '+got.views);

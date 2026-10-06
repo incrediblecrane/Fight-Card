@@ -749,7 +749,7 @@ srv.listen(0,async function(){
       assert.ok(w!=='bench' || r[0].vbw>100,'the bench side crop is '+r[0].vbw+' wide, so this does not test a wide crop');
     }
     p=await open('bench');
-    var bench=await p.evaluate(function(){ return document.querySelectorAll('#fig-live-front svg rect').length; });
+    var bench=await p.evaluate(function(){ return document.querySelectorAll('#fig-live-front svg rect:not([data-p])').length; });
     await close(p);
     assert.ok(bench>0,'the bench press from above has no bench under it');
   });

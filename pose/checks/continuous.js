@@ -64,7 +64,7 @@ EX.forEach(function(ex){
 var FINE=2000, JUMP=3;
 var app=(function(){
   var h=require('fs').readFileSync(require('path').join(__dirname,'..','..','index.html'),'utf8');
-  var src=h.slice(h.indexOf('var RL='), h.indexOf('function rSeg('))+h.slice(h.indexOf('function rSolveFront('), h.indexOf('function rEquipFront('));
+  var src=h.slice(h.indexOf('var RL='), h.indexOf('function rF('))+h.slice(h.indexOf('function rSolveFront('), h.indexOf('function rEquipFront('));
   return new Function(src+';return {RIGFRAMES:RIGFRAMES,solve:rSolve,poseAt:rPoseAt,lerpFrame:rFrame,solveFront:rSolveFront,frontAt:rFrontAt,bellAt:rBellAt,bellFront:rBellFront,footAt:rFootPts};')();
 })();
 // A cut (loop:'cut') swaps keyframes while the figure is faded out, so that
