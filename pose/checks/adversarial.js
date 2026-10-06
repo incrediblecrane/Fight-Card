@@ -185,10 +185,7 @@ EX.forEach(function(ex){
 // are being re-authored (their toes and rear feet need footN and footF), so
 // they print as warnings; any other rig breaking it fails, and a listed rig
 // that comes right says so, so the list only shrinks.
-var FOOTING={woodchopper:'hover',
-  boxjump:'sink',medballthrow:'hover',skipping:'hover',jumpingjack:'hover',highknees:'hover',briskwalkjog:'hover',
-  hipflexor:'hover',couchstretch:'sink',catcow:'hover',thoracic:'hover',
-  ankle_mob:'hover',rowerg:'sink'};
+var FOOTING={catcow:'hover',thoracic:'hover',ankle_mob:'hover',rowerg:'sink'};
 var footWarn=[], footDone=[];
 function surfaces(ex){ var t=[{x0:-1e9,x1:1e9,y:GROUND,h:1e9}];
   (ex.props||[]).forEach(function(p){ if(!p[5]) t.push({x0:p[0],x1:p[0]+p[2],y:p[1],h:p[3]}); }); return t; }
@@ -207,6 +204,29 @@ EX.forEach(function(ex){
   ['hover','sink'].forEach(function(w){ var msg=w==='hover'?'a foot on the floor or a prop lies on it, not floating just above':'no foot sinks into the floor or a prop';
     if(known.indexOf(w)>=0){ if(bad[w]) footWarn.push(ex.id+' '+w+': '+bad[w]); else footDone.push(ex.id+' '+w); }
     else ck(ex.id,msg,!bad[w],bad[w]); });
+});
+// A jump names its keyframes in the air (flight). Every other keyframe has
+// a sole on the floor or the box (within 1.5), and every flight keyframe
+// both clear of it (more than 4): the jumps used to take off with the feet
+// already 13 up and land in a crouch in mid-air. A rig that leaves the floor
+// with both feet at once without declaring it is not a jump the checks know.
+var JUMPS=['sq_jump','boxjump','broadjump'];
+JUMPS.forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
+  ck(id,'a jump declares the keyframes it is in the air (flight)',!!(ex&&ex.flight&&ex.flight.length),'no flight');
+  if(!ex||!ex.flight) return;
+  var T=surfaces(ex);
+  ex.frames.forEach(function(f,i){ var s=solve(f), g=[footGap(T,s,'N'),footGap(T,s,'F')], air=ex.flight.indexOf(i)>=0;
+    // (Off the box one foot steps down at a time; the other is lifted clear.)
+    ck(id,'frame '+i+(air?' is in the air: both feet clear the floor':' is on the ground: a sole on the floor or the box, the other on it or lifted clear'),
+      air?g[0]>4&&g[1]>4:g.some(function(x){ return Math.abs(x)<=1.5; })&&g.every(function(x){ return Math.abs(x)<=1.5||x>4; }),'soles '+r(g[0])+', '+r(g[1])+' above'); }); });
+// Running, walking, hopping and jacks touch down in each half of the cycle:
+// a sole on the floor (within 1.5) at some moment of each half. The sprint's
+// stance foot used to float 6 above the floor all the way round.
+['sprint','highknees','briskwalkjog','skipping','jumpingjack'].forEach(function(id){
+  var ex=EX.filter(function(e){ return e.id===id; })[0], T=surfaces(ex), low=[1e9,1e9];
+  for(var q=0;q<192;q++){ var s=solve(rig.poseAt(ex,q/192)), h=q<96?0:1;
+    low[h]=Math.min(low[h],footGap(T,s,'N'),footGap(T,s,'F')); }
+  ck(id,'a foot touches the floor in each half of the cycle',low[0]<=1.5&&low[1]<=1.5,'lowest sole '+r(low[0])+' then '+r(low[1])+' above');
 });
 if(footWarn.length) console.log('WARN: '+footWarn.length+' rigs float or sink a foot (listed in FOOTING, being re-authored):\n  ! '+footWarn.join('\n  ! '));
 if(footDone.length) console.log('NOTE: now standing on their feet, take off FOOTING: '+footDone.join(', '));

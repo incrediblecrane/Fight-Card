@@ -57,7 +57,7 @@ setTimeout(function(){
   var app=new Function('hasOwn',cut2('var RL=','function figureSVG(')+';return {RIGMAP:RIGMAP,rigBox:rigBox};')(function(o,k){ return Object.prototype.hasOwnProperty.call(o,k); });
   var exOf={}; Object.keys(app.RIGMAP).forEach(function(k){ if(!exOf[app.RIGMAP[k]]) exOf[app.RIGMAP[k]]=k; });
   EX.forEach(function(ex,i){ if(!exOf[ex.id]||!cards[i]) return; var b=app.rigBox(exOf[ex.id]), v=cards[i].querySelectorAll('.figwrap svg');
-    var want=[b.x+' '+b.y+' '+b.w+' '+b.h,'20 '+b.y+' 100 '+b.h];
+    var want=[b.x+' '+b.y+' '+b.w+' '+b.h,b.fx+' '+b.y+' '+b.fw+' '+b.h];
     [].forEach.call(v,function(svg,k){ var got=svg.getAttribute('viewBox');
       if(got!==want[k]) fails.push(ex.id+': the preview\'s '+(k?'second':'side')+' panel is '+got+', the app draws '+want[k]); });
     var fw=cards[i].querySelector('.figwrap').style.flexGrow;

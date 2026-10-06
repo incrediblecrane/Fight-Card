@@ -1124,21 +1124,21 @@ var EXERCISES = [
   changed:"The shoulders and legs now hover off the floor with the lumbar spine pinned down, instead of a generic supine pose. It is a hold, so almost nothing travels.",
   equip:null, active:null, floor:true,
   frames:[
-    {hip:[50,160],torso:288,ankN:[96,140],ankF:[90,143], handN:[-6,133],handF:[-2,136], kneeSign:-1, elbowSign:1},
-    {hip:[50,160],torso:288,ankN:[96,137],ankF:[90,140], handN:[-6,131],handF:[-2,134], kneeSign:-1, elbowSign:1},
-    {hip:[50,160],torso:288,ankN:[96,137],ankF:[90,140], handN:[-6,131],handF:[-2,134], kneeSign:-1, elbowSign:1},
-    {hip:[50,160],torso:288,ankN:[96,140],ankF:[90,143], handN:[-6,133],handF:[-2,136], kneeSign:-1, elbowSign:1}
+    {hip:[50,160],torso:288,ankN:[104,140],ankF:[99,141], handN:[-17.9,132.1],handF:[-21.9,131.1], kneeSign:-1, elbowSign:1},
+    {hip:[50,160],torso:288,ankN:[103.5,138.5],ankF:[98.5,139.5], handN:[-18.2,132.8],handF:[-22.3,131.7], kneeSign:-1, elbowSign:1},
+    {hip:[50,160],torso:288,ankN:[103.5,138.5],ankF:[98.5,139.5], handN:[-18.2,132.8],handF:[-22.3,131.7], kneeSign:-1, elbowSign:1},
+    {hip:[50,160],torso:288,ankN:[104,140],ankF:[99,141], handN:[-17.9,132.1],handF:[-21.9,131.1], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"bearcrawl", tempo:[260,260,260,260], name:"Bear crawl",
   real:"Hands and feet on the floor, knees hovering a couple of inches off it, back flat. Crawl by moving the opposite hand and foot together while the hips stay low and stop rocking side to side. If the knees touch down or the hips sway, slow it right down.",
   changed:"The knees now hover just clear of the floor and opposite limbs travel together, which is the movement. It used to share the static plank pose and never moved at all.",
-  equip:null, active:"legs", floor:true,
+  equip:null, active:"legs", floor:true, stops:[0,2],
   frames:[
-    {hip:[48,132],torso:88,ankN:[16,156],ankF:[10,158], handN:[92,160],handF:[84,162], kneeSign:-1, elbowSign:1},
-    {hip:[48,132],torso:88,ankN:[32,150],ankF:[10,158], handN:[92,160],handF:[76,156], kneeSign:-1, elbowSign:1},
-    {hip:[48,132],torso:88,ankN:[16,156],ankF:[10,158], handN:[92,160],handF:[84,162], kneeSign:-1, elbowSign:1},
-    {hip:[48,132],torso:88,ankN:[16,156],ankF:[26,151], handN:[84,156],handF:[84,162], kneeSign:-1, elbowSign:1}
+    {hip:[48,132],torso:80,ankN:[26,160],ankF:[7,160], handN:[76,165],handF:[82,165], footRot:45, kneeSign:-1, elbowSign:1},
+    {hip:[48,132],torso:80,ankN:[19,160],ankF:[14,152], handN:[81.5,162],handF:[76.5,165], footRot:45, kneeSign:-1, elbowSign:1},
+    {hip:[48,132],torso:80,ankN:[12,160],ankF:[21,160], handN:[87,165],handF:[71,165], footRot:45, kneeSign:-1, elbowSign:1},
+    {hip:[48,132],torso:80,ankN:[19,152],ankF:[14,160], handN:[81.5,165],handF:[76.5,162], footRot:45, kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"woodchopper", tempo:[380,380,460,460], name:"Cable or band woodchopper",
@@ -1146,26 +1146,26 @@ var EXERCISES = [
   changed:"The hands now travel on a long diagonal from high on one side to the opposite hip with the torso rotating behind them, rather than sharing the generic TWIST pose that only turned the shoulders.",
   // One cable, high on one side, to one handle held in both hands: two from
   // opposite sides drew it as a cable crossover.
-  equip:"cable", active:"arms", anchorAt:[124,40], anchorFront:[128,28],
+  equip:"cable", active:"arms", anchorAt:[72,22], anchorFront:[128,28], stops:[0,2],
   frames:[
-    {hip:[55,110],torso:352,ankN:[64,163],ankF:[46,163], handN:[82,58],handF:[76,60], elbowSign:1},
-    {hip:[55,110],torso:6,  ankN:[64,163],ankF:[46,163], handN:[72,88],handF:[66,90], elbowSign:1},
-    {hip:[55,112],torso:18, ankN:[64,163],ankF:[46,161], handN:[50,112],handF:[44,114], elbowSign:1},
-    {hip:[55,110],torso:6,  ankN:[64,163],ankF:[46,163], handN:[72,88],handF:[66,90], elbowSign:1}
+    {hip:[55,108],torso:0, ankN:[64,163],ankF:[46,163], armN:[25,25],  armScaleN:0.85,armScaleF:0.85},
+    {hip:[55,109],torso:4, ankN:[64,163],ankF:[46,163], armN:[112,112],armScaleN:0.92,armScaleF:0.92},
+    {hip:[55,112],torso:16,ankN:[64,163],ankF:[46,161], footF:13, armN:[168,168],armScaleN:0.85,armScaleF:0.85},
+    {hip:[55,109],torso:4, ankN:[64,163],ankF:[46,163], armN:[112,112],armScaleN:0.92,armScaleF:0.92}
   ]},
 
 { id:"russiantwist", tempo:[340,340,340,340], name:"Russian twist",
   real:"Seated, leaning back to about forty-five degrees with the feet up or lightly down, weight held at the chest. Rotate it side to side from the ribcage while the hips stay still. Swinging the arms across a rigid torso is the usual cheat and does nothing.",
   changed:"It now sits with the torso leaned back and the feet up, which is the position that makes it hard, and the weight tracks across the body rather than the arms flapping. It used to share the standing TWIST pose.",
-  equip:"dumbbell", axis:"vertical", active:"arms", floor:true,
+  equip:"dumbbell", axis:"vertical", active:"arms", floor:true, frontStops:[1,3],
   frames:[
-    {hip:[40,152],torso:42,ankN:[86,138],ankF:[80,140], handN:[74,116],handF:[68,118], kneeSign:-1, elbowSign:1},
-    {hip:[40,152],torso:42,ankN:[86,138],ankF:[80,140], handN:[64,112],handF:[58,114], kneeSign:-1, elbowSign:1},
-    {hip:[40,152],torso:42,ankN:[86,138],ankF:[80,140], handN:[74,116],handF:[68,118], kneeSign:-1, elbowSign:1},
-    {hip:[40,152],torso:42,ankN:[86,138],ankF:[80,140], handN:[80,124],handF:[74,126], kneeSign:-1, elbowSign:1}
+    {hip:[40,161],torso:318,ankN:[84,150],ankF:[79,151], handN:[41.8,127.1],handF:[39.8,128.1], armScaleN:1,  armScaleF:1,  kneeSign:-1, elbowSign:1},
+    {hip:[40,161],torso:318,ankN:[84,150],ankF:[79,151], handN:[32.9,135.1],handF:[30.9,136.1], armScaleN:0.6,armScaleF:0.6,kneeSign:-1, elbowSign:1},
+    {hip:[40,161],torso:318,ankN:[84,150],ankF:[79,151], handN:[41.8,127.1],handF:[39.8,128.1], armScaleN:1,  armScaleF:1,  kneeSign:-1, elbowSign:1},
+    {hip:[40,161],torso:318,ankN:[84,150],ankF:[79,151], handN:[32.9,135.1],handF:[30.9,136.1], armScaleN:0.6,armScaleF:0.6,kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"palloffpress", tempo:[420,520,520,420], name:"Pallof press",
+{ id:"palloffpress", tempo:[480,820,480,420], name:"Pallof press",
   real:"Stand side-on to a cable at chest height, hands together at the sternum. Press straight out and hold: the cable is trying to rotate you and you refuse. Nothing should turn. The further the hands travel from the chest, the harder the anti-rotation demand gets.",
   changed:"The hands now press straight out from the sternum with the torso locked square, so the exercise reads as anti-rotation. It used to share the overhead PRESS pose, which is the wrong plane entirely.",
   // The cable pulls from one side, which is the whole exercise: two cables
@@ -1174,114 +1174,135 @@ var EXERCISES = [
   // behind the lifter it read as a cable chest press.
   equip:"cable", active:"arms", anchorFront:[134,86],
   frames:[
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[62,88],handF:[56,89], elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[76,86],handF:[70,87], elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[90,84],handF:[84,85], elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[76,86],handF:[70,87], elbowSign:1}
+    {hip:[55,105.5],torso:2,ankN:[56,163],ankF:[50,163], handN:[63,88],handF:[58,89], elbowSign:1},
+    {hip:[55,105.5],torso:2,ankN:[56,163],ankF:[50,163], handN:[94,84],handF:[88,85], elbowSign:1},
+    {hip:[55,105.5],torso:2,ankN:[56,163],ankF:[50,163], handN:[94,84],handF:[88,85], elbowSign:1},
+    {hip:[55,105.5],torso:2,ankN:[56,163],ankF:[50,163], handN:[63,88],handF:[58,89], elbowSign:1}
   ]},
 
-{ id:"hangingkneeraise", tempo:[420,420,520,520], name:"Hanging knee raise",
+{ id:"hangingkneeraise", tempo:[380,380,560,560], name:"Hanging knee raise",
   real:"Hang from a bar with straight arms and lift the knees toward the chest by curling the pelvis up, not just by bending the hips. Lower under control. If you swing, you are using momentum and the abs have stopped working.",
   changed:"It hangs from a fixed bar with straight arms while the KNEES travel, which is the movement. It used to share one HANG pose with the pull-up, so the legs never moved.",
-  equip:"fixedbar", active:"legs", barAt:[60,30],
+  equip:"fixedbar", active:"legs", barAt:[60,30], stops:[0,2],
   frames:[
-    {hip:[58,103],torso:2, ankN:[54,157],ankF:[46,156], handN:[60,30],handF:[56,30], elbowSign:1},
-    {hip:[58,103],torso:4, ankN:[76,140],ankF:[68,141], handN:[60,30],handF:[56,30], elbowSign:1},
-    {hip:[58,103],torso:6, ankN:[84,118],ankF:[76,119], handN:[60,30],handF:[56,30], elbowSign:1},
-    {hip:[58,103],torso:4, ankN:[76,140],ankF:[68,141], handN:[60,30],handF:[56,30], elbowSign:1}
+    {hip:[58,103.8],torso:2,  ankN:[54,157],ankF:[46,156], handN:[60,30],handF:[56,30], elbowSign:1},
+    {hip:[58,103.6],torso:358,ankN:[77,140],ankF:[69,141], handN:[60,30],handF:[56,30], elbowSign:1},
+    {hip:[58,103.2],torso:354,ankN:[88,116],ankF:[82,117], handN:[60,30],handF:[56,30], elbowSign:1},
+    {hip:[58,103.6],torso:358,ankN:[77,140],ankF:[69,141], handN:[60,30],handF:[56,30], elbowSign:1}
   ]},
 
-{ id:"kb_tgu", tempo:[600,600,700,700], name:"Turkish get-up",
+{ id:"kb_tgu", still:8, tempo:[700,800,700,900,1300,700,600,700,800,600,700,1300,900,700,800,600], name:"Turkish get-up",
   real:"From flat on your back with one arm locked overhead, stand up without ever letting that arm bend or the eyes leave the bell, then reverse it. It is a slow sequence of positions rather than a rep: roll to the elbow, to the hand, bridge, sweep the leg through, kneel, stand.",
-  changed:"It now shows the actual sequence, from lying with the arm locked out to the half-kneeling position, with the loaded arm vertical the whole way. It used to share the generic REACH pose and looked like a standing stretch.",
+  changed:"It now shows the whole sequence, from lying with the arm locked out through the elbow, the hand, the leg sweep and the half kneel to standing tall, stepping the back foot in rather than dragging it, then back down the same way, with the loaded arm straight and vertical throughout. It used to share the generic REACH pose and looked like a standing stretch, then stopped at the half kneel with the loaded arm bent.",
   equip:"kettlebell", load:"R", active:"arms", floor:true,
   frames:[
-    {hip:[46,156],torso:268,ankN:[86,150],ankF:[78,158], handN:[14,120],handF:[24,152], kneeSign:-1, elbowSign:1},
-    {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:1},
-    {hip:[56,138],torso:344,ankN:[82,163],ankF:[32,159], handN:[50,67], handF:[38,142], kneeSign:-1, elbowSign:1},
-    {hip:[52,150],torso:300,ankN:[86,156],ankF:[76,158], handN:[28,96],handF:[16,158], kneeSign:-1, elbowSign:1}
+    {hip:[46,160],torso:270,ankN:[78,163],ankF:[98.5,162.5], armN:[0,0],armF:[98,98], armScaleF:0.72, kneeSign:-1, elbowSign:-1},
+    {hip:[47,160],torso:300,ankN:[78,163],ankF:[98,162.5], armN:[0,0],armF:[168,95], kneeSign:-1, elbowSign:-1},
+    {hip:[49,160],torso:330,ankN:[78,163],ankF:[98,162.5], armN:[0,0],armF:[206,206], kneeSign:-1, elbowSign:1},
+    {hip:[54,133],torso:282,ankN:[78,163],ankF:[98,163], armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[53,132.5],torso:322,ankN:[78,163],ankF:[78,154], armN:[0,0],armF:[177,178], kneeSign:-1, elbowSign:1},
+    {hip:[52,132],torso:2,  ankN:[78,163],ankF:[24,157], armN:[0,0],armF:[176,178], kneeSign:-1, elbowSign:1},
+    {hip:[60,112],torso:2,  ankN:[78,163],ankF:[24,158.6], footF:45, armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[72,108],torso:2,  ankN:[78,163],ankF:[50,150], armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[78,105.5],torso:2,ankN:[78,163],ankF:[72,163], armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[72,108],torso:2,  ankN:[78,163],ankF:[50,150], armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[60,112],torso:2,  ankN:[78,163],ankF:[24,158.6], footF:45, armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[52,132],torso:2,  ankN:[78,163],ankF:[24,157], armN:[0,0],armF:[176,178], kneeSign:-1, elbowSign:1},
+    {hip:[53,132.5],torso:322,ankN:[78,163],ankF:[78,154], armN:[0,0],armF:[177,178], kneeSign:-1, elbowSign:1},
+    {hip:[54,133],torso:282,ankN:[78,163],ankF:[98,163], armN:[0,0],armF:[178,178], kneeSign:-1, elbowSign:1},
+    {hip:[49,160],torso:330,ankN:[78,163],ankF:[98,162.5], armN:[0,0],armF:[206,206], kneeSign:-1, elbowSign:1},
+    {hip:[47,160],torso:300,ankN:[78,163],ankF:[98,162.5], armN:[0,0],armF:[168,95], kneeSign:-1, elbowSign:-1}
   ]},
 
 // The still is the loaded bottom (keyframe 0), not the apex, where it hung in
 // the air with the arms up.
-{ id:"sq_jump", tempo:[380,220,300,420], still:0, name:"Jump squat",
+{ id:"sq_jump", tempo:[420,260,260,260,620], still:0, name:"Jump squat",
   real:"Quarter to half squat, then jump as high as you can and land soft on the same spot, absorbing through the hips and knees. The landing is the part that matters: quiet feet, knees tracking out, straight back into the next one only when you have control.",
   changed:"The feet now actually leave the floor and it lands back into a bent-knee absorb, rather than sharing a generic JUMP pose that stayed planted.",
-  equip:null, active:"legs",
+  equip:null, active:"legs", stops:[0,2,4], flight:[2], ease:[null,"out","in"],
   frames:[
-    {hip:[52,130],torso:26,ankN:[60,163],ankF:[50,163], armN:[196,196]},
-    {hip:[55,102],torso:6, ankN:[60,155],ankF:[50,155], armN:[20,14]},
-    {hip:[56,86], torso:2, ankN:[60,140],ankF:[50,140], armN:[10,6]},
-    {hip:[53,124],torso:20,ankN:[60,163],ankF:[50,163], armN:[150,150]}
+    {hip:[51,123],  torso:30,ankN:[60,163],ankF:[50,163], armN:[228,224]},
+    {hip:[58,101.5],torso:6, ankN:[60,159],ankF:[50,159], armN:[70,62], footRot:28},
+    {hip:[58,86],   torso:3, ankN:[61,143],ankF:[51,143], armN:[20,16], footRot:30},
+    {hip:[58,105.5],torso:8, ankN:[60,159.9],ankF:[50,159.9], armN:[112,106], footRot:20},
+    {hip:[52,124],  torso:28,ankN:[60,163],ankF:[50,163], armN:[160,156]}
   ]},
 
-{ id:"boxjump", tempo:[380,240,320,420], name:"Box jump",
+{ id:"boxjump", tempo:[540,190,190,220,330,260,250,230,420], name:"Box jump",
   real:"Load the hips, swing the arms and jump up onto the box, landing soft with the hips absorbing and the feet fully on. Step down, never jump down: the landing off a box is where achilles injuries come from.",
   changed:"There is a box in front and the figure lands ON it, so the height gain is visible. It used to share the jump pose with nothing to jump onto.",
-  equip:null, active:"legs", props:[[86,140,44,30]],
+  equip:null, active:"legs", props:[[86,140,44,30]], stops:[0,2,4,5,7,8], still:5, flight:[2], ease:[null,"out","in"],
   frames:[
-    {hip:[46,130],torso:30,ankN:[54,163],ankF:[44,163], armN:[200,200]},
-    {hip:[54,104],torso:10,ankN:[62,152],ankF:[52,152], armN:[24,18]},
-    {hip:[92,102],torso:12,ankN:[96,140],ankF:[86,140], armN:[150,140]},
-    {hip:[92,114],torso:26,ankN:[96,140],ankF:[86,140], armN:[170,160]}
+    {hip:[50,123], torso:32,ankN:[60,163], ankF:[50,163], armN:[212,208]},
+    {hip:[69,103], torso:14,ankN:[60,159], ankF:[50,159], armN:[78,70], footRot:28},
+    {hip:[76,79],  torso:18,ankN:[80,121], ankF:[72,121], armN:[100,94], footRot:10},
+    {hip:[97,78.5],torso:10,ankN:[102,131],ankF:[94,131], armN:[120,114], footRot:12},
+    {hip:[94,96],  torso:26,ankN:[102,133],ankF:[94,133], armN:[160,156]},
+    {hip:[100,77], torso:2, ankN:[102,133],ankF:[94,133], armN:[180,178]},
+    {hip:[92,90],  torso:4, ankN:[72,132], ankF:[94,133], armN:[184,180]},
+    {hip:[78,110], torso:6, ankN:[60,163], ankF:[94,133], armN:[186,182]},
+    {hip:[62,108], torso:4, ankN:[60,163], ankF:[66,136], armN:[182,178]}
   ]},
 
 // The landing is 60 in front of the take-off, so the rep cuts back to the
 // start (loop:'cut') rather than sliding there backwards in a crouch.
-{ id:"broadjump", tempo:[380,240,320,420], loop:"cut", name:"Broad jump",
+{ id:"broadjump", tempo:[720,300,300,240,500,380,480], loop:"cut", name:"Broad jump",
   real:"Hips back, arms swung behind, then jump forward as far as you can and stick the landing with both feet and bent knees. It is a horizontal version of the same hip extension, and sticking the landing rather than stumbling out of it is the skill.",
   changed:"It now travels FORWARD across the frame and sticks a two-foot landing, which is the only thing separating it from a vertical jump. Both used to share one pose.",
-  equip:null, active:"legs",
+  equip:null, active:"legs", stops:[0,2,4,5,6], still:4, flight:[2], ease:[null,"out","in"],
   frames:[
-    {hip:[30,132],torso:34,ankN:[38,163],ankF:[28,163], armN:[204,204]},
-    {hip:[54,110],torso:22,ankN:[52,150],ankF:[42,150], armN:[46,40]},
-    {hip:[86,120],torso:26,ankN:[98,150],ankF:[88,150], armN:[120,110]},
-    {hip:[90,132],torso:30,ankN:[100,163],ankF:[90,163], armN:[150,140]}
+    {hip:[26,122], torso:40,ankN:[38,163], ankF:[33,163], armN:[208,203]},
+    {hip:[73,114], torso:40,ankN:[38,158.8],ankF:[33,158.8], armN:[70,64], footRot:30},
+    {hip:[90,104], torso:30,ankN:[94,142], ankF:[86,142], armN:[96,90], footRot:10},
+    {hip:[94,110], torso:24,ankN:[108,163],ankF:[98,163], armN:[120,114]},
+    {hip:[92,128], torso:40,ankN:[108,163],ankF:[98,163], armN:[140,136]},
+    {hip:[92,128], torso:40,ankN:[108,163],ankF:[98,163], armN:[140,136]},
+    {hip:[106,105.5],torso:3,ankN:[108,163],ankF:[98,163], armN:[180,178]}
   ]},
 
-{ id:"medballthrow", tempo:[360,260,340,440], name:"Med ball rotational throw",
+{ id:"medballthrow", tempo:[200,200,460,520], name:"Med ball rotational throw",
   real:"Side on to a wall, ball at the hip. Turn hard from the back foot through the hips and let the ball go across the body into the wall. The arms are the last link, not the engine: if your back heel does not pivot, you are throwing with your shoulders.",
   changed:"It now rotates from the hips with the back heel pivoting and the ball travelling across the body, rather than sharing the standing TWIST pose that only turned the shoulders.",
-  equip:"ball", active:"arms",
+  equip:"ball", active:"arms", stops:[0,2,3], still:2, handPolar:true,
   frames:[
-    {hip:[55,110],torso:344,ankN:[64,163],ankF:[44,163], handN:[36,110],handF:[30,112], elbowSign:1},
-    {hip:[55,110],torso:358,ankN:[64,163],ankF:[44,161], handN:[56,102],handF:[50,104], elbowSign:1},
-    {hip:[55,110],torso:14, ankN:[64,163],ankF:[46,154], handN:[86,92], handF:[80,94], elbowSign:1},
-    {hip:[55,110],torso:358,ankN:[64,163],ankF:[44,161], handN:[56,102],handF:[50,104], elbowSign:1}
+    {hip:[54,111],torso:344,ankN:[64,163],ankF:[44,163], handN:[30.4,115],handF:[26,115.2], elbowSign:1},
+    {hip:[57,111],torso:352,ankN:[64,163],ankF:[44,161], footF:13, handN:[45,115],handF:[40.2,116], elbowSign:1},
+    {hip:[60,110],torso:14, ankN:[64,163],ankF:[46,158.3], footF:35, handN:[105,84],handF:[100,86], elbowSign:1, ballAt:[114,82]},
+    {hip:[56,110],torso:0,  ankN:[64,163],ankF:[44,161.7], footF:8, handN:[62,104],handF:[57,106], elbowSign:1}
   ]},
 
-{ id:"medballslam", tempo:[340,240,300,420], name:"Med ball slam",
+{ id:"medballslam", tempo:[260,280,520,600], name:"Med ball slam",
   real:"Ball overhead with the whole body extended, then drive it into the floor by folding hard at the hips and pulling down through the lats. Follow the ball down; do not stay upright and drop it. Catch the bounce and reset.",
   changed:"The ball now goes from a full overhead extension to the floor with the torso folding over it, so the slam has somewhere to travel. The old REACH pose only lifted the arms.",
-  equip:"ball", active:"arms",
+  equip:"ball", active:"arms", stops:[0,2,3], still:0, handPolar:true,
   frames:[
-    {hip:[55,107],torso:2, ankN:[62,163],ankF:[53,163], handN:[59,34], handF:[53,36], elbowSign:1},
-    {hip:[52,112],torso:20,ankN:[62,163],ankF:[53,163], handN:[68,76], handF:[62,78], elbowSign:1},
+    {hip:[56,106],torso:358,ankN:[62,159.9],ankF:[53,159.9], handN:[57,33], handF:[52,35], elbowSign:1, footRot:20},
+    {hip:[52,111],torso:18, ankN:[62,163],ankF:[53,163], handN:[95,60], handF:[90,62], elbowSign:1},
     // Let go of: the ball strikes the floor (ballAt) below the hands.
-    {hip:[42,124],torso:56,ankN:[62,163],ankF:[53,163], handN:[80,140],handF:[74,142], elbowSign:1, ballAt:[80,159]},
-    {hip:[50,114],torso:26,ankN:[62,163],ankF:[53,163], handN:[70,84], handF:[64,86], elbowSign:1}
+    {hip:[40,128],torso:60, ankN:[62,163],ankF:[53,163], handN:[78.8,149.2],handF:[73.6,149.2],elbowSign:1, ballAt:[80,159]},
+    {hip:[49,116],torso:24, ankN:[62,163],ankF:[53,163], handN:[80,93], handF:[75,95], elbowSign:1}
   ]},
 
 { id:"situpwallthrow", tempo:[300,240,300,460], name:"Sit-up wall throw",
   real:"Sit on the floor facing a wall, knees bent and feet planted, ball held at the chest. Sit up and throw the ball into the wall at the top of the rep, catch the rebound and lower back down with it. The throw comes from the torso finishing the sit-up, not from pressing with the arms: if you can do it lying still, you are only pressing.",
   changed:"New. The trunk travels from flat on the floor to fully sat up with the feet pinned, and the ball leaves the hands toward a wall in front rather than staying at the chest, which is the half of the movement that makes it a throw.",
-  equip:"ball", active:"arms", floor:true, props:[[116,36,7,134]],
+  equip:"ball", active:"arms", floor:true, props:[[132,36,7,134]],
   frames:[
     {hip:[58,158],torso:270,ankN:[96,163],ankF:[90,163], handN:[34,146],handF:[28,148], kneeSign:-1, elbowSign:1},
     {hip:[58,156],torso:320,ankN:[96,163],ankF:[90,163], handN:[48,124],handF:[42,126], kneeSign:-1, elbowSign:1},
-    {hip:[58,156],torso:34, ankN:[96,163],ankF:[90,163], handN:[107,103],handF:[101,105], kneeSign:-1, elbowSign:1},
+    {hip:[58,156],torso:20, ankN:[96,163],ankF:[90,163], handN:[107,110],handF:[101,112], kneeSign:-1, elbowSign:1, ballAt:[121,104]},
     {hip:[58,156],torso:330,ankN:[96,163],ankF:[90,163], handN:[62,112],handF:[56,114], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"sprint", tempo:[200,200,200,200], name:"Short sprint",
   real:"Tall posture, aggressive arm drive front to back rather than across the body, knees up and the foot striking under the hips. Short efforts at full speed with long rests, because the quality of each one is the point.",
   changed:"It now cycles a real sprint stride with opposite arm and leg driving and a front-to-back arm swing, instead of sharing a static forward-lean pose.",
-  equip:null, active:"legs",
+  equip:null, active:"legs", still:0,
   frames:[
-    {hip:[55,104],torso:12,ankN:[80,130],ankF:[30,150], armN:[210,150], armF:[20,60]},
-    {hip:[55,110],torso:12,ankN:[66,158],ankF:[44,132], armN:[250,200], armF:[340,20]},
-    {hip:[55,104],torso:12,ankN:[30,150],ankF:[80,130], armN:[20,60],  armF:[210,150]},
-    {hip:[55,110],torso:12,ankN:[44,132],ankF:[66,158], armN:[340,20], armF:[250,200]}
+    {hip:[55,104],torso:10,ankN:[76,139],ankF:[22,152], armN:[235,170], armF:[125,35]},
+    {hip:[55,108],torso:10,ankN:[62,163],ankF:[30,128], armN:[190,100], armF:[185,100]},
+    {hip:[55,104],torso:10,ankN:[27,152],ankF:[71,139], armN:[125,35],  armF:[235,170]},
+    {hip:[55,108],torso:10,ankN:[35,128],ankF:[57,163], armN:[185,100], armF:[190,100]}
   ]},
 
 { id:"skipping", tempo:[200,180,200,180], name:"Skipping",
@@ -1291,32 +1312,32 @@ var EXERCISES = [
   // head as the feet land and passes under them at the top of each hop.
   equip:"rope", active:"legs",
   frames:[
-    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,84], rope:0},
-    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112], rope:180},
-    {hip:[55,109],torso:3,ankN:[62,161],ankF:[52,161], armN:[150,140], rope:0},
-    {hip:[55,105],torso:3,ankN:[62,157],ankF:[52,157], armN:[150,112], rope:180}
+    {hip:[55,108],torso:3,ankN:[60,161.7],ankF:[53,161.7], handN:[69,107],handF:[64,107], footRot:8, rope:0},
+    {hip:[55,102],torso:3,ankN:[60,155],ankF:[53,155], handN:[70,101],handF:[65,101], footRot:22, rope:180},
+    {hip:[55,108],torso:3,ankN:[60,161.7],ankF:[53,161.7], handN:[69,107],handF:[64,107], footRot:8, rope:0},
+    {hip:[55,102],torso:3,ankN:[60,155],ankF:[53,155], handN:[70,101],handF:[65,101], footRot:22, rope:180}
   ]},
 
 { id:"jumpingjack", tempo:[240,240,240,240], name:"Jumping jacks",
   real:"Feet jump out wide as the arms sweep overhead, then both come back together. Land on the balls of the feet with soft knees. It is a warm-up movement, so rhythm matters more than height.",
   changed:"The arms and legs now open and close together, which is the whole movement and the one thing the shared JUMP pose could not do.",
-  equip:null, active:null,
+  equip:null, active:null, handPolar:true, frontW:136, still:2,
   frames:[
-    {hip:[55,107],torso:2,ankN:[60,163],ankF:[52,163], armN:[176,176]},
-    {hip:[55,105],torso:2,ankN:[66,160],ankF:[44,160], armN:[100,80]},
-    {hip:[55,107],torso:2,ankN:[74,159],ankF:[36,159], armN:[16,10]},
-    {hip:[55,105],torso:2,ankN:[66,160],ankF:[44,160], armN:[100,80]}
+    {hip:[56,105.5],torso:2,ankN:[58,163],ankF:[53,163], handN:[57,111],handF:[52,111], armScaleN:1,   armScaleF:1},
+    {hip:[55,102],  torso:2,ankN:[58,158],ankF:[53,158], handN:[56.2,69.5], handF:[51.2,69.5],  armScaleN:0.06,armScaleF:0.06},
+    {hip:[55,109],  torso:2,ankN:[58,163],ankF:[53,163], handN:[58,36], handF:[53,36],  armScaleN:1,   armScaleF:1},
+    {hip:[55,102],  torso:2,ankN:[58,158],ankF:[53,158], handN:[56.2,69.5], handF:[51.2,69.5],  armScaleN:0.06,armScaleF:0.06}
   ]},
 
 { id:"highknees", tempo:[200,200,200,200], name:"High knees",
   real:"Run on the spot driving each knee up to at least hip height, staying tall on the balls of the feet with quick ground contact. Leaning back to get the knees up defeats the point.",
   changed:"The knees now alternate up to hip height with the opposite arm driving, rather than sharing a static pose where nothing rose at all.",
-  equip:null, active:"legs",
+  equip:null, active:"legs", still:0,
   frames:[
-    {hip:[55,107],torso:6,ankN:[74,118],ankF:[52,160], armN:[200,160], armF:[20,50]},
-    {hip:[55,110],torso:6,ankN:[64,150],ankF:[58,140], armN:[240,190], armF:[350,30]},
-    {hip:[55,107],torso:6,ankN:[52,160],ankF:[74,118], armN:[20,50],   armF:[200,160]},
-    {hip:[55,110],torso:6,ankN:[58,140],ankF:[64,150], armN:[350,30],  armF:[240,190]}
+    {hip:[55,107],torso:4,ankN:[81,136],ankF:[52,163], armN:[230,165], armF:[130,40]},
+    {hip:[55,105],torso:4,ankN:[66,150],ankF:[48,161], footF:13, armN:[188,105], armF:[190,110]},
+    {hip:[55,107],torso:4,ankN:[57,163],ankF:[76,136], armN:[130,40],  armF:[230,165]},
+    {hip:[55,105],torso:4,ankN:[53,161],ankF:[61,150], footN:13, armN:[190,110], armF:[188,105]}
   ]},
 
 { id:"briskwalkjog", tempo:[340,340,340,340], name:"Brisk walk or jog",
@@ -1324,32 +1345,32 @@ var EXERCISES = [
   changed:"It walks with a real alternating stride and a relaxed arm swing rather than sharing the loaded CARRY pose, which had the arms hanging dead at the sides.",
   equip:null, active:"legs",
   frames:[
-    {hip:[55,107],torso:4,ankN:[74,160],ankF:[38,158], armN:[200,175], armF:[160,175]},
-    {hip:[55,105],torso:4,ankN:[64,158],ankF:[50,161], armN:[185,175], armF:[175,175]},
-    {hip:[55,107],torso:4,ankN:[38,158],ankF:[74,160], armN:[160,175], armF:[200,175]},
-    {hip:[55,105],torso:4,ankN:[50,161],ankF:[64,158], armN:[175,175], armF:[185,175]}
+    {hip:[55,108],torso:3,ankN:[73,163],ankF:[37,159.3], footF:25, armN:[200,172], armF:[158,140]},
+    {hip:[55,105.5],torso:3,ankN:[57,163],ankF:[52,155], armN:[182,160], armF:[178,160]},
+    {hip:[55,108],torso:3,ankN:[42,159.3],ankF:[68,163], footN:25, armN:[158,140], armF:[200,172]},
+    {hip:[55,105.5],torso:3,ankN:[57,155],ankF:[52,163], armN:[178,160], armF:[182,160]}
   ]},
 
-{ id:"hipflexor", tempo:[600,900,900,600], name:"Hip flexor stretch",
+{ id:"hipflexor", tempo:[700,700,1600,700], name:"Hip flexor stretch",
   real:"Half-kneeling, back knee down, front foot forward. Tuck the tailbone under first, then push the hips gently forward. The stretch belongs at the front of the back hip; if you feel it in your lower back you have arched instead of tucking.",
   changed:"It is now genuinely half-kneeling with the rear knee on the floor and the pelvis tucked, rather than a generic KNEEL pose that could have been any kneeling position.",
-  equip:null, active:null,
+  equip:null, active:null, stops:[0,2,3], frontStops:[0,1,2,3], still:2,
   frames:[
-    {hip:[52,132],torso:6, ankN:[76,163],ankF:[22,162], handN:[54,124],handF:[46,126], kneeSign:-1, elbowSign:1},
-    {hip:[56,133],torso:2, ankN:[76,163],ankF:[22,162], handN:[58,125],handF:[50,127], kneeSign:-1, elbowSign:1},
-    {hip:[58,133],torso:0, ankN:[76,163],ankF:[22,162], handN:[60,125],handF:[52,127], kneeSign:-1, elbowSign:1},
-    {hip:[54,132],torso:4, ankN:[76,163],ankF:[22,162], handN:[56,124],handF:[48,126], kneeSign:-1, elbowSign:1}
+    {hip:[52,132],torso:6, ankN:[76,163],ankF:[22,163], handN:[54,124],handF:[46,126], kneeSign:-1, elbowSign:1},
+    {hip:[55,133],torso:1, ankN:[76,163],ankF:[22,163], handN:[57,125],handF:[49,127], kneeSign:-1, elbowSign:1},
+    {hip:[60,133],torso:0, ankN:[76,163],ankF:[22,163], handN:[62,125],handF:[54,127], kneeSign:-1, elbowSign:1},
+    {hip:[60,133],torso:0, ankN:[76,163],ankF:[22,163], handN:[62,125],handF:[54,127], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"couchstretch", tempo:[600,900,900,600], name:"Couch stretch",
+{ id:"couchstretch", tempo:[700,700,1600,700], name:"Couch stretch",
   real:"Same half-kneeling shape but the back foot is up against a wall or couch, so the quad is stretched at the knee as well as the hip. Tuck the pelvis and come upright only as far as you can hold without the lower back arching. It is brutal; ease into it.",
   changed:"The rear shin is now vertical against a wall behind, which is the entire difference from a plain hip flexor stretch. Both used to share one KNEEL pose.",
-  equip:null, active:null, props:[[18,104,7,66]],
+  equip:null, active:null, stops:[0,2,3], still:2, props:[[18,104,7,66]],
   frames:[
-    {hip:[54,142],torso:14,ankN:[80,163],ankF:[26,131], handN:[64,134],handF:[56,136], kneeSign:-1, elbowSign:1},
-    {hip:[56,142],torso:9, ankN:[80,163],ankF:[26,131], handN:[66,134],handF:[58,136], kneeSign:-1, elbowSign:1},
-    {hip:[58,142],torso:4, ankN:[80,163],ankF:[26,131], handN:[68,134],handF:[60,136], kneeSign:-1, elbowSign:1},
-    {hip:[55,142],torso:11,ankN:[80,163],ankF:[26,131], handN:[65,134],handF:[57,136], kneeSign:-1, elbowSign:1}
+    {hip:[51,135],torso:14,ankN:[80,163],ankF:[27,134], footF:-90, handN:[66,128],handF:[58,130], kneeSign:-1, elbowSign:1},
+    {hip:[52,133],torso:7, ankN:[80,163],ankF:[27,134], footF:-90, handN:[66,127],handF:[58,129], kneeSign:-1, elbowSign:1},
+    {hip:[54,132],torso:1, ankN:[80,163],ankF:[27,134], footF:-90, handN:[65,126],handF:[57,128], kneeSign:-1, elbowSign:1},
+    {hip:[54,132],torso:1, ankN:[80,163],ankF:[27,134], footF:-90, handN:[65,126],handF:[57,128], kneeSign:-1, elbowSign:1}
   ]},
 
 { id:"childspose", tempo:[900,700,900,700], name:"Child\'s pose",
@@ -1700,6 +1721,20 @@ var EXERCISES = [
 // mirrored (x to 140-x, L and R swapped); the single-arm row's working hand
 // moved to L, its feet were already right.
 var FRONTS = {
+  // Box jump from the front: arms swing up through the take-off, both feet
+  // land together on the box, and it steps down one foot at a time (the near
+  // one, R, first), never jumping down.
+  boxjump:[
+    {hipY:123,torsoScale:0.8,footL:[60,163],footR:[80,163],handL:[54,121.9],handR:[86,121.9],kneeL:[55.9,138.1],kneeR:[84.1,138.1],elbL:[52.5,108.2],elbR:[87.5,108.2]},
+    {hipY:107,torsoScale:1,footL:[60,163],footR:[80,163],handL:[54,57.9],handR:[86,57.9],kneeL:[61,136],kneeR:[79,136],elbL:[52.5,66.8],elbR:[87.5,66.8]},
+    {hipY:79,torsoScale:1,footL:[60,121],footR:[80,121],handL:[54,51.6],handR:[86,51.6],kneeL:[56,98.1],kneeR:[84,98.1],elbL:[52.5,50.3],elbR:[87.5,50.3]},
+    {hipY:81.5,torsoScale:1,footL:[60,133],footR:[80,133],handL:[54,66.2],handR:[86,66.2],kneeL:[57.5,106],kneeR:[82.5,106],elbL:[52.5,58.5],elbR:[87.5,58.5]},
+    {hipY:96,torsoScale:0.9,footL:[60,133],footR:[80,133],handL:[54,102.5],handR:[86,102.5],kneeL:[55.4,109.9],kneeR:[84.6,109.9],elbL:[52.5,85.2],elbR:[87.5,85.2]},
+    {hipY:77,torsoScale:1,footL:[60,133],footR:[80,133],handL:[54,82.5],handR:[86,82.5],kneeL:[58.2,104.7],kneeR:[81.8,104.7],elbL:[54,64],elbR:[86,64]},
+    {hipY:90,torsoScale:1,footL:[60,133],footR:[80,132],handL:[54,95.6],handR:[86,95.6],kneeL:[57.1,118.4],kneeR:[82.9,118.4],elbL:[54,77],elbR:[86,77]},
+    {hipY:110,torsoScale:1,footL:[60,133],footR:[80,163],handL:[54,115.7],handR:[86,115.7],kneeL:[61,112],kneeR:[79,138.9],elbL:[54,97.1],elbR:[86,97.1]},
+    {hipY:108,torsoScale:1,footL:[60,136],footR:[80,163],handL:[54,113.6],handR:[86,113.6],kneeL:[58,114.4],kneeR:[82,135.8],elbL:[54,95.1],elbR:[86,95.1]}],
+
   jabcross:[
     {hipY:112,footL:[58,163],footR:[80,167],kneeL:[58,136],kneeR:[82,140],
      handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]},
@@ -1781,10 +1816,10 @@ var FRONTS = {
   // straight, both hovering. What this view carries is that the legs stay
   // together and the arms stay by the ears rather than drifting wide.
   hollowhold:[
-    {hipY:132,footL:[66,172],footR:[74,172],handL:[64,88],handR:[76,88]},
-    {hipY:132,footL:[66,174],footR:[74,174],handL:[64,86],handR:[76,86]},
-    {hipY:132,footL:[66,174],footR:[74,174],handL:[64,86],handR:[76,86]},
-    {hipY:132,footL:[66,172],footR:[74,172],handL:[64,88],handR:[76,88]}],
+    {hipY:112,torsoScale:0.95,footL:[66,166],footR:[74,166],kneeL:[63.5,139],kneeR:[76.5,139],handL:[62,44],handR:[78,44],armScaleL:0.92,armScaleR:0.92},
+    {hipY:112,torsoScale:0.95,footL:[66,167],footR:[74,167],kneeL:[63.5,139.5],kneeR:[76.5,139.5],handL:[62,43],handR:[78,43],armScaleL:0.92,armScaleR:0.92},
+    {hipY:112,torsoScale:0.95,footL:[66,167],footR:[74,167],kneeL:[63.5,139.5],kneeR:[76.5,139.5],handL:[62,43],handR:[78,43],armScaleL:0.92,armScaleR:0.92},
+    {hipY:112,torsoScale:0.95,footL:[66,166],footR:[74,166],kneeL:[63.5,139],kneeR:[76.5,139],handL:[62,44],handR:[78,44],armScaleL:0.92,armScaleR:0.92}],
 
   // Bear crawl seen from ABOVE (frontPlan): opposite hand and foot travel
   // together, which is the whole coordination and is invisible from the side
@@ -1793,28 +1828,28 @@ var FRONTS = {
   // elbow given. Left to the solver, a hand passing the shoulder on screen
   // swung the folded elbow from below it to above it in one frame.
   bearcrawl:[
-    {hipY:134,footL:[58,166],footR:[82,166],handL:[54,106],handR:[86,106],elbL:[52,103],elbR:[88,103]},
-    {hipY:134,footL:[58,152],footR:[82,166],handL:[54,106],handR:[86,94], elbL:[52,103],elbR:[88,97]},
-    {hipY:134,footL:[58,166],footR:[82,166],handL:[54,106],handR:[86,106],elbL:[52,103],elbR:[88,103]},
-    {hipY:134,footL:[58,166],footR:[82,152],handL:[54,94], handR:[86,106],elbL:[52,97], elbR:[88,103]}],
+    {hipY:134,footL:[60,156],kneeL:[60,127],footR:[80,170],kneeR:[80,141],handL:[55,106],elbL:[52,103],handR:[85,95],elbR:[88,97.5]},
+    {hipY:134,footL:[60,163],kneeL:[60,134],footR:[80,163],kneeR:[80,134.6],handL:[55,100.5],elbL:[52,100.3],handR:[85,100.5],elbR:[88,100.3]},
+    {hipY:134,footL:[60,170],kneeL:[60,141],footR:[80,156],kneeR:[80,127],handL:[55,95],elbL:[52,97.5],handR:[85,106],elbR:[88,103]},
+    {hipY:134,footL:[60,163],kneeL:[60,134.6],footR:[80,163],kneeR:[80,134],handL:[55,100.5],elbL:[52,100.3],handR:[85,100.5],elbR:[88,100.3]}],
 
   // Woodchopper from the front. The hands travel a long diagonal from high on
   // one side to the opposite hip, and the whole point is that the torso turns
   // with them rather than the arms swinging across a still trunk.
   woodchopper:[
-    {hipY:110,footL:[58,163],footR:[84,163],lean:-4,handL:[74,58], handR:[88,62]},
-    {hipY:110,footL:[58,163],footR:[84,163],handL:[62,88], handR:[78,90]},
-    {hipY:112,footL:[58,163],footR:[84,161],lean:5, handL:[48,116],handR:[62,120]},
-    {hipY:110,footL:[58,163],footR:[84,163],handL:[62,88], handR:[78,90]}],
+    {hipY:108,footL:[56,163],footR:[84,163],lean:6,shHW:11,hipHW:8,handL:[84,52],handR:[92,50],armScaleL:0.82,armScaleR:0.66},
+    {hipY:109,footL:[56,163],footR:[84,163],handL:[66,90],handR:[74,90],armScaleL:0.6,armScaleR:0.6},
+    {hipY:112,torsoScale:0.96,footL:[56,163],footR:[84,160],lean:-8,shHW:11,hipHW:8,handL:[48,116],handR:[56,113]},
+    {hipY:109,footL:[56,163],footR:[84,163],handL:[66,90],handR:[74,90],armScaleL:0.6,armScaleR:0.6}],
 
   // Russian twist seen from ABOVE (frontPlan): seated and leaned back, so the
   // camera looks down at the chest. The weight tracking side to side while the
   // hips stay put is the movement, and only this view shows the travel.
   russiantwist:[
-    {hipY:140,footL:[62,172],footR:[78,172],handL:[76,120],handR:[88,124]},
-    {hipY:140,footL:[62,172],footR:[78,172],handL:[62,118],handR:[74,120]},
-    {hipY:140,footL:[62,172],footR:[78,172],handL:[76,120],handR:[88,124]},
-    {hipY:140,footL:[62,172],footR:[78,172],handL:[50,122],handR:[62,124]}],
+    {hipY:128,torsoScale:0.74,footL:[66,172],footR:[74,172],kneeL:[60,145.6],kneeR:[80,145.6],handL:[66,129.8],handR:[74,129.8]},
+    {hipY:128,torsoScale:0.74,footL:[66,172],footR:[74,172],kneeL:[60,145.6],kneeR:[80,145.6],handL:[86.8,120.9],handR:[94.8,120.9],shHW:11},
+    {hipY:128,torsoScale:0.74,footL:[66,172],footR:[74,172],kneeL:[60,145.6],kneeR:[80,145.6],handL:[66,129.8],handR:[74,129.8]},
+    {hipY:128,torsoScale:0.74,footL:[66,172],footR:[74,172],kneeL:[60,145.6],kneeR:[80,145.6],handL:[45.2,120.9],handR:[53.2,120.9],shHW:11}],
 
   // Sit-up wall throw seen from ABOVE (frontPlan): flat on your back to begin
   // with, so the camera looks down at the chest. What only this view can show
@@ -1823,10 +1858,10 @@ var FRONTS = {
   // Sitting up lifts the chest toward the camera, so the torso foreshortens and
   // the hands close together as they drive away.
   situpwallthrow:[
-    {hipY:150,footL:[56,168],footR:[84,168],handL:[63,126],handR:[77,126]},
-    {hipY:150,footL:[56,168],footR:[84,168],handL:[64,134],handR:[76,134]},
-    {hipY:150,footL:[56,168],footR:[84,168],handL:[66,152],handR:[74,152]},
-    {hipY:150,footL:[56,168],footR:[84,168],handL:[64,138],handR:[76,138]}],
+    {hipY:122,torsoScale:1,   footL:[61,160],footR:[79,160],kneeL:[61,145],kneeR:[79,145],handL:[63,98], handR:[77,98]},
+    {hipY:122,torsoScale:0.64,footL:[61,160],footR:[79,160],kneeL:[61,145],kneeR:[79,145],handL:[64,112],handR:[76,112]},
+    {hipY:122,torsoScale:0.2, footL:[61,160],footR:[79,160],kneeL:[61,145],kneeR:[79,145],handL:[65,171],handR:[75,171]},
+    {hipY:122,torsoScale:0.5, footL:[61,160],footR:[79,160],kneeL:[61,145],kneeR:[79,145],handL:[64,126],handR:[76,126]}],
 
   /* Reverse cable fly from the FRONT, which is the only view that carries it.
      Each hand holds the opposite side's handle, so the cords cross in front at
@@ -1890,28 +1925,40 @@ var FRONTS = {
   // straight out, and the shoulders staying square to the camera IS the
   // exercise: the cable pulls from one side and nothing is allowed to turn.
   palloffpress:[
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[66,90],handR:[76,90]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[66,86],handR:[76,86]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[66,82],handR:[76,82]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[66,86],handR:[76,86]}],
+    {hipY:105.5,footL:[57,163],footR:[83,163],handL:[66,87],handR:[74,87],elbL:[56,94],elbR:[84,94]},
+    {hipY:105.5,footL:[57,163],footR:[83,163],handL:[66,85],handR:[74,85],armScaleL:0.45,armScaleR:0.45},
+    {hipY:105.5,footL:[57,163],footR:[83,163],handL:[66,85],handR:[74,85],armScaleL:0.45,armScaleR:0.45},
+    {hipY:105.5,footL:[57,163],footR:[83,163],handL:[66,87],handR:[74,87],elbL:[56,94],elbR:[84,94]}],
 
   // Turkish get-up from the front. The loaded arm stays locked vertical while
   // everything underneath it changes shape, which is the one rule of the lift
   // and the thing worth checking at a glance.
   kb_tgu:[
-    {hipY:150,footL:[56,160],footR:[82,166],handL:[52,150],handR:[78,104]},
-    {hipY:144,footL:[56,158],footR:[82,164],handL:[50,156], handR:[78,96]},
-    {hipY:138,footL:[54,150],footR:[84,163],handL:[52,140], handR:[80,74]},
-    {hipY:144,footL:[56,158],footR:[82,164],handL:[50,156], handR:[78,96]}],
+    {hipY:160,torsoScale:0.1,footR:[81,163],kneeR:[83,137.5],footL:[40,163],kneeL:[50.5,161.5],handR:[86,118.1],handL:[28,164],armScaleL:0.75},
+    {hipY:160,torsoScale:0.5,footR:[81,163],kneeR:[83,137.1],footL:[40,163],kneeL:[50.5,161.5],handR:[86,103.8],handL:[32,164],elbL:[40,159]},
+    {hipY:160,torsoScale:0.9,footR:[81,163],kneeR:[83,136.6],footL:[40,163],kneeL:[50.5,161.5],handR:[86,91.4],handL:[37,164]},
+    {hipY:133,torsoScale:0.2,footR:[81,163],kneeR:[83,134.1],footL:[44,163],kneeL:[52.5,148],handR:[86,86.7],handL:[45,164.5]},
+    {hipY:132.5,torsoScale:0.6,footR:[80,163],footL:[54,150],handR:[86,72],handL:[47,152]},
+    {hipY:132,footR:[80,163],kneeR:[80,134],footL:[60,158],kneeL:[60,161],handR:[86,58.8],handL:[51,137]},
+    {hipY:112,footR:[80,163],footL:[60,160],handR:[86,38.8],handL:[52,117]},
+    {hipY:108,footR:[79,163],footL:[61,150],handR:[86,34.8],handL:[52,113]},
+    {hipY:105.5,footR:[78,163],footL:[62,163],handR:[86,32.3],handL:[52,110.5]},
+    {hipY:108,footR:[79,163],footL:[61,150],handR:[86,34.8],handL:[52,113]},
+    {hipY:112,footR:[80,163],footL:[60,160],handR:[86,38.8],handL:[52,117]},
+    {hipY:132,footR:[80,163],kneeR:[80,134],footL:[60,158],kneeL:[60,161],handR:[86,58.8],handL:[51,137]},
+    {hipY:132.5,torsoScale:0.6,footR:[80,163],footL:[54,150],handR:[86,72],handL:[47,152]},
+    {hipY:133,torsoScale:0.2,footR:[81,163],kneeR:[83,134.1],footL:[44,163],kneeL:[52.5,148],handR:[86,86.7],handL:[45,164.5]},
+    {hipY:160,torsoScale:0.9,footR:[81,163],kneeR:[83,136.6],footL:[40,163],kneeL:[50.5,161.5],handR:[86,91.4],handL:[37,164]},
+    {hipY:160,torsoScale:0.5,footR:[81,163],kneeR:[83,137.1],footL:[40,163],kneeL:[50.5,161.5],handR:[86,103.8],handL:[32,164],elbL:[40,159]}],
 
   // Jumping jacks from the front. This is the view the movement is FOR: the
   // legs opening wide and the arms sweeping overhead both happen in the frontal
   // plane, so the side view sees almost none of it.
   jumpingjack:[
-    {hipY:107,footL:[62,163],footR:[78,163],handL:[52,140],handR:[88,140]},
-    {hipY:105,footL:[48,160],footR:[92,160],handL:[40,104],handR:[100,104]},
-    {hipY:107,footL:[40,163],footR:[100,163],handL:[54,46],handR:[86,46]},
-    {hipY:105,footL:[48,160],footR:[92,160],handL:[40,104],handR:[100,104]}],
+    {hipY:105.5,footL:[62,163],footR:[78,163],handL:[52,110.5],handR:[88,110.5]},
+    {hipY:102,footL:[50,158],footR:[90,158],handL:[14,71], handR:[126,71]},
+    {hipY:109,footL:[42,163],footR:[98,163],handL:[61,35], handR:[79,35]},
+    {hipY:102,footL:[50,158],footR:[90,158],handL:[14,71], handR:[126,71]}],
 
   // High knees from the front. Which knee is up alternates, and from here you
   // can see the knee driving straight up rather than swinging out to the side.
@@ -1919,55 +1966,55 @@ var FRONTS = {
   // shoulder and is given: solved, it had to bend sideways, out like a chicken
   // wing or in across the chest.
   highknees:[
-    {hipY:107,footL:[60,163],footR:[82,120],handL:[54,96],handR:[86,140], elbL:[53,93.6],elbR:[87,93.6]},
-    {hipY:110,footL:[60,146],footR:[82,150],handL:[54,120],handR:[86,124],elbL:[53,96.6],elbR:[87,96.6]},
-    {hipY:107,footL:[60,120],footR:[82,163],handL:[54,140], handR:[86,96],elbL:[53,93.6],elbR:[87,93.6]},
-    {hipY:110,footL:[60,150],footR:[82,146],handL:[54,124],handR:[86,120],elbL:[53,96.6],elbR:[87,96.6]}],
+    {hipY:107,footL:[61,163],footR:[79,136],kneeL:[61,135],kneeR:[79,110],handL:[56,70], handR:[87,103],elbL:[53,85],elbR:[87,85]},
+    {hipY:105,footL:[61,161],footR:[79,150],kneeL:[61,133],kneeR:[79,127],handL:[53,99], handR:[87,99],elbL:[53,91],elbR:[87,91]},
+    {hipY:107,footL:[61,136],footR:[79,163],kneeL:[61,110],kneeR:[79,135],handL:[53,103],handR:[84,70],elbL:[53,85],elbR:[87,85]},
+    {hipY:105,footL:[61,150],footR:[79,161],kneeL:[61,127],kneeR:[79,133],handL:[53,99], handR:[87,99],elbL:[53,91],elbR:[87,91]}],
 
   // Sprint from the front. Arms driving front to back rather than crossing the
   // midline is the cue this view exists for; from the side they overlap.
   // Elbows given under the shoulders, as for high knees.
   sprint:[
-    {hipY:104,footL:[60,158],footR:[82,134],handL:[54,86],handR:[88,132], elbL:[53,90.6],elbR:[87,90.6]},
-    {hipY:110,footL:[60,140],footR:[82,152],handL:[54,110],handR:[88,116],elbL:[53,96.6],elbR:[87,96.6]},
-    {hipY:104,footL:[60,134],footR:[82,158],handL:[54,132], handR:[88,86],elbL:[53,90.6],elbR:[87,90.6]},
-    {hipY:110,footL:[60,152],footR:[82,140],handL:[54,116],handR:[88,110],elbL:[53,96.6],elbR:[87,96.6]}],
+    {hipY:104,footL:[60,152],footR:[80,139],kneeL:[60,132],kneeR:[79,113],handL:[56,68], handR:[87,100],elbL:[53,83],elbR:[87,83]},
+    {hipY:108,footL:[60,128],footR:[80,163],kneeL:[60,136],kneeR:[79,136],handL:[53,97], handR:[87,97],elbL:[53,92],elbR:[87,92]},
+    {hipY:104,footL:[60,139],footR:[80,152],kneeL:[61,113],kneeR:[80,132],handL:[53,100],handR:[84,68],elbL:[53,83],elbR:[87,83]},
+    {hipY:108,footL:[60,163],footR:[80,128],kneeL:[61,136],kneeR:[80,136],handL:[53,97], handR:[87,97],elbL:[53,92],elbR:[87,92]}],
 
   // Brisk walk or jog from the front. Relaxed and symmetrical, with the arms
   // swinging by the ribs rather than across the body.
   briskwalkjog:[
-    {hipY:107,footL:[58,150],footR:[80,161],handL:[52,132],handR:[86,116]},
-    {hipY:105,footL:[58,158],footR:[80,156],handL:[52,126],handR:[86,124]},
-    {hipY:107,footL:[58,161],footR:[80,150],handL:[52,116],handR:[86,132]},
-    {hipY:105,footL:[58,156],footR:[80,158],handL:[52,124],handR:[86,126]}],
+    {hipY:108,footL:[61,163],footR:[79,161],kneeL:[61,136],kneeR:[79,135],handL:[52,112],handR:[86,110],elbL:[53,93],elbR:[87,93]},
+    {hipY:105,footL:[61,163],footR:[79,155],kneeL:[61,134],kneeR:[79,130],handL:[52,111],handR:[86,111],elbL:[53,93],elbR:[87,93]},
+    {hipY:108,footL:[61,161],footR:[79,163],kneeL:[61,135],kneeR:[79,136],handL:[52,110],handR:[86,112],elbL:[53,93],elbR:[87,93]},
+    {hipY:105,footL:[61,155],footR:[79,163],kneeL:[61,130],kneeR:[79,134],handL:[52,111],handR:[86,111],elbL:[53,93],elbR:[87,93]}],
 
   // Rotational throw from the front. The hips and shoulders turning together
   // toward the target, with the back heel pivoting off the floor, is the
   // difference between throwing with your body and throwing with your arms.
   medballthrow:[
-    {hipY:110,footL:[52,163],footR:[82,163],lean:-6,handL:[42,112],handR:[56,112]},
-    {hipY:110,footL:[52,161],footR:[82,163],handL:[58,104],handR:[72,104]},
-    {hipY:110,footL:[54,154],footR:[82,163],lean:7, handL:[76,94], handR:[90,96]},
-    {hipY:110,footL:[52,161],footR:[82,163],handL:[58,104],handR:[72,104]}],
+    {hipY:111,footL:[50,163],footR:[84,163],lean:-6,shHW:12,hipHW:8,handL:[36,114],handR:[50,116]},
+    {hipY:111,footL:[51,161],footR:[84,163],lean:-2,shHW:13,hipHW:5,handL:[51,112],handR:[65,114]},
+    {hipY:110,footL:[54,162],footR:[84,163],lean:7,shHW:5,hipHW:4,handL:[96,92],handR:[106,94]},
+    {hipY:110,footL:[51,162],footR:[84,163],shHW:16,hipHW:9,handL:[60,104],handR:[74,104]}],
 
   // Half-kneeling hip flexor stretch from the front. The pelvis tucking under
   // rather than the lower back arching is the whole technique, and from here
   // you can also see the front knee stacked over its own foot. The rear shin
   // runs straight back from the knee on the floor, so it hides behind it.
   hipflexor:[
-    {hipY:132,footL:[59,163],footR:[78,161],handL:[52,128],handR:[86,128]},
-    {hipY:133,footL:[59,163],footR:[78,161],handL:[52,129],handR:[86,129]},
-    {hipY:133,footL:[59,163],footR:[78,161],handL:[52,129],handR:[86,129]},
-    {hipY:132,footL:[59,163],footR:[78,161],handL:[52,128],handR:[86,128]}],
+    {hipY:132,footL:[61,164],footR:[80,163],kneeL:[61,160],kneeR:[80,136],handL:[52,128],handR:[88,128]},
+    {hipY:133,footL:[61,164],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[52,129],handR:[88,129]},
+    {hipY:133,footL:[61,164],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[52,129],handR:[88,129]},
+    {hipY:133,footL:[61,164],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[52,129],handR:[88,129]}],
 
   // Couch stretch from the front: same shape, but the rear shin is vertical up
   // a wall behind, so the rear foot sits high on screen, right above its knee,
   // rather than on the floor.
   couchstretch:[
-    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]},
-    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]},
-    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]},
-    {hipY:142,footL:[59,131],footR:[78,163],handL:[52,136],handR:[86,136]}],
+    {hipY:135,footL:[61,137],footR:[80,163],kneeL:[61,161],kneeR:[80,140],handL:[55,128],handR:[86,130]},
+    {hipY:133,footL:[61,137],footR:[80,163],kneeL:[61,161],kneeR:[80,138],handL:[55,127],handR:[86,129]},
+    {hipY:132,footL:[61,137],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[55,126],handR:[86,128]},
+    {hipY:132,footL:[61,137],footR:[80,163],kneeL:[61,161],kneeR:[80,137],handL:[55,126],handR:[86,128]}],
 
   // Child's pose seen from ABOVE (frontPlan). Knees wide with the big toes
   // together and the arms stretched long and even is what the view carries.
@@ -2325,9 +2372,9 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
  {id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
  {id:'chinup', stance:8, grip:16},{id:'invertedrow',stance:8,grip:18},
  {id:'platepinch',stance:8,grip:20},{id:'hangingkneeraise',stance:8,grip:19},
- {id:'sq_jump', stance:11,grip:16},{id:'boxjump',  stance:10,grip:16},
- {id:'broadjump',stance:10,grip:16},{id:'medballslam',stance:9,grip:7},
- {id:'skipping',stance:7, grip:14},{id:'shoulderdisloc',stance:8,grip:30},
+ {id:'sq_jump', stance:11,grip:16},
+ {id:'broadjump',stance:10,grip:16},{id:'medballslam',stance:11,grip:7},
+ {id:'skipping',stance:7, grip:20},{id:'shoulderdisloc',stance:8,grip:30},
  {id:'ankle_mob',stance:7,grip:16},{id:'battleropes',stance:11,grip:16},
  {id:'farmerscarry',stance:8,grip:20},{id:'burpee',stance:10,grip:16},
  {id:'shrug',   stance:8, grip:20},
@@ -2409,7 +2456,7 @@ EXERCISES.forEach(function(ex){
 // loaded lifts, cadences for the running and skipping drills, and 4 to 6 s for
 // the holds and stretches, which looked like reps at 2.4 s.
 var CYCLES={backsquat:2800,frontsquat:2800,goblet:2800,rdl:2800,deadlift:3200,pullup:3000,
-  kbswing:1500,boxjump:3000,kb_tgu:9600,medballslam:2000,medballthrow:2200,situpwallthrow:2400,
+  kbswing:1500,boxjump:3000,kb_tgu:11500,medballslam:2000,medballthrow:2200,situpwallthrow:2400,
   sprint:1000,highknees:1000,skipping:900,jumpingjack:1100,briskwalkjog:1200,mtnclimb:1100,
   farmerscarry:1150,suitcasecarry:1150,burpee:2600,deadbug:7000,curl_reverse:3200,
   plank:4000,wallsit:4000,sideplank:4000,hollowhold:4000,deadhang:4000,platepinch:4000,
@@ -2423,6 +2470,10 @@ EXERCISES.forEach(function(e){ if(FRONTS[e.id]) e.front=FRONTS[e.id]; });
 EXERCISES.forEach(function(e){ if(e.id==='bench') e.planProps=[[56,88,28,70,4]];
   // The step under the calf raise, seen from the front.
   if(e.id==='calfraise') e.planProps=[[36,159,68,11,2]];
+  // The box the jump lands on, seen end on behind the lifter.
+  if(e.id==='boxjump') e.planProps=[[44,140,52,30,2]];
+  // The wall the sit-up throw hits, past the feet, seen from above.
+  if(e.id==='situpwallthrow') e.planProps=[[28,176,84,5,2]];
   // The bench under the split squat's rear foot, end on.
   if(e.id==='splitsq_bulg') e.planProps=[[47,140,22,30,2]];
   // The bench the single-arm row kneels and leans on, under the far knee and hand.
@@ -2499,8 +2550,8 @@ function boxOf(ex){
   if(ex.barAt){ see(ex.barAt[0],4); up(ex.barAt[1],4); }
   if(ex.anchorAt){ see(ex.anchorAt[0],2); up(ex.anchorAt[1],2); }
   if(ex.anchorFront) for(var a=1;a<ex.anchorFront.length;a+=2) up(ex.anchorFront[a],2);
-  var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2));
-  return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y};
+  var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2)), fw=ex.frontW||100;
+  return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y, fx:70-fw/2, fw:fw};
 }
 // A prop has an edge of its own (--prop, 3:1 against the panel).
 function propEl(p){
@@ -2651,10 +2702,10 @@ function update(ex,ref,u){
 // hip) behind the body.
 function buildFront(ex,host,bx){
   bx=bx||boxOf(ex);
-  var svg=el('svg',{viewBox:'20 '+bx.y+' 100 '+bx.h,role:'img','aria-label':ex.name+' front view'});
+  var svg=el('svg',{viewBox:bx.fx+' '+bx.y+' '+bx.fw+' '+bx.h,role:'img','aria-label':ex.name+' front view'});
   var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
-  if(!ex.frontPlan) svg.appendChild(groundEl(20,120));
+  if(!ex.frontPlan) svg.appendChild(groundEl(bx.fx,bx.fx+bx.fw));
   (ex.planProps||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
   var R={svg:svg};
   // A rope's arch behind the body (on its way over), and in front (on its way
@@ -2840,7 +2891,7 @@ EXERCISES.forEach(function(ex,i){
   // and its cap in proportion to its crop, the front 100 wide.
   var wraps=c.querySelectorAll('.figwrap'), bx=boxOf(ex);
   wraps[0].style.flexGrow=bx.w; wraps[0].style.flexBasis='0px'; wraps[0].style.setProperty('--fig-w',(bx.w/100).toFixed(3));
-  if(wraps[1]){ wraps[1].style.flexGrow=100; wraps[1].style.flexBasis='0px'; }
+  if(wraps[1]){ wraps[1].style.flexGrow=bx.fw; wraps[1].style.flexBasis='0px'; wraps[1].style.setProperty('--fig-w',(bx.fw/100).toFixed(3)); }
   var ref=buildFigure(ex,wraps[0],bx);
   ref.front = ex.front ? buildFront(ex,wraps[1],bx) : null;
   refs.push(ref);

@@ -7,10 +7,10 @@ var EX=require('./exercises.js');
 // Fixed order so a regeneration is a no-op diff when nothing changed. `floor`
 // is a check-suite hint and `name`/`real`/`changed`/`flag` are authoring notes,
 // so none of them ship.
-// `stops`, `frontStops`, `ease` and `still` are authoring keys: what the app
+// `flight` is a check-suite hint, and `stops`, `frontStops`, `ease` and `still` are authoring keys: what the app
 // needs of them is worked out here by rig.ship (the rep's length, frames per
 // rep, the still's keyframe and the time warp), so the phone never does it.
-var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','planProps','front','behindHead','load','bellUp','handPolar','loop'];
+var KEYS=['tempo','frames','equip','axis','active','props','barAt','anchorAt','anchorFront','frontPlan','planProps','front','behindHead','load','bellUp','handPolar','loop','frontW'];
 var rig=require('./rig.js'), out={};
 EX.forEach(function(e){
   var o={}, s=rig.ship(e);

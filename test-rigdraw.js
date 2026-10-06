@@ -228,6 +228,25 @@ t('every rig\'s second panel stays inside its box top and bottom all through the
     if(w){ bad.push(id+' u='+(i/96).toFixed(2)+' '+w.n+' '+w.o.toFixed(1)+' out'); break; } } });
   assert.ok(!bad.length,bad.length+' rigs leave the box: '+bad.slice(0,10).join('; '));
 });
+// A jumping jack's arms reach out sideways at shoulder height, past a 100
+// wide panel: a rig gives its second panel a width (frontW), centred on the
+// body, and the pair keeps one scale. The hands used to be cut off.
+// The lateral raise's hand grazes the edge by under a unit at the top; it
+// gets its width with the other arm sweeps.
+var WIDE={raise_lateral:1};
+t('a second panel is wide enough for arms out to the sides', function(){
+  var bad=[], wideWarn=[];
+  RIGS.forEach(function(id){ if(!rex(id).front) return; for(var i=0;i<96;i++){ var svg=app.rigFrontSVG(EXOF[id],i/96), vb=vbOf(svg), w=null;
+    // Cables run off to anchors beyond the panel, and props and the floor
+    // span it, on purpose.
+    shapes(svg).slice(1).forEach(function(p){ if(p.n==='line'||p.n==='rect') return; var e=extent(p); if(!e) return;
+      var o=Math.max(vb.x-e.x0, e.x1-(vb.x+vb.w)); if(o>0.5&&(!w||o>w.o)) w={o:o,n:p.n}; });
+    if(w){ (WIDE[id]?wideWarn:bad).push(id+' u='+(i/96).toFixed(2)+' '+w.n+' '+w.o.toFixed(1)+' out'); break; } } });
+  if(wideWarn.length) console.log('        WARN (listed, the arm sweeps still to re-author): '+wideWarn.join('; '));
+  assert.ok(!bad.length,bad.length+' second panels cut off a limb at the side: '+bad.slice(0,10).join('; '));
+  var jj=app.rigBox(EXOF.jumpingjack), st=app.figPairStyle(EXOF.jumpingjack);
+  assert.ok(jj.fw>100&&st.indexOf('minmax(0,'+jj.fw+'fr)')>-1&&st.indexOf('--fig-arf:'+jj.fw+'/'+jj.h)>-1,'the jack\'s wide second panel is not sized to its width: '+st);
+});
 t('both panels share one top and one height, so they are drawn at one scale', function(){
   RIGS.forEach(function(id){ if(!rex(id).front) return; var a=vbOf(app.rigSVG(EXOF[id],0)), b=vbOf(app.rigFrontSVG(EXOF[id],0));
     assert.ok(a.y===b.y&&a.h===b.h,id+': side '+JSON.stringify(a)+', front '+JSON.stringify(b)); });

@@ -64,8 +64,8 @@ function boxOf(ex){
   if(ex.barAt){ see(ex.barAt[0],4); up(ex.barAt[1],4); }
   if(ex.anchorAt){ see(ex.anchorAt[0],2); up(ex.anchorAt[1],2); }
   if(ex.anchorFront) for(var a=1;a<ex.anchorFront.length;a+=2) up(ex.anchorFront[a],2);
-  var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2));
-  return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y};
+  var w=Math.max(100,x1-x0+12), vx=(x0+x1)/2-w/2, y=Math.min(18,Math.floor(top-2)), fw=ex.frontW||100;
+  return {x:Math.round(vx*10)/10, w:Math.round(w*10)/10, y:y, h:186-y, fx:70-fw/2, fw:fw};
 }
 // A prop has an edge of its own (--prop, 3:1 against the panel).
 function propEl(p){
@@ -216,10 +216,10 @@ function update(ex,ref,u){
 // hip) behind the body.
 function buildFront(ex,host,bx){
   bx=bx||boxOf(ex);
-  var svg=el('svg',{viewBox:'20 '+bx.y+' 100 '+bx.h,role:'img','aria-label':ex.name+' front view'});
+  var svg=el('svg',{viewBox:bx.fx+' '+bx.y+' '+bx.fw+' '+bx.h,role:'img','aria-label':ex.name+' front view'});
   var ink='var(--text)', hi='var(--accent)', soft='var(--text-soft)';
   var legCol=ex.active==='legs'?hi:ink, armCol=(ex.active==='arms'||ex.active==='armN')?hi:ink;
-  if(!ex.frontPlan) svg.appendChild(groundEl(20,120));
+  if(!ex.frontPlan) svg.appendChild(groundEl(bx.fx,bx.fx+bx.fw));
   (ex.planProps||[]).forEach(function(p){ svg.appendChild(propEl(p)); });
   var R={svg:svg};
   // A rope's arch behind the body (on its way over), and in front (on its way
@@ -405,7 +405,7 @@ EXERCISES.forEach(function(ex,i){
   // and its cap in proportion to its crop, the front 100 wide.
   var wraps=c.querySelectorAll('.figwrap'), bx=boxOf(ex);
   wraps[0].style.flexGrow=bx.w; wraps[0].style.flexBasis='0px'; wraps[0].style.setProperty('--fig-w',(bx.w/100).toFixed(3));
-  if(wraps[1]){ wraps[1].style.flexGrow=100; wraps[1].style.flexBasis='0px'; }
+  if(wraps[1]){ wraps[1].style.flexGrow=bx.fw; wraps[1].style.flexBasis='0px'; wraps[1].style.setProperty('--fig-w',(bx.fw/100).toFixed(3)); }
   var ref=buildFigure(ex,wraps[0],bx);
   ref.front = ex.front ? buildFront(ex,wraps[1],bx) : null;
   refs.push(ref);

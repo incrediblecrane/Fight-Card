@@ -1070,6 +1070,28 @@ first half way, while the figure is faded out (`rig.alphaAt`, the app's
 `rigAlpha` on the figure's opacity), instead of sliding back along the floor.
 Both ends rest, and the swap is exempt from the continuity checks.
 
+**Jump** (`flight`):
+A jump names the keyframes it is in the air (`flight`); every other keyframe
+has a sole on the floor or the box. It loads into a quarter to half squat,
+takes off from a full extension still on its toes, and touches down with the
+legs long before it absorbs, so the flight starts and ends on the ground. The
+segment from take-off to the apex eases `out` and the fall to the landing
+`in`, so the flight is parabolic and the landing arrives at speed; there the
+whip check allows 10 units in 1/144 of a rep instead of 6. A box jump steps
+down one foot at a time and never jumps down. `adversarial.js` checks the
+contact and flight keyframes.
+
+**Run**:
+Running, high knees, walking, skipping and jacks touch down in each half of
+the cycle (a sole within 1.5 of the floor), and a running arm swings front to
+back below the shoulder: an upper arm blended the short way from behind the
+back to overhead drew a backward circle over the head every stride.
+
+**Stretch hold**:
+A stretch eases in and is held (its end keyframe repeated, a stop at both
+ends of the hold), never pulsed, and a half-kneeling stretch keeps the rear
+hip within 25 degrees behind the trunk; more is the lower back arching.
+
 **Axis**:
 Which way a dumbbell's handle runs: `lateral`, `sagittal`, `vertical`.
 Decides whether the side view shows a bell face or the whole dumbbell.
@@ -1087,7 +1109,9 @@ The box a rig is drawn in, worked out once from the whole rep: the side view
 is cropped to the ground the figure covers, and both panels share a top (18,
 or higher for a rig that reaches above it, such as the top of a pull-up or a
 jump squat's hands) and so one scale. The side panel's share of the row and
-its width cap follow its crop (`figPairStyle`); the cap (`--fig-cap`) grows
+its width cap follow its crop (`figPairStyle`); a second panel is 100 wide,
+or `frontW` for arms out to the sides at shoulder height (a jumping jack),
+centred on the body and capped in proportion so it keeps the same scale; the cap (`--fig-cap`) grows
 from 155 px on a phone to 260 px on a tablet. The floor (`--ground`) runs the
 full width of the panel, and props have an edge of their own (`--prop`), both
 at 3:1 or more against the panel. `pose/render.js` crops the preview the same

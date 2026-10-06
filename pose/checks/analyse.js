@@ -383,18 +383,58 @@ EX.forEach(function(ex){
       (S[1].ankN.x!==S[0].ankN.x) && (S[1].handF.x!==S[0].handF.x),'the limbs did not pair up');
     check(ex.id,'the hips stay low and level', S.every(function(x){return Math.abs(x.hip.y-S[0].hip.y)<3;}),'the hips rocked');
   }
+  // The core rigs and jumps, as the coaches' review (batch D) found them: a
+  // tucked hollow hold, a crawl with the knees trailing behind the hips, a
+  // woodchopper pulled in like a sideways pulldown, a twist folded onto the
+  // thighs, a get-up that never stood, jumps that took off from a half squat
+  // and landed in a crouch, and a broad jump that slid back to its start.
+  function reach(s,far){ return far?Math.hypot(s.handF.x-s.shF.x,s.handF.y-s.shF.y):Math.hypot(s.handN.x-s.sh.x,s.handN.y-s.sh.y); }
+  function kneeAng(s){ return angAt(s.hip,s.kneeN,s.ankN); }
+  function sample(fn){ var out=[]; for(var q=0;q<=96;q++) out.push(fn(solve(rig.poseAt(ex,q/96)),q/96)); return out; }
+  if(ex.id==='hollowhold'){
+    check(ex.id,'the legs are straight, not tucked', S.every(function(x){ return kneeAng(x)>160; }),'knee '+r(kneeAng(S[0])));
+    check(ex.id,'the arms are straight overhead, past the head', S.every(function(x){ return reach(x)>38 && x.handN.x<x.head.x; }),
+      'reach '+r(reach(S[0]))+' hand '+r(S[0].handN.x)+' head '+r(S[0].head.x));
+    var hp=rig.solveFront(ex.front[0]);
+    check(ex.id+' above','the hands are beyond the head and the legs are long',
+      hp.handL.y<hp.head.y-8 && hp.footL.y-hp.hipL.y>48,'hand '+r(hp.handL.y)+' head '+r(hp.head.y)+' leg '+r(hp.footL.y-hp.hipL.y));
+  }
+  if(ex.id==='bearcrawl'){
+    check(ex.id,'the knees are under the hips and below them, not trailing behind',
+      S.every(function(x){ return x.kneeN.y>x.hip.y+20 && Math.abs(x.kneeN.x-x.hip.x)<12; }),
+      'knee '+r(S[0].kneeN.x)+','+r(S[0].kneeN.y)+' hip '+r(S[0].hip.x)+','+r(S[0].hip.y));
+    check(ex.id,'the arms are long with the hands under the shoulders',
+      S.every(function(x){ return (x.handN.y<GROUND-6 || reach(x)>37) && Math.abs(x.handN.x-x.sh.x)<9; }),'reach '+r(reach(S[0]))+' hand-shoulder '+r(S[0].handN.x-S[0].sh.x));
+  }
   if(ex.id==='woodchopper'){
-    check(ex.id,'the hands travel a long diagonal, high on one side to the opposite hip',
-      S[T].handN.y-S[0].handN.y>40 && S[0].handN.x-S[T].handN.x>20,
-      'dy '+r(S[T].handN.y-S[0].handN.y)+' dx '+r(S[0].handN.x-S[T].handN.x));
+    // From the side the chop runs high to low with long arms; across the body
+    // is what the front view shows.
+    check(ex.id,'the hands travel a long way from high to low', S[T].handN.y-S[0].handN.y>40,'dy '+r(S[T].handN.y-S[0].handN.y));
+    var shortest=Math.min.apply(null,sample(function(s){ return reach(s)/((L.UPPER+L.FORE)*s.armScaleN); }));
+    check(ex.id,'the arms stay long through the chop, it is not a pulldown', shortest>0.93,'shortest reach '+r(shortest*100)+'%');
     check(ex.id,'the torso rotates with them rather than staying square',
       Math.abs(ex.frames[T].torso-ex.frames[0].torso)>15,'torso '+ex.frames[0].torso+' -> '+ex.frames[T].torso);
+    var w0=(ex.front[0].handL[0]+ex.front[0].handR[0])/2, wT=(ex.front[TF].handL[0]+ex.front[TF].handR[0])/2;
+    check(ex.id+' front','the chop crosses the body, high on one side to the other hip', w0>80 && wT<60 && ex.front[TF].handL[1]>ex.front[0].handL[1]+40,
+      'start '+r(w0)+' finish '+r(wT));
+    check(ex.id+' front','one handle: both hands together on it', ex.front.every(function(f){ return Math.abs(f.handR[0]-f.handL[0])<=10; }),
+      'hands '+ex.front.map(function(f){ return r(f.handR[0]-f.handL[0]); }).join(','));
+    // From the side the mid-chop hands are where the front view puts them.
+    var ms=S[1], mf=rig.solveFront(ex.front[1]);
+    check(ex.id,'mid-chop, both views put the hands at the same height', Math.abs(ms.handN.y-mf.handL.y)<=4,'side '+r(ms.handN.y)+' front '+r(mf.handL.y));
   }
   if(ex.id==='russiantwist'){
-    check(ex.id,'it is seated and leaned back', ex.frames[0].torso>30 && S[0].hip.y>GROUND-22,
-      'torso '+ex.frames[0].torso+' hip '+r(S[0].hip.y));
-    check(ex.id,'the weight tracks side to side', Math.abs(S[1].handN.x-S[3].handN.x)>10,
-      'travel '+r(Math.abs(S[1].handN.x-S[3].handN.x)));
+    check(ex.id,'it leans BACK, away from the feet', S[0].sh.x<S[0].hip.x && S[0].ankN.x>S[0].hip.x,
+      'shoulder '+r(S[0].sh.x)+' hip '+r(S[0].hip.x)+' feet '+r(S[0].ankN.x));
+    var ta=Math.atan2(S[0].sh.x-S[0].hip.x,S[0].hip.y-S[0].sh.y)*180/Math.PI, th=Math.atan2(S[0].kneeN.x-S[0].hip.x,S[0].hip.y-S[0].kneeN.y)*180/Math.PI;
+    check(ex.id,'the hips are open in a V, not folded onto the thighs', th-ta>70,'trunk-thigh '+r(th-ta));
+    check(ex.id,'it is seated on the floor', S[0].hip.y>GROUND-12,'hip '+r(S[0].hip.y));
+    var m=ex.front.map(function(f){ return (f.handL[0]+f.handR[0])/2-70; });
+    check(ex.id+' above','the weight goes to one side and then the other', m[1]*m[3]<0 && Math.abs(m[1]-m[3])>20,'sides '+m.map(r).join(','));
+    // From above the twist passes through the middle at speed; from the side
+    // that middle is where the hands are furthest forward, so they rest there.
+    check(ex.id,'from above it rests only at the sides, from the side also at the middle',
+      JSON.stringify(rig.stopsOf(ex,true))==='[1,3]' && rig.stopsOf(ex).indexOf(0)>=0,'side '+JSON.stringify(rig.stopsOf(ex))+' above '+JSON.stringify(rig.stopsOf(ex,true)));
     check(ex.id,'the hips stay still while it rotates', S.every(function(x){return x.hip.x===S[0].hip.x && x.hip.y===S[0].hip.y;}),'the hips moved');
     check(ex.id,'the feet stay up off the floor', S.every(function(x){return x.ankN.y<GROUND-16;}),'a foot went down');
   }
@@ -404,46 +444,74 @@ EX.forEach(function(ex){
     check(ex.id,'nothing rotates, which is the entire exercise',
       ex.frames.every(function(f){return f.torso===ex.frames[0].torso;}),'the torso turned');
     check(ex.id,'the hands stay near chest height', S.every(function(x){return Math.abs(x.handN.y-x.sh.y)<20;}),'the hands drifted off the chest line');
+    var far=S.reduce(function(a,x){ return x.handN.x>a.handN.x?x:a; },S[0]);
+    check(ex.id,'the arms reach full extension at the press', reach(far)>38.5,'reach '+r(reach(far)));
+    var tot=rig.tempoOf(ex).reduce(function(a,b){return a+b;},0), hold=0;
+    ex.frames.forEach(function(f,j){ var g=ex.frames[(j+1)%ex.frames.length]; if(JSON.stringify(f)===JSON.stringify(g) && solve(f).handN.x>S[0].handN.x+20) hold+=rig.tempoOf(ex)[j]; });
+    check(ex.id,'it holds at full extension, which is where the work is', hold/tot>0.25,'hold '+r(hold/tot*100)+'% of the rep');
+  }
+  if(ex.id==='hangingkneeraise'){
+    check(ex.id,'the arms are straight at the hang', reach(S[0])>39.3,'reach '+r(reach(S[0])));
+    // Knees up moves the weight forward, so the trunk tilts back under the bar:
+    // the hips stay under it and the shoulders go back, never the hips forward.
+    check(ex.id,'the hips stay under the bar while the trunk tilts back', S.every(function(x){ return Math.abs(x.hip.x-ex.barAt[0])<=3; }) && S[T].sh.x<ex.barAt[0]-3,
+      'hip x '+S.map(function(x){ return r(x.hip.x); }).join(',')+' top shoulder '+r(S[T].sh.x)+' bar '+ex.barAt[0]);
   }
   if(ex.id==='kb_tgu'){
-    check(ex.id,'it starts lying down and finishes up off the floor', S[0].hip.y-S[T].hip.y>12,
-      'hip '+r(S[0].hip.y)+' -> '+r(S[T].hip.y));
-    check(ex.id,'the loaded arm never bends: it stays near full extension throughout',
-      S.every(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y)>32;}),
-      'shortest loaded reach '+r(Math.min.apply(null,S.map(function(x){return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y);}))));
-    check(ex.id,'the loaded hand stays above the shoulder the whole way up',
-      S.every(function(x){return x.handN.y<x.sh.y;}),'the bell dropped below the shoulder');
+    var top=S.reduce(function(a,x){ return x.hip.y<a.hip.y?x:a; },S[0]);
+    check(ex.id,'it starts lying down and gets all the way up to standing', S[0].hip.y>GROUND-14 && top.hip.y<=rig.STAND_HIP_Y+0.5,
+      'hip '+r(S[0].hip.y)+' -> '+r(top.hip.y));
+    var bent=Math.min.apply(null,sample(function(s){ return reach(s); }));
+    check(ex.id,'the loaded arm is locked: it never bends', bent>39,'shortest loaded reach '+r(bent));
+    check(ex.id,'the loaded arm stays vertical over the shoulder', S.every(function(x){ return Math.abs(x.handN.x-x.sh.x)<4 && x.handN.y<x.sh.y; }),
+      'worst offset '+r(Math.max.apply(null,S.map(function(x){return Math.abs(x.handN.x-x.sh.x);}))));
+    check(ex.id,'the planted foot is flat on the floor', S.every(function(x){ return x.ankN.y>=GROUND-8; }),
+      'highest planted foot '+r(Math.min.apply(null,S.map(function(x){return x.ankN.y;}))));
+    var lk=ex.load||'R';
+    check(ex.id+' front','the loaded arm ('+lk+') is straight too', ex.front.every(function(f){ var s=rig.solveFront(f); return Math.hypot(s['hand'+lk].x-s['sh'+lk].x,s['hand'+lk].y-s['sh'+lk].y)>37; }),
+      'front reach '+ex.front.map(function(f){ var s=rig.solveFront(f); return r(Math.hypot(s['hand'+lk].x-s['sh'+lk].x,s['hand'+lk].y-s['sh'+lk].y)); }).join(','));
   }
   if(ex.id==='sq_jump'||ex.id==='boxjump'||ex.id==='broadjump'){
+    var surf=function(x){ var b=(ex.props||[])[0]; return b&&x>=b[0]&&x<=b[0]+b[2]?b[1]-7:GROUND-7; };
+    var onGround=function(s){ return s.ankN.y>=surf(s.ankN.x)-5 && s.ankF.y>=surf(s.ankF.x)-5; };
     check(ex.id,'the feet actually leave the floor', S.some(function(x){return x.ankN.y<GROUND-14;}),
       'highest foot '+r(Math.min.apply(null,S.map(function(x){return x.ankN.y;}))));
-    check(ex.id,'it loads the hips before jumping', S[0].hip.y>S[1].hip.y+14,
-      'load '+r(S[0].hip.y)+' flight '+r(S[1].hip.y));
-    check(ex.id,'it lands with the knees bent to absorb', S[3].hip.y>S[1].hip.y+8,
-      'flight '+r(S[1].hip.y)+' landing '+r(S[3].hip.y));
+    check(ex.id,'it loads into a quarter-to-half squat first', kneeAng(S[0])>=80 && kneeAng(S[0])<=125,'knee '+r(kneeAng(S[0])));
+    var fl=ex.flight||[1], to=fl[0]-1, td=Math.min(fl[fl.length-1]+1,S.length-2);
+    check(ex.id,'it takes off from full extension, still on its toes', onGround(S[to]) && kneeAng(S[to])>=150 && (ex.frames[to].footRot||0)>15,
+      'take-off knee '+r(kneeAng(S[to]))+' on the ground '+onGround(S[to]));
+    check(ex.id,'it touches down with the legs long and absorbs AFTER contact', onGround(S[td]) && kneeAng(S[td])>=125 &&
+      onGround(S[td+1]) && kneeAng(S[td+1])<=kneeAng(S[td])-30,'touchdown knee '+r(kneeAng(S[td]))+' absorb '+r(kneeAng(S[td+1])));
+    check(ex.id,'the flight eases out of the take-off and falls into the landing',
+      ex.ease && ex.ease[to]==='out' && ex.ease[td-1]==='in','ease '+JSON.stringify(ex.ease));
   }
   if(ex.id==='boxjump'){
-    var box=ex.props&&ex.props[0];
-    check(ex.id,'it lands ON the box, not beside it',
-      !!box && S[T].ankN.x>box[0] && S[T].ankN.x<box[0]+box[2] && Math.abs(S[T].ankN.y-box[1])<4,
-      'foot '+r(S[T].ankN.x)+','+r(S[T].ankN.y)+' box '+JSON.stringify(box));
-    check(ex.id,'it ends higher than it started', S[T].ankN.y<S[0].ankN.y-14,
-      'start '+r(S[0].ankN.y)+' finish '+r(S[T].ankN.y));
+    var box=ex.props[0], land=(ex.flight||[1])[(ex.flight||[1]).length-1]+1;
+    var on=function(x,far){ var ax=far?x.ankF.x:x.ankN.x; return ax-L.FOOT*0.28>box[0] && ax+L.FOOT*0.72<box[0]+box[2]; };
+    check(ex.id,'it lands ON the box with both whole feet', Math.abs(S[land].ankN.y-(box[1]-7))<4 && on(S[land]) && on(S[land],1),'landing '+r(S[land].ankN.x)+','+r(S[land].ankN.y));
+    check(ex.id,'it ends higher than it started', S[land].ankN.y<S[0].ankN.y-14,'start '+r(S[0].ankN.y)+' landing '+r(S[land].ankN.y));
+    var clip=sample(function(s){ return [s.ankN,s.ankF].some(function(a){ var sole=a.y+6, toe=a.x+L.FOOT*0.72, heel=a.x-L.FOOT*0.28;
+      return sole>box[1]+1 && a.y<box[1]+box[3] && toe>box[0]+1 && heel<box[0]+box[2]; }); }).some(function(v){return v;});
+    check(ex.id,'the feet clear the box edge', !clip,'a foot passes through the box');
+    var fly=sample(function(s,u){ return u>0.45 && [s.ankN,s.ankF].every(function(a){ return a.y<surf(a.x)-2; }); }).some(function(v){return v;});
+    check(ex.id,'it steps down, it never jumps down', !fly,'both feet in the air after landing on the box');
   }
   if(ex.id==='broadjump'){
-    check(ex.id,'it travels forward across the frame, which is what makes it broad',
-      S[3].ankN.x-S[0].ankN.x>40,'travel '+r(S[3].ankN.x-S[0].ankN.x));
-    check(ex.id,'it sticks a two-footed landing on the floor',
-      Math.abs(S[3].ankN.y-GROUND)<9 && Math.abs(S[3].ankF.y-GROUND)<9,
-      'feet '+r(S[3].ankN.y)+','+r(S[3].ankF.y));
+    var farX=Math.max.apply(null,S.map(function(x){return x.ankN.x;}));
+    check(ex.id,'it travels forward across the frame, which is what makes it broad', farX-S[0].ankN.x>40,'travel '+r(farX-S[0].ankN.x));
+    var ld=S[(ex.flight||[1])[(ex.flight||[1]).length-1]+1];
+    check(ex.id,'it sticks a two-footed landing on the floor', Math.abs(ld.ankN.y-(GROUND-7))<1 && Math.abs(ld.ankF.y-(GROUND-7))<1,'feet '+r(ld.ankN.y)+','+r(ld.ankF.y));
   }
   if(ex.id==='medballthrow'){
     check(ex.id,'the ball travels across the body', S[T].handN.x-S[0].handN.x>35,
       'travel '+r(S[T].handN.x-S[0].handN.x));
     check(ex.id,'the torso rotates through it', ex.frames[T].torso-ex.frames[0].torso>20 ||
       (ex.frames[T].torso+360)-ex.frames[0].torso>20,'torso '+ex.frames[0].torso+' -> '+ex.frames[T].torso);
-    check(ex.id,'the back heel pivots off the floor', ex.frames[T].ankF[1]<ex.frames[0].ankF[1]-4,
-      'rear heel '+ex.frames[0].ankF[1]+' -> '+ex.frames[T].ankF[1]);
+    // The heel turns up off the floor round the ball of the foot; the whole
+    // foot used to lift into the air.
+    check(ex.id,'the back heel pivots off the floor on the ball of the foot', S[T].footF-S[0].footF>20,
+      'rear foot pitch '+r(S[0].footF)+' -> '+r(S[T].footF));
+    check(ex.id,'the arms are long at the release, not a chest pass', reach(S[T])>36,'reach '+r(reach(S[T])));
   }
   if(ex.id==='medballslam'){
     check(ex.id,'it starts fully extended overhead', S[0].handN.y<S[0].sh.y-30,
@@ -643,12 +711,20 @@ EX.forEach(function(ex){
       'furthest elbow '+r(Math.max.apply(null,S.map(function(x){return Math.abs(x.elbN.x-x.hip.x);}))));
   }
   if(ex.id==='jumpingjack'){
+    // The arms and legs open sideways, in the front view's plane: from the
+    // side the feet stay together and the arms rise past the shoulder end on.
+    // It used to split the legs front to back and front-raise the arms.
+    var JF=ex.front.map(rig.solveFront), jT=rig.turn(ex,true);
     check(ex.id,'the arms sweep from the sides to overhead',
       S[0].handN.y-S[T].handN.y>40,'travel '+r(S[0].handN.y-S[T].handN.y));
-    check(ex.id,'the legs open and close', (S[T].ankN.x-S[T].ankF.x)-(S[0].ankN.x-S[0].ankF.x)>20,
-      'stance '+r(S[0].ankN.x-S[0].ankF.x)+' -> '+r(S[T].ankN.x-S[T].ankF.x));
-    check(ex.id,'arms and legs move together, not in sequence',
-      (S[1].handN.y<S[0].handN.y)===((S[1].ankN.x-S[1].ankF.x)>(S[0].ankN.x-S[0].ankF.x)),'they were out of phase');
+    check(ex.id,'from the side the feet stay together', S.every(function(x){ return Math.abs(x.ankN.x-x.ankF.x)<=6; }),
+      'stance '+S.map(function(x){ return r(x.ankN.x-x.ankF.x); }).join(','));
+    check(ex.id+' front','the legs open and close', (JF[jT].footR.x-JF[jT].footL.x)-(JF[0].footR.x-JF[0].footL.x)>20,
+      'stance '+r(JF[0].footR.x-JF[0].footL.x)+' -> '+r(JF[jT].footR.x-JF[jT].footL.x));
+    check(ex.id+' front','arms and legs move together, not in sequence',
+      (JF[1].handL.y<JF[0].handL.y)===((JF[1].footR.x-JF[1].footL.x)>(JF[0].footR.x-JF[0].footL.x)),'they were out of phase');
+    check(ex.id+' front','the arms are straight, not a double-biceps pose', JF.every(function(f){ return angAt(f.shL,f.elbL,f.handL)>=150; }),
+      'elbow '+JF.map(function(f){ return r(angAt(f.shL,f.elbL,f.handL)); }).join(','));
   }
   if(ex.id==='hipflexor'||ex.id==='couchstretch'){
     check(ex.id,'it is half-kneeling: one knee down, one foot planted in front',
@@ -964,7 +1040,8 @@ function angAt(a,b,c){ var d=Math.abs(Math.atan2(a.y-b.y,a.x-b.x)-Math.atan2(c.y
 var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadlift:'turn', ohp:'all', kbswing:'after',
   facepull:'all', triceps_ext:'all', kb_press:'all', platepinch:'top', kb_clean:[1,2,3,4,5,6], kb_snatch:[1,2,3,4,5],
   splitsq_bulg:'none', farmerscarry:'none', suitcasecarry:'none', kb_bottomsup:'none',
-  curl_reverse:'all', burpee:[0], jabcross:'none', lunge_walk:'none'};
+  curl_reverse:'all', burpee:[0], jabcross:'none', lunge_walk:'none',
+  palloffpress:'all', kb_tgu:[8], jumpingjack:[0], woodchopper:'none', sprint:'none', highknees:'none', briskwalkjog:'none', boxjump:'none'};
 (function standingTall(){
   EX.forEach(function(ex){
     var how=STANDING[ex.id], T=rig.turn(ex), bad=[];
@@ -1129,6 +1206,36 @@ var GAIT={shadowbox:'swing'};
   var ws=get('wallsit'), WS=at(ws,48), hy=WS.map(function(s){ return s.hip.y; });
   check('wallsit','it is a hold: the hips barely move',Math.max.apply(null,hy)-Math.min.apply(null,hy)<=4.5,'hip travels '+r(Math.max.apply(null,hy)-Math.min.apply(null,hy)));
   check('wallsit front','the hands stay off the thighs',ws.front.every(function(f){ return f.handL[1]<f.hipY-12 && f.handR[1]<f.hipY-12; }),'hand y '+ws.front[0].handL[1]+' hip y '+ws.front[0].hipY);
+})();
+
+/* The conditioning rigs, as the coaches' review (batch E) found them: sprint
+   and high-knee arms that windmilled over the head every stride, a couch
+   stretch that hung the rear thigh 38 to 48 degrees behind the trunk (an arched
+   lower back, which the exercise forbids), and stretches that pulsed. */
+(function conditioning(){
+  function get(id){ return EX.filter(function(e){return e.id===id;})[0]; }
+  function at(ex,n){ var o=[]; for(var i=0;i<n;i++) o.push(solve(rig.poseAt(ex,i/n))); return o; }
+  // A running arm swings front to back below the shoulder: neither upper arm
+  // ever rises above level. Blended the short way from behind the back to
+  // overhead, it drew a backward circle over the head.
+  ['sprint','highknees','briskwalkjog'].forEach(function(id){
+    var worst=1e9, where='';
+    at(get(id),240).forEach(function(s,i){ [['N',s.sh,s.elbN],['F',s.shF,s.elbF]].forEach(function(a){
+      if(a[2].y-a[1].y<worst){ worst=a[2].y-a[1].y; where='elb'+a[0]+' at u='+r(i/240*100)/100; } }); });
+    check(id,'no arm goes overhead: the upper arm stays below level, swinging front to back',worst>=-1,'elbow '+r(-worst)+' above the shoulder, '+where);
+  });
+  // Rear-hip extension: how far the rear thigh hangs behind the line of the
+  // trunk. 10 to 20 degrees is all a hip has; more is the lower back arching.
+  ['couchstretch','hipflexor'].forEach(function(id){
+    var worst=0;
+    at(get(id),96).forEach(function(s){ var tr=Math.atan2(s.hipF.x-s.shF.x,s.hipF.y-s.shF.y), th=Math.atan2(s.kneeF.x-s.hipF.x,s.kneeF.y-s.hipF.y);
+      worst=Math.max(worst,(tr-th)*180/Math.PI); });
+    check(id,'the rear hip extends 25 degrees or less behind the trunk, no lumbar arch',worst<=25,'rear hip '+r(worst)+' degrees behind the trunk');
+    // A stretch eases in and is held, not pulsed: the end keyframe is held
+    // (repeated) and rests at both ends of the hold.
+    var ex=get(id), n=ex.frames.length, held=ex.frames.filter(function(f,i){ return JSON.stringify(f)===JSON.stringify(ex.frames[(i+1)%n]); }).length;
+    check(id,'it eases into the stretch and holds it',held>=1 && rig.tempoOf(ex).reduce(function(a,b){ return Math.max(a,b); })>=1200,'held keyframes '+held+', longest segment '+Math.max.apply(null,rig.tempoOf(ex))+' ms');
+  });
 })();
 
 // Frame 2 is the bottom of the usual four-frame rep and nothing more: a rig

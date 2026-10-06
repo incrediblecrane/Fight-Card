@@ -316,9 +316,7 @@ EX.forEach(function(ex){ var ax=app.RIGFRAMES[ex.id], w=0;
 // for now they print as warnings. Any other rig breaking it fails, and a
 // listed rig that has come back inside it says so, so the list only shrinks.
 var BENDS={backsquat:'elbF elbN',facepull:'elbF elbN',press_push:'elbF',
-  sq_jump:'elbF elbN',boxjump:'elbF elbN',medballslam:'elbF elbN',sprint:'elbF elbN',
-  highknees:'elbF elbN',briskwalkjog:'elbF elbN',worldsgreatest:'elbF',shadowbox:'elbF elbN',
-  bagspeed:'elbF elbN',skierg:'elbN'};
+  worldsgreatest:'elbF',shadowbox:'elbF elbN',bagspeed:'elbF elbN',skierg:'elbN'};
 // Floor and prone rigs are done: a face-down plank whose knees bent the wrong
 // way is what this check was written for, so none of them may be listed.
 Object.keys(BENDS).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
@@ -398,9 +396,11 @@ EX.forEach(function(ex){
 // a rep. The rigs listed have an elbow that swings through its IK branch or a
 // ballistic hand that already does, and print as warnings while they are
 // re-authored; any other rig breaking it fails, and a listed one that has come
-// back inside it says so.
-var WHIPS={woodchopper:'front',sq_jump:'side',medballslam:'side',jumpingjack:'front',
-  worldsgreatest:'side',bagspeed:'side',burpee:'side'};
+// back inside it says so. A jump's flight (a segment authored with the ease
+// 'out' from take-off to the apex or 'in' from the apex to the landing) moves
+// at the speed of a body thrown and falling, and lands at speed on purpose, so
+// there the limit is 10.
+var WHIPS={worldsgreatest:'side',bagspeed:'side',burpee:'side'};
 var whipWarn=[], whipDone=[];
 EX.forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id], known=(WHIPS[ex.id]||'').split(' ').filter(Boolean), N=1152, W=N/144;
@@ -408,9 +408,11 @@ EX.forEach(function(ex){
     if(/app/.test(v[0])) return;
     var S=[], worst=0, where='';
     for(var i=0;i<N;i++) S.push(v[1](i/N));
-    for(i=0;i<N;i++){ var a=S[i], b=S[(i+W)%N];
+    var tp=rig.tempoOf(ex), ease=ex.ease||[];
+    function thrown(u){ var e=ease[rig.segAt(tp,u).i]; return e==='out'||e==='in'; }
+    for(i=0;i<N;i++){ var a=S[i], b=S[(i+W)%N], lim=thrown(i/N)||thrown(((i+W)%N)/N)?10:6;
       if(rig.cutBetween(ex,i/N,(i+W)/N)) continue;
-      v[3].forEach(function(k){ var dd=d(a[k],b[k]); if(dd>worst){ worst=dd; where=k+' at u='+(i/N).toFixed(3); } }); }
+      v[3].forEach(function(k){ var dd=d(a[k],b[k])*6/lim; if(dd>worst){ worst=dd; where=k+' at u='+(i/N).toFixed(3)+(lim>6?' (in flight, limit 10: '+r(dd*lim/6)+')':''); } }); }
     var listed=known.indexOf(v[0])>=0;
     if(worst>6){ if(listed) whipWarn.push(ex.id+' '+v[0]+' '+r(worst)+' '+where);
       else ck(ex.id+' '+v[0],'no joint moves more than 6 units in 1/144 of a rep',false,r(worst)+' '+where); }
@@ -482,9 +484,8 @@ EX.forEach(function(ex){ ck(ex.id,'rests at the reviewed keyframes (pose/checks/
 // sweeps a straight arm round its shoulder. The rigs listed still fold and
 // print as warnings while they are re-authored; any other rig folding fails,
 // and a listed one that no longer does says so.
-var FOLDING={kb_snatch:'front',kb_press:'front',bearcrawl:'front',woodchopper:'front',kb_tgu:'side',
-  sq_jump:'side front',boxjump:'side front',broadjump:'front',medballslam:'front',sprint:'side',
-  jumpingjack:'front',highknees:'side',thoracic:'front',shadowbox:'front',bagspeed:'front',
+var FOLDING={kb_snatch:'front',kb_press:'front',
+  sq_jump:'front',boxjump:'front',broadjump:'front',medballslam:'front',thoracic:'front',shadowbox:'front',bagspeed:'front',
   skierg:'side front',pulldown_straight:'front',burpee:'side front',deadbug:'front'};
 var foldWarn=[], foldDone=[];
 function inner(a,b,c){ return ang({x:a.x-b.x,y:a.y-b.y},{x:c.x-b.x,y:c.y-b.y}); }
