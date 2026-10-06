@@ -106,6 +106,22 @@ srv.listen(0,async function(){
       ok('the figure drawn in place matches a fresh drawing at the same phase');
     }catch(e){ bad('figure in place matches',e); }
     try{
+      // The ghost, the path and the arrow show only while the figure stands
+      // still: a tap pauses it and shows them, another plays on and hides them.
+      var seen=function(){ return p.evaluate(function(){ return ['#fig-live','#fig-live-front'].map(function(s){
+        return [].map.call(document.querySelectorAll(s+' [data-g]'),function(g){ return g.getAttribute('data-g')+':'+getComputedStyle(g).visibility; }).join(' '); }).join(' | '); }); };
+      assert.ok(!/visible/.test(await seen()),'the guides show on the moving figure: '+await seen());
+      await p.click('#fig-live'); await p.waitForTimeout(300);
+      var pu=await p.getAttribute('#fig-live','data-u'), g=await seen();
+      assert.ok(/ghost:visible/.test(g)&&/path:visible/.test(g)&&/arrow:visible/.test(g)&&!/hidden/.test(g),'paused, the guides are '+g);
+      await p.waitForTimeout(500);
+      assert.strictEqual(await p.getAttribute('#fig-live','data-u'),pu,'a tap did not pause the figure');
+      await p.click('#fig-live'); await p.waitForTimeout(400);
+      assert.notStrictEqual(await p.getAttribute('#fig-live','data-u'),pu,'a second tap did not play it on');
+      assert.ok(!/visible/.test(await seen()),'playing on, the guides still show');
+      ok('a tap pauses the figure and shows its ghost, path and arrow; another plays on without them');
+    }catch(e){ bad('the guides on a tap',e); }
+    try{
       // With the rest clock running after a set, it moves at a third of the rate.
       var count=function(){ return p.evaluate(function(){ var el=document.getElementById('fig-live'), seen={}, n=0;
         return new Promise(function(r){ var iv=setInterval(function(){ var u=el.getAttribute('data-u'); if(!seen[u]){ seen[u]=1; n++; } },3);
@@ -193,6 +209,12 @@ srv.listen(0,async function(){
       assert.strictEqual(h1,h0,'the figure was redrawn under reduced motion');
       assert.ok(/<svg/.test(h0),'no figure drawn');
       ok('under reduced motion the figure is drawn once and holds still');
+      // The still is where the guides teach: the other end of the rep as a
+      // ghost, the path and the way it goes next, in both panels.
+      var gs=await p.evaluate(function(){ return ['#fig-live','#fig-live-front'].map(function(s){
+        return [].map.call(document.querySelectorAll(s+' [data-g]'),function(g){ var r=g.getBoundingClientRect(); return g.getAttribute('data-g')+':'+getComputedStyle(g).visibility+':'+(r.width>2&&r.height>2?'drawn':'empty'); }).join(' '); }); });
+      gs.forEach(function(g,k){ assert.ok(/ghost:visible:drawn/.test(g)&&/arrow:visible/.test(g)&&/path:visible/.test(g),(k?'second':'side')+' panel\'s guides on the still: '+g); });
+      ok('the reduced-motion still shows the ghost, the path and the arrow in both panels');
       // Tapping the figure plays one rep, as long as the rig's own, and stops again.
       var ms=+(await p.getAttribute('#fig-live','data-ms'));
       assert.ok(ms>=900,'the figure does not say how long its rep is: '+ms);

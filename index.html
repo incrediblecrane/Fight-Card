@@ -5,21 +5,21 @@ var CSS = "\
 :root{\
   --bg:#EEEAE1;--surface:#FFFFFF;--surface-raised:#F7F3EA;\
   --text:#18181C;--text-soft:#55555F;--text-faint:#64646D;\
-  --accent:#C2410C;--accent-ink:#FFFFFF;--good:#2A7D4F;--good-ink:#FFFFFF;--warn:#8A6000;--warn-ink:#FFFFFF;--line:#DAD4C6;--ground:#8F887A;--prop:#8F887A;--prop-fill:#E2DCCF;--fig-far:#8C8A87;--fig-far-hi:#DA9170;--fig-shadow:#D6D2CB;--fig-mat:#E7E4DC;--field-border:#8E877A;--rest:#DCE9DF;\
+  --accent:#C2410C;--accent-ink:#FFFFFF;--good:#2A7D4F;--good-ink:#FFFFFF;--warn:#8A6000;--warn-ink:#FFFFFF;--line:#DAD4C6;--ground:#8F887A;--prop:#8F887A;--prop-fill:#E2DCCF;--fig-far:#8C8A87;--fig-far-hi:#DA9170;--fig-shadow:#D6D2CB;--fig-mat:#E7E4DC;--fig-ghost:#E0DBD1;--field-border:#8E877A;--rest:#DCE9DF;\
   color-scheme:light;\
 }\
 @media (prefers-color-scheme: dark){\
   :root:not([data-theme=light]){\
     --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;\
     --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#9696A0;\
-    --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--good-ink:#15151B;--warn:#F2B134;--warn-ink:#15151B;--line:#303038;--ground:#74747F;--prop:#74747F;--prop-fill:#3A3A46;--fig-far:#868486;--fig-far-hi:#9D4327;--fig-shadow:#44434C;--fig-mat:#34343D;--field-border:#7A7A86;--rest:#24352A;\
+    --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--good-ink:#15151B;--warn:#F2B134;--warn-ink:#15151B;--line:#303038;--ground:#74747F;--prop:#74747F;--prop-fill:#3A3A46;--fig-far:#868486;--fig-far-hi:#9D4327;--fig-shadow:#44434C;--fig-mat:#34343D;--fig-ghost:#393944;--field-border:#7A7A86;--rest:#24352A;\
     color-scheme:dark;\
   }\
 }\
 :root[data-theme=dark]{\
   --bg:#15151B;--surface:#1E1E27;--surface-raised:#262631;\
   --text:#EDEAE2;--text-soft:#A6A6B0;--text-faint:#9696A0;\
-  --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--good-ink:#15151B;--warn:#F2B134;--warn-ink:#15151B;--line:#303038;--ground:#74747F;--prop:#74747F;--prop-fill:#3A3A46;--fig-far:#868486;--fig-far-hi:#9D4327;--fig-shadow:#44434C;--fig-mat:#34343D;--field-border:#7A7A86;--rest:#24352A;\
+  --accent:#FF5A1F;--accent-ink:#15151B;--good:#4CAF6D;--good-ink:#15151B;--warn:#F2B134;--warn-ink:#15151B;--line:#303038;--ground:#74747F;--prop:#74747F;--prop-fill:#3A3A46;--fig-far:#868486;--fig-far-hi:#9D4327;--fig-shadow:#44434C;--fig-mat:#34343D;--fig-ghost:#393944;--field-border:#7A7A86;--rest:#24352A;\
   color-scheme:dark;\
 }\
 input,select,textarea{font-size:max(16px,1em);}\
@@ -171,10 +171,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sys
 .story-head button{min-height:44px;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;background:none;border:1px solid var(--line);color:var(--text-soft);border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap;}\
 .story-title{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:0.95rem;color:var(--text-faint);margin:0;}\
 .slide{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;touch-action:pan-y pinch-zoom;}\
-#fig-live svg,#fig-live-front svg{pointer-events:none;}\
+#fig-live svg,#fig-live-front svg{pointer-events:none;}#fig-live,#fig-live-front{cursor:pointer;}#fig-live [data-g],#fig-live-front [data-g]{visibility:hidden;}#fig-live[data-guides=on] [data-g],#fig-live-front[data-guides=on] [data-g]{visibility:visible;}\
 .fig-wrap{background:var(--surface-raised);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 0;margin-bottom:14px;overflow:hidden;--fig-cap:clamp(155px,min(34vw,calc((100vh - 120px) * 0.54)),260px);}\
 .fig-wrap svg{width:var(--fig-cap);height:auto;aspect-ratio:155/172;overflow:visible;}\
-@media (prefers-reduced-motion:reduce){#fig-live,#fig-live-front{cursor:pointer;}}\
 .slide h4{font-family:'Work Sans',sans-serif;font-weight:700;font-size:1.15rem;margin:0 0 2px;text-align:center;}\
 .slide .cat{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;text-align:center;display:block;margin-bottom:8px;}\
 .slide .target{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--text-faint);text-align:center;}\
@@ -4325,6 +4324,12 @@ function rigAlpha(ex,u){
   var g=rSegAt(ex,u); if(rCutAt(ex,g)<0) return 1;
   return Math.max(0,Math.min(1,(Math.abs(1-2*g.t)-0.2)*2));
 }
+// Where in the rep (0 to 1) the still falls: the rig's still keyframe.
+function rStillU(ex){
+  var t=ex.tempo||ex.frames.map(function(){ return 1; }), k=ex.still===undefined?1:ex.still, acc=0;
+  for(var i=0;i<k&&i<t.length;i++) acc+=t[i];
+  return acc/t.reduce(function(a,b){ return a+b; },0)%1;
+}
 // A skipping rope's turn (equip:'rope'): 0 overhead, 180 under the feet, given
 // at each keyframe (rope) and turning on forwards at an even pace between.
 function rRopeTurn(fr,g){
@@ -4681,6 +4686,8 @@ function rigFrontSVG(exId,u){
   if(ex.frontPlan&&!ex.planProps) o+='<rect data-p="mat" x="'+(bx.fx+8)+'" y="'+(bx.y+4)+'" width="'+(bx.fw-16)+'" height="'+(bx.h-8)+'" rx="8" fill="var(--fig-mat)"/>';
   else o+=rShadow((s.footL.x+s.footR.x)/2,Math.abs(s.footR.x-s.footL.x)/2+8,RGROUND-7-Math.max(s.footL.y,s.footR.y))+rGround(bx.fx,bx.fx+bx.fw);
   (ex.planProps||[]).forEach(function(p){ o+=rProp(p); });
+  var gd=rGuideOf(exId,ex);
+  o+=rGhost(gd.front[rGhostEnd(ex,gd,u)]);
   // A skipping rope arches between the hands to the height its loop has
   // reached: behind the body on the way over, in front of it on the way down
   // and under. Both places are always drawn, the unused one empty, so every
@@ -4717,7 +4724,7 @@ function rigFrontSVG(exId,u){
   if(bar&&!back) o+=rEquipFront(ex,s);
   o+=rDot('handL',s.handL,rF(a[3]*s.fistL),armCol,1)+rDot('handR',s.handR,rF(a[3]*s.fistR),armCol,1);
   if(!bar) o+=rEquipFront(ex,s);
-  return o+rope[1]+'</svg>';
+  return o+rope[1]+rPath(gd.pf)+rArrow(rTrackFront(ex,s),rTrackFront(ex,rSolveFront(rFrontAt(ex,u+0.05))))+'</svg>';
 }
 /* Both panels are cropped to what the figure covers over the whole rep. The
    side view gets the ground it covers, at the front view's height, so the two
@@ -4796,6 +4803,8 @@ function rigSVG(exId,u){
   var o='<svg viewBox="'+bx.x+' '+bx.y+' '+bx.w+' '+bx.h+'" preserveAspectRatio="xMidYMax meet" role="img" aria-label="exercise animation">';
   o+=rShadow((s.ankN.x+s.ankF.x)/2+3,Math.abs(s.ankN.x-s.ankF.x)/2+7,RGROUND-6-Math.max(s.ankN.y,s.ankF.y))+rGround(bx.x,bx.x+bx.w);
   (ex.props||[]).forEach(function(p){ o+=rProp(p); });
+  var gd=rGuideOf(exId,ex);
+  o+=rGhost(gd.side[rGhostEnd(ex,gd,u)]);
   var top=ex.equip==='barbell'||ex.equip==='fixedbar'||ex.equip==='plate', back=ex.equip==='kettlebell'&&s.handN.y<s.hip.y;
   function leg(k,h,kn,an,rot,col,w,cut){ return rPart('thigh'+k,rCap(h,w[0],kn,w[1]),col,cut)+rPart('shin'+k,rCap(kn,w[1],an,w[2]),col,cut)+rPart('foot'+k,rSmooth(rShoePts(an,rot)),col); }
   function arm(k,sh,e,hd,col,w,cut){ return rPart('upper'+k,rCap(sh,w[0],e,w[1]),col,cut)+rPart('fore'+k,rCap(e,w[1],hd,w[2]),col,cut)+rDot('hand'+k,hd,w[3],col,cut); }
@@ -4813,8 +4822,80 @@ function rigSVG(exId,u){
   o+=arm('N',s.sh,s.elbN,s.handN,armCol,RW.arm,1);
   if(top) o+=rEquip(ex,s);
   if(rq) o+='<path d="'+rRopePath(s.handN,rq,s.rope)+rst;
-  return o+'</svg>';
+  return o+rPath(gd.ps)+rArrow(rTrack(ex,s),rTrack(ex,rSolve(rPoseAt(ex,u+0.05))))+'</svg>';
 }
+
+// ---- motion guides ----
+// A coach's marks on the figure, shown while it stands still: a
+// faint ghost of the other end of the rep, the path the bar (or the hip, or
+// the shoulders) takes over the whole rep, and a small arrow on that path
+// pointing the way the movement goes next. Each is one shape in every frame,
+// the arrow shrunk to a point when nothing moves, so the live figure still
+// moves in place. The ghost and the path are worked out once per rig.
+var rGuides={};
+// What the path follows: the implement in the hand, else the shoulders for an
+// arm drill or a hang, else the hip.
+function rTrack(ex,s){
+  var q=ex.equip;
+  if(s.ball) return s.ball;
+  if(q==='kettlebell') return rBellAt(ex,s);
+  if(q==='barbell'||q==='dumbbell'||q==='plate'||q==='cable'||q==='ball') return s.handN;
+  return q==='fixedbar'||ex.active==='arms'||ex.active==='armN'?s.sh:s.hip;
+}
+function rTrackFront(ex,s){
+  var q=ex.equip, m=rP((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2);
+  if(s.ball) return s.ball;
+  if(q==='kettlebell') return rBellFront(ex,s);
+  if(q==='barbell'||q==='ball'||(q==='dumbbell'&&rAxis(ex)==='vertical')||(q==='cable'&&ex.anchorFront&&ex.anchorFront.length<4)) return m;
+  if(q&&q!=='fixedbar'&&q!=='rope') return ex.load==='L'?s.handL:s.handR;
+  return q==='fixedbar'||ex.active==='arms'||ex.active==='armN'?s.shC:s.hipC;
+}
+// The ghost: the whole body as one shape, in a shade just off the panel.
+function rGhostSide(s){
+  var a=RW.arm, l=RW.leg;
+  return rCap(s.hipF,l[0],s.kneeF,l[1])+rCap(s.kneeF,l[1],s.ankF,l[2])+rSmooth(rShoePts(s.ankF,s.footF))+
+    rCap(s.shF,a[0],s.elbF,a[1])+rCap(s.elbF,a[1],s.handF,a[2])+rSmooth(rTorsoPts(s.hip,s.mid,s.sh))+
+    rCap(s.hip,l[0],s.kneeN,l[1])+rCap(s.kneeN,l[1],s.ankN,l[2])+rSmooth(rShoePts(s.ankN,s.footN))+
+    rNeck(s.sh,s.head)+rSmooth(rHeadPts(s.sh,s.head))+rCap(s.sh,a[0],s.elbN,a[1])+rCap(s.elbN,a[1],s.handN,a[2]);
+}
+function rGhostFront(s){
+  var a=RW.farm, l=RW.fleg, h=s.head;
+  return rCap(s.hipL,l[0],s.kneeL,l[1])+rCap(s.kneeL,l[1],s.footL,l[2])+rCap(s.hipR,l[0],s.kneeR,l[1])+rCap(s.kneeR,l[1],s.footR,l[2])+
+    rSmooth(rTorsoFrontPts(s))+rCap(s.shC,3.8,h,3.2)+'M'+rF(h.x-7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x+7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x-7)+','+rF(h.y)+'Z'+
+    rCap(s.shL,a[0],s.elbL,a[1])+rCap(s.elbL,a[1],s.handL,a[2])+rCap(s.shR,a[0],s.elbR,a[1])+rCap(s.elbR,a[1],s.handR,a[2]);
+}
+// Worked out once per rig: both ends of the rep (the start and the still) as
+// ghosts, and each panel's path. A path that hardly moves (a sprint's hip) is
+// left out: a dot of dashes says nothing.
+function rGuideOf(key,ex){
+  if(hasOwn(rGuides,key)) return rGuides[key];
+  var N=48, ends=[0,rStillU(ex)], g={ends:ends, side:[], front:[], ps:'', pf:''};
+  function line(pts){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    pts.forEach(function(p){ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); });
+    return Math.max(x1-x0,y1-y0)<6?'':pts.map(rXY).join(' '); }
+  ends.forEach(function(u){ g.side.push(rGhostSide(rSolve(rPoseAt(ex,u)))); if(ex.front) g.front.push(rGhostFront(rSolveFront(rFrontAt(ex,u)))); });
+  var ps=[], pf=[];
+  for(var i=0;i<=N;i++){ ps.push(rTrack(ex,rSolve(rPoseAt(ex,i/N)))); if(ex.front) pf.push(rTrackFront(ex,rSolveFront(rFrontAt(ex,i/N)))); }
+  g.ps=line(ps); g.pf=ex.front?line(pf):'';
+  return (rGuides[key]=g);
+}
+// Which end the ghost shows: whichever the figure is further from, so a still
+// at the bottom of a squat shows the standing start and the start shows the
+// bottom.
+function rGhostEnd(ex,g,u){
+  function far(v){ var a=rSolve(rPoseAt(ex,u)), b=rSolve(rPoseAt(ex,v)), d=0;
+    ['hip','sh','head','handN','handF','kneeN','ankN'].forEach(function(k){ d+=Math.hypot(a[k].x-b[k].x,a[k].y-b[k].y); }); return d; }
+  return far(g.ends[0])>=far(g.ends[1])?0:1;
+}
+// The arrow: where the tracked point goes over the next twentieth of the rep,
+// a small head on the path pointing that way; a point when it holds.
+function rArrow(c,n){
+  var dx=n.x-c.x, dy=n.y-c.y, l=Math.hypot(dx,dy), k=l<1?0:1, ux=k*dx/(l||1), uy=k*dy/(l||1);
+  var tip=rP(c.x+ux*6,c.y+uy*6), a=rP(c.x-uy*3.4,c.y+ux*3.4), b=rP(c.x+uy*3.4,c.y-ux*3.4);
+  return '<path data-g="arrow" d="M'+rXY(tip)+' L'+rXY(a)+' L'+rXY(b)+'Z" fill="var(--accent)" stroke="var(--surface-raised)" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/>';
+}
+function rGhost(d){ return '<path data-g="ghost" d="'+d+'" fill="var(--fig-ghost)"/>'; }
+function rPath(p){ return '<polyline data-g="path" points="'+p+'" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="2.4 2.6" stroke-linecap="round" opacity="0.85"/>'; }
 
 function figureSVG(poseKey,phase,equip){
   var pair=PP[poseKey]||PP.SQUAT;
@@ -4842,7 +4923,7 @@ function figureSVG(poseKey,phase,equip){
 // instead of snapping back to the start. Only moving to another rig starts it
 // over. While the rest clock runs it runs at a third of the speed, so the
 // figure moves in true slow motion, every frame drawn, rather than skipping.
-var rigRaf=null, rigTm=null, rigVT=0, rigAt=0, rigPlay=false, rigLastId=null, rigIO=null, rigSeen=null, rigHidden=false;
+var rigRaf=null, rigTm=null, rigVT=0, rigAt=0, rigPlay=false, rigLastId=null, rigIO=null, rigSeen=null, rigHidden=false, rigPaused=false, rigShown=0;
 // One knob for every rig's pace: above 1 slows them all alike, should the fast
 // drills prove hard to follow.
 var RIG_PACE=1;
@@ -4856,11 +4937,7 @@ function rigData(id){ var ex=rigFor(id); return ex?' data-ms="'+rigCycle(ex)+'" 
 // The still is where the rep turns around, the bottom of a squat or the top
 // of a press (the rig's `still` keyframe): the start of most reps is just
 // standing, and the end of the first segment is half way down.
-function rigStillU(rigId){
-  var ex=rigFor(rigId), t=ex.tempo||ex.frames.map(function(){ return 1; }), k=ex.still===undefined?1:ex.still, acc=0;
-  for(var i=0;i<k&&i<t.length;i++) acc+=t[i];
-  return acc/t.reduce(function(a,b){ return a+b; },0)%1;
-}
+function rigStillU(rigId){ return rStillU(rigFor(rigId)); }
 /* A frame moves the figure already drawn: the same shapes in the same order,
    each given the new frame's attributes. Rebuilding both drawings with
    innerHTML thirty times a second kept a phone's main thread a quarter busy
@@ -4916,19 +4993,30 @@ function rigWatch(w){
   });
   rigIO.disconnect(); rigSeen=box; rigHidden=false; rigIO.observe(box);
 }
+// The motion guides (rigSVG's ghost, path and arrow) show while the figure
+// stands still, and only then: on a moving figure at phone size the ghost and
+// the path were one thing too many to follow.
+function rigGuides(on){
+  ['fig-live','fig-live-front'].forEach(function(id){ var e=document.getElementById(id); if(e) e.setAttribute('data-guides',on?'on':'off'); });
+}
 // Under reduced motion the figure is a still, and a tap on it plays one rep.
+// Otherwise a tap pauses it where it is, and another plays on from there.
 function startPoseLoop(play){
   stopPoseLoop();
   var w=document.getElementById('fig-live');
   var rigId=w?w.getAttribute('data-rig'):null, still=!play && stillMotion();
   if(rigId && rigFor(rigId)){
-    if(still){ drawRig(rigId,rigStillU(rigId)); return; }
+    if(still){ drawRig(rigId,rigStillU(rigId)); rigGuides(true); return; }
+    var ex=rigFor(rigId), cyc=rigCycle(ex), n=rigSteps(ex), per=cyc/n, last=-1;
+    if(rigId!==rigLastId) rigPaused=false;
+    // Paused on the frame on screen, and played on from it.
+    if(rigPaused && !play){ rigVT=rigShown*cyc; drawRig(rigId,rigShown); rigGuides(true); return; }
+    rigGuides(false);
     rigWatch(w);
     // A rigged exercise animates continuously through the whole rep rather than
     // flipping between two stills, because the path between the positions is
     // most of what a form reminder is for.
     if(play || rigId!==rigLastId){ rigVT=0; rigLastId=rigId; }
-    var ex=rigFor(rigId), cyc=rigCycle(ex), n=rigSteps(ex), per=cyc/n, last=-1;
     rigAt=performance.now(); rigPlay=!!play;
     // Each frame is drawn on time and the page then sleeps until just before
     // the next one is due, rather than waking for every screen refresh.
@@ -4939,11 +5027,11 @@ function startPoseLoop(play){
       // A rep asked for with a tap plays at full speed, rest clock or not.
       var rate=rigPlay?1:rigRate();
       rigVT+=Math.max(0,now-rigAt)*rate; rigAt=now;
-      if(play && rigVT>=cyc){ drawRig(rigId,rigStillU(rigId)); return; }
+      if(play && rigVT>=cyc){ drawRig(rigId,rigStillU(rigId)); rigGuides(true); return; }
       // A frame due within half a screen refresh is drawn now: the refresh
       // after it would be late, and waking for the one before it a waste.
       var at=Math.floor((rigVT+8*rate)/per), i=at%n;
-      if(i!==last){ last=i; drawRig(rigId,i/n); }
+      if(i!==last){ last=i; rigShown=i/n; drawRig(rigId,rigShown); }
       // The sleep is never longer than a frame at full speed, so the end of a
       // rest, which the loop is not told about, costs it at most one frame.
       var due=Math.min(((at+1)*per-rigVT)/rate,per);
@@ -4964,6 +5052,10 @@ function startPoseLoop(play){
     flip(!poseFlip);
     if(play && ++flips>=2){ clearInterval(poseTimer); poseTimer=null; flip(true); }
   },900);
+}
+function tapFigure(){
+  var w=document.getElementById('fig-live');
+  if(w && rigFor(w.getAttribute('data-rig'))){ rigPaused=!rigPaused; startPoseLoop(); }
 }
 // Both halves of the wait, the sleep and the frame it asks for: clearing only
 // the frame left a sleeping one to wake a second chain after a render.
@@ -6122,7 +6214,7 @@ function drawKeeping(app,html){
 var lastCut=null;
 function onClick(e){
   var t=e.target.closest('[data-action]');
-  if(!t){ if(stillMotion() && e.target.closest('#fig-live,#fig-live-front')) startPoseLoop(true); return; }
+  if(!t){ if(e.target.closest('#fig-live,#fig-live-front')){ if(stillMotion()) startPoseLoop(true); else tapFigure(); } return; }
   var action=t.getAttribute('data-action');
   // Only a tap that logs something on the day makes a record of it.
   var today={water:1,logsauna:1,workout:1,rest:1,alcohol:1,smoking:1,weed:1}[action]?ensureDay(activeDate()):null;

@@ -62,7 +62,7 @@ setTimeout(function(){
   // at the same places (to the 0.1 both round to), in both panels. It used to
   // be a second renderer of its own, which drifted from the app's.
   var app2=new Function('hasOwn',cut2('var RL=','function figureSVG(')+';return {RIGMAP:RIGMAP,rigSVG:rigSVG,rigFrontSVG:rigFrontSVG,rSolve:rSolve,rPoseAt:rPoseAt,rigFor:rigFor,rTorsoPts:rTorsoPts};')(function(o,k){ return Object.prototype.hasOwnProperty.call(o,k); });
-  function tags(html){ return (html.match(/<[a-z][^>]*>/g)||[]).slice(1).filter(function(t){ return t.indexOf('data-p="trace"')<0; }); }
+  function tags(html){ return (html.match(/<[a-z][^>]*>/g)||[]).slice(1); }
   function same(a,b){ var x=a.match(/-?\d+\.?\d*/g)||[], y=b.match(/-?\d+\.?\d*/g)||[];
     if(a.replace(/-?\d+\.?\d*/g,'#')!==b.replace(/-?\d+\.?\d*/g,'#')||x.length!==y.length) return false;
     for(var k=0;k<x.length;k++) if(Math.abs(x[k]-y[k])>0.11) return false; return true; }

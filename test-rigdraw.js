@@ -7,7 +7,7 @@ var fs=require('fs'), assert=require('assert');
 var h=fs.readFileSync(process.argv[2]||(__dirname+'/index.html'),'utf8');
 function cut(a,b){ var i=h.indexOf(a), j=h.indexOf(b,i); if(i<0||j<0) throw new Error('could not find '+a+' .. '+b+' in index.html'); return h.slice(i,j); }
 var app=new Function('hasOwn',cut('var RL=','function figureSVG(')+
-  ';return {RL:RL,RGROUND:RGROUND,RIGFRAMES:RIGFRAMES,RIGMAP:RIGMAP,rigFor:rigFor,rSolve:rSolve,rPoseAt:rPoseAt,rSolveFront:rSolveFront,rFrontAt:rFrontAt,rigSVG:rigSVG,rigFrontSVG:rigFrontSVG,rigBox:rigBox,figPairStyle:figPairStyle,rFootPts:rFootPts};')
+  ';return {RL:RL,RGROUND:RGROUND,RIGFRAMES:RIGFRAMES,RIGMAP:RIGMAP,rigFor:rigFor,rSolve:rSolve,rPoseAt:rPoseAt,rSolveFront:rSolveFront,rFrontAt:rFrontAt,rigSVG:rigSVG,rigFrontSVG:rigFrontSVG,rigBox:rigBox,figPairStyle:figPairStyle,rFootPts:rFootPts,rStillU:typeof rStillU==="function"?rStillU:null};')
   (function(o,k){ return Object.prototype.hasOwnProperty.call(o,k); });
 var EXOF={}; Object.keys(app.RIGMAP).forEach(function(k){ if(!EXOF[app.RIGMAP[k]]) EXOF[app.RIGMAP[k]]=k; });
 var RIGS=Object.keys(app.RIGFRAMES).filter(function(id){ return EXOF[id]; });
@@ -215,7 +215,7 @@ t('a ball let go of is drawn where the rig puts it, not in the hands', function(
 t('skipping draws its rope from the hands, overhead as it lands', function(){
   var ex=rex('skipping'); assert.strictEqual(ex.equip,'rope','skipping has no rope');
   for(var i=0;i<16;i++){ var u=i/16, s=app.rSolve(app.rPoseAt(ex,u)), f=app.rSolveFront(app.rFrontAt(ex,u));
-    var side=shapes(app.rigSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'&&!p.a['data-p']; }), front=shapes(app.rigFrontSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'&&!p.a['data-p']; });
+    var side=shapes(app.rigSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'&&!p.a['data-p']&&!p.a['data-g']; }), front=shapes(app.rigFrontSVG(EXOF.skipping,u)).filter(function(p){ return p.n==='path'&&!p.a['data-p']&&!p.a['data-g']; });
     assert.strictEqual(side.length,2,'u='+u+': '+side.length+' strands');
     [s.handF,s.handN].forEach(function(h,j){ assert.ok(side[j].a.d.indexOf('M'+h.x.toFixed(1)+' '+h.y.toFixed(1))===0,'u='+u+': a strand does not start at a hand'); });
     assert.strictEqual(front.length,2,'u='+u+': the front rope changes its shapes');
@@ -223,7 +223,7 @@ t('skipping draws its rope from the hands, overhead as it lands', function(){
     assert.strictEqual(arch.length,1,'u='+u+': '+arch.length+' arches');
     var ys=(arch[0].a.d.match(/-?[\d.]+ -?[\d.]+/g)||[]).map(function(x){ return +x.split(' ')[1]; });
     assert.ok(arch[0].a.d.indexOf('M'+f.handL.x.toFixed(1)+' '+f.handL.y.toFixed(1))===0&&/ -?[\d.]+ -?[\d.]+$/.test(arch[0].a.d)&&Math.abs(ys[ys.length-1]-f.handR.y)<0.06,'u='+u+': the arch does not run between the hands'); }
-  var s0=app.rSolveFront(app.rFrontAt(ex,0)), a0=shapes(app.rigFrontSVG(EXOF.skipping,0)).filter(function(p){ return p.n==='path'&&!p.a['data-p']&&/ Q/.test(p.a.d); })[0];
+  var s0=app.rSolveFront(app.rFrontAt(ex,0)), a0=shapes(app.rigFrontSVG(EXOF.skipping,0)).filter(function(p){ return p.n==='path'&&!p.a['data-p']&&!p.a['data-g']&&/ Q/.test(p.a.d); })[0];
   var top=Math.min.apply(null,(a0.a.d.match(/-?[\d.]+ -?[\d.]+/g)||[]).map(function(x){ return +x.split(' ')[1]; }));
   assert.ok(top<s0.head.y,'as the feet land the rope is at y '+top+', not over the head at '+s0.head.y.toFixed(1));
 });
@@ -389,6 +389,63 @@ t('a shadow under the feet narrows as a jump leaves the floor; from above the fi
   assert.ok(fx(u)<fx(0)*0.8,'the second panel\'s shadow is '+fx(u)+' wide in the air and '+fx(0)+' on the floor');
   assert.ok(idx(shapes(app.rigFrontSVG(EXOF.pushup,0)),part('mat'))>=0,'the push-up from above has no mat');
   assert.ok(idx(shapes(app.rigFrontSVG(EXOF.bench,0)),part('mat'))<0,'the bench press from above lies on a mat instead of its bench');
+});
+
+console.log('\nMOTION GUIDES');
+// A coach's marks on the figure (style C): a faint ghost of the other end of
+// the rep, the path of the bar (or the hip, or the shoulders) over the whole
+// rep, and a small arrow on it pointing the way it goes next. They are one
+// shape each in every frame of both panels, so the figure still moves in
+// place, and the page shows them only while the figure stands still.
+function guide(sh,k){ return sh.filter(function(p){ return p.a['data-g']===k; }); }
+function arrowOf(sh){ var a=guide(sh,'arrow')[0]; return (a.a.d.match(/-?[\d.]+,-?[\d.]+/g)||[]).map(function(q){ return q.split(',').map(Number); }); }
+t('every rig has a ghost, a path and an arrow, one shape each, in both panels and every frame: the ghost under the figure, the path and arrow over it', function(){
+  var bad=[];
+  RIGS.forEach(function(id){ [app.rigSVG,app.rigFrontSVG].forEach(function(f,v){ if(!f(EXOF[id],0)) return;
+    for(var i=0;i<12;i++){ var sh=shapes(f(EXOF[id],i/12)), g=guide(sh,'ghost'), pa=guide(sh,'path'), ar=guide(sh,'arrow');
+      if(g.length!==1||pa.length!==1||ar.length!==1){ bad.push(id+(v?' front':' side')+' u='+(i/12).toFixed(2)+': '+g.length+' ghosts, '+pa.length+' paths, '+ar.length+' arrows'); break; }
+      var gi=sh.indexOf(g[0]), first=idx(sh,function(p){ return !!p.a['data-p']&&!/shadow|mat/.test(p.a['data-p']); });
+      if(g[0].n!=='path'||!/^M/.test(g[0].a.d)||gi>first){ bad.push(id+(v?' front':' side')+': the ghost is not a shape drawn under the figure'); break; }
+      if(sh.indexOf(pa[0])!==sh.length-2||sh.indexOf(ar[0])!==sh.length-1){ bad.push(id+(v?' front':' side')+': the path and the arrow are not drawn last'); break; } } }); });
+  assert.ok(!bad.length,bad.length+' panels: '+bad.slice(0,6).join('; '));
+});
+t('the ghost shows the other end of the rep: the standing start at the bottom of a squat, the bottom while standing, in both panels', function(){
+  ['backsquat','goblet','ohp','pullup'].forEach(function(id){ var su=app.rStillU(rex(id));
+    [[app.rigSVG],[app.rigFrontSVG]].forEach(function(v,k){
+      function head(sh){ var j=idx(sh,part('head')), a=sh[j].a; return a.d?Math.min.apply(null,pathPts(a.d).map(function(q){ return q[1]; })):+a.cy-(+a.ry); }
+      [0,su].forEach(function(u,e){ var sh=shapes(v[0](EXOF[id],u)), other=shapes(v[0](EXOF[id],e?0:su));
+        var gp=pathPts(guide(sh,'ghost')[0].a.d), ys=gp.map(function(q){ return q[1]; });
+        // The ghost spans what the figure at the other end spans.
+        var fig=[].concat.apply([],other.filter(function(p){ return p.a['data-p']&&p.n==='path'&&!/shadow|mat|foot/.test(p.a['data-p']); }).map(function(p){ return pathPts(p.a.d); }));
+        var fy=fig.map(function(q){ return q[1]; }).concat([head(other)]);
+        assert.ok(Math.abs(Math.min.apply(null,ys)-Math.min.apply(null,fy))<1.5,id+(k?' front':' side')+' u='+u.toFixed(2)+': the ghost\'s top is '+Math.min.apply(null,ys).toFixed(1)+', the other end\'s '+Math.min.apply(null,fy).toFixed(1));
+        var now=[].concat.apply([],sh.filter(function(p){ return p.a['data-p']&&p.n==='path'&&!/shadow|mat|foot/.test(p.a['data-p']); }).map(function(p){ return pathPts(p.a.d); })).map(function(q){ return q[1]; }).concat([head(sh)]);
+        assert.ok(Math.abs(Math.min.apply(null,now)-Math.min.apply(null,fy))>6,id+(k?' front':' side')+' u='+u.toFixed(2)+': the ghost is where the figure is'); }); }); });
+});
+t('a squat\'s bar path runs straight up and down, and the arrow points the way the bar goes next: down from the top, up from the bottom', function(){
+  var sh=shapes(app.rigSVG(EXOF.backsquat,0)), pts=guide(sh,'path')[0].a.points.split(' ').map(function(q){ return q.split(',').map(Number); });
+  var xs=pts.map(function(q){ return q[0]; }), ys=pts.map(function(q){ return q[1]; });
+  assert.ok(Math.max.apply(null,xs)-Math.min.apply(null,xs)<6&&Math.max.apply(null,ys)-Math.min.apply(null,ys)>25,'the bar path is '+(Math.max.apply(null,xs)-Math.min.apply(null,xs)).toFixed(1)+' wide and '+(Math.max.apply(null,ys)-Math.min.apply(null,ys)).toFixed(1)+' tall');
+  var s=app.rSolve(app.rPoseAt(rex('backsquat'),0.02));
+  assert.ok(pts.some(function(q){ return Math.hypot(q[0]-s.handN.x,q[1]-s.handN.y)<2; }),'the path does not pass through the bar');
+  [[0.02,1],[app.rStillU(rex('backsquat')),-1]].forEach(function(c){
+    var a=arrowOf(shapes(app.rigSVG(EXOF.backsquat,c[0]))), tip=a[0], base=(a[1][1]+a[2][1])/2;
+    assert.ok((tip[1]-base)*c[1]>4,'u='+c[0].toFixed(2)+': the arrow points '+(tip[1]>base?'down':'up')+' ('+tip[1]+' against '+base+')'); });
+  var f=arrowOf(shapes(app.rigFrontSVG(EXOF.backsquat,0.02)));
+  assert.ok(f[0][1]-(f[1][1]+f[2][1])/2>4,'the front view\'s arrow does not point down as the squat starts');
+});
+t('a path that hardly moves is left out, and the arrow shrinks to a point while the body holds still', function(){
+  var sh=shapes(app.rigSVG(EXOF.sprint,0));
+  assert.strictEqual(guide(sh,'path')[0].a.points,'','a sprint\'s hip path is drawn: '+guide(sh,'path')[0].a.points.slice(0,60));
+  var held=RIGS.filter(function(id){ return arrowOf(shapes(app.rigSVG(EXOF[id],0))).every(function(q,i,a){ return q[0]===a[0][0]&&q[1]===a[0][1]; }); });
+  assert.ok(held.indexOf('plank')>=0,'a plank\'s arrow points somewhere: '+JSON.stringify(arrowOf(shapes(app.rigSVG(EXOF.plank,0)))));
+  assert.ok(held.indexOf('backsquat')<0,'a squat\'s arrow is a point');
+});
+t('the guides are hidden unless the figure is marked to show them, in a shade of their own in both themes', function(){
+  assert.ok(/#fig-live \[data-g\],#fig-live-front \[data-g\]\{visibility:hidden;\}/.test(css),'the guides are not hidden by default');
+  assert.ok(/#fig-live\[data-guides=on\] \[data-g\],#fig-live-front\[data-guides=on\] \[data-g\]\{visibility:visible;\}/.test(css),'nothing shows the guides');
+  var n=(h.match(/--fig-ghost:#[0-9A-Fa-f]{6}/g)||[]).length;
+  assert.strictEqual(n,3,'--fig-ghost is set in '+n+' of the 3 theme blocks');
 });
 
 console.log('\nDRAWN IN PLACE');

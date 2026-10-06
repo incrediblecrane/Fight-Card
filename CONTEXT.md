@@ -1172,6 +1172,20 @@ the head unless the rig sets `behindHead` (the overhead triceps extension),
 and a stick held behind the back (side-view hands behind the hip) behind the
 body. The second panel's arms carry the same cut line.
 
+**Motion guides**:
+Each panel also carries a coach's marks (`rGuideOf`, worked out once per rig):
+a ghost of the other end of the rep (the start or the still, whichever the
+figure is further from) in `--fig-ghost` under the figure, then over it a
+dashed path of the bar (the implement in the hand, else the shoulders for an
+arm drill or a hang, else the hip; left out when it moves under 6 units) and
+a small arrow on it pointing the way it goes over the next twentieth of the
+rep, shrunk to a point while the body holds. Each is one shape in every frame
+(`data-g`), so the figure still moves in place. They show only while the
+figure stands still (`data-guides="on"` on `#fig-live`): the reduced-motion
+still, the end of a tapped rep, and a figure paused with a tap. On a moving
+figure at phone size they were one thing too many to follow, and the ghost
+swaps ends half way through the rep.
+
 **Preview drawing**:
 `pose/render.js` draws the preview with a copy of the app's `rigSVG` and
 `rigFrontSVG` on `rig.js`'s solver, and plays each rig in its own frames as the
@@ -1193,6 +1207,8 @@ carries on where it was when the rest starts and ends. Scrolled out of sight it
 stops, and picks up where it left off. Under `prefers-reduced-motion: reduce`
 it is a still at the rig's `still` keyframe (the turnaround when the rep rests
 there, else its last stop), and a tap on it plays one rep at full speed.
+Otherwise a tap pauses it on the frame on screen (`rigPaused`, kept through a
+re-render of the page) and another plays on from there.
 
 `RIGFRAMES` in the app is generated from `pose/exercises.js` by
 `pose/emit-rig.js`, never edited by hand: change `pose/` and regenerate.

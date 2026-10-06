@@ -47,7 +47,7 @@ function world(rig0,opt){
   var api=new Function(names.join(','),
     'var poseTimer=null, poseFlip=false;\n'+
     'function rigSVG(id,u){ return "<svg u=\\""+u+"\\"></svg>"; } function rigFrontSVG(){ return ""; } function figureSVG(){ return ""; }\n'+
-    src+';\nreturn {start:startPoseLoop, stop:stopPoseLoop, still:rigStillU, rigFor:rigFor, RIGFRAMES:RIGFRAMES};'
+    src+';\nreturn {start:startPoseLoop, stop:stopPoseLoop, still:rigStillU, rigFor:rigFor, RIGFRAMES:RIGFRAMES, tap:typeof tapFigure==="function"?tapFigure:function(){}};'
   ).apply(null,names.map(function(k){ return env[k]; }));
   // Run the clock forward: timers as they fall due, frames on each refresh.
   function run(ms){
@@ -177,6 +177,36 @@ t('under reduced motion a tap plays one rep at the rig\'s own length, rest clock
   w.run(ship.plank.cycleMs*0.2+200);
   assert.strictEqual(w.us[w.us.length-1].u,u0,'it did not come to rest on the still');
   assert.strictEqual(w.pending(),0,'it kept running after one rep');
+});
+
+console.log('\nTHE GUIDES');
+// The ghost, the path and the arrow (rigSVG's motion guides) show while the
+// figure stands still and never while it moves: on a moving figure at phone
+// size they were one thing too many to follow.
+function guides(w){ return w.el.attrs['data-guides']; }
+t('the reduced-motion still shows the guides; the rep a tap plays hides them, and they come back when it stops', function(){
+  var w=world('backsquat',{still:true}); w.api.start();
+  assert.strictEqual(guides(w),'on','the still does not show its guides');
+  w.api.start(true); w.run(300);
+  assert.strictEqual(guides(w),'off','the guides stay on while the tapped rep plays');
+  w.run(ship.backsquat.cycleMs+200);
+  assert.strictEqual(guides(w),'on','the guides did not come back on the still');
+});
+t('a moving figure hides its guides; a tap pauses it where it is and shows them, and another plays on from there', function(){
+  var w=world('backsquat'); w.api.start(); w.run(900);
+  assert.strictEqual(guides(w),'off','the guides show while the figure moves');
+  var u0=w.us[w.us.length-1].u; w.api.tap();
+  assert.strictEqual(guides(w),'on','a tap did not show the guides');
+  assert.strictEqual(w.us[w.us.length-1].u,u0,'the pause moved the figure from u='+u0);
+  assert.strictEqual(w.pending(),0,'paused, '+w.pending()+' wakes still pending');
+  var n0=w.us.length; w.run(3000); assert.strictEqual(w.us.length,n0,'it drew while paused');
+  w.api.start();
+  assert.strictEqual(guides(w),'on','a redraw of the page (a save) played the paused figure');
+  assert.strictEqual(w.us[w.us.length-1].u,u0,'a redraw moved the paused figure');
+  w.api.tap(); assert.strictEqual(guides(w),'off','playing on, the guides still show');
+  var d=drawsIn(w,300), n=ship.backsquat.steps;
+  assert.ok(d.length>3,'a second tap did not play it on');
+  assert.ok(Math.round(((d[0].u-u0+1)%1)*n)<=1,'it played on from u='+d[0].u+', having paused at u='+u0);
 });
 
 console.log(fails?('\n'+fails+' rig loop check(s) failed'):'\nrig loop checks passed');

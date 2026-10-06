@@ -1,13 +1,6 @@
 // The preview: every rig drawn as the app draws it. The drawing is the app's
 // own (rigSVG and rigFrontSVG in index.html, copied here onto rig.js's solver),
 // and pose/checks/render.js fails unless the two draw the same shapes.
-// Precompute the bar path over a full rep so it can be shown as a trace.
-function barPath(ex){
-  if(!ex.equip||ex.equip==='fixedbar') return null;
-  var pts=[];
-  for(var i=0;i<=90;i++){ var s=solve(poseAt(ex,i/90)); pts.push(s.handN.x.toFixed(1)+','+s.handN.y.toFixed(1)); }
-  return pts.join(' ');
-}
 // The app's rigBox, so the preview is cropped and scaled as the app draws it:
 // both panels share a top (18, or higher for a rig that reaches above it) and
 // the side view is cropped to the ground the figure covers, at the front
@@ -260,6 +253,8 @@ function rigFrontSVG(ex,u,bx){
   if(ex.frontPlan&&!ex.planProps) o+='<rect data-p="mat" x="'+(bx.fx+8)+'" y="'+(bx.y+4)+'" width="'+(bx.fw-16)+'" height="'+(bx.h-8)+'" rx="8" fill="var(--fig-mat)"/>';
   else o+=rShadow((s.footL.x+s.footR.x)/2,Math.abs(s.footR.x-s.footL.x)/2+8,GROUND-7-Math.max(s.footL.y,s.footR.y))+rGround(bx.fx,bx.fx+bx.fw);
   (ex.planProps||[]).forEach(function(p){ o+=rProp(p); });
+  var gd=rGuideOf(ex.id,ex);
+  o+=rGhost(gd.front[rGhostEnd(ex,gd,u)]);
   // A skipping rope arches between the hands to the height its loop has
   // reached: behind the body on the way over, in front of it on the way down
   // and under. Both places are always drawn, the unused one empty, so every
@@ -296,7 +291,7 @@ function rigFrontSVG(ex,u,bx){
   if(bar&&!back) o+=rEquipFront(ex,s);
   o+=rDot('handL',s.handL,rF(a[3]*s.fistL),armCol,1)+rDot('handR',s.handR,rF(a[3]*s.fistR),armCol,1);
   if(!bar) o+=rEquipFront(ex,s);
-  return o+rope[1]+'</svg>';
+  return o+rope[1]+rPath(gd.pf)+rArrow(rTrackFront(ex,s),rTrackFront(ex,solveFront(frontAt(ex,u+0.05))))+'</svg>';
 }
 
 // Side view, back to front: far leg and arm, the body, the near leg, the
@@ -316,6 +311,8 @@ function rigSVG(ex,u,bx){
   var o='<svg viewBox="'+bx.x+' '+bx.y+' '+bx.w+' '+bx.h+'" preserveAspectRatio="xMidYMax meet" role="img" aria-label="exercise animation">';
   o+=rShadow((s.ankN.x+s.ankF.x)/2+3,Math.abs(s.ankN.x-s.ankF.x)/2+7,GROUND-6-Math.max(s.ankN.y,s.ankF.y))+rGround(bx.x,bx.x+bx.w);
   (ex.props||[]).forEach(function(p){ o+=rProp(p); });
+  var gd=rGuideOf(ex.id,ex);
+  o+=rGhost(gd.side[rGhostEnd(ex,gd,u)]);
   var top=ex.equip==='barbell'||ex.equip==='fixedbar'||ex.equip==='plate', back=ex.equip==='kettlebell'&&s.handN.y<s.hip.y;
   function leg(k,h,kn,an,rot,col,w,cut){ return rPart('thigh'+k,rCap(h,w[0],kn,w[1]),col,cut)+rPart('shin'+k,rCap(kn,w[1],an,w[2]),col,cut)+rPart('foot'+k,rSmooth(rShoePts(an,rot)),col); }
   function arm(k,sh,e,hd,col,w,cut){ return rPart('upper'+k,rCap(sh,w[0],e,w[1]),col,cut)+rPart('fore'+k,rCap(e,w[1],hd,w[2]),col,cut)+rDot('hand'+k,hd,w[3],col,cut); }
@@ -333,9 +330,87 @@ function rigSVG(ex,u,bx){
   o+=arm('N',s.sh,s.elbN,s.handN,armCol,RW.arm,1);
   if(top) o+=rEquip(ex,s);
   if(rq) o+='<path d="'+rRopePath(s.handN,rq,s.rope)+rst;
-  return o+'</svg>';
+  return o+rPath(gd.ps)+rArrow(rTrack(ex,s),rTrack(ex,solve(poseAt(ex,u+0.05))))+'</svg>';
 }
 
+
+// Where in the rep (0 to 1) the still falls: the rig's still keyframe.
+function rStillU(ex){
+  var t=tempoOf(ex), k=stillOf(ex), acc=0;
+  for(var i=0;i<k&&i<t.length;i++) acc+=t[i];
+  return acc/t.reduce(function(a,b){ return a+b; },0)%1;
+}
+// ---- motion guides ----
+// A coach's marks on the figure, shown while it stands still: a
+// faint ghost of the other end of the rep, the path the bar (or the hip, or
+// the shoulders) takes over the whole rep, and a small arrow on that path
+// pointing the way the movement goes next. Each is one shape in every frame,
+// the arrow shrunk to a point when nothing moves, so the live figure still
+// moves in place. The ghost and the path are worked out once per rig.
+var rGuides={};
+// What the path follows: the implement in the hand, else the shoulders for an
+// arm drill or a hang, else the hip.
+function rTrack(ex,s){
+  var q=ex.equip;
+  if(s.ball) return s.ball;
+  if(q==='kettlebell') return bellAt(ex,s);
+  if(q==='barbell'||q==='dumbbell'||q==='plate'||q==='cable'||q==='ball') return s.handN;
+  return q==='fixedbar'||ex.active==='arms'||ex.active==='armN'?s.sh:s.hip;
+}
+function rTrackFront(ex,s){
+  var q=ex.equip, m=rP((s.handL.x+s.handR.x)/2,(s.handL.y+s.handR.y)/2);
+  if(s.ball) return s.ball;
+  if(q==='kettlebell') return bellFront(ex,s);
+  if(q==='barbell'||q==='ball'||(q==='dumbbell'&&rAxis(ex)==='vertical')||(q==='cable'&&ex.anchorFront&&ex.anchorFront.length<4)) return m;
+  if(q&&q!=='fixedbar'&&q!=='rope') return ex.load==='L'?s.handL:s.handR;
+  return q==='fixedbar'||ex.active==='arms'||ex.active==='armN'?s.shC:s.hipC;
+}
+// The ghost: the whole body as one shape, in a shade just off the panel.
+function rGhostSide(s){
+  var a=RW.arm, l=RW.leg;
+  return rCap(s.hipF,l[0],s.kneeF,l[1])+rCap(s.kneeF,l[1],s.ankF,l[2])+rSmooth(rShoePts(s.ankF,s.footF))+
+    rCap(s.shF,a[0],s.elbF,a[1])+rCap(s.elbF,a[1],s.handF,a[2])+rSmooth(rTorsoPts(s.hip,s.mid,s.sh))+
+    rCap(s.hip,l[0],s.kneeN,l[1])+rCap(s.kneeN,l[1],s.ankN,l[2])+rSmooth(rShoePts(s.ankN,s.footN))+
+    rNeck(s.sh,s.head)+rSmooth(rHeadPts(s.sh,s.head))+rCap(s.sh,a[0],s.elbN,a[1])+rCap(s.elbN,a[1],s.handN,a[2]);
+}
+function rGhostFront(s){
+  var a=RW.farm, l=RW.fleg, h=s.head;
+  return rCap(s.hipL,l[0],s.kneeL,l[1])+rCap(s.kneeL,l[1],s.footL,l[2])+rCap(s.hipR,l[0],s.kneeR,l[1])+rCap(s.kneeR,l[1],s.footR,l[2])+
+    rSmooth(rTorsoFrontPts(s))+rCap(s.shC,3.8,h,3.2)+'M'+rF(h.x-7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x+7)+','+rF(h.y)+' A7,7.8 0 1,0 '+rF(h.x-7)+','+rF(h.y)+'Z'+
+    rCap(s.shL,a[0],s.elbL,a[1])+rCap(s.elbL,a[1],s.handL,a[2])+rCap(s.shR,a[0],s.elbR,a[1])+rCap(s.elbR,a[1],s.handR,a[2]);
+}
+// Worked out once per rig: both ends of the rep (the start and the still) as
+// ghosts, and each panel's path. A path that hardly moves (a sprint's hip) is
+// left out: a dot of dashes says nothing.
+function rGuideOf(key,ex){
+  if(Object.prototype.hasOwnProperty.call(rGuides,key)) return rGuides[key];
+  var N=48, ends=[0,rStillU(ex)], g={ends:ends, side:[], front:[], ps:'', pf:''};
+  function line(pts){ var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    pts.forEach(function(p){ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); });
+    return Math.max(x1-x0,y1-y0)<6?'':pts.map(rXY).join(' '); }
+  ends.forEach(function(u){ g.side.push(rGhostSide(solve(poseAt(ex,u)))); if(ex.front) g.front.push(rGhostFront(solveFront(frontAt(ex,u)))); });
+  var ps=[], pf=[];
+  for(var i=0;i<=N;i++){ ps.push(rTrack(ex,solve(poseAt(ex,i/N)))); if(ex.front) pf.push(rTrackFront(ex,solveFront(frontAt(ex,i/N)))); }
+  g.ps=line(ps); g.pf=ex.front?line(pf):'';
+  return (rGuides[key]=g);
+}
+// Which end the ghost shows: whichever the figure is further from, so a still
+// at the bottom of a squat shows the standing start and the start shows the
+// bottom.
+function rGhostEnd(ex,g,u){
+  function far(v){ var a=solve(poseAt(ex,u)), b=solve(poseAt(ex,v)), d=0;
+    ['hip','sh','head','handN','handF','kneeN','ankN'].forEach(function(k){ d+=Math.hypot(a[k].x-b[k].x,a[k].y-b[k].y); }); return d; }
+  return far(g.ends[0])>=far(g.ends[1])?0:1;
+}
+// The arrow: where the tracked point goes over the next twentieth of the rep,
+// a small head on the path pointing that way; a point when it holds.
+function rArrow(c,n){
+  var dx=n.x-c.x, dy=n.y-c.y, l=Math.hypot(dx,dy), k=l<1?0:1, ux=k*dx/(l||1), uy=k*dy/(l||1);
+  var tip=rP(c.x+ux*6,c.y+uy*6), a=rP(c.x-uy*3.4,c.y+ux*3.4), b=rP(c.x+uy*3.4,c.y-ux*3.4);
+  return '<path data-g="arrow" d="M'+rXY(tip)+' L'+rXY(a)+' L'+rXY(b)+'Z" fill="var(--accent)" stroke="var(--surface-raised)" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/>';
+}
+function rGhost(d){ return '<path data-g="ghost" d="'+d+'" fill="var(--fig-ghost)"/>'; }
+function rPath(p){ return '<polyline data-g="path" points="'+p+'" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="2.4 2.6" stroke-linecap="round" opacity="0.85"/>'; }
 
 // ---- drawn in place, as the app draws its live figure ----
 // A frame gives every shape of the drawing its new attributes rather than
@@ -362,22 +437,14 @@ function drawInPlace(el,d){
     for(var j=0;j<a.length;j+=2) if(node.getAttribute(a[j])!==a[j+1]) node.setAttribute(a[j],a[j+1]);
   }
 }
-// The bar path over the rep, shown as a trace when asked (Bar path).
-var showPath=false, paths={};
-function traceOf(ex){
-  if(!(ex.id in paths)) paths[ex.id]=barPath(ex);
-  return paths[ex.id]?'<polyline data-p="trace" points="'+paths[ex.id]+'" fill="none" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3" opacity="'+(showPath?0.85:0)+'"/>':'';
-}
 // Each panel draws into a box of its own inside the card's frame, so the
 // frame's label is not taken for the drawing.
 function panel(host){ var b=document.createElement('div'); host.appendChild(b); return b; }
 function buildFigure(ex,host,bx){ return {ex:ex, el:panel(host), bx:bx||boxOf(ex), u:null}; }
 function buildFront(ex,host,bx){ return {ex:ex, el:panel(host), bx:bx||boxOf(ex), u:null}; }
 function update(ex,ref,u){
-  if(ref.u===u&&ref.p===showPath) return; ref.u=u; ref.p=showPath;
-  // The app's drawing, with the bar path laid over the props.
-  var html=rigSVG(ex,u,ref.bx).replace('aria-label="exercise animation"','aria-label="'+ex.name+' animation"'), t=traceOf(ex);
-  if(t){ var k=html.indexOf('<path data-p='); html=html.slice(0,k)+t+html.slice(k); }
+  if(ref.u===u) return; ref.u=u;
+  var html=rigSVG(ex,u,ref.bx).replace('aria-label="exercise animation"','aria-label="'+ex.name+' animation"');
   drawInPlace(ref.el,svgShapes(html)); ref.svg=ref.el.firstElementChild;
 }
 function updateFront(ex,ref,u){
@@ -422,13 +489,15 @@ var playBtn=document.getElementById('playBtn'), scrub=document.getElementById('s
 playBtn.addEventListener('click',function(){
   playing=!playing; this.textContent=playing?'Pause':'Play'; this.classList.toggle('on',playing);
   if(playing){ manual=null; t0=performance.now()-elapsed/speed; }
-  scrub.disabled=playing;
+  scrub.disabled=playing; guidesShown();
 });
 scrub.addEventListener('input',function(){ if(!playing) manual=+this.value/100; });
 document.getElementById('slowBtn').addEventListener('click',function(){
   speed = speed===1?0.35:1; this.textContent = speed===1?'Slow motion':'Normal speed';
   this.classList.toggle('on',speed!==1); t0=performance.now()-elapsed/speed;
 });
-document.getElementById('pathBtn').addEventListener('click',function(){
-  showPath=!showPath; this.classList.toggle('on',showPath);
-});
+// The guides (the ghost of the other end of the rep, the path, the arrow)
+// show while paused, as in the app, or all the time when asked.
+var guideBtn=document.getElementById('guideBtn'), showGuides=false;
+function guidesShown(){ grid.classList.toggle('guides',showGuides||!playing); }
+guideBtn.addEventListener('click',function(){ showGuides=!showGuides; this.classList.toggle('on',showGuides); guidesShown(); });
