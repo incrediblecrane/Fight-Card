@@ -475,7 +475,7 @@ it unless the control moved out of sight.
 Two stores, and the split is the point.
 
 **The artifact document** holds code: the `App` function, the CSS string, the
-exercise library, and 79 rigs' worth of geometry. It changes only when a new
+exercise library, and 88 rigs' worth of geometry. It changes only when a new
 version is published.
 
 **The `db` capability** holds everything the user logs, as small documents:
@@ -886,7 +886,17 @@ the camera) drew as a seated butterfly stretch. Cat-cow and the thoracic rotatio
 with none (seen from above, a back arching and an elbow turning to the ceiling
 are both movements toward the camera), nor do child's pose and the pigeon,
 whose second panels read on a phone as someone seated with their hands up
-and as a small dark blob.
+and as a small dark blob. Where both panels draw the same hands (the arm
+sweeps: flys, raises, the ergs), they are at the same height, within 4, all
+through the rep and not only at keyframes; the flys once had the hands at the
+navel from the side and at the shoulders from the front.
+
+**Turned trunk** (`shHW`, `hipHW`):
+A hand-authored front frame may narrow its shoulders and hips (half widths,
+16 and 9 when not given) for a trunk turned away from the camera, with `lean`
+tilting it sideways: a woodchopper, a rotational throw and a Russian twist
+turn the trunk with the weight rather than swinging the arms across a still
+one.
 
 **Foreshortened leg**:
 A leg pointing toward or away from the camera in a second panel. The front
@@ -961,7 +971,8 @@ The keyframe a rep turns around at: the bottom of a squat, the top of a pull.
 **Stop**:
 A keyframe the figure comes to rest at, in one view (`rig.stopsOf`). Found
 from the paths (a hold either side of it, or a hip, hand or foot turning more
-than 60 degrees through it, or one passed at under a tenth of top speed),
+than 60 degrees through it, or one the time warp would pass at under 12% of
+the view's top speed, which reads as a stutter),
 or authored as `stops` (and `frontStops` for the second panel). A second
 panel in which only the elbows or knees move through a segment is read off
 those too. `node pose/emit-rig.js --stops` prints the table for review, and
@@ -973,8 +984,12 @@ _Avoid_: pause (a pause is the app's, not the rep's)
 **Time warp**:
 Where in its segment the pose is at a moment of the rep (`rig.warp`): a cubic
 whose end slopes are 0 at a stop and the shared speed of the two segments at
-any other keyframe, so the figure passes through a half-way keyframe instead of
-stopping dead there. Slopes stay within 0 to 3, so no pose is overshot. Each
+any other keyframe (the two segments' average speeds, weighted harmonic mean,
+as Fritsch and Butland have it, and less where the path bends there), so the
+figure passes through a half-way keyframe instead of stopping dead there. It
+used to ease every segment to rest at both ends, so the figure stopped dead at
+every keyframe, half way down a squat included. Slopes stay within 0 to 3, so
+no pose is overshot. Each
 view has its own, and both reach every keyframe at the same moment. A segment
 may author `ease` ('out' from take-off to apex, 'in' from apex to landing,
 'inout'). Only the timing changes: the keyframes and the path between them do
@@ -983,8 +998,26 @@ not.
 **Rep length** (`cycleMs`):
 How long one rep plays: authored (the `CYCLES` table in `exercises.js`: the
 coaches' lift timings, running cadences, 4 to 6 s for holds and stretches),
-otherwise the tempo's sum kept within 0.9 to 3 s. `RIG_PACE` in the app slows
-every rig alike.
+otherwise the tempo's sum kept within 0.9 to 3 s. Every rep used to take
+2.4 s, so sprints and boxing drills played at a third to a half of their speed
+and a held plank looked like reps. `RIG_PACE` in the app (1) slows every rig
+alike, should fast drills prove hard to read: one knob rather than single rigs
+distorted.
+
+**Frame period** (`steps`):
+How many frames a rep is drawn in: one every 50 ms (three screen refreshes),
+or every 33 ms (two) for a rig whose hips, head, hands or feet would jump more
+than 6 units (about 9 CSS px) between two frames at 50 (`rig.stepsOf`). It
+used to be 48 frames a rep for every rig, which strobed the fast ones; at each
+rig's own rep length it would draw a 6 s stretch at 8 frames a second. `emit-rig.js --stops` lists what each rig
+jumps a frame.
+
+**Still** (`still`):
+The keyframe a figure that is not playing shows: under reduced motion, and at
+the end of a tapped rep. Authored as `still`, else the turnaround when the rep
+rests there, else the last keyframe it rests at (a jump's landing, never the
+air) (`rig.stillOf`). It used to be the end of the first segment, half way
+down. The motion guides' ghost is the other end of the rep from it.
 
 **Bend range**:
 A knee or elbow bends from -10 to 160 degrees of flexion, never backwards.
@@ -1139,7 +1172,8 @@ jump squat's hands) and so one scale. The side panel's share of the row and
 its width cap follow its crop (`figPairStyle`); a second panel is 100 wide,
 or `frontW` for arms out to the sides at shoulder height (a jumping jack),
 centred on the body and capped in proportion so it keeps the same scale; the cap (`--fig-cap`) grows
-from 155 px on a phone to 260 px on a tablet. The floor (`--ground`) runs the
+from 155 px on a phone to 260 px on a tablet, and on a phone held sideways
+stays short enough that the whole figure fits on screen. The floor (`--ground`) runs the
 full width of the panel, and props have an edge of their own (`--prop`), both
 at 3:1 or more against the panel. `pose/render.js` crops the preview the same
 way (`boxOf`), and `pose/checks/render.js` fails if the two differ.
@@ -1175,7 +1209,8 @@ body. The second panel's arms carry the same cut line.
 **Motion guides**:
 Each panel also carries a coach's marks (`rGuideOf`, worked out once per rig):
 a ghost of the other end of the rep (the start or the still, whichever the
-figure is further from) in `--fig-ghost` under the figure, then over it a
+figure is further from) in `--fig-ghost` under the figure, then over it, in
+`--accent`, a
 dashed path of the bar (the implement in the hand, else the shoulders for an
 arm drill or a hang, else the hip; left out when it moves under 6 units) and
 a small arrow on it pointing the way the point goes next (looking on past a
@@ -1198,7 +1233,8 @@ without its third argument): the guides left empty, no ghost built.
 app does. `pose/checks/render.js` fails unless the preview and the app draw the
 same shapes, in the same order, at the same places, for every rig. Change
 both copies together, as with the solver. It used to be a second renderer of
-its own, which drifted from the app's.
+its own, which drifted from the app's. A paused preview shows the motion
+guides, and Show guides keeps them on while it plays.
 
 **Live figure**:
 The slide's figure plays the rep at the rig's own length, a frame every 50 ms
@@ -1233,7 +1269,7 @@ is being authored.
 
 `npm test` runs both halves: `test:pose` for the rig, then `test:app`, which
 builds the document (`build-publish.js`) and runs every suite over it. It
-takes about 35 minutes, so run it in the background and read its log. Browser
+takes about 40 minutes, so run it in the background and read its log. Browser
 suites launch Chromium through `test-env.js` (`launch()`, `PUBLISH`;
 `FC_CHROMIUM` and `FC_PUBLISH` override) and stub the artifact capability
 faithfully: a publish saves AND reloads, and a db stub survives the reload
@@ -1248,15 +1284,38 @@ checks once passed whatever the app did.
 `test:pose`:
 
 - `pose/build.js`, then `emit-rig.js --check`: the app's rig matches `pose/`.
-- `pose/checks/`: movement criteria (`analyse.js`), adversarial geometry,
-  continuous motion (including the time warp: every keyframe that is not a
-  stop passed at speed, no lurch through one, equal keyframes held still, and
-  no joint whipping more than 6 units in 1/144 of a rep, with the rigs that
-  already do listed in `WHIPS`; the frame period; every view resting
-  somewhere; the core lifts resting at the top and bottom only; the reviewed
-  stops table; a jump's still not in the air; the bell rule, in both copies,
-  and the feet drawn alike), views (including the near side and the load),
-  and rendering. `adversarial.js` holds the footing check, `analyse.js` the walking one.
+- `pose/checks/analyse.js`: movement criteria, per exercise as a coach would
+  judge it (the deadlift plate on the floor, the rower driving away from the
+  footplate, a fly's one soft elbow, both panels' hands at one height), and
+  across rigs: prone (`PRONE`), standing (`STANDING`), walking (`GAIT`,
+  `PIVOT`) and stretch holds. A check written for the old wrong shape is
+  rewritten on purpose, never loosened to pass.
+- `pose/checks/adversarial.js`: geometry the rig must never produce: footing
+  (`FOOTING`), a jump's contact and flight keyframes, and runs and jacks
+  touching down in each half of the cycle.
+- `pose/checks/continuous.js`: continuous motion. The app's solver against
+  `rig.js` at 400 moments of every rig and the edge cases; no joint jumping
+  between samples 1/2000 of a rep apart; the bend range (`BENDS`, `FOLDS`,
+  `ACROSS`); no elbow folding between keyframes (`FOLDING`, polar hands, a
+  shortened arm keeping its bend); the time warp (every keyframe that is not a
+  stop passed at speed, no lurch through one, equal keyframes held still, the
+  authored eases exactly the curves they name, and no joint whipping more than
+  6 units in 1/144 of a rep, with the rigs that already do listed in `WHIPS`);
+  the frame period; every view resting somewhere; the core lifts resting at
+  the top and bottom only; the reviewed stops table (`stops.json`); a jump's
+  still not in the air; the bell rule, in both copies, and the feet drawn
+  alike.
+- `pose/checks/views.js`: second panels: the bench and the jab, which way a
+  dumbbell faces, a fixed bar staying fixed, reach over the whole rep, a key
+  written twice in `FRONTS`, the near side (`HANDED`), the load, and
+  foreshortened legs (`kneeOut`).
+- `pose/checks/render.js`: the preview in a DOM: every figure has geometry,
+  the head drawn under the near arm, a bowed spine drawn bent, and the preview
+  drawing and cropping (`boxOf`) exactly as the app does.
+
+A list named above holds rigs that break a check today and are being
+re-authored: they print as warnings, any other rig breaking it fails, and a
+listed rig that comes right says so, so the list only shrinks.
 
 `test:app`, in the order it runs:
 
@@ -1282,16 +1341,26 @@ checks once passed whatever the app did.
   substance, past 400 days), the estimated 1RM and rep PB, recent workouts and
   the week target, water XP for old days, form cues.
 - `test-rigloop.js`: the live figure's loop on a fake clock: frames at the
-  rig's own pace, asleep between them, every frame drawn in order, slow motion
-  while resting with no jump at either end of the rest, one loop after a
-  render and nothing left behind when stopped, the pause off screen, the still
-  on a stop, and a tapped rep at full speed.
+  rig's own pace (a sprint fast, a hold slow), asleep between them, every
+  frame drawn in order, a cut fading round its swap, slow motion while resting
+  (a third of the speed, every frame drawn) with no jump at either end of the
+  rest, one loop after a render and nothing left behind when stopped, the
+  pause off screen, the still on a stop, a tapped rep at full speed, a tap
+  pausing a moving figure, and the guides shown only while it stands still.
 - `test-rigdraw.js`: how the figure is drawn: what lies in front of what
   (the near arm over the head, with its cut line; the implement in the near
   hand, and in the second panel in the loaded hand of a one-handed lift; the second panel's arms, raised knees and a stick behind the back; a pinched plate hanging from the fist by its rim, over the arm),
   every rig inside its panel at 96 moments of the rep, both panels at one
   top and height, the tablet cap, the floor across the panel, and `--ground`
-  and `--prop` at 3:1 or more against the panel in both themes.
+  and `--prop` at 3:1 or more against the panel in both themes. The figure's
+  shapes: a face turned the way the figure faces, a neck, tapered limbs, a
+  shaped trunk, the far and working limbs' shades, shoes, the shadow and the
+  mat. The motion guides: a ghost, a path and an arrow in every rig, both
+  panels and every frame, the ghost the other end of the rep and solid where
+  its parts overlap, a squat's bar path straight with the arrow the way it
+  goes next, a path drawn once where the rep comes back along it, a bare frame
+  with the guides empty, and the guides hidden unless shown. And a rep
+  redrawing the figure in place.
 - `test-roundtrip.js`: state survives `dbDocs`/`dbApply` with every key.
 - `test-app.js`: the real save cycle, backfill dates (a tap moves only that
   day), session dating, a new day opening on Today, and Today's in-progress
@@ -1303,7 +1372,8 @@ checks once passed whatever the app did.
   storage, a shopping item, which session an undo belongs to, the
   announcement, and the toast staying clear of the page.
 - `test-session.js`: prep steps, per-implement weights, sauna stints and their
-  minutes, exercise search and picker previews, supersets, logging on one slide
+  minutes, exercise search and picker previews (each figure in its own
+  cropped box), supersets, logging on one slide
   (interval picks, a double tap, backfills), the warm-up's ramp and rounds,
   Recent sessions newest first, and the water target's -/+.
 - `test-meals.js`: recipe portions and the shopping list in the browser.
@@ -1313,7 +1383,8 @@ checks once passed whatever the app did.
   storage and without.
 - `test-db.js`: seeding (in the background, one view at a time, a lease run
   out, a store with no leases, a seed cut off), small saves, reload survival,
-  merge between views,
+  merge between views, the live figure keeping its place in the rep across a
+  render at its own frame rate,
   save serialization and retry, every store state and how a failed save shows,
   imports in the browser: the backup, Put back and an unfinished import; the
   store's per-document limits, which the stub keeps, and the forms and imports
@@ -1352,8 +1423,10 @@ checks once passed whatever the app did.
   not do.
 - `test-slideview.js`: the session slide view: a new slide (Next, Prev, Skip,
   a swipe, Resume) opens at its top while a tap within it leaves the page
-  where it is, the live figure's main-thread cost, its slower rate while
-  resting, and the still under reduced motion.
+  where it is, a landscape phone opening a slide with its name in view, the
+  live figure's main-thread cost, drawing in place, a tap pausing it with its
+  guides shown, its slower rate while resting, and the still under reduced
+  motion with its guides and a tapped rep.
 - `test-a11y.js`: what a screen reader and a keyboard meet, read from the
   accessibility tree at phone width: an idle saving pill that says nothing,
   every control named for what it acts on (sauna boxes, history-row removes,
