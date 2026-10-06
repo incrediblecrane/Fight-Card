@@ -1164,7 +1164,7 @@ srv.listen(0,async function(){
   // movement is purely sagittal, so a front view projects the arms to nothing;
   // it ships with the start and finish of the side view instead.
   var NEW_EX=[{id:'raise_front', name:'Front dumbbell raise', find:'front raise', pair:true, front:false},
-              {id:'raise_lateral', name:'Side lateral raise', find:'lateral', pair:true, front:true},
+              {id:'raise_lateral', name:'Side lateral raise', find:'lateral', pair:true, front:true, frontW:128},
               {id:'pulldown_straight', name:'Standing lat pulldown', find:'standing lat', pair:false, front:true, props:true},
               {id:'curl_reverse', name:'Reverse barbell curl', find:'reverse curl', pair:false, front:true}];
 
@@ -1196,7 +1196,10 @@ srv.listen(0,async function(){
       // The generic fallback's box is -20 -20 180 200, so a box that ends at 186
       // is the rig's own.
       var vb=(got.boxes[0]||'').split(' ').map(Number), fits=vb.length===4&&vb[1]+vb[3]===186;
-      assert.ok(fits&&(E.front?got.boxes[1]==='20 '+vb[1]+' 100 '+vb[3]:got.boxes[1]===got.boxes[0]),
+      // A second panel is 100 wide, centred on x 70, or the rig's frontW (arms
+      // held out to the sides: the lateral raise is 128).
+      var fw=E.frontW||100;
+      assert.ok(fits&&(E.front?got.boxes[1]===(70-fw/2)+' '+vb[1]+' '+fw+' '+vb[3]:got.boxes[1]===got.boxes[0]),
         'the second panel is not the view it should be, its viewBox is '+got.boxes[1]);
       assert.ok(got.shapes>6,'only '+got.shapes+' limb shapes: this is not a solved figure');
       assert.strictEqual(got.arrow, E.front?'':'\u2192',

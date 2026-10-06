@@ -665,11 +665,16 @@ EX.forEach(function(ex){
       S[T].handN.x<S[0].handN.x-30,'travel '+r(S[0].handN.x-S[T].handN.x));
     check(ex.id,'they finish behind the shoulder', S[T].handN.x<S[T].sh.x,
       'hand '+r(S[T].handN.x)+' shoulder '+r(S[T].sh.x));
+    // The drawn reach shrinks as the arm turns end-on to the side view, so
+    // the bend is the reach over the arm's drawn length (armScaleN). A raw
+    // reach check forbade the true finish, a T seen end-on.
+    function bendOf(x){ return Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y)/((L.UPPER+L.FORE)*x.armScaleN); }
     check(ex.id,'the elbow angle barely changes: it is a fly, not a row',
-      Math.abs(Math.hypot(S[0].handN.x-S[0].sh.x,S[0].handN.y-S[0].sh.y)
-              -Math.hypot(S[T].handN.x-S[T].sh.x,S[T].handN.y-S[T].sh.y))<16,
-      'reach '+r(Math.hypot(S[0].handN.x-S[0].sh.x,S[0].handN.y-S[0].sh.y))+
-      ' -> '+r(Math.hypot(S[T].handN.x-S[T].sh.x,S[T].handN.y-S[T].sh.y)));
+      Math.abs(bendOf(S[0])-bendOf(S[T]))<0.08,'reach over arm '+r(bendOf(S[0]))+' -> '+r(bendOf(S[T])));
+    // Horizontal abduction ends in a T. The old finish put the hands behind
+    // the hips, a kickback.
+    check(ex.id,'the hands finish level with the shoulders, not down by the hips',
+      Math.abs(S[T].handN.y-S[T].sh.y)<10,'hand y '+r(S[T].handN.y)+' shoulder y '+r(S[T].sh.y));
     var F=ex.front||[];
     check(ex.id,'the hands cross in front at the start', F.length>2 && F[0].handL[0]>F[0].handR[0],
       F.length?('L '+F[0].handL[0]+' R '+F[0].handR[0]):'no front view');
@@ -693,6 +698,38 @@ EX.forEach(function(ex){
       'travel '+r(S[T].handN.y-S[0].handN.y));
     check(ex.id,'the feet stay planted', ex.frames.every(function(f){
       return f.ankN[0]===ex.frames[0].ankN[0] && f.ankN[1]===ex.frames[0].ankN[1]; }),'a foot moved');
+  }
+  if(ex.id==='skierg'){
+    var skK=angAt(S[T].hip,S[T].kneeN,S[T].ankN);
+    check(ex.id,'it is a hinge, not a squat: the knees only soften at the finish', skK>125,'finish knee '+r(skK));
+  }
+  // The arm-sweep lifts and the ergs: both panels draw the same hands, so
+  // they are at the same height all through the rep, not only at keyframes.
+  // The flys had the hands at the navel from the side and at the shoulders
+  // from the front, 17 to 19 apart.
+  if(['fly_cable','fly_cable_high','fly_cable_rev','raise_lateral','pulldown_straight','battleropes','rowerg','skierg'].indexOf(ex.id)>=0){
+    var worstY=0, wyAt=0;
+    for(var vi=0;vi<96;vi++){ var sv=solve(rig.poseAt(ex,vi/96)), fv=rig.solveFront(rig.frontAt(ex,vi/96));
+      var ya=[sv.handN.y,sv.handF.y].sort(function(p,q){return p-q;}), yb=[fv.handL.y,fv.handR.y].sort(function(p,q){return p-q;});
+      var gy=Math.max(Math.abs(ya[0]-yb[0]),Math.abs(ya[1]-yb[1])); if(gy>worstY){ worstY=gy; wyAt=vi/96; } }
+    check(ex.id,'the side and front views show the hands at the same height (within 4)', worstY<=4,'they disagree by '+r(worstY)+' at u='+r(wyAt*100)/100);
+  }
+  if(ex.id==='raise_lateral'){
+    var top=rig.solveFront(ex.front[TF]);
+    check(ex.id,'the elbows stay level with or above the wrists at the top', top.elbL.y<=top.handL.y+2,
+      'elbow '+r(top.elbL.y)+' wrist '+r(top.handL.y));
+  }
+  // The fixed-elbow arcs: the reach from shoulder to hand holds through the
+  // whole rep, not just at the keyframes. Hands blended in straight lines
+  // between keyframes bent the elbow to 108 half way up a front raise.
+  if(ex.id==='raise_front'||ex.id==='pulldown_straight'){
+    var rr=[]; for(var qi=0;qi<60;qi++){ var q=solve(rig.poseAt(ex,qi/60)); rr.push(Math.hypot(q.handN.x-q.sh.x,q.handN.y-q.sh.y)); }
+    check(ex.id,'the elbow holds one angle through the whole rep',
+      Math.max.apply(null,rr)-Math.min.apply(null,rr)<2,'reach ranges '+r(Math.min.apply(null,rr))+' to '+r(Math.max.apply(null,rr)));
+  }
+  if(ex.id==='bagspeed'){
+    var ext=Math.max.apply(null,S.map(function(x){return Math.max(Math.hypot(x.handN.x-x.sh.x,x.handN.y-x.sh.y),Math.hypot(x.handF.x-x.shF.x,x.handF.y-x.shF.y));}));
+    check(ex.id,'a straight punch lands with the arm nearly straight', ext>37,'longest reach '+r(ext)+' of '+(L.UPPER+L.FORE));
   }
   if(ex.id==='situpwallthrow'){
     // The two halves that make it this exercise and not a crunch: the trunk
@@ -918,20 +955,50 @@ EX.forEach(function(ex){
   if(ex.id==='battleropes'){
     check(ex.id,'it holds a braced quarter-squat', ex.frames.every(function(f){return f.torso>15 && f.torso<45;}),
       'torso '+ex.frames[0].torso);
+    var bk=angAt(S[0].hip,S[0].kneeN,S[0].ankN);
+    check(ex.id,'a quarter squat, not a half squat', bk>110 && bk<150,'knee '+r(bk));
     check(ex.id,'the hips stay put while the arms work',
       S.every(function(x){return x.hip.y===S[0].hip.y;}),'the hips moved');
-    check(ex.id,'the arms alternate up and down', (S[0].handN.y<S[0].handF.y)!==(S[T].handN.y<S[T].handF.y),
-      'the waves did not alternate');
+    // Each keyframe is a top or a bottom of the wave, so a hand never stalls
+    // half way. The old keys put both hands level at every other keyframe.
+    check(ex.id,'the arms alternate up and down at every keyframe', S.every(function(x,i){
+      var y=S[(i+1)%S.length]; return (x.handN.y<x.handF.y)!==(y.handN.y<y.handF.y); }),'the waves did not alternate');
+    var BF=ex.front||[];
+    check(ex.id,'the front view alternates too', BF.length>1 && BF.every(function(f,i){
+      var g=BF[(i+1)%BF.length]; return (f.handL[1]<f.handR[1])!==(g.handL[1]<g.handR[1]); }),
+      'both hands move together in the front view');
   }
   if(ex.id==='rowerg'){
     check(ex.id,'the feet stay on the footplate', S.every(function(x){return x.ankN.y===S[0].ankN.y;}),'a foot moved');
-    check(ex.id,'the seat travels: the hips move back down the rail', S[T].hip.x-S[0].hip.x>16,
-      'hip '+r(S[0].hip.x)+' -> '+r(S[T].hip.x));
-    check(ex.id,'legs drive before the arms pull: at mid-drive the handle has barely moved',
-      Math.abs(S[1].handN.x-S[0].handN.x)<12 && S[1].hip.x>S[0].hip.x+6,
-      'handle moved '+r(Math.abs(S[1].handN.x-S[0].handN.x))+' while the seat moved '+r(S[1].hip.x-S[0].hip.x));
+    // The seat runs AWAY from the footplate on the drive. It used to travel
+    // toward it, so the knees folded shut at the finish: a stroke run
+    // backwards. (These replace the old "hips move back down the rail" and
+    // "handle has barely moved at mid-drive" checks, which read x the wrong
+    // way round and passed that backwards stroke.)
+    var foot=S[0].ankN.x; function gap(x){ return Math.abs(foot-x.hip.x); }
+    function knee(x){ return angAt(x.hip,x.kneeN,x.ankN); }
+    check(ex.id,'the seat travels away from the footplate on the drive', gap(S[T])-gap(S[0])>30,
+      'hip to foot '+r(gap(S[0]))+' at the catch, '+r(gap(S[T]))+' at the finish');
+    check(ex.id,'the legs finish flat, not folded', knee(S[T])>160,'finish knee '+r(knee(S[T])));
+    check(ex.id,'the shins are near vertical at the catch', Math.abs(S[0].kneeN.x-S[0].ankN.x)<6 && knee(S[0])<60,
+      'knee x '+r(S[0].kneeN.x)+' ankle x '+r(S[0].ankN.x)+', knee '+r(knee(S[0])));
+    // Legs, then body, then arms (Concept2): the trunk holds its angle and
+    // the arms stay long while the legs push nearly flat.
+    check(ex.id,'legs first: the body angle holds and the arms stay long through the leg drive',
+      Math.abs(ex.frames[1].torso-ex.frames[0].torso)<4 && knee(S[1])>145 &&
+      Math.hypot(S[1].handN.x-S[1].sh.x,S[1].handN.y-S[1].sh.y)>37,
+      'torso '+ex.frames[0].torso+' -> '+ex.frames[1].torso+', knee '+r(knee(S[1]))+', reach '+r(Math.hypot(S[1].handN.x-S[1].sh.x,S[1].handN.y-S[1].sh.y)));
+    check(ex.id,'the body swings past vertical at the finish', ex.frames[T].torso>300,'finish torso '+ex.frames[T].torso);
     check(ex.id,'the finish pulls the handle in to the body', S[T].handN.x<S[1].handN.x-16,
       'mid '+r(S[1].handN.x)+' finish '+r(S[T].handN.x));
+    var hy=[]; for(var ri=0;ri<60;ri++) hy.push(solve(rig.poseAt(ex,ri/60)).handN.y);
+    check(ex.id,'the handle travels level', Math.max.apply(null,hy)-Math.min.apply(null,hy)<3,
+      'handle height ranges '+r(Math.max.apply(null,hy)-Math.min.apply(null,hy)));
+    var last=S[S.length-1];
+    check(ex.id,'recovery: the hands clear the knees before the knees bend', last.handN.x>last.kneeN.x+10 && knee(last)>160,
+      'hand '+r(last.handN.x)+' knee '+r(last.kneeN.x)+', knee '+r(knee(last)));
+    var rt=ex.tempo, drive=ex.tempo.slice(0,T).reduce(function(a,b){return a+b;},0)/rt.reduce(function(a,b){return a+b;},0);
+    check(ex.id,'the recovery takes about twice as long as the drive', drive>0.28 && drive<0.4,'drive share '+r(drive*100)+'%');
   }
   if(ex.id==='fly_cable'||ex.id==='fly_cable_high'){
     check(ex.id,'the hands sweep together across the body', ex.front &&
@@ -1120,7 +1187,8 @@ var STANDING={backsquat:'top', frontsquat:'top', goblet:'top', rdl:'top', deadli
   facepull:'all', triceps_ext:'all', kb_press:'all', platepinch:'top', kb_clean:[1,2,3,4,5,6], kb_snatch:[1,2,3,4,5],
   splitsq_bulg:'none', farmerscarry:'none', suitcasecarry:'none', kb_bottomsup:'none',
   curl_reverse:'all', burpee:[0], jabcross:'none', lunge_walk:'none',
-  palloffpress:'all', shoulderdisloc:'all', kb_tgu:[8], jumpingjack:[0], woodchopper:'none', sprint:'none', highknees:'none', briskwalkjog:'none', boxjump:'none'};
+  palloffpress:'all', shoulderdisloc:'all', kb_tgu:[8], jumpingjack:[0], woodchopper:'none', sprint:'none',
+  raise_front:'all', raise_lateral:'all', skierg:[0], fly_cable:'none', fly_cable_high:'none', fly_cable_rev:'none', highknees:'none', briskwalkjog:'none', boxjump:'none'};
 (function standingTall(){
   EX.forEach(function(ex){
     var how=STANDING[ex.id], T=rig.turn(ex), bad=[];

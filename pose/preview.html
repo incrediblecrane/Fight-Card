@@ -1518,40 +1518,54 @@ var EXERCISES = [
     {hip:[61,111],torso:20,ankN:[70,163],ankF:[46,159], armN:[168,20],armF:[88,86]}
   ]},
 
-{ id:"bagspeed", tempo:[180,180,180,180], name:"Heavy-bag speed combo",
+{ id:"bagspeed", tempo:[220,260,220,260,240,300,900], name:"Heavy-bag speed combo",
   real:"Short bursts of fast, light shots on the bag. It is about hand speed and staying relaxed, not power: the moment you start loading up you slow down. Guard comes straight back between every shot.",
   changed:"It now throws rapid alternating shots at a bag in front, with the guard recovering between them, instead of sharing the static GUARD pose.",
-  equip:null, active:"arms", props:[[90,50,22,76]],
+  equip:null, active:"arms", props:[[97,50,22,76]],
   frames:[
-    {hip:[55,112],torso:0,ankN:[70,163],ankF:[40,163], handN:[86,78],handF:[52,76], elbowSign:1},
-    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[62,74],handF:[50,76], elbowSign:1},
-    {hip:[55,112],torso:6,ankN:[70,163],ankF:[40,163], handN:[62,74],handF:[86,82], elbowSign:1},
-    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[62,74],handF:[50,76], elbowSign:1}
+    // Guard, jab to the bag and back, twice, then a cross and the reset: a
+    // burst of fast shots that land with the arm long, not slow pushes.
+    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[70,70],handF:[62,71], elbowSign:1},
+    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[95,79],handF:[62,71], elbowSign:1},
+    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[70,70],handF:[62,71], elbowSign:1},
+    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[95,79],handF:[62,71], elbowSign:1},
+    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[70,70],handF:[62,71], elbowSign:1},
+    {hip:[55,112],torso:11,ankN:[70,163],ankF:[40,163], handN:[75,70],handF:[95,80], elbowSign:1},
+    {hip:[55,112],torso:2,ankN:[70,163],ankF:[40,163], handN:[70,70],handF:[62,71], elbowSign:1}
   ]},
 
-{ id:"battleropes", tempo:[200,200,200,200], name:"Battle ropes",
+{ id:"battleropes", tempo:[400,400,400,400,400,400], name:"Battle ropes",
   real:"Athletic stance, hips back, knees soft, and drive alternating waves down the ropes from the shoulders. The legs and trunk brace while the arms work. If you stand up tall it becomes an arm exercise and you last about twenty seconds.",
   changed:"It now holds a braced quarter-squat while the arms alternate up and down, which is what makes the waves. It used to share the ROW pose, which pulled both arms back together.",
   equip:null, active:"arms",
   frames:[
-    {hip:[50,124],torso:26,ankN:[64,163],ankF:[46,163], handN:[78,104],handF:[70,130], elbowSign:1},
-    {hip:[50,124],torso:26,ankN:[64,163],ankF:[46,163], handN:[78,118],handF:[72,118], elbowSign:1},
-    {hip:[50,124],torso:26,ankN:[64,163],ankF:[46,163], handN:[78,130],handF:[70,104], elbowSign:1},
-    {hip:[50,124],torso:26,ankN:[64,163],ankF:[46,163], handN:[78,118],handF:[72,118], elbowSign:1}
+    // Three waves a rep, each keyframe a top or a bottom, so the hands never
+    // stall half way; a quarter squat (knee about 120), not a half squat.
+    {hip:[49,115],torso:24,ankN:[64,163],ankF:[46,163], handN:[88,92],handF:[76,117], elbowSign:1},
+    {hip:[49,115],torso:24,ankN:[64,163],ankF:[46,163], handN:[82,116],handF:[83,94], elbowSign:1},
+    {hip:[49,115],torso:24,ankN:[64,163],ankF:[46,163], handN:[88,92],handF:[76,117], elbowSign:1},
+    {hip:[49,115],torso:24,ankN:[64,163],ankF:[46,163], handN:[82,116],handF:[83,94], elbowSign:1},
+    {hip:[49,115],torso:24,ankN:[64,163],ankF:[46,163], handN:[88,92],handF:[76,117], elbowSign:1},
+    {hip:[49,115],torso:24,ankN:[64,163],ankF:[46,163], handN:[82,116],handF:[83,94], elbowSign:1}
   ]},
 
-{ id:"rowerg", tempo:[300,300,420,420], name:"Rowing machine",
+{ id:"rowerg", tempo:[340,460,400,480,720], stops:[0,2], frontStops:[0,1,2,3,4], name:"Rowing machine",
   real:"Legs, then body, then arms on the drive; arms, then body, then legs on the recovery. That order is the whole technique. Most of the power is the legs; pulling with the arms first is the classic mistake and caps your split immediately.",
   changed:"It now runs the real catch-to-finish sequence on a seated erg with the legs driving before the arms, rather than sharing the standing bent-row pose.",
-  equip:"fixedbar", active:"legs", props:[[16,148,62,6],[80,132,8,26]],
+  equip:"fixedbar", active:"legs", props:[[4,148,76,6],[80,132,8,26]],
   frames:[
-    {hip:[40,138],torso:26,ankN:[74,140],ankF:[68,142], handN:[76,120],handF:[70,122], kneeSign:-1, elbowSign:1},
-    {hip:[52,138],torso:12,ankN:[74,140],ankF:[68,142], handN:[80,124],handF:[74,126], kneeSign:-1, elbowSign:1},
-    {hip:[62,138],torso:348,ankN:[74,140],ankF:[68,142], handN:[56,126],handF:[50,128], kneeSign:-1, elbowSign:1},
-    {hip:[52,138],torso:8, ankN:[74,140],ankF:[68,142], handN:[76,124],handF:[70,126], kneeSign:-1, elbowSign:1}
+    // Catch, legs nearly flat (the trunk and arms still as at the catch),
+    // finish (body past vertical, handle to the ribs), arms away, body over:
+    // the seat runs away from the footplate on the drive, and the recovery
+    // takes about twice as long.
+    {hip:[54,138],torso:24,ankN:[74,144],ankF:[68,146], handN:[104.5,121],handF:[98.5,123], kneeSign:-1, elbowSign:1},
+    {hip:[18,138],torso:24,ankN:[74,144],ankF:[68,146], handN:[68.5,121],handF:[62.5,123], kneeSign:-1, elbowSign:1},
+    {hip:[16.5,138],torso:340,ankN:[74,144],ankF:[68,146], handN:[20,121],handF:[14,123], kneeSign:-1, elbowSign:1},
+    {hip:[16.5,138],torso:340,ankN:[74,144],ankF:[68,146], handN:[41.2,121],handF:[35.2,123], kneeSign:-1, elbowSign:1},
+    {hip:[16.5,138],torso:24,ankN:[74,144],ankF:[68,146], handN:[67,121],handF:[61,123], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"skierg", tempo:[280,300,420,420], name:"Ski erg",
+{ id:"skierg", tempo:[170,410,460,380], stops:[0,2], name:"Ski erg",
   real:"Stand tall with the handles high, hinge at the hips and drive them down past your hips, finishing with the arms straight and the torso folded. It is a hip hinge with a lat pull on the end, not an arm exercise: if your torso stays upright you are pulling with your arms and you will gas out in a minute.",
   changed:"New. The rower had its own exercise and the ski erg did not, so it could only be logged as a machine inside a generic cardio step and could not be put in a superset at all. The trunk hinges through the pull rather than staying upright, which is the whole movement.",
   // Two handles on cords, not a bar: a rigid bar between the hands would be a
@@ -1561,81 +1575,86 @@ var EXERCISES = [
   equip:"cable", active:"arms", anchorAt:[84,32], anchorFront:[58,26,82,26],
   props:[[94,26,8,144],[74,26,28,7]],
   frames:[
-    {hip:[50,109],torso:6, ankN:[62,163],ankF:[53,163], handN:[78,46], handF:[72,48], kneeSign:-1, elbowSign:1},
-    {hip:[48,112],torso:26,ankN:[62,163],ankF:[53,163], handN:[82,92], handF:[76,94], kneeSign:-1, elbowSign:1},
-    {hip:[44,122],torso:48,ankN:[62,163],ankF:[53,163], handN:[58,134],handF:[52,136], kneeSign:-1, elbowSign:1},
-    {hip:[48,113],torso:22,ankN:[62,163],ankF:[53,163], handN:[80,62], handF:[74,64], kneeSign:-1, elbowSign:1}
+    // Tall, hinge as the hands come down, finish folded with the knees only
+    // soft (a squat is the fault), and back up: the recovery keyframe sits
+    // half way up so the hands rise at one even pace.
+    {hip:[57,105.5],torso:4, ankN:[59,163],ankF:[53,163], handN:[82,46], handF:[77,46], kneeSign:-1, elbowSign:1},
+    {hip:[48,109],torso:30,ankN:[59,163],ankF:[53,163], handN:[90,72], handF:[85,72], kneeSign:-1, elbowSign:1},
+    {hip:[43,112],torso:50,ankN:[59,163],ankF:[53,163], handN:[58,128],handF:[53,128], kneeSign:-1, elbowSign:1},
+    {hip:[47,110],torso:26,ankN:[59,163],ankF:[53,163], handN:[80,86], handF:[75,86], kneeSign:-1, elbowSign:1}
   ]},
 
-{ id:"fly_cable", tempo:[420,420,520,520], name:"Cable fly",
+{ id:"fly_cable", tempo:[480,480,720,720], frontW:128, stops:[0,2], name:"Cable fly",
   real:"Handles from pulleys at about chest height, one foot forward for balance, a slight forward lean. Elbows stay softly bent at a fixed angle and the hands sweep out wide then back together in front of the chest. The angle at the elbow does not change: the moment it opens and closes you are pressing, not flying.",
   changed:"New rig. The front view carries it, because the hands sweep across the body and a side view sees that arc almost end-on. From the side the arm is genuinely foreshortened at the stretch, which is why the hand sits close to the shoulder there rather than far behind it. The side arm is genuinely foreshortened, and armScaleN now draws that as a shorter arm rather than a folded one, so the elbow holds the one soft bend these lifts ask for instead of going from nearly straight to badly folded inside a rep.",
-  equip:"cable", active:"arms", anchorAt:[8,84], anchorFront:[18,80,122,80],
-  frames:[
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[36,95],handF:[32,97], armScaleN:0.85,armScaleF:0.86, elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], armScaleN:0.64,armScaleF:0.7, elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[90,95],handF:[86,97], armScaleN:0.98,armScaleF:1, elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[66,97],handF:[62,99], armScaleN:0.64,armScaleF:0.7, elbowSign:1}
-  ]},
+  equip:"cable", active:"arms", anchorAt:[8,84], anchorFront:[8,86,132,86],
+  // From 10 degrees behind the shoulders to meeting at the sternum, 22
+  // degrees below level (flySweep).
+  frames:flySweep(false,[-10,48.5,107],22)},
 
-{ id:"fly_cable_high", tempo:[420,420,520,520], name:"High cable fly",
+{ id:"fly_cable_high", tempo:[480,480,720,720], frontW:128, stops:[0,2], name:"High cable fly",
   real:"Same movement from pulleys set high, so the hands travel down and in and meet low, around the belly button. Coming from above puts the line of pull across the lower chest rather than the mid chest, which is the only reason to do both. Same fixed soft elbow throughout.",
   changed:"New rig, and it is deliberately NOT the mid-height fly with a different label: the hands start high and finish low, so the arc runs downward across the body. That difference is the whole point of having the two, and it is visible in both views. The side arm is genuinely foreshortened, and armScaleN now draws that as a shorter arm rather than a folded one, so the elbow holds the one soft bend these lifts ask for instead of going from nearly straight to badly folded inside a rep.",
   equip:"cable", active:"arms", anchorAt:[8,38], anchorFront:[20,36,120,36],
   frames:[
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[44,50],handF:[40,52], armScaleN:0.76,armScaleF:0.7, elbowSign:1},
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], armScaleN:0.75,armScaleF:0.75, elbowSign:1},
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[80,100],handF:[76,102], armScaleN:0.86,armScaleF:0.92, elbowSign:1},
-    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[86,60],handF:[82,62], armScaleN:0.75,armScaleF:0.75, elbowSign:1}
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[62.1,52.8],handF:[57.1,52.8], armScaleN:0.53,armScaleF:0.53, elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[92,76.2],handF:[87,76.2], armScaleN:0.8,armScaleF:0.8, elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[89.9,98.6],handF:[84.9,98.6], armScaleN:0.98,armScaleF:0.98, elbowSign:1},
+    {hip:[55,107],torso:10,ankN:[64,163],ankF:[46,163], handN:[92,76.2],handF:[87,76.2], armScaleN:0.8,armScaleF:0.8, elbowSign:1}
   ]},
 
-{ id:"fly_cable_rev", tempo:[420,420,520,520], name:"Reverse cable fly",
+{ id:"fly_cable_rev", tempo:[480,480,720,720], frontW:128, stops:[0,2], name:"Reverse cable fly",
   real:"Pulleys at about chest height, standing between them, each hand holding the OPPOSITE side\'s handle so the cables cross in front of you. Arms almost straight with a soft fixed elbow, sweep the hands apart and back until the shoulder blades pinch, then let them come back together under control. It is the mirror of a cable fly: that one closes the arms in front, this one opens them behind.",
   changed:"New. It is the opposite direction of travel to the two chest flys, and the front view carries it: the cords cross in front at the start and the hands finish wide. From the side the arms are almost end-on, which is why the hand sits close to the shoulder at the finish rather than far behind it. The side arm is genuinely foreshortened, and armScaleN now draws that as a shorter arm rather than a folded one, so the elbow holds the one soft bend these lifts ask for instead of going from nearly straight to badly folded inside a rep.",
-  equip:"cable", active:"arms", anchorAt:[124,84], anchorFront:[122,80,18,80],
-  frames:[
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[94,88],handF:[90,90], armScaleN:0.98,armScaleF:1, elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], armScaleN:0.73,armScaleF:0.78, elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[50,96],handF:[46,98], armScaleN:0.65,armScaleF:0.69, elbowSign:1},
-    {hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163], handN:[80,92],handF:[76,94], armScaleN:0.73,armScaleF:0.78, elbowSign:1}
-  ]},
+  equip:"cable", active:"arms", anchorAt:[124,84], anchorFront:[130,64,10,64],
+  // The cable fly's arc run backwards from crossed hands in front to a T at
+  // shoulder height (flySweep). The finish used to be the hands behind the
+  // hips, a kickback.
+  frames:flySweep(false,[118,45,-10],7)},
 
-{ id:"raise_front", tempo:[420,420,520,520], name:"Front dumbbell raise",
+{ id:"raise_front", tempo:[480,480,720,720], stops:[0,2], name:"Front dumbbell raise",
   real:"Dumbbells at the thighs, palms down. Raise them straight out in front to shoulder height and lower under control. Arms stay long: this is the front of the shoulder lifting the weight, not the whole body swinging it up. If your lower back is moving you are using momentum.",
   changed:"New. The arm stays long through the whole lift and the hand travels forward and up to shoulder height, so it reads as a raise rather than a curl or a press. Palms down means the handle runs across the body, so the side view sees the bell face.\n\nThe only exercise here with NO front view, on purpose. The movement is purely sagittal: from the front the arms point straight at you and project to nothing, so at the top the hands land on the shoulders. Derived, that drew two full-length arms knotted up behind a pair of dumbbells; authored with armScale, it drew two dumbbells sitting on the shoulders, which reads as the start of a press. Neither is the exercise, and a wrong picture gets copied literally, so the second panel is the finish position of the side view instead.",
   equip:"dumbbell", axis:"lateral", active:"arms",
   frames:[
-    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[64,110],handF:[58,109], elbowSign:1},
-    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,95], handF:[76,94],  elbowSign:1},
-    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[95,74], handF:[89,73],  elbowSign:1},
-    {hip:[55,107],torso:4,ankN:[62,163],ankF:[53,163], handN:[82,95], handF:[76,94],  elbowSign:1}
+    // Joint angles, so the arm swings round the shoulder at one soft bend.
+    {hip:[56,105.5],torso:4,ankN:[57,163],ankF:[53,163], armN:[172,160], elbowSign:1},
+    {hip:[56,105.5],torso:4,ankN:[57,163],ankF:[53,163], armN:[130,118], elbowSign:1},
+    {hip:[56,105.5],torso:4,ankN:[57,163],ankF:[53,163], armN:[88,76],   elbowSign:1},
+    {hip:[56,105.5],torso:4,ankN:[57,163],ankF:[53,163], armN:[130,118], elbowSign:1}
   ]},
 
-{ id:"raise_lateral", tempo:[420,420,520,520], name:"Side lateral raise",
+{ id:"raise_lateral", tempo:[480,480,720,720], frontW:128, stops:[0,2], name:"Side lateral raise",
   real:"Dumbbells at your sides, a soft bend at the elbow that does not change. Lift out to the sides to about shoulder height, leading with the elbows, and lower slowly. It is a small movement with a light weight: if you need to heave it up, it is too heavy and your traps are doing it.",
   changed:"New. It happens in the frontal plane, so the FRONT view is the exercise and the side view is a projection of it: abduction is entirely left-to-right, so from the side the arm keeps pointing straight down and simply shortens as it rises, reaching almost nothing at shoulder height. armScaleN carries that. Drawn without it the solver had only one way to reach a hand closer than arm\'s length, which was to fold the elbow, and the result was a bent arm holding a bell at chest height: a curl.",
   equip:"dumbbell", axis:"sagittal", active:"arms",
   frames:[
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,111],handF:[51,110],
-     armScaleN:1,   armScaleF:1,   elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,101],handF:[51,100],
-     armScaleN:0.74,armScaleF:0.74,elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,82], handF:[51,82],
-     armScaleN:0.24,armScaleF:0.24,elbowSign:1},
-    {hip:[55,107],torso:2,ankN:[62,163],ankF:[53,163], handN:[57,101],handF:[51,100],
-     armScaleN:0.74,armScaleF:0.74,elbowSign:1}
+    {hip:[56,105.5],torso:2,ankN:[57,163],ankF:[53,163], handN:[57.7,110.7],handF:[52.7,110.7], armScaleN:1,armScaleF:1, elbowSign:1},
+    {hip:[56,105.5],torso:2,ankN:[57,163],ankF:[53,163], handN:[61.2,98.1],handF:[56.2,98.1], armScaleN:0.68,armScaleF:0.68, elbowSign:1},
+    {hip:[56,105.5],torso:2,ankN:[57,163],ankF:[53,163], handN:[62.7,71.5],handF:[57.7,71.5], armScaleN:0.14,armScaleF:0.14, elbowSign:1},
+    {hip:[56,105.5],torso:2,ankN:[57,163],ankF:[53,163], handN:[61.2,98.1],handF:[56.2,98.1], armScaleN:0.68,armScaleF:0.68, elbowSign:1}
   ]},
 
-{ id:"pulldown_straight", tempo:[420,420,520,520], name:"Standing lat pulldown",
+{ id:"pulldown_straight", tempo:[240,240,240,240,360,360,360,360], stops:[0,4], name:"Standing lat pulldown",
   real:"Standing at a high pulley, bar at arms length in front of you, a small hinge at the hips and a long spine. Keep the arms STRAIGHT and pull the bar down in an arc to your thighs using the lats, then let it come back up without letting the elbows bend. Bending the elbows turns it into a triceps pushdown.",
   changed:"New. The arms stay straight and the hands travel in an arc from overhead to the thighs, which is what separates it from a seated pulldown and from a pushdown. The reach from shoulder to hand barely changes through the whole movement.",
   equip:"cable", active:"arms", anchorAt:[106,30], anchorFront:[56,26,84,26],
   props:[[112,24,8,146],[92,24,28,7]],
   frames:[
-    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[92,52], handF:[86,54], elbowSign:1},
-    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[94,80], handF:[88,82], elbowSign:1},
-    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[80,108],handF:[74,110],elbowSign:1},
-    {hip:[55,107],torso:12,ankN:[62,163],ankF:[53,163], handN:[94,80], handF:[88,82], elbowSign:1}
+    // A hinge with the arms in line with the trunk at the top, swung round the
+    // shoulder at one fixed soft bend to the thighs (joint angles, so it never
+    // bends into a pushdown on the way). Three keyframes on the arc each way,
+    // the middle one with the arms pointing at the camera, so the front view,
+    // which can only draw straight lines between keyframes, keeps the hands at
+    // the height the side view has them.
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[34,6],      elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[69.5,41.5], elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[105,77],    elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[140.5,112.5],elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[176,148],   elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[140.5,112.5],elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[105,77],    elbowSign:1},
+    {hip:[52,108],torso:30,ankN:[62,163],ankF:[53,163], armN:[69.5,41.5], elbowSign:1}
   ]},
 
 { id:"curl_reverse", tempo:[400,400,700,700], name:"Reverse barbell curl",
@@ -1752,6 +1771,27 @@ var EXERCISES = [
 // suitcase, pistol and running fronts were drawn the other way round and are
 // mirrored (x to 140-x, L and R swapped); the single-arm row's working hand
 // moved to L, its feet were already right.
+/* A cable fly's hands sweep round the shoulders on one arc, out of the
+   picture in both panels, the arm 39 long (a soft fixed elbow) and deg
+   degrees below level. th are the keyframes' angles out of the shoulders'
+   line toward the front (the stretch, half way, the finish); each panel's
+   keyframes are the arc projected there, so the two panels always agree on
+   where the hands are. They used to put the hands at the navel from the side
+   and at the shoulders from the front, the elbows folded into a hug. (Four
+   keyframes each way would follow the arc closer, but each panel then turns
+   round inside the stroke, the side as the arm points straight ahead, and
+   would rest there.) front: the front view's keyframes, else the side's. */
+function flySweep(front,th,deg){
+  var r=39, e=deg*Math.PI/180, h=r*Math.cos(e), dy=r*Math.sin(e), t=8*Math.PI/180;
+  var shx=55+34*Math.sin(t), y=Math.round((107-34*Math.cos(t)+dy)*10)/10, o=[];
+  function r1(v){ return Math.round(v*10)/10; }
+  function sc(v){ return Math.max(0.06,Math.round(Math.sqrt(v*v+dy*dy)/r*100)/100); }
+  th.forEach(function(d){ var a=d*Math.PI/180, fw=h*Math.sin(a), lat=h*Math.cos(a);
+    o.push(front?{hipY:107,torsoScale:0.99,footL:[58,163],footR:[82,163],handL:[r1(54-lat),y],handR:[r1(86+lat),y],armScaleL:sc(lat),armScaleR:sc(lat)}
+      :{hip:[55,107],torso:8,ankN:[64,163],ankF:[46,163],handN:[r1(shx+fw),y],handF:[r1(shx+fw-5),y],armScaleN:sc(fw),armScaleF:sc(fw),elbowSign:1}); });
+  return o.concat([o[1]]);
+}
+
 var FRONTS = {
   // Box jump from the front: arms swing up through the take-off, both feet
   // land together on the box, and it steps down one foot at a time (the near
@@ -1903,11 +1943,7 @@ var FRONTS = {
   // No authored elbows: they swing a long way here, and an elbow given as a
   // point is interpolated straight between keyframes, which stretches the upper
   // arm past its length halfway through the sweep. Solved from the hand instead.
-  fly_cable_rev:[
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[76,92], handR:[64,92]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[56,90], handR:[84,90]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[34,88], handR:[106,88]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[56,90], handR:[84,90]}],
+  fly_cable_rev:flySweep(true,[118,45,-10],7),
 
   /* Face pull from the FRONT, authored because the derived view was wrong.
      The arms point along the cable at the start, so a projection of the side
@@ -1932,26 +1968,26 @@ var FRONTS = {
      them, which is a picture of a triceps pushdown and flatly contradicts the
      one cue this exercise has. The arms are long throughout; halfway down they
      point at the camera, so they project SHORT rather than bent, which is what
-     armScale is for. */
-  pulldown_straight:[
-    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.9,armScaleR:0.9,
-     handL:[58,40],handR:[82,40]},
-    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.3,armScaleR:0.3,
-     handL:[55,84],handR:[85,84]},
-    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:1,armScaleR:1,
-     handL:[52,110],handR:[88,110]},
-    {hipY:107,footL:[60,163],footR:[80,163],armScaleL:0.3,armScaleR:0.3,
-     handL:[55,84],handR:[85,84]}],
+     armScale is for. Hands and elbows sit at the heights the side view puts
+     them at each keyframe. */
+  pulldown_straight:(function(){
+    // The elbow on the line from shoulder (y 78.4) to hand: a long arm.
+    function k(h,a){ var e=Math.round((78.4+(h-78.4)*21/40)*10)/10;
+      return {hipY:108,torsoScale:0.87,footL:[60,163],footR:[80,163],handL:[55,h],handR:[85,h],elbL:[54.5,e],elbR:[85.5,e],armScaleL:a,armScaleR:a}; }
+    var top=k(42.2,0.91), q1=k(57,0.54), mid=k(79.7,0.1), q3=k(102,0.59), low=k(115.6,0.93);
+    return [top,q1,mid,q3,low,q3,mid,q1]; })(),
 
   /* Side lateral raise from the FRONT. This is the whole exercise: it happens
      in the frontal plane, so the side view sees it end-on and shows nothing.
-     No authored elbows, because they swing far enough that interpolating them
-     as points stretches the upper arm past its length halfway up. */
+     The arms stay long with the elbows level with or above the wrists at the
+     top, rising from the thighs to shoulder height. The arm keeps its length
+     between keyframes (keepBend), so the authored elbows no longer stretch it
+     half way up. */
   raise_lateral:[
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[50,108],handR:[90,108]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[32,96], handR:[108,96]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[24,78], handR:[116,78]},
-    {hipY:107,footL:[60,163],footR:[80,163],handL:[32,96], handR:[108,96]}],
+    {hipY:105.5,torsoScale:1,footL:[60,163],footR:[80,163],handL:[50.6,110.7],handR:[89.4,110.7],elbL:[52.2,92.1],elbR:[87.8,92.1],armScaleL:1,armScaleR:1},
+    {hipY:105.5,torsoScale:1,footL:[60,163],footR:[80,163],handL:[25.3,98.1],handR:[114.7,98.1],elbL:[38.9,85.5],elbR:[101.1,85.5],armScaleL:0.99,armScaleR:0.99},
+    {hipY:105.5,torsoScale:1,footL:[60,163],footR:[80,163],handL:[15.1,71.5],handR:[124.9,71.5],elbL:[33.6,70.5],elbR:[106.4,70.5],armScaleL:0.99,armScaleR:0.99},
+    {hipY:105.5,torsoScale:1,footL:[60,163],footR:[80,163],handL:[25.3,98.1],handR:[114.7,98.1],elbL:[38.9,85.5],elbR:[101.1,85.5],armScaleL:0.99,armScaleR:0.99}],
 
   // Pallof press from the front. Hands together at the sternum pressing
   // straight out, and the shoulders staying square to the camera IS the
@@ -2068,42 +2104,46 @@ var FRONTS = {
     var up=x(a,{kneeL:[50,140],footL:[44,166],kneeR:[90,140],footR:[96,166]});
     return [up,x(a,{kneeL:[56,164],footL:[84,165],kneeR:[106,162],footR:[106,160]}),up,x(a,{kneeL:[34,162],footL:[34,160],kneeR:[84,164],footR:[56,165]})]; })(),
 
-  // Heavy-bag speed combo from the front. Fast alternating shots, the near
-  // hand (R) first, with the guard snapping back between each one. A
+  // Heavy-bag speed combo from the front, keyframe for keyframe with the
+  // side: jab, jab, cross, the near hand (R) jabbing and the far one (L)
+  // crossing, with the guard snapping back between each one. A
   // straight shot goes at the camera: toward the centreline and growing,
   // never out to the side like a hook, which is how both used to go.
-  bagspeed:[
-    {hipY:112,footL:[46,163],footR:[76,167],handL:[60,70],handR:[78,65],elbL:[56,88],elbR:[82,76],fistR:1.9},
-    {hipY:112,footL:[46,163],footR:[76,167],handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]},
-    {hipY:112,footL:[46,163],footR:[76,167],lean:5,handL:[66,64],handR:[82,70],elbL:[64,76],elbR:[86,88],fistL:2.15},
-    {hipY:112,footL:[46,163],footR:[76,167],handL:[60,70],handR:[80,70],elbL:[56,88],elbR:[84,88]}],
+  bagspeed:(function(){
+    var g={hipY:112,footL:[46,163],footR:[76,167],handL:[60,71],handR:[80,70],elbL:[59,88],elbR:[81,87]};
+    function x(o){ var r={}, k; for(k in g) r[k]=g[k]; for(k in o) r[k]=o[k]; return r; }
+    var jab=x({handR:[74,79],elbR:[79,86],fistR:2}), cross=x({handL:[67,80],elbL:[61,86],fistL:2.2,lean:4});
+    return [g,jab,g,jab,g,cross,g]; })(),
 
   // Rowing machine from the front. The handle staying level and the knees
   // tracking straight rather than splaying out at the catch is what this view
   // is for; from the side the near leg hides the far one entirely.
   rowerg:[
-    {hipY:138,footL:[60,146],footR:[80,146],handL:[64,122],handR:[76,122]},
-    {hipY:138,footL:[60,146],footR:[80,146],handL:[64,126],handR:[76,126]},
-    {hipY:138,footL:[60,146],footR:[80,146],handL:[62,128],handR:[78,128]},
-    {hipY:138,footL:[60,146],footR:[80,146],handL:[64,126],handR:[76,126]}],
+    {hipY:138,torsoScale:0.91,footL:[61,144],footR:[79,144],kneeL:[61,115.1],kneeR:[79,115.1],handL:[57,121],handR:[83,121],armScaleL:0.36,armScaleR:0.36},
+    {hipY:138,torsoScale:0.91,footL:[61,144],footR:[79,144],kneeL:[61,134.1],kneeR:[79,134.1],handL:[57,121],handR:[83,121],armScaleL:0.36,armScaleR:0.36},
+    {hipY:138,torsoScale:0.94,footL:[61,144],footR:[79,144],kneeL:[61,138.7],kneeR:[79,138.7],handL:[57,121],handR:[83,121],elbL:[51,126.8],elbR:[89,126.8],armScaleL:1,armScaleR:1},
+    {hipY:138,torsoScale:0.94,footL:[61,144],footR:[79,144],kneeL:[61,138.7],kneeR:[79,138.7],handL:[57,121],handR:[83,121],armScaleL:0.39,armScaleR:0.39},
+    {hipY:138,torsoScale:0.91,footL:[61,144],footR:[79,144],kneeL:[61,138.7],kneeR:[79,138.7],handL:[57,121],handR:[83,121],armScaleL:0.36,armScaleR:0.36}],
+
+  // Battle ropes from the front: the hands alternate, one up as the other is
+  // down, every keyframe. Derived from the near hand alone, both moved together.
+  battleropes:[0,1,2,3,4,5].map(function(i){ var up=[[58,92],[55,102.7]], dn=[[58,116.5],[55,104.6]], a=i%2?up:dn, b=i%2?dn:up;
+    return {hipY:115,torsoScale:0.91,footL:[57,163],footR:[83,163],kneeL:[56,134.7],kneeR:[84,134.7],
+      handL:a[0],elbL:a[1],handR:[140-b[0][0],b[0][1]],elbR:[140-b[1][0],b[1][1]]}; }),
 
   // Cable fly from the front. This is the view the movement lives in: the
   // hands sweep from wide out to together in front of the chest. An arm
   // reaching toward the camera at the finish projects short, so the hands
   // converge near the midline rather than crossing it.
-  fly_cable:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[26,78],handR:[114,78]},
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,82],handR:[96,82]},
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[62,86],handR:[78,86]},
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[44,82],handR:[96,82]}],
+  fly_cable:flySweep(true,[-10,48.5,107],22),
 
   // High cable fly from the front. Hands start high and wide and finish low
   // and together: the downward arc is the whole difference from the mid fly.
   fly_cable_high:[
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[28,50],handR:[112,50]},
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[46,76],handR:[94,76]},
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[62,104],handR:[78,104]},
-    {hipY:107,footL:[58,163],footR:[82,163],handL:[46,76],handR:[94,76]}],
+    {hipY:107,torsoScale:0.98,footL:[58,163],footR:[82,163],handL:[20.9,52.8],handR:[119.1,52.8],armScaleL:1,armScaleR:1},
+    {hipY:107,torsoScale:0.98,footL:[58,163],footR:[82,163],handL:[30.6,76.2],handR:[109.4,76.2],armScaleL:0.6,armScaleR:0.6},
+    {hipY:107,torsoScale:0.98,footL:[58,163],footR:[82,163],handL:[61.2,98.6],handR:[78.8,98.6],armScaleL:0.67,armScaleR:0.67},
+    {hipY:107,torsoScale:0.98,footL:[58,163],footR:[82,163],handL:[30.6,76.2],handR:[109.4,76.2],armScaleL:0.6,armScaleR:0.6}],
 
   // Pistol squat from the front. The free leg points AT the camera, so it
   // projects short and sits high on screen; the standing leg does all the
@@ -2362,7 +2402,7 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
 // the point of most of them: a hammer curl and a supinated curl are the same
 // geometry and differ only in what the implement does, which is why the
 // equipment axis matters as much as the joints.
-[{id:'skierg',stance:8,grip:13},
+[{id:'skierg',stance:9,grip:15,elbowOut:0},
  {id:'curl_reverse',stance:8,grip:18},
  {id:'press_push',stance:8,grip:17},{id:'sq_air',stance:11,grip:20},
  {id:'chinup', stance:8, grip:16},{id:'invertedrow',stance:8,grip:18},
@@ -2370,7 +2410,7 @@ Object.keys(FRONTS).forEach(function(k){ FRONTS[k]=clampFront(FRONTS[k]); });
  {id:'sq_jump', stance:11,grip:16},
  {id:'broadjump',stance:10,grip:16},{id:'medballslam',stance:11,grip:7},
  {id:'skipping',stance:7, grip:20},{id:'shoulderdisloc',stance:8,grip:30},
- {id:'ankle_mob',stance:7,grip:16},{id:'battleropes',stance:11,grip:16},
+ {id:'ankle_mob',stance:7,grip:16},
  {id:'farmerscarry',stance:8,grip:20},{id:'burpee',stance:10,grip:16},
  {id:'shrug',   stance:8, grip:20},
  {id:'deadhang',stance:8, grip:19},{id:'dip',stance:6,grip:17,kneeOut:0.3,elbowOut:0.6},

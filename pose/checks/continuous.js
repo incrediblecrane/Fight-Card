@@ -347,8 +347,7 @@ EX.forEach(function(ex){ var ax=app.RIGFRAMES[ex.id], w=0;
 // The rigs listed below already break the range and are being re-authored, so
 // for now they print as warnings. Any other rig breaking it fails, and a
 // listed rig that has come back inside it says so, so the list only shrinks.
-var BENDS={backsquat:'elbF elbN',press_push:'elbF',
-  bagspeed:'elbF elbN',skierg:'elbN'};
+var BENDS={backsquat:'elbF elbN',press_push:'elbF'};
 // Floor and prone rigs are done: a face-down plank whose knees bent the wrong
 // way is what this check was written for, so none of them may be listed.
 Object.keys(BENDS).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
@@ -442,7 +441,7 @@ EX.forEach(function(ex){
 // 'out' from take-off to the apex or 'in' from the apex to the landing) moves
 // at the speed of a body thrown and falling, and lands at speed on purpose, so
 // there the limit is 10.
-var WHIPS={bagspeed:'side',burpee:'side'};
+var WHIPS={burpee:'side'};
 var whipWarn=[], whipDone=[];
 EX.forEach(function(ex){
   var ax=app.RIGFRAMES[ex.id], known=(WHIPS[ex.id]||'').split(' ').filter(Boolean), N=1152, W=N/144;
@@ -493,10 +492,17 @@ EX.forEach(function(ex){
 // deadlift also rests once more, with the bar set down on the floor between
 // reps (its fifth keyframe is its first), rather than bouncing it.
 var FLOW={backsquat:'[0,2]',frontsquat:'[0,2]',goblet:'[0,2]',deadlift:'[0,2,4]',rdl:'[0,2]',
-  pullup:'[0,2]',ohp:'[0,2]',kbswing:'[0,2]',sq_air:'[0,2]',bench:'[0,2]',dip:'[0,2]'};
+  pullup:'[0,2]',ohp:'[0,2]',kbswing:'[0,2]',sq_air:'[0,2]',bench:'[0,2]',dip:'[0,2]',
+  // The arm sweeps and the ergs too, so the check above holds their speed
+  // through the keyframe half way through each stroke, in both panels: the
+  // rower rested at every keyframe from the side, and the high fly half way.
+  // ('side|front' where they differ: the rower's front view moves only its
+  // knees and elbows, which rest at every keyframe.)
+  fly_cable:'[0,2]',fly_cable_high:'[0,2]',fly_cable_rev:'[0,2]',raise_front:'[0,2]',raise_lateral:'[0,2]',
+  pulldown_straight:'[0,4]',rowerg:'[0,2]|[0,1,2,3,4]',skierg:'[0,2]'};
 Object.keys(FLOW).forEach(function(id){ var ex=EX.filter(function(e){ return e.id===id; })[0];
-  ['side','front'].forEach(function(v){ var st=rig.stopsOf(ex,v==='front');
-    ck(id+' '+v,'rests at the top and bottom only, passing through half way',JSON.stringify(st)===FLOW[id],JSON.stringify(st)+' not '+FLOW[id]); }); });
+  ['side','front'].forEach(function(v){ if(v==='front'&&!ex.front) return; var st=rig.stopsOf(ex,v==='front'), want=FLOW[id].split('|')[v==='front'?1:0]||FLOW[id];
+    ck(id+' '+v,'rests at the top and bottom only, passing through half way',JSON.stringify(st)===want,JSON.stringify(st)+' not '+want); }); });
 // Every rig's stops, as reviewed. A change in which keyframes the figure rests
 // at changes how every rep of it looks, so it is a deliberate edit: look at the
 // rigs named, then rewrite the table with --write-stops.
@@ -533,7 +539,7 @@ EX.forEach(function(ex){ ck(ex.id,'rests at the reviewed keyframes (pose/checks/
 // half-raised keyframe, so a curl to 91 on the way there passed.
 var FOLDING={kb_snatch:'front',kb_press:'front',
   sq_jump:'front',boxjump:'front',broadjump:'front',medballslam:'front',
-  skierg:'side front',burpee:'side front',deadbug:'front'};
+  skierg:'side',burpee:'side front',deadbug:'front'};
 var foldWarn=[], foldDone=[];
 function inner(a,b,c){ return ang({x:a.x-b.x,y:a.y-b.y},{x:c.x-b.x,y:c.y-b.y}); }
 EX.concat(EDGE,EDGEFRONT).filter(function(e){ return !/^edge/.test(e.id)||e.handPolar; }).forEach(function(ex){
